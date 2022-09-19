@@ -1,0 +1,8 @@
+[package]
+name = "afseq"
+version = "0.1.0"
+edition = "2018"
+description = "afplay sequencer"
+authors = ["Eduard Müller <mail@emuell.net>"]
+exclude = ["assets", "examples"]
+categories = ["audio", "player", "sequencer"]
