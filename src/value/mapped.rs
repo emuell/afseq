@@ -1,46 +1,38 @@
-use std::fmt::Display;
-
 use crate::{EmitterEvent, EmitterValue};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits a emitter value which can be mutated with a custom function
+/// Emits events which can be mutated/mapped in each iter step with a custom map function.
 #[derive(Clone)]
 pub struct MappedEmitterValue {
-    events: Vec<EmitterEvent>,
-    map_fn: fn(events: &Vec<EmitterEvent>) -> Vec<EmitterEvent>,
+    event: EmitterEvent,
+    initial_event: EmitterEvent,
+    map: fn(event: &EmitterEvent) -> EmitterEvent,
 }
 
 impl MappedEmitterValue {
-    pub fn new(
-        events: Vec<EmitterEvent>,
-        map_fn: fn(event: &Vec<EmitterEvent>) -> Vec<EmitterEvent>,
-    ) -> Self {
-        Self { events, map_fn }
+    pub fn new(event: EmitterEvent, map: fn(event: &EmitterEvent) -> EmitterEvent) -> Self {
+        let initial_event = event.clone();
+        Self {
+            event,
+            initial_event,
+            map,
+        }
     }
 }
 
 impl Iterator for MappedEmitterValue {
-    type Item = Vec<EmitterEvent>;
+    type Item = EmitterEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let copy = self.events.clone();
-        self.events = (self.map_fn)(&self.events);
-        Some(copy)
+        let current = self.event.clone();
+        self.event = (self.map)(&self.event);
+        Some(current)
     }
 }
 
-impl EmitterValue for MappedEmitterValue {}
-
-impl Display for MappedEmitterValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "{}",
-            self.events
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ))
+impl EmitterValue for MappedEmitterValue {
+    fn reset(&mut self) {
+        self.event = self.initial_event.clone();
     }
 }

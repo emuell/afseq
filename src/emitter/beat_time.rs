@@ -31,7 +31,7 @@ impl BeatTimeEmitter {
 }
 
 impl Iterator for BeatTimeEmitter {
-    type Item = (SampleTime, Option<Vec<EmitterEvent>>);
+    type Item = (SampleTime, Option<EmitterEvent>);
 
     fn next(&mut self) -> Option<Self::Item> {
         // fetch current value
@@ -71,5 +71,11 @@ impl Emitter for BeatTimeEmitter {
     }
     fn current_sample_time(&self) -> SampleTime {
         self.sample_time as SampleTime
+    }
+
+    fn reset(&mut self) {
+        self.value.reset();
+        self.counter = 0;
+        self.sample_time = 0.0;
     }
 }

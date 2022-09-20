@@ -1,39 +1,29 @@
 use crate::{EmitterEvent, EmitterValue};
-use std::fmt::Display;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits a vector of const note values
+/// Emits a fixed set of immutable events.
 #[derive(Clone)]
 pub struct FixedEmitterValue {
-    events: Vec<EmitterEvent>,
+    event: EmitterEvent,
 }
 
 impl FixedEmitterValue {
-    pub fn new(events: Vec<EmitterEvent>) -> Self {
-        Self { events }
+    pub fn new(events: EmitterEvent) -> Self {
+        Self { event: events }
     }
 }
 
 impl Iterator for FixedEmitterValue {
-    type Item = Vec<EmitterEvent>;
+    type Item = EmitterEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.events.clone())
+        Some(self.event.clone())
     }
 }
 
-impl EmitterValue for FixedEmitterValue {}
-
-impl Display for FixedEmitterValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "{}",
-            self.events
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ))
+impl EmitterValue for FixedEmitterValue {
+    fn reset(&mut self) {
+        // fixed values fon't change: nothing to do
     }
 }

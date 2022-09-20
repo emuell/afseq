@@ -13,7 +13,7 @@ pub struct BeatTimeBase {
 
 impl BeatTimeBase {
     /// Convert beat to sample time and vice versa
-    fn samples_per_beat(&self) -> f64 {
+    pub fn samples_per_beat(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64
     }
 }
