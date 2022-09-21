@@ -3,26 +3,40 @@ use crate::{Emitter, EmitterEvent, EmitterValue, SampleTime};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits Some<EmitterValue> every nth BeatTimeStep::Beats or BeatTimeStep::Bar.
+/// Emits `Some(EmitterValue)` every nth BeatTimeStep::Beats or BeatTimeStep::Bar.
 pub struct BeatTimeEmitter {
     time_base: BeatTimeBase,
-    beat_time: BeatTimeStep,
+    step: BeatTimeStep,
+    offset: BeatTimeStep,
     counter: u32,
     sample_time: f64,
     value: Box<dyn EmitterValue>,
 }
 
 impl BeatTimeEmitter {
+    /// Create a new beat time emitter which emits the given `value` every beat_time `step`.  
     pub fn new<Value: EmitterValue + 'static>(
         time_base: BeatTimeBase,
-        beat_time: BeatTimeStep,
+        step: BeatTimeStep,
         value: Value,
     ) -> Self {
-        let sample_time = 0.0;
+        Self::new_with_offset(time_base, step, BeatTimeStep::Beats(0), value)
+    }
+
+    /// Create a new beat time emitter which emits the given `value` every beat_time `step`
+    /// starting at the given beat_time `offset`.  
+    pub fn new_with_offset<Value: EmitterValue + 'static>(
+        time_base: BeatTimeBase,
+        step: BeatTimeStep,
+        offset: BeatTimeStep,
+        value: Value,
+    ) -> Self {
+        let sample_time = offset.to_samples(&time_base);
         let counter = 0;
         Self {
             time_base,
-            beat_time,
+            step,
+            offset,
             counter,
             sample_time,
             value: Box::new(value),
@@ -37,7 +51,7 @@ impl Iterator for BeatTimeEmitter {
         // fetch current value
         let sample_time = self.sample_time as SampleTime;
         // move sample_time and counter
-        let step = match self.beat_time {
+        let step = match self.step {
             BeatTimeStep::Beats(step) => step,
             BeatTimeStep::Bar(step) => step,
         };
@@ -47,7 +61,7 @@ impl Iterator for BeatTimeEmitter {
             Some((sample_time, None))
         };
         // move sample_time
-        match self.beat_time {
+        match self.step {
             BeatTimeStep::Beats(_) => {
                 self.sample_time += self.time_base.samples_per_beat() as f64;
             }
@@ -75,7 +89,7 @@ impl Emitter for BeatTimeEmitter {
 
     fn reset(&mut self) {
         self.value.reset();
+        self.sample_time = self.offset.to_samples(&self.time_base);
         self.counter = 0;
-        self.sample_time = 0.0;
     }
 }
