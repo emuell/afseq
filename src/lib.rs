@@ -65,6 +65,10 @@ pub struct EmitterSequence {
 }
 
 impl EmitterSequence {
+    pub fn new(emitters: Vec<Rc<dyn Emitter>>) -> Self {
+        Self { emitters }
+    }
+
     /// Run all emitters in the sequence until a given sample time is reached and call given
     /// visitor function for all emitted events.
     pub fn run_until_time<F>(&mut self, run_sample_time: SampleTime, mut visitor: F)

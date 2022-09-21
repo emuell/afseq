@@ -7,15 +7,15 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug example 'svg-waveform'",
+      "name": "Debug example 'drum-sequence'",
       "cargo": {
         "args": [
           "build",
-          "--example=svg-waveform",
+          "--example=drum-sequence",
           "--package=afseq"
         ],
         "filter": {
-          "name": "svg-waveform",
+          "name": "drum-sequence",
           "kind": "example"
         }
       },
