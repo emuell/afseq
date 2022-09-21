@@ -6,10 +6,12 @@ pub mod value;
 mod event;
 pub use event::*;
 
+pub use value::from_iter::EmitterValueFromIter;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Sample time value type emitted by the [`Emitter`] trait.
-type SampleTime = usize;
+pub type SampleTime = usize;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -22,6 +24,14 @@ type SampleTime = usize;
 pub trait EmitterValue: Iterator<Item = EmitterEvent> {
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
+}
+
+/// Convert an arbitary iterator of EmitterEvents to an implemenation of EmitterValue.
+pub fn emitter_value_from_iter<Iter>(iter: Iter) -> EmitterValueFromIter<Iter>
+where
+    Iter: Iterator<Item = EmitterEvent> + Clone,
+{
+    EmitterValueFromIter::new(iter)
 }
 
 // -------------------------------------------------------------------------------------------------
