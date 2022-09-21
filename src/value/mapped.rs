@@ -4,14 +4,20 @@ use crate::{EmitterEvent, EmitterValue};
 
 /// Emits events which can be mutated/mapped in each iter step with a custom map function.
 #[derive(Clone)]
-pub struct MappedEmitterValue {
+pub struct MappedEmitterValue<F>
+where
+    F: FnMut(&EmitterEvent) -> EmitterEvent,
+{
     event: EmitterEvent,
     initial_event: EmitterEvent,
-    map: fn(event: &EmitterEvent) -> EmitterEvent,
+    map: F,
 }
 
-impl MappedEmitterValue {
-    pub fn new(event: EmitterEvent, map: fn(event: &EmitterEvent) -> EmitterEvent) -> Self {
+impl<F> MappedEmitterValue<F>
+where
+    F: FnMut(&EmitterEvent) -> EmitterEvent,
+{
+    pub fn new(event: EmitterEvent, map: F) -> Self {
         let initial_event = event.clone();
         Self {
             event,
@@ -21,7 +27,10 @@ impl MappedEmitterValue {
     }
 }
 
-impl Iterator for MappedEmitterValue {
+impl<F> Iterator for MappedEmitterValue<F>
+where
+    F: FnMut(&EmitterEvent) -> EmitterEvent,
+{
     type Item = EmitterEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -31,7 +40,10 @@ impl Iterator for MappedEmitterValue {
     }
 }
 
-impl EmitterValue for MappedEmitterValue {
+impl<F> EmitterValue for MappedEmitterValue<F>
+where
+    F: FnMut(&EmitterEvent) -> EmitterEvent,
+{
     fn reset(&mut self) {
         self.event = self.initial_event.clone();
     }
