@@ -1,9 +1,12 @@
-use std::rc::Rc;
+use std::cell::RefCell;
 
 use afseq::{
-    emitter::BeatTimeBase, emitter_value_from_iter, value::fixed::FixedEmitterValue,
-    value::mapped::MappedEmitterValue, EmitterEvent, EmitterSequence, InstrumentId, NoteEvent,
-    SampleTime,
+    events::{
+        fixed::ToMappedNotesEmitterValue, new_note, InstrumentId, ToFixedPatternEventValue,
+        ToPatternEventValueSequence,
+    },
+    time::BeatTimeBase,
+    Phrase, SampleTime,
 };
 
 fn main() {
@@ -16,78 +19,41 @@ fn main() {
     const KICK: InstrumentId = 0;
     const SNARE: InstrumentId = 1;
     const HIHAT: InstrumentId = 2;
+    const BASS: InstrumentId = 3;
 
-    let new_note = |instrument, note, velocity| {
-        FixedEmitterValue::new(EmitterEvent::new_note(NoteEvent {
-            instrument,
-            note,
-            velocity,
-        }))
-    };
-
-    let new_mapped_note = |instrument: Option<usize>,
-                           note: u32,
-                           velocity: f32,
-                           map: fn(&mut Vec<NoteEvent>) -> ()| {
-        MappedEmitterValue::new(
-            EmitterEvent::new_note(NoteEvent {
-                instrument,
-                note,
-                velocity,
-            }),
-            move |event| {
-                let mut event = event.clone();
-                match &mut event {
-                    EmitterEvent::NoteEvents(notes) => map(notes),
-                    EmitterEvent::ParameterChangeEvent(_) => {}
-                }
-                event
-            },
-        )
-    };
-
-    let kick_pattern = time_base.every_nth_beat(4, new_note(Some(KICK), 60, 1.0));
-    let snare_pattern = time_base.every_nth_beat_with_offset(8, 4, new_note(Some(SNARE), 60, 1.0));
+    let kick_pattern = time_base.every_nth_beat(4, new_note(Some(KICK), 60, 1.0).to_event());
+    let snare_pattern =
+        time_base.every_nth_beat_with_offset(8, 4, new_note(Some(SNARE), 60, 1.0).to_event());
     let hihat_pattern = time_base.every_nth_beat_with_offset(
         2,
         1,
-        new_mapped_note(Some(HIHAT), 60, 1.0, |notes| {
-            for note in notes {
-                if note.velocity > 0.1 {
-                    note.velocity -= 0.1;
-                }
+        new_note(Some(HIHAT), 60, 1.0).to_event().map_notes(|note| {
+            let mut note = note;
+            if note.velocity > 0.1 {
+                note.velocity -= 0.1;
             }
+            note
         }),
     );
 
-    let hihat_pattern2 = time_base.every_nth_beat(
-        2,
-        emitter_value_from_iter(
-            new_note(Some(HIHAT), 60, 1.0)
-                .map(|event| {
-                    let mut mut_event = event;
-                    match &mut mut_event {
-                        EmitterEvent::NoteEvents(notes) => {
-                            for note in notes {
-                                note.velocity = 0.1;
-                            }
-                        }
-                        EmitterEvent::ParameterChangeEvent(_) => {}
-                    }
-                    mut_event
-                })
-                .take(2),
-        ),
-    );
+    let bass_note_sequence = vec![
+        new_note(Some(BASS), 60, 1.0),
+        new_note(Some(BASS), 64, 0.5),
+        new_note(Some(BASS), 48, 0.70),
+    ]
+    .to_event_sequence();
 
-    let mut drum_sequence = EmitterSequence::new(vec![
-        Rc::new(kick_pattern),
-        Rc::new(snare_pattern),
-        Rc::new(hihat_pattern),
-        Rc::new(hihat_pattern2),
+    let bass_notes_pattern =
+        time_base.every_nth_beat_with_pattern(1, vec![true, false, true, true], bass_note_sequence);
+
+    let mut phrase = Phrase::new(vec![
+        Box::new(RefCell::new(kick_pattern)),
+        Box::new(RefCell::new(snare_pattern)),
+        Box::new(RefCell::new(hihat_pattern)),
+        Box::new(RefCell::new(bass_notes_pattern)),
     ]);
 
-    drum_sequence.run_until_time(
+    phrase.run_until_time(
         (time_base.samples_per_bar() * 4.0) as SampleTime,
         |sample_time, event| {
             println!(
