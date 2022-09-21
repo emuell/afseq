@@ -9,8 +9,8 @@ pub struct FixedEmitterValue {
 }
 
 impl FixedEmitterValue {
-    pub fn new(events: EmitterEvent) -> Self {
-        Self { event: events }
+    pub fn new(event: EmitterEvent) -> Self {
+        Self { event }
     }
 }
 

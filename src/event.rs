@@ -3,9 +3,9 @@ use std::fmt::Debug;
 // -------------------------------------------------------------------------------------------------
 
 /// Id to refer to a specific instrument in a NoteEvent.
-type InstrumentId = usize;
+pub type InstrumentId = usize;
 /// Id to refer to a specific parameter in a ParameterChangeEvent.
-type ParameterId = usize;
+pub type ParameterId = usize;
 
 // -------------------------------------------------------------------------------------------------
 
