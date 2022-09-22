@@ -8,7 +8,7 @@ exclude = ["assets", "examples"]
 categories = ["audio", "player", "sequencer"]
 
 [dev-dependencies]
-afplay = { path = "../afplay", default-features = false, features=["cubeb-output"] }
+afplay = { path = "../afplay", default-features = false, features=["cpal-output"] }
 
-[[examples]]
-name = "play-sequence"
+[[example]]
+name = "play"
