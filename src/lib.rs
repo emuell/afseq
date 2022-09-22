@@ -75,7 +75,7 @@ mod test {
         let beat_time_pattern_emitter = BeatTimeSequencePattern::new(
             time_base.clone(),
             BeatTimeStep::Beats(2),
-            vec![true, false, false, true],
+            [1, 0, 0, 1],
             note_vector,
         );
 
