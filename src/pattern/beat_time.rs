@@ -54,28 +54,17 @@ impl Iterator for BeatTimePattern {
         // fetch current value
         let sample_time = self.current_sample_time as SampleTime;
         // move sample_time and counter
-        let step = match self.step {
-            BeatTimeStep::Beats(step) => step,
-            BeatTimeStep::Bar(step) => step,
-        };
+        let steps = self.step.steps();
         let value: Option<Self::Item> = if self.current_counter == 0 {
             Some((sample_time, self.event_iter.next()))
         } else {
             Some((sample_time, None))
         };
         // move sample_time
-        match self.step {
-            BeatTimeStep::Beats(_) => {
-                self.current_sample_time += self.time_base.samples_per_beat() as f64;
-            }
-            BeatTimeStep::Bar(_) => {
-                self.current_sample_time +=
-                    self.time_base.samples_per_beat() as f64 * self.time_base.beats_per_bar as f64;
-            }
-        };
+        self.current_sample_time += self.step.samples_per_step(&self.time_base);
         // move counter
         self.current_counter += 1;
-        if self.current_counter == step {
+        if self.current_counter == steps {
             self.current_counter = 0;
         }
         value

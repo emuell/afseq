@@ -12,7 +12,7 @@ pub struct BeatTimeSequencePattern {
     step: BeatTimeStep,
     offset: BeatTimeStep,
     pattern: Vec<bool>,
-    pos_in_pattern: u32,
+    pos_in_pattern: usize,
     current_sample_time: f64,
     event_iter: Box<dyn PatternEventIter>,
 }
@@ -56,30 +56,24 @@ impl Iterator for BeatTimeSequencePattern {
     type Item = (SampleTime, Option<PatternEvent>);
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.pattern.is_empty() {
+            return None;
+        }
         // fetch current value
         let sample_time = self.current_sample_time as SampleTime;
-        let value = if !self.pattern.is_empty() && self.pattern[self.pos_in_pattern as usize] {
+        let value = if self.pattern[self.pos_in_pattern] {
             Some((sample_time, self.event_iter.next()))
         } else {
             Some((sample_time, None))
         };
         // move sample_time
-        match self.step {
-            BeatTimeStep::Beats(step) => {
-                self.current_sample_time += self.time_base.samples_per_beat() as f64 * step as f64;
-            }
-            BeatTimeStep::Bar(step) => {
-                self.current_sample_time += self.time_base.samples_per_beat() as f64
-                    * self.time_base.beats_per_bar as f64
-                    * step as f64;
-            }
-        };
+        self.current_sample_time += self.step.to_samples(&self.time_base);
         // move pattern pos
         self.pos_in_pattern += 1;
-        if self.pos_in_pattern >= self.pattern.len() as u32 {
+        if self.pos_in_pattern >= self.pattern.len() {
             self.pos_in_pattern = 0;
         }
-        // return previous value
+        // return current value
         value
     }
 }
