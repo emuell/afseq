@@ -7,15 +7,15 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug example 'drum-sequence'",
+      "name": "Debug example 'play'",
       "cargo": {
         "args": [
           "build",
-          "--example=drum-sequence",
+          "--example=play",
           "--package=afseq"
         ],
         "filter": {
-          "name": "drum-sequence",
+          "name": "play",
           "kind": "example"
         }
       },

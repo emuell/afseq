@@ -6,3 +6,9 @@ description = "afplay sequencer"
 authors = ["Eduard Müller <mail@emuell.net>"]
 exclude = ["assets", "examples"]
 categories = ["audio", "player", "sequencer"]
+
+[dev-dependencies]
+afplay = { path = "../afplay", default-features = false, features=["cubeb-output"] }
+
+[[examples]]
+name = "play-sequence"
