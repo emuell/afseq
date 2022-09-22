@@ -15,7 +15,7 @@ pub type ParameterId = usize;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Single note event in a [`PatternEvent`].
+/// Single note event in a [`Event`].
 #[derive(Clone)]
 pub struct NoteEvent {
     pub instrument: Option<InstrumentId>,
@@ -31,49 +31,57 @@ pub fn new_note(instrument: Option<InstrumentId>, note: u32, velocity: f32) -> N
     }
 }
 
-pub trait ToFixedPatternEventValue {
-    fn to_event(self) -> self::fixed::FixedPatternEventIter;
+pub fn new_note_event(
+    instrument: Option<InstrumentId>,
+    note: u32,
+    velocity: f32,
+) -> fixed::FixedEventIter {
+    new_note(instrument, note, velocity).to_event()
 }
 
-impl ToFixedPatternEventValue for NoteEvent {
-    fn to_event(self) -> self::fixed::FixedPatternEventIter {
-        self::fixed::FixedPatternEventIter::new(PatternEvent::NoteEvents(vec![self]))
+pub trait ToFixedEventValue {
+    fn to_event(self) -> self::fixed::FixedEventIter;
+}
+
+impl ToFixedEventValue for NoteEvent {
+    fn to_event(self) -> self::fixed::FixedEventIter {
+        self::fixed::FixedEventIter::new(Event::NoteEvents(vec![self]))
     }
 }
 
-impl ToFixedPatternEventValue for Vec<NoteEvent> {
-    fn to_event(self) -> self::fixed::FixedPatternEventIter {
-        self::fixed::FixedPatternEventIter::new(PatternEvent::NoteEvents(self))
+impl ToFixedEventValue for Vec<NoteEvent> {
+    fn to_event(self) -> self::fixed::FixedEventIter {
+        self::fixed::FixedEventIter::new(Event::NoteEvents(self))
     }
 }
 
-pub trait ToPatternEventValueSequence {
-    fn to_event_sequence(self) -> self::sequence::PatternEventIterSequence;
+pub trait ToEventValueSequence {
+    fn to_event_sequence(self) -> self::sequence::EventIterSequence;
 }
 
-impl ToPatternEventValueSequence for Vec<NoteEvent> {
-    fn to_event_sequence(self) -> self::sequence::PatternEventIterSequence {
+impl ToEventValueSequence for Vec<NoteEvent> {
+    fn to_event_sequence(self) -> self::sequence::EventIterSequence {
         let mut sequence = Vec::new();
         for note in self {
-            sequence.push(PatternEvent::NoteEvents(vec![note]));
+            sequence.push(Event::NoteEvents(vec![note]));
         }
-        self::sequence::PatternEventIterSequence::new(sequence)
+        self::sequence::EventIterSequence::new(sequence)
     }
 }
 
-impl ToPatternEventValueSequence for Vec<Vec<NoteEvent>> {
-    fn to_event_sequence(self) -> self::sequence::PatternEventIterSequence {
+impl ToEventValueSequence for Vec<Vec<NoteEvent>> {
+    fn to_event_sequence(self) -> self::sequence::EventIterSequence {
         let mut sequence = Vec::new();
         for notes in self {
-            sequence.push(PatternEvent::NoteEvents(notes));
+            sequence.push(Event::NoteEvents(notes));
         }
-        self::sequence::PatternEventIterSequence::new(sequence)
+        self::sequence::EventIterSequence::new(sequence)
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// Single parameter change event in a [`PatternEvent`].
+/// Single parameter change event in a [`Event`].
 #[derive(Clone)]
 pub struct ParameterChangeEvent {
     pub parameter: Option<ParameterId>,
@@ -84,22 +92,22 @@ pub fn new_parameter_change(parameter: Option<ParameterId>, value: f32) -> Param
     ParameterChangeEvent { parameter, value }
 }
 
-impl ToFixedPatternEventValue for ParameterChangeEvent {
-    fn to_event(self) -> self::fixed::FixedPatternEventIter {
-        self::fixed::FixedPatternEventIter::new(PatternEvent::ParameterChangeEvent(self))
+impl ToFixedEventValue for ParameterChangeEvent {
+    fn to_event(self) -> self::fixed::FixedEventIter {
+        self::fixed::FixedEventIter::new(Event::ParameterChangeEvent(self))
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// Event which gets triggered by [`PatternEventIter`].
+/// Event which gets triggered by [`EventIter`].
 #[derive(Clone)]
-pub enum PatternEvent {
+pub enum Event {
     NoteEvents(Vec<NoteEvent>),
     ParameterChangeEvent(ParameterChangeEvent),
 }
 
-impl PatternEvent {
+impl Event {
     pub fn new_note(note: NoteEvent) -> Self {
         Self::NoteEvents(vec![note])
     }
@@ -113,20 +121,19 @@ impl PatternEvent {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A resettable [`PatternEvent`] iterator, which typically will be used in
-/// [Pattern](`super::Pattern`) trait impls to sequencially emit new events.
-pub trait PatternEventIter: Iterator<Item = PatternEvent> {
+/// A resettable [`Event`] iterator, which typically will be used in
+/// [Rhythm](`super::Rhythm`) trait impls to sequencially emit new events.
+pub trait EventIter: Iterator<Item = Event> {
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
 }
 
-/// Converts  arbitary [`PatternEvent`] iterator into a [`PatternEventIter`] implementation in
-/// order to fulfy the `PatternEventIter` trait.
-pub fn from_iter<Iter>(iter: Iter) -> from_iter::PatternEventIterFromIter<Iter>
+/// Converts a std::collection::Iter of [`Event`] into a [`EventIter`] implementation.
+pub fn from_iter<Iter>(iter: Iter) -> from_iter::FromIter<Iter>
 where
-    Iter: Iterator<Item = PatternEvent> + Clone,
+    Iter: Iterator<Item = Event> + Clone,
 {
-    from_iter::PatternEventIterFromIter::new(iter)
+    from_iter::FromIter::new(iter)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -160,10 +167,10 @@ impl Debug for ParameterChangeEvent {
     }
 }
 
-impl Debug for PatternEvent {
+impl Debug for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PatternEvent::NoteEvents(note_vector) => f.write_fmt(format_args!(
+            Event::NoteEvents(note_vector) => f.write_fmt(format_args!(
                 "{:?}",
                 note_vector
                     .iter()
@@ -171,7 +178,7 @@ impl Debug for PatternEvent {
                     .collect::<Vec<String>>()
                     .join(" | ")
             )),
-            PatternEvent::ParameterChangeEvent(change) => f.write_fmt(format_args!("{:?}", change)),
+            Event::ParameterChangeEvent(change) => f.write_fmt(format_args!("{:?}", change)),
         }
     }
 }

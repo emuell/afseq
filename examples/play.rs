@@ -5,9 +5,9 @@ use afplay::{
     AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
 };
 use afseq::{
-    events::{fixed::ToMappedNotesEmitterValue, new_note, InstrumentId, ToFixedPatternEventValue},
+    event::{fixed::ToMappedNotesEventIter, new_note_event, InstrumentId},
     time::BeatTimeBase,
-    PatternEvent, Phrase, SampleTime,
+    Event, Phrase, SampleTime,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,14 +49,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
         ],
-        new_note(Some(KICK), 60, 1.0).to_event(),
+        new_note_event(Some(KICK), 60, 1.0),
     );
     let snare_pattern =
-        time_base.every_nth_beat_with_offset(2, 1, new_note(Some(SNARE), 60, 1.0).to_event());
+        time_base.every_nth_beat_with_offset(2, 1, new_note_event(Some(SNARE), 60, 1.0));
     let hihat_pattern = time_base.every_nth_sixteenth_with_offset(
         2,
         0,
-        new_note(Some(HIHAT), 60, 1.0).to_event().map_notes({
+        new_note_event(Some(HIHAT), 60, 1.0).map_notes({
             let mut step = 0;
             move |note| {
                 let mut note = note;
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hihat_pattern2 = time_base.every_nth_sixteenth_with_offset(
         2,
         1,
-        new_note(Some(HIHAT), 60, 1.0).to_event().map_notes({
+        new_note_event(Some(HIHAT), 60, 1.0).map_notes({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |note| {
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]);
 
     // emit notes and feed them into the player
-    let print_event = |sample_time: SampleTime, event: &Option<PatternEvent>| {
+    let print_event = |sample_time: SampleTime, event: &Option<Event>| {
         println!(
             "{:.1} ({:08}) -> {}",
             sample_time as f64 / time_base.samples_per_beat(),
@@ -117,32 +117,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // delay initial playback a bit until we're emitting: the player is already running
     let playback_delay_in_samples = player.output_sample_frame_position() + seconds_to_samples(0.5);
 
-    let play_event =
-        |player: &mut AudioFilePlayer, sample_time: SampleTime, event: &Option<PatternEvent>| {
-            // play
-            if let Some(event) = event {
-                match event {
-                    PatternEvent::NoteEvents(notes) => {
-                        for note in notes {
-                            if let Some(instrument) = note.instrument {
-                                if let Some(sample) = sample_pool.get(&instrument) {
-                                    let mut new_source = sample.clone();
-                                    new_source.set_volume(note.velocity);
-                                    player
-                                        .play_file_source(
-                                            new_source,
-                                            speed_from_note(note.note),
-                                            Some(sample_time as u64 + playback_delay_in_samples),
-                                        )
-                                        .unwrap();
-                                }
-                            }
-                        }
+    let play_event = |player: &mut AudioFilePlayer,
+                      sample_time: SampleTime,
+                      event: &Option<Event>| {
+        // play
+        if let Event::NoteEvents(notes) = event.as_ref().unwrap_or(&Event::NoteEvents(Vec::new())) {
+            for note in notes {
+                if let Some(instrument) = note.instrument {
+                    if let Some(sample) = sample_pool.get(&instrument) {
+                        let mut new_source = sample.clone();
+                        new_source.set_volume(note.velocity);
+                        player
+                            .play_file_source(
+                                new_source,
+                                speed_from_note(note.note),
+                                Some(sample_time as u64 + playback_delay_in_samples),
+                            )
+                            .unwrap();
                     }
-                    PatternEvent::ParameterChangeEvent(_) => {}
                 }
             }
-        };
+        }
+    };
 
     let mut emitted_sample_time: u64 = 0;
     loop {

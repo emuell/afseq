@@ -1,24 +1,24 @@
-use crate::events::{NoteEvent, PatternEvent, PatternEventIter};
+use crate::event::{Event, EventIter, NoteEvent};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Endlessly emits [`PatternEvent`] which's notes can be mutated/mapped in each iter step
+/// Endlessly emits [`Event`] which's notes can be mutated/mapped in each iter step
 /// with a custom map function.
 #[derive(Clone)]
-pub struct MappedNotePatternEventIter<F>
+pub struct MappedNoteEventIter<F>
 where
     F: FnMut(NoteEvent) -> NoteEvent,
 {
-    event: PatternEvent,
-    initial_event: PatternEvent,
+    event: Event,
+    initial_event: Event,
     map: F,
 }
 
-impl<F> MappedNotePatternEventIter<F>
+impl<F> MappedNoteEventIter<F>
 where
     F: FnMut(NoteEvent) -> NoteEvent,
 {
-    pub fn new(event: PatternEvent, map: F) -> Self {
+    pub fn new(event: Event, map: F) -> Self {
         let initial_event = event.clone();
         Self {
             event,
@@ -28,29 +28,29 @@ where
     }
 }
 
-impl<F> Iterator for MappedNotePatternEventIter<F>
+impl<F> Iterator for MappedNoteEventIter<F>
 where
     F: FnMut(NoteEvent) -> NoteEvent,
 {
-    type Item = PatternEvent;
+    type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.event.clone();
         match &self.event {
-            PatternEvent::NoteEvents(notes) => {
+            Event::NoteEvents(notes) => {
                 let mut mut_notes = notes.clone();
                 for note in &mut mut_notes {
                     *note = (self.map)(note.clone());
                 }
-                self.event = PatternEvent::NoteEvents(mut_notes);
+                self.event = Event::NoteEvents(mut_notes);
             }
-            PatternEvent::ParameterChangeEvent(_) => {}
+            Event::ParameterChangeEvent(_) => {}
         }
         Some(current)
     }
 }
 
-impl<F> PatternEventIter for MappedNotePatternEventIter<F>
+impl<F> EventIter for MappedNoteEventIter<F>
 where
     F: FnMut(NoteEvent) -> NoteEvent,
 {

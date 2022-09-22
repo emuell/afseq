@@ -1,28 +1,28 @@
 use crate::{
-    events::{PatternEvent, PatternEventIter},
+    event::{Event, EventIter},
     time::{BeatTimeBase, BeatTimeStep},
-    Pattern, SampleTime,
+    Rhythm, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits `Some(PatternEvent)` every nth [`BeatTimeStep`]::Beat or Bar with a specified pattern.
-pub struct BeatTimeSequencePattern {
+/// Emits `Some(Event)` every nth [`BeatTimeStep`]::Beat or Bar with a specified pattern.
+pub struct BeatTimeSequenceRhythm {
     time_base: BeatTimeBase,
     step: BeatTimeStep,
     offset: BeatTimeStep,
     pattern: Vec<bool>,
     pos_in_pattern: usize,
     current_sample_time: f64,
-    event_iter: Box<dyn PatternEventIter>,
+    event_iter: Box<dyn EventIter>,
 }
 
-impl BeatTimeSequencePattern {
+impl BeatTimeSequenceRhythm {
     /// Create a new pattern based emitter which emits `value` every beat_time `step`.
     ///
     /// Param `pattern` is evaluated as an array of boolean -> when to trigger an event and when not,
-    /// but can be specified as number array as well to notate things shorter: e.g. via [0,1,1,1,0].  
-    pub fn new<Value: PatternEventIter + 'static, const N: usize, T: Ord + Default>(
+    /// but can be specified as number array as well to notate things shorter: e.g. via \[0,1,1,1,0\].  
+    pub fn new<Value: EventIter + 'static, const N: usize, T: Ord + Default>(
         time_base: BeatTimeBase,
         step: BeatTimeStep,
         pattern: [T; N],
@@ -36,7 +36,7 @@ impl BeatTimeSequencePattern {
     /// starting at the given beat_time `offset`.  
     ///
     /// See `new` on how to specify the `pattern` parameter.
-    pub fn new_with_offset<Value: PatternEventIter + 'static, const N: usize, T: Ord + Default>(
+    pub fn new_with_offset<Value: EventIter + 'static, const N: usize, T: Ord + Default>(
         time_base: BeatTimeBase,
         step: BeatTimeStep,
         offset: BeatTimeStep,
@@ -61,8 +61,8 @@ impl BeatTimeSequencePattern {
     }
 }
 
-impl Iterator for BeatTimeSequencePattern {
-    type Item = (SampleTime, Option<PatternEvent>);
+impl Iterator for BeatTimeSequenceRhythm {
+    type Item = (SampleTime, Option<Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pattern.is_empty() {
@@ -87,8 +87,8 @@ impl Iterator for BeatTimeSequencePattern {
     }
 }
 
-impl Pattern for BeatTimeSequencePattern {
-    fn current_event(&self) -> &dyn PatternEventIter {
+impl Rhythm for BeatTimeSequenceRhythm {
+    fn current_event(&self) -> &dyn EventIter {
         &*self.event_iter
     }
     fn current_sample_time(&self) -> SampleTime {

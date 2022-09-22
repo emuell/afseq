@@ -1,24 +1,24 @@
 use crate::{
-    events::{PatternEvent, PatternEventIter},
+    event::{Event, EventIter},
     time::{BeatTimeBase, BeatTimeStep},
-    Pattern, SampleTime,
+    Rhythm, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits `Some(PatternEvent)` every nth [`BeatTimeStep`]::Beat or Bar.
-pub struct BeatTimePattern {
+/// Emits `Some(Event)` every nth [`BeatTimeStep`]::Beat or Bar.
+pub struct BeatTimeRhythm {
     time_base: BeatTimeBase,
     step: BeatTimeStep,
     offset: BeatTimeStep,
     current_counter: u32,
     current_sample_time: f64,
-    event_iter: Box<dyn PatternEventIter>,
+    event_iter: Box<dyn EventIter>,
 }
 
-impl BeatTimePattern {
+impl BeatTimeRhythm {
     /// Create a new beat time pattern which emits the given `value` every beat-time `step`.  
-    pub fn new<Iter: PatternEventIter + 'static>(
+    pub fn new<Iter: EventIter + 'static>(
         time_base: BeatTimeBase,
         step: BeatTimeStep,
         event_iter: Iter,
@@ -28,7 +28,7 @@ impl BeatTimePattern {
 
     /// Create a new beat time pattern which emits the given `value` every beat-time `step`
     /// starting at the given beat-time `offset`.  
-    pub fn new_with_offset<Iter: PatternEventIter + 'static>(
+    pub fn new_with_offset<Iter: EventIter + 'static>(
         time_base: BeatTimeBase,
         step: BeatTimeStep,
         offset: BeatTimeStep,
@@ -47,8 +47,8 @@ impl BeatTimePattern {
     }
 }
 
-impl Iterator for BeatTimePattern {
-    type Item = (SampleTime, Option<PatternEvent>);
+impl Iterator for BeatTimeRhythm {
+    type Item = (SampleTime, Option<Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
         // fetch current value
@@ -71,8 +71,8 @@ impl Iterator for BeatTimePattern {
     }
 }
 
-impl Pattern for BeatTimePattern {
-    fn current_event(&self) -> &dyn PatternEventIter {
+impl Rhythm for BeatTimeRhythm {
+    fn current_event(&self) -> &dyn EventIter {
         &*self.event_iter
     }
     fn current_sample_time(&self) -> SampleTime {

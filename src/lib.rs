@@ -4,10 +4,11 @@
 pub mod time;
 pub use time::SampleTime;
 
-pub mod events;
-pub use events::{PatternEvent, PatternEventIter};
-pub mod pattern;
-pub use pattern::Pattern;
+pub mod event;
+pub use event::{Event, EventIter};
+
+pub mod rhythm;
+pub use rhythm::Rhythm;
 
 pub mod phrase;
 pub use phrase::Phrase;
@@ -20,10 +21,10 @@ mod test {
     use std::cell::RefCell;
 
     use super::{
-        events::NoteEvent,
-        events::PatternEvent,
-        events::{fixed::*, mapped::*},
-        pattern::{beat_time::*, beat_time_sequence::*},
+        event::Event,
+        event::NoteEvent,
+        event::{fixed::*, mapped::*},
+        rhythm::{beat_time::*, beat_time_sequence::*},
         time::{BeatTimeBase, BeatTimeStep},
     };
 
@@ -35,7 +36,7 @@ mod test {
             beats_per_min: 120.0,
         };
 
-        let note_vector = FixedPatternEventIter::new(PatternEvent::new_note_vector(vec![
+        let note_vector = FixedEventIter::new(Event::new_note_vector(vec![
             NoteEvent {
                 instrument: None,
                 note: 60,
@@ -52,15 +53,15 @@ mod test {
                 velocity: 1.0,
             },
         ]));
-        let note = MappedPatternEventIter::new(
-            PatternEvent::new_note(NoteEvent {
+        let note = MappedEventIter::new(
+            Event::new_note(NoteEvent {
                 instrument: None,
                 note: 60,
                 velocity: 1.0,
             }),
             |event| {
                 let mut event = event;
-                if let PatternEvent::NoteEvents(note_vector) = &mut event {
+                if let Event::NoteEvents(note_vector) = &mut event {
                     for note in note_vector {
                         note.note += 1;
                     }
@@ -70,9 +71,9 @@ mod test {
         );
 
         let beat_time_emitter =
-            BeatTimePattern::new(time_base.clone(), BeatTimeStep::Beats(2), note);
+            BeatTimeRhythm::new(time_base.clone(), BeatTimeStep::Beats(2), note);
 
-        let beat_time_pattern_emitter = BeatTimeSequencePattern::new(
+        let beat_time_pattern_emitter = BeatTimeSequenceRhythm::new(
             time_base.clone(),
             BeatTimeStep::Beats(2),
             [1, 0, 0, 1],
@@ -87,7 +88,7 @@ mod test {
         let mut num_note_events = 0;
         phrase.run_until_time((time_base.samples_per_beat() * 8.0) as SampleTime, {
             let num_note_events = &mut num_note_events;
-            move |sample_time: SampleTime, event: &Option<PatternEvent>| {
+            move |sample_time: SampleTime, event: &Option<Event>| {
                 if event.is_some() {
                     *num_note_events += 1;
                 }

@@ -1,21 +1,21 @@
 use std::cell::RefCell;
 
-use crate::{events::PatternEvent, Pattern, SampleTime};
+use crate::{event::Event, Rhythm, SampleTime};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Combines and runs one or more [`Pattern`] at the same time, allowing to form more complex
+/// Combines and runs one or more [`Rhythm`] at the same time, allowing to form more complex
 /// patterns that are meant to run together.
 ///
 /// An example phrase is a drum-kit pattern where each instrument's pattern is defined separately
 /// and then is combined into a single "big" pattern to play the entire kit together.
 pub struct Phrase {
-    patterns: Vec<Box<RefCell<dyn Pattern>>>,
-    held_back_events: Vec<(SampleTime, Option<PatternEvent>)>,
+    patterns: Vec<Box<RefCell<dyn Rhythm>>>,
+    held_back_events: Vec<(SampleTime, Option<Event>)>,
 }
 
 impl Phrase {
-    pub fn new(patterns: Vec<Box<RefCell<dyn Pattern>>>) -> Self {
+    pub fn new(patterns: Vec<Box<RefCell<dyn Rhythm>>>) -> Self {
         Self {
             patterns,
             held_back_events: Vec::new(),
@@ -26,7 +26,7 @@ impl Phrase {
     /// visitor function for all emitted events.
     pub fn run_until_time<F>(&mut self, run_sample_time: SampleTime, mut visitor: F)
     where
-        F: FnMut(SampleTime, &Option<PatternEvent>),
+        F: FnMut(SampleTime, &Option<Event>),
     {
         // emit held back events first
         for (sample_time, event) in &self.held_back_events {
