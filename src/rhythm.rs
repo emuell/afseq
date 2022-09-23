@@ -13,9 +13,9 @@ pub mod beat_time_sequence;
 /// at a specific sample time. An audio players will use the sample time to schedule those events
 /// within the audio stream.
 ///
-/// Rhythm impls will typically use a [`EventIter`] to produce note or parameter change
-/// events, so all emitted events are fetched from some iterator as well and thus may dynamically
-/// change over time as well.
+/// Rhythm impls will typically use a [EventIter][`super::EventIter`] to produce note or parameter
+/// change events, so all emitted events are fetched from some iterator as well and thus may
+/// dynamically change over time as well.
 pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> {
     /// Resets/rewinds the pattern iterator to its initial state.
     fn reset(&mut self);
