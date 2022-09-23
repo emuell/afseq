@@ -88,12 +88,6 @@ impl Iterator for BeatTimeSequenceRhythm {
 }
 
 impl Rhythm for BeatTimeSequenceRhythm {
-    fn current_event(&self) -> &dyn EventIter {
-        &*self.event_iter
-    }
-    fn current_sample_time(&self) -> SampleTime {
-        self.current_sample_time as SampleTime
-    }
     fn reset(&mut self) {
         self.event_iter.reset();
         self.current_sample_time = self.offset.to_samples(&self.time_base);
