@@ -4,11 +4,8 @@ use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlayer,
     AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
 };
-use afseq::{
-    event::{fixed::ToMappedNotesEventIter, new_note_event, InstrumentId},
-    time::BeatTimeBase,
-    Event, Phrase, SampleTime,
-};
+
+use afseq::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create player
@@ -49,14 +46,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
         ],
-        new_note_event(Some(KICK), 60, 1.0),
+        new_note_event(KICK, 60, 1.0),
     );
-    let snare_pattern =
-        time_base.every_nth_beat_with_offset(2, 1, new_note_event(Some(SNARE), 60, 1.0));
+    let snare_pattern = time_base.every_nth_beat_with_offset(2, 1, new_note_event(SNARE, 60, 1.0));
     let hihat_pattern = time_base.every_nth_sixteenth_with_offset(
         2,
         0,
-        new_note_event(Some(HIHAT), 60, 1.0).map_notes({
+        new_note_event(HIHAT, 60, 1.0).map_notes({
             let mut step = 0;
             move |note| {
                 let mut note = note;
@@ -72,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hihat_pattern2 = time_base.every_nth_sixteenth_with_offset(
         2,
         1,
-        new_note_event(Some(HIHAT), 60, 1.0).map_notes({
+        new_note_event(HIHAT, 60, 1.0).map_notes({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |note| {

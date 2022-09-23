@@ -1,7 +1,11 @@
+//! Value and value iters which get emitted by `Rhythms`.
+
+use self::fixed::FixedEventIter;
+use crate::convert::ToFixedEventValue;
+
 use std::fmt::Debug;
 
 pub mod fixed;
-pub mod from_iter;
 pub mod mapped;
 pub mod mapped_note;
 pub mod sequence;
@@ -23,7 +27,13 @@ pub struct NoteEvent {
     pub velocity: f32,
 }
 
-pub fn new_note(instrument: Option<InstrumentId>, note: u32, velocity: f32) -> NoteEvent {
+/// Shortcut for creating a new [`NoteEvent`].
+pub fn new_note<Instrument: Into<Option<InstrumentId>>>(
+    instrument: Instrument,
+    note: u32,
+    velocity: f32,
+) -> NoteEvent {
+    let instrument: Option<InstrumentId> = instrument.into();
     NoteEvent {
         instrument,
         note,
@@ -31,52 +41,13 @@ pub fn new_note(instrument: Option<InstrumentId>, note: u32, velocity: f32) -> N
     }
 }
 
-pub fn new_note_event(
-    instrument: Option<InstrumentId>,
+/// Shortcut for creating a new [`NoteEvent`] [`EventIter`].
+pub fn new_note_event<Instrument: Into<Option<InstrumentId>>>(
+    instrument: Instrument,
     note: u32,
     velocity: f32,
-) -> fixed::FixedEventIter {
+) -> FixedEventIter {
     new_note(instrument, note, velocity).to_event()
-}
-
-pub trait ToFixedEventValue {
-    fn to_event(self) -> self::fixed::FixedEventIter;
-}
-
-impl ToFixedEventValue for NoteEvent {
-    fn to_event(self) -> self::fixed::FixedEventIter {
-        self::fixed::FixedEventIter::new(Event::NoteEvents(vec![self]))
-    }
-}
-
-impl ToFixedEventValue for Vec<NoteEvent> {
-    fn to_event(self) -> self::fixed::FixedEventIter {
-        self::fixed::FixedEventIter::new(Event::NoteEvents(self))
-    }
-}
-
-pub trait ToEventValueSequence {
-    fn to_event_sequence(self) -> self::sequence::EventIterSequence;
-}
-
-impl ToEventValueSequence for Vec<NoteEvent> {
-    fn to_event_sequence(self) -> self::sequence::EventIterSequence {
-        let mut sequence = Vec::new();
-        for note in self {
-            sequence.push(Event::NoteEvents(vec![note]));
-        }
-        self::sequence::EventIterSequence::new(sequence)
-    }
-}
-
-impl ToEventValueSequence for Vec<Vec<NoteEvent>> {
-    fn to_event_sequence(self) -> self::sequence::EventIterSequence {
-        let mut sequence = Vec::new();
-        for notes in self {
-            sequence.push(Event::NoteEvents(notes));
-        }
-        self::sequence::EventIterSequence::new(sequence)
-    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -88,14 +59,21 @@ pub struct ParameterChangeEvent {
     pub value: f32,
 }
 
-pub fn new_parameter_change(parameter: Option<ParameterId>, value: f32) -> ParameterChangeEvent {
+/// Shortcut for creating a new [`ParameterChangeEvent`].
+pub fn new_parameter_change<Parameter: Into<Option<ParameterId>>>(
+    parameter: Parameter,
+    value: f32,
+) -> ParameterChangeEvent {
+    let parameter: Option<ParameterId> = parameter.into();
     ParameterChangeEvent { parameter, value }
 }
 
-impl ToFixedEventValue for ParameterChangeEvent {
-    fn to_event(self) -> self::fixed::FixedEventIter {
-        self::fixed::FixedEventIter::new(Event::ParameterChangeEvent(self))
-    }
+/// Shortcut for creating a new [`ParameterChangeEvent`] [`EventIter`].
+pub fn new_parameter_change_event<Parameter: Into<Option<ParameterId>>>(
+    parameter: Parameter,
+    value: f32,
+) -> FixedEventIter {
+    new_parameter_change(parameter, value).to_event()
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -126,14 +104,6 @@ impl Event {
 pub trait EventIter: Iterator<Item = Event> {
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
-}
-
-/// Converts a std::collection::Iter of [`Event`] into a [`EventIter`] implementation.
-pub fn from_iter<Iter>(iter: Iter) -> from_iter::FromIter<Iter>
-where
-    Iter: Iterator<Item = Event> + Clone,
-{
-    from_iter::FromIter::new(iter)
 }
 
 // -------------------------------------------------------------------------------------------------

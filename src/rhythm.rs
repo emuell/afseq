@@ -1,3 +1,5 @@
+//! Periodically emit `Events` via an `EventIter` on a given time base.
+
 use crate::{
     event::{Event, EventIter},
     SampleTime,

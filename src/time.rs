@@ -1,3 +1,5 @@
+//! The time base that `Rhythms` can run on.
+
 mod beats;
 pub use beats::{BeatTimeBase, BeatTimeStep};
 

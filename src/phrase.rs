@@ -1,3 +1,5 @@
+//! Combine multiple `Rythm` iterators into a single one.
+
 use std::cell::RefCell;
 
 use crate::{event::Event, Rhythm, SampleTime};
