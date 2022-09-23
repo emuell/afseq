@@ -74,11 +74,11 @@ mod test {
         );
 
         let beat_time_emitter =
-            BeatTimeRhythm::new(time_base.clone(), BeatTimeStep::Beats(2), note);
+            BeatTimeRhythm::new(time_base.clone(), BeatTimeStep::Beats(2.0), note);
 
         let beat_time_pattern_emitter = BeatTimeSequenceRhythm::new(
             time_base.clone(),
-            BeatTimeStep::Beats(2),
+            BeatTimeStep::Beats(2.0),
             [1, 0, 0, 1],
             note_vector,
         );

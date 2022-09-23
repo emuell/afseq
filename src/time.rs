@@ -2,6 +2,8 @@
 
 mod beats;
 pub use beats::{BeatTimeBase, BeatTimeStep};
+mod seconds;
+pub use seconds::{SecondTimeBase, SecondTimeStep};
 
 // -------------------------------------------------------------------------------------------------
 

@@ -35,16 +35,16 @@ impl BeatTimeBase {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Defines a number of steps in either beat or bar timing values.
+/// Defines a number of steps in sixteenth, beat or bar amounts.
 pub enum BeatTimeStep {
-    Sixteenth(u32),
-    Beats(u32),
-    Bar(u32),
+    Sixteenth(f32),
+    Beats(f32),
+    Bar(f32),
 }
 
 impl BeatTimeStep {
     /// Get number of steps in the current time range.
-    pub fn steps(&self) -> u32 {
+    pub fn steps(&self) -> f32 {
         match *self {
             BeatTimeStep::Sixteenth(amount) => amount,
             BeatTimeStep::Beats(amount) => amount,
@@ -72,15 +72,15 @@ macro_rules! generate_step_funcs {
         paste::paste! {
             pub fn [<every_nth_ $name>]<Iter: EventIter + 'static>(
                 &self,
-                step: u32,
+                step: f32,
                 event_iter: Iter,
             ) -> BeatTimeRhythm {
                 self.every_nth_step($type(step), event_iter)
             }
             pub fn [<every_nth_ $name _with_offset>]<Iter: EventIter + 'static>(
                 &self,
-                step: u32,
-                offset: u32,
+                step: f32,
+                offset: f32,
                 event_iter: Iter,
             ) -> BeatTimeRhythm {
                 self.every_nth_step_with_offset(
@@ -95,11 +95,11 @@ macro_rules! generate_step_funcs {
                 T: Ord + Default,
             >(
                 &self,
-                value: u32,
+                step: f32,
                 pattern: [T; N],
                 event_iter: Iter,
             ) -> BeatTimeSequenceRhythm {
-                self.every_nth_step_with_pattern($type(value), pattern, event_iter)
+                self.every_nth_step_with_pattern($type(step), pattern, event_iter)
             }
         }
     };

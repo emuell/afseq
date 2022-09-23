@@ -4,6 +4,8 @@ use crate::{event::Event, SampleTime};
 
 pub mod beat_time;
 pub mod beat_time_sequence;
+pub mod second_time;
+pub mod second_time_sequence;
 
 // -------------------------------------------------------------------------------------------------
 
