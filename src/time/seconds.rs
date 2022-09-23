@@ -44,7 +44,7 @@ impl SecondTimeBase {
     ) -> SecondTimeRhythm {
         SecondTimeRhythm::new_with_offset(self.clone(), step, offset, event_iter)
     }
-    pub fn every_nth_second_with_pattern<
+    pub fn every_nth_seconds_with_pattern<
         Iter: EventIter + 'static,
         const N: usize,
         T: Ord + Default,

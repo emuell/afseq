@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let hihat_rhythm = Phrase::new(vec![Box::new(hihat_pattern), Box::new(hihat_pattern2)]);
 
-    let fx_pattern = second_time_base.every_nth_second_with_pattern(
+    let fx_pattern = second_time_base.every_nth_seconds_with_pattern(
         beat_time_base
             .samples_to_seconds(BeatTimeStep::Beats(7.0 / 4.0).to_samples(&beat_time_base) as u64),
         [1, 0, 1, 1],

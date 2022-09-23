@@ -6,7 +6,7 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits `Some(Event)` every nth [`SecondStep`]::Beat or Bar.
+/// Emits `Some(Event)` every nth [`SecondTimeStep`]::Beat or Bar.
 pub struct SecondTimeRhythm {
     time_base: SecondTimeBase,
     step: SecondTimeStep,
