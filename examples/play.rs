@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::collections::HashMap;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlayer,
@@ -88,11 +88,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     );
 
+    let hihat_rhythm = Phrase::new(vec![Box::new(hihat_pattern), Box::new(hihat_pattern2)]);
+
     let mut phrase = Phrase::new(vec![
-        Box::new(RefCell::new(kick_pattern)),
-        Box::new(RefCell::new(snare_pattern)),
-        Box::new(RefCell::new(hihat_pattern)),
-        Box::new(RefCell::new(hihat_pattern2)),
+        Box::new(kick_pattern),
+        Box::new(snare_pattern),
+        Box::new(hihat_rhythm),
     ]);
 
     // emit notes and feed them into the player

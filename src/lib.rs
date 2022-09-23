@@ -22,7 +22,6 @@ pub mod prelude;
 #[cfg(test)]
 mod test {
     use crate::{Phrase, SampleTime};
-    use std::cell::RefCell;
 
     use super::{
         event::Event,
@@ -85,8 +84,8 @@ mod test {
         );
 
         let mut phrase = Phrase::new(vec![
-            Box::new(RefCell::new(beat_time_emitter)),
-            Box::new(RefCell::new(beat_time_pattern_emitter)),
+            Box::new(beat_time_emitter),
+            Box::new(beat_time_pattern_emitter),
         ]);
 
         let mut num_note_events = 0;
