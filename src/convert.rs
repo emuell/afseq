@@ -72,14 +72,14 @@ impl ToEventIterSequence for Vec<Vec<NoteEvent>> {
 
 pub trait ToMappedEventIter<EventMap>
 where
-    EventMap: FnMut(Event) -> Event,
+    EventMap: FnMut(Event) -> Event + Copy,
 {
     fn map_events(self, map: EventMap) -> MappedEventIter<EventMap>;
 }
 
 impl<EventMap> ToMappedEventIter<EventMap> for FixedEventIter
 where
-    EventMap: FnMut(Event) -> Event,
+    EventMap: FnMut(Event) -> Event + Copy,
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedEventIter`].
     fn map_events(self, map: EventMap) -> MappedEventIter<EventMap> {
@@ -98,7 +98,7 @@ where
 
 impl<NoteMap> ToMappedNotesEventIter<NoteMap> for FixedEventIter
 where
-    NoteMap: FnMut(NoteEvent) -> NoteEvent,
+    NoteMap: FnMut(NoteEvent) -> NoteEvent + Copy,
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedNoteEventIter`].
     fn map_notes(self, map: NoteMap) -> MappedNoteEventIter<NoteMap> {
