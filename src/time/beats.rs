@@ -67,9 +67,46 @@ impl BeatTimeStep {
 
 // -------------------------------------------------------------------------------------------------
 
+macro_rules! generate_step_funcs {
+    ($name:ident, $type:expr) => {
+        paste::paste! {
+            pub fn [<every_nth_ $name>]<Iter: EventIter + 'static>(
+                &self,
+                step: u32,
+                event_iter: Iter,
+            ) -> BeatTimeRhythm {
+                self.every_nth_step($type(step), event_iter)
+            }
+            pub fn [<every_nth_ $name _with_offset>]<Iter: EventIter + 'static>(
+                &self,
+                step: u32,
+                offset: u32,
+                event_iter: Iter,
+            ) -> BeatTimeRhythm {
+                self.every_nth_step_with_offset(
+                    $type(step),
+                    $type(offset),
+                    event_iter,
+                )
+            }
+            pub fn [<every_nth_ $name _with_pattern>]<
+                Iter: EventIter + 'static,
+                const N: usize,
+                T: Ord + Default,
+            >(
+                &self,
+                value: u32,
+                pattern: [T; N],
+                event_iter: Iter,
+            ) -> BeatTimeSequenceRhythm {
+                self.every_nth_step_with_pattern($type(value), pattern, event_iter)
+            }
+        }
+    };
+}
+
 /// Shortcuts for creating beat-time based patterns.
 impl BeatTimeBase {
-    // Emit every Nth step
     pub fn every_nth_step<Iter: EventIter + 'static>(
         &self,
         step: BeatTimeStep,
@@ -98,102 +135,7 @@ impl BeatTimeBase {
         BeatTimeSequenceRhythm::new(self.clone(), step, pattern, event_iter)
     }
 
-    // Emit every sixteenth
-    pub fn every_nth_sixteenth<Iter: EventIter + 'static>(
-        &self,
-        sixteenth: u32,
-        event_iter: Iter,
-    ) -> BeatTimeRhythm {
-        self.every_nth_step(BeatTimeStep::Sixteenth(sixteenth), event_iter)
-    }
-    pub fn every_nth_sixteenth_with_offset<Iter: EventIter + 'static>(
-        &self,
-        sixteenth: u32,
-        offset: u32,
-        event_iter: Iter,
-    ) -> BeatTimeRhythm {
-        self.every_nth_step_with_offset(
-            BeatTimeStep::Sixteenth(sixteenth),
-            BeatTimeStep::Sixteenth(offset),
-            event_iter,
-        )
-    }
-    pub fn every_nth_sixteenth_with_pattern<
-        Iter: EventIter + 'static,
-        const N: usize,
-        T: Ord + Default,
-    >(
-        &self,
-        sixteenth: u32,
-        pattern: [T; N],
-        event_iter: Iter,
-    ) -> BeatTimeSequenceRhythm {
-        self.every_nth_step_with_pattern(BeatTimeStep::Sixteenth(sixteenth), pattern, event_iter)
-    }
-
-    // Emit every beat
-    pub fn every_nth_beat<Iter: EventIter + 'static>(
-        &self,
-        beats: u32,
-        event_iter: Iter,
-    ) -> BeatTimeRhythm {
-        self.every_nth_step(BeatTimeStep::Beats(beats), event_iter)
-    }
-    pub fn every_nth_beat_with_offset<Iter: EventIter + 'static>(
-        &self,
-        beats: u32,
-        offset: u32,
-        event_iter: Iter,
-    ) -> BeatTimeRhythm {
-        self.every_nth_step_with_offset(
-            BeatTimeStep::Beats(beats),
-            BeatTimeStep::Beats(offset),
-            event_iter,
-        )
-    }
-    pub fn every_nth_beat_with_pattern<
-        Iter: EventIter + 'static,
-        const N: usize,
-        T: Ord + Default,
-    >(
-        &self,
-        beats: u32,
-        pattern: [T; N],
-        event_iter: Iter,
-    ) -> BeatTimeSequenceRhythm {
-        self.every_nth_step_with_pattern(BeatTimeStep::Beats(beats), pattern, event_iter)
-    }
-
-    // Emit every bar
-    pub fn every_nth_bar<Iter: EventIter + 'static>(
-        &self,
-        bars: u32,
-        event_iter: Iter,
-    ) -> BeatTimeRhythm {
-        self.every_nth_step(BeatTimeStep::Bar(bars), event_iter)
-    }
-    pub fn every_nth_bar_with_offset<Iter: EventIter + 'static>(
-        &self,
-        bars: u32,
-        offset_in_beats: u32,
-        event_iter: Iter,
-    ) -> BeatTimeRhythm {
-        self.every_nth_step_with_offset(
-            BeatTimeStep::Bar(bars),
-            BeatTimeStep::Beats(offset_in_beats),
-            event_iter,
-        )
-    }
-    pub fn every_nth_bar_with_pattern<
-        Iter: EventIter + 'static,
-        const N: usize,
-        T: Ord + Default,
-    >(
-        &self,
-        bars: u32,
-        pattern: [T; N],
-        event_iter: Iter,
-    ) -> BeatTimeSequenceRhythm {
-        self.every_nth_step_with_pattern(BeatTimeStep::Bar(bars), pattern, event_iter)
-    }
+    generate_step_funcs!(sixteenth, BeatTimeStep::Sixteenth);
+    generate_step_funcs!(beat, BeatTimeStep::Beats);
+    generate_step_funcs!(bar, BeatTimeStep::Bar);
 }

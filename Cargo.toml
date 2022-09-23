@@ -7,6 +7,9 @@ authors = ["Eduard Müller <mail@emuell.net>"]
 exclude = ["assets", "examples"]
 categories = ["audio", "player", "sequencer"]
 
+[dependencies]
+paste = { version = "1.0.9"}
+
 [dev-dependencies]
 afplay = { path = "../afplay", default-features = false, features=["cpal-output"] }
 
