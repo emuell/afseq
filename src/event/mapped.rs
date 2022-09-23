@@ -31,7 +31,7 @@ where
     }
 
     fn mutate(event: Event, map: &mut F) -> Event {
-        (*map)(event.clone())
+        (*map)(event)
     }
 }
 
