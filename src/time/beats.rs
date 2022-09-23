@@ -1,6 +1,6 @@
 use crate::{
     event::EventIter, rhythm::beat_time::BeatTimeRhythm,
-    rhythm::beat_time_sequence::BeatTimeSequenceRhythm,
+    rhythm::beat_time_sequence::BeatTimeSequenceRhythm, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -21,6 +21,15 @@ impl BeatTimeBase {
     /// Time base's samples per bar, in order to convert bar to sample time and vice versa.
     pub fn samples_per_bar(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64 * self.beats_per_bar as f64
+    }
+
+    /// Convert given sample amount in seconds, using this time bases' samples per second rate.
+    pub fn samples_to_seconds(&self, samples: SampleTime) -> f64 {
+        samples as f64 / self.samples_per_sec as f64
+    }
+    /// Convert given second duration in samples, using this time bases' samples per second rate.
+    pub fn seconds_to_samples(&self, seconds: f64) -> SampleTime {
+        (seconds as f64 * self.samples_per_sec as f64) as SampleTime
     }
 }
 
