@@ -1,6 +1,8 @@
 //! Combine multiple `Rythm` iterators into a single one.
 
-use crate::{event::Event, Rhythm, SampleTime};
+use std::{cell::RefCell, rc::Rc};
+
+use crate::{event::Event, prelude::BeatTimeStep, BeatTimeBase, Rhythm, SampleTime};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -12,21 +14,38 @@ use crate::{event::Event, Rhythm, SampleTime};
 /// and then is combined into a single "big" pattern to play the entire kit together.
 ///
 /// The `run_until_time` function can then be used to feed the entire phrase into a player engine.
+#[derive(Clone)]
 pub struct Phrase {
-    rhythms: Vec<Box<dyn Rhythm>>,
+    time_base: BeatTimeBase,
+    offset: BeatTimeStep,
+    rhythms: Rc<RefCell<Vec<Box<dyn Rhythm>>>>,
     next_events: Vec<Option<(SampleTime, Option<Event>)>>,
     held_back_event: Option<(SampleTime, Option<Event>)>,
 }
 
 impl Phrase {
     /// Create a new phrase from a vector of boxed `Rhythms`.
-    pub fn new(rhythms: Vec<Box<dyn Rhythm>>) -> Self {
+    pub fn new(time_base: BeatTimeBase, rhythms: Vec<Box<dyn Rhythm>>) -> Self {
+        let offset = BeatTimeStep::Beats(0.0);
         let next_events = vec![None; rhythms.len()];
         let held_back_event = None;
         Self {
-            rhythms,
+            time_base,
+            offset,
+            rhythms: Rc::new(RefCell::new(rhythms)),
             next_events,
             held_back_event,
+        }
+    }
+
+    /// Apply the given beat-time step offset to all events.
+    pub fn with_offset<O: Into<Option<BeatTimeStep>>>(&self, offset: O) -> Phrase {
+        Self {
+            time_base: self.time_base,
+            offset: offset.into().unwrap_or(BeatTimeStep::Beats(0.0)),
+            rhythms: self.rhythms.clone(),
+            next_events: self.next_events.clone(),
+            held_back_event: self.held_back_event.clone(),
         }
     }
 
@@ -60,7 +79,12 @@ impl Iterator for Phrase {
 
     fn next(&mut self) -> Option<Self::Item> {
         // fetch next events in all rhythms
-        for (rhythm, next_event) in self.rhythms.iter_mut().zip(self.next_events.iter_mut()) {
+        for (rhythm, next_event) in self
+            .rhythms
+            .borrow_mut()
+            .iter_mut()
+            .zip(self.next_events.iter_mut())
+        {
             if !next_event.is_some() {
                 *next_event = rhythm.next();
             }
@@ -78,7 +102,12 @@ impl Iterator for Phrase {
         if let Some(next_due) = next_due {
             let next = next_due.clone();
             *next_due = None; // consume
-            next
+            if let Some((sample_time, event)) = next {
+                let sample_offset = self.offset.to_samples(&self.time_base) as u64;
+                Some((sample_offset + sample_time, event))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -91,7 +120,7 @@ impl Rhythm for Phrase {
         self.next_events.fill(None);
         self.held_back_event = None;
         // reset all our rhythm iters
-        for rhythm in self.rhythms.iter_mut() {
+        for rhythm in self.rhythms.borrow_mut().iter_mut() {
             rhythm.reset();
         }
     }
