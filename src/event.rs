@@ -5,6 +5,7 @@ use crate::convert::ToFixedEventValue;
 
 use std::fmt::Debug;
 
+pub mod empty;
 pub mod fixed;
 pub mod mapped;
 pub mod mapped_note;
