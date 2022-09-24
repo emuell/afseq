@@ -33,6 +33,7 @@ impl BeatTimeBase {
 #[derive(Copy, Clone)]
 pub enum BeatTimeStep {
     Sixteenth(f32),
+    Eighth(f32),
     Beats(f32),
     Bar(f32),
 }
@@ -42,6 +43,7 @@ impl BeatTimeStep {
     pub fn steps(&self) -> f32 {
         match *self {
             BeatTimeStep::Sixteenth(amount) => amount,
+            BeatTimeStep::Eighth(amount) => amount,
             BeatTimeStep::Beats(amount) => amount,
             BeatTimeStep::Bar(amount) => amount,
         }
@@ -50,6 +52,7 @@ impl BeatTimeStep {
     pub fn samples_per_step(&self, time_base: &BeatTimeBase) -> f64 {
         match *self {
             BeatTimeStep::Sixteenth(_) => time_base.samples_per_beat() / 4.0,
+            BeatTimeStep::Eighth(_) => time_base.samples_per_beat() / 2.0,
             BeatTimeStep::Beats(_) => time_base.samples_per_beat() as f64,
             BeatTimeStep::Bar(_) => time_base.samples_per_bar() as f64,
         }
@@ -81,6 +84,7 @@ impl BeatTimeBase {
         BeatTimeRhythm::new(*self, step)
     }
     generate_step_funcs!(sixteenth, BeatTimeStep::Sixteenth);
+    generate_step_funcs!(eighth, BeatTimeStep::Eighth);
     generate_step_funcs!(beat, BeatTimeStep::Beats);
     generate_step_funcs!(bar, BeatTimeStep::Bar);
 }
