@@ -3,6 +3,7 @@
 use self::fixed::FixedEventIter;
 use crate::convert::ToFixedEventValue;
 
+use core::sync::atomic::{AtomicUsize, Ordering};
 use std::fmt::Debug;
 
 pub mod empty;
@@ -17,6 +18,14 @@ pub mod sequence;
 pub type InstrumentId = usize;
 /// Id to refer to a specific parameter in a ParameterChangeEvent.
 pub type ParameterId = usize;
+
+// -------------------------------------------------------------------------------------------------
+
+/// Generate a new unique instrument id.
+pub fn unique_instrument_id() -> InstrumentId {
+    static ID: AtomicUsize = AtomicUsize::new(0);
+    ID.fetch_add(1, Ordering::Relaxed)
+}
 
 // -------------------------------------------------------------------------------------------------
 
