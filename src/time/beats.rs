@@ -1,16 +1,19 @@
-use crate::{
-    event::EventIter, rhythm::beat_time::BeatTimeRhythm,
-    rhythm::beat_time_sequence::BeatTimeSequenceRhythm, SampleTime,
-};
+use crate::{rhythm::beat_time::BeatTimeRhythm, time::TimeBase};
 
 // -------------------------------------------------------------------------------------------------
 
 /// Beat & bar timing base for beat based [Rhythm](`crate::Rhythm`) impls.
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct BeatTimeBase {
     pub beats_per_min: f32,
     pub beats_per_bar: u32,
     pub samples_per_sec: u32,
+}
+
+impl TimeBase for BeatTimeBase {
+    fn samples_per_second(&self) -> u32 {
+        self.samples_per_sec
+    }
 }
 
 impl BeatTimeBase {
@@ -22,20 +25,12 @@ impl BeatTimeBase {
     pub fn samples_per_bar(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64 * self.beats_per_bar as f64
     }
-
-    /// Convert given sample amount in seconds, using this time bases' samples per second rate.
-    pub fn samples_to_seconds(&self, samples: SampleTime) -> f64 {
-        samples as f64 / self.samples_per_sec as f64
-    }
-    /// Convert given second duration in samples, using this time bases' samples per second rate.
-    pub fn seconds_to_samples(&self, seconds: f64) -> SampleTime {
-        (seconds as f64 * self.samples_per_sec as f64) as SampleTime
-    }
 }
 
 // -------------------------------------------------------------------------------------------------
 
 /// Defines a number of steps in sixteenth, beat or bar amounts.
+#[derive(Copy, Clone)]
 pub enum BeatTimeStep {
     Sixteenth(f32),
     Beats(f32),

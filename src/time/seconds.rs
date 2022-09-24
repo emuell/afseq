@@ -1,24 +1,16 @@
-use crate::{
-    event::EventIter, rhythm::second_time::SecondTimeRhythm,
-    rhythm::second_time_sequence::SecondTimeSequenceRhythm, SampleTime,
-};
+use crate::{rhythm::second_time::SecondTimeRhythm, time::TimeBase};
 
 // -------------------------------------------------------------------------------------------------
 
 /// Second time timing base for beat based [Rhythm](`crate::Rhythm`) impls.
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct SecondTimeBase {
     pub samples_per_sec: u32,
 }
 
-impl SecondTimeBase {
-    /// Convert given sample amount in seconds, using this time bases' samples per second rate.
-    pub fn samples_to_seconds(&self, samples: SampleTime) -> f64 {
-        samples as f64 / self.samples_per_sec as f64
-    }
-    /// Convert given second duration in samples, using this time bases' samples per second rate.
-    pub fn seconds_to_samples(&self, seconds: f64) -> SampleTime {
-        (seconds as f64 * self.samples_per_sec as f64) as SampleTime
+impl TimeBase for SecondTimeBase {
+    fn samples_per_second(&self) -> u32 {
+        self.samples_per_sec
     }
 }
 
