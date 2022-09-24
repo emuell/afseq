@@ -55,18 +55,6 @@ impl Phrase {
     }
 }
 
-impl Rhythm for Phrase {
-    fn reset(&mut self) {
-        // reset our own iter state
-        self.next_events.fill(None);
-        self.held_back_event = None;
-        // reset all our rhythm iters
-        for rhythm in self.rhythms.iter_mut() {
-            rhythm.reset();
-        }
-    }
-}
-
 impl Iterator for Phrase {
     type Item = (SampleTime, Option<Event>);
 
@@ -93,6 +81,18 @@ impl Iterator for Phrase {
             next
         } else {
             None
+        }
+    }
+}
+
+impl Rhythm for Phrase {
+    fn reset(&mut self) {
+        // reset our own iter state
+        self.next_events.fill(None);
+        self.held_back_event = None;
+        // reset all our rhythm iters
+        for rhythm in self.rhythms.iter_mut() {
+            rhythm.reset();
         }
     }
 }

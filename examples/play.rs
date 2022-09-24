@@ -13,14 +13,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut player = AudioFilePlayer::new(audio_output.sink(), None);
 
     // preload all samples
-    let load_file = |file_name| {
-        PreloadedFileSource::new(file_name, None, FilePlaybackOptions::default()).unwrap()
-    };
-
     const KICK: InstrumentId = 0;
     const SNARE: InstrumentId = 1;
     const HIHAT: InstrumentId = 2;
     const FX: InstrumentId = 3;
+    let load_file = |file_name| {
+        PreloadedFileSource::new(file_name, None, FilePlaybackOptions::default()).unwrap()
+    };
     let sample_pool: HashMap<InstrumentId, PreloadedFileSource> = HashMap::from([
         (KICK, load_file("assets/kick.wav")),
         (SNARE, load_file("assets/snare.wav")),
@@ -39,39 +38,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // generate a simple drum sequence
-    let kick_pattern = beat_time_base.every_nth_sixteenth_with_pattern(
-        1.0,
-        [
+    let kick_pattern = beat_time_base
+        .every_nth_sixteenth(1.0)
+        .with_pattern([
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
-        ],
-        new_note_event(KICK, 60, 1.0),
-    );
+        ])
+        .trigger(new_note_event(KICK, 60, 1.0));
 
-    let snare_pattern =
-        beat_time_base.every_nth_beat_with_offset(2.0, 1.0, new_note_event(SNARE, 60, 1.0));
+    let snare_pattern = beat_time_base
+        .every_nth_beat(2.0)
+        .with_offset(BeatTimeStep::Beats(1.0))
+        .trigger(new_note_event(SNARE, 60, 1.0));
 
-    let hihat_pattern = beat_time_base.every_nth_sixteenth_with_offset(
-        2.0,
-        0.0,
-        new_note_event(HIHAT, 60, 1.0).map_notes({
-            let mut step = 0;
-            move |mut note| {
-                note.velocity = 1.0 / (step + 1) as f32;
-                step += 1;
-                if step >= 3 {
-                    step = 0;
+    let hihat_pattern =
+        beat_time_base
+            .every_nth_sixteenth(2.0)
+            .trigger(new_note_event(HIHAT, 60, 1.0).map_notes({
+                let mut step = 0;
+                move |mut note| {
+                    note.velocity = 1.0 / (step + 1) as f32;
+                    step += 1;
+                    if step >= 3 {
+                        step = 0;
+                    }
+                    note
                 }
-                note
-            }
-        }),
-    );
-    let hihat_pattern2 = beat_time_base.every_nth_sixteenth_with_offset(
-        2.0,
-        1.0,
-        new_note_event(HIHAT, 60, 1.0).map_notes({
+            }));
+    let hihat_pattern2 = beat_time_base
+        .every_nth_sixteenth(2.0)
+        .with_offset(BeatTimeStep::Sixteenth(1.0))
+        .trigger(new_note_event(HIHAT, 60, 1.0).map_notes({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |mut note| {
@@ -87,24 +86,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 note
             }
-        }),
-    );
+        }));
 
     let hihat_rhythm = Phrase::new(vec![Box::new(hihat_pattern), Box::new(hihat_pattern2)]);
 
-    let fx_pattern = second_time_base.every_nth_seconds_with_pattern(
-        beat_time_base
-            .samples_to_seconds(BeatTimeStep::Beats(7.0 / 4.0).to_samples(&beat_time_base) as u64),
-        [1, 0, 1, 1],
-        new_note_event(FX, 48, 0.2).map_notes({
-            let mut step = 2;
-            move |mut note| {
-                note.note = 48 + step * 5;
-                step = (step + 1) % 3;
-                note
-            }
-        }),
-    );
+    let fx_pattern =
+        second_time_base
+            .every_nth_seconds(beat_time_base.samples_to_seconds(
+                BeatTimeStep::Beats(7.0 / 4.0).to_samples(&beat_time_base) as u64,
+            ))
+            .with_pattern([1, 0, 1, 1])
+            .trigger(new_note_event(FX, 48, 0.2).map_notes({
+                let mut step = 2;
+                move |mut note| {
+                    note.note = 48 + step * 5;
+                    step = (step + 1) % 3;
+                    note
+                }
+            }));
 
     let mut phrase = Phrase::new(vec![
         Box::new(kick_pattern),

@@ -21,31 +21,7 @@ pub type SecondTimeStep = f64;
 
 /// Shortcuts for creating beat-time based patterns.
 impl SecondTimeBase {
-    pub fn every_nth_seconds<Iter: EventIter + 'static>(
-        &self,
-        step: SecondTimeStep,
-        event_iter: Iter,
-    ) -> SecondTimeRhythm {
-        SecondTimeRhythm::new(self.clone(), step, event_iter)
-    }
-    pub fn every_nth_seconds_with_offset<Iter: EventIter + 'static>(
-        &self,
-        step: SecondTimeStep,
-        offset: SecondTimeStep,
-        event_iter: Iter,
-    ) -> SecondTimeRhythm {
-        SecondTimeRhythm::new_with_offset(self.clone(), step, offset, event_iter)
-    }
-    pub fn every_nth_seconds_with_pattern<
-        Iter: EventIter + 'static,
-        const N: usize,
-        T: Ord + Default,
-    >(
-        &self,
-        step: SecondTimeStep,
-        pattern: [T; N],
-        event_iter: Iter,
-    ) -> SecondTimeSequenceRhythm {
-        SecondTimeSequenceRhythm::new(self.clone(), step, pattern, event_iter)
+    pub fn every_nth_seconds(&self, step: SecondTimeStep) -> SecondTimeRhythm {
+        SecondTimeRhythm::new(*self, step)
     }
 }

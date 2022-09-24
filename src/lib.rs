@@ -21,14 +21,11 @@ pub mod prelude;
 
 #[cfg(test)]
 mod test {
-    use crate::{Phrase, SampleTime};
-
-    use super::{
-        event::Event,
-        event::NoteEvent,
-        event::{fixed::*, mapped::*},
-        rhythm::{beat_time::*, beat_time_sequence::*},
-        time::{BeatTimeBase, BeatTimeStep},
+    use crate::prelude::*;
+    use crate::{
+        event::{fixed::*, mapped::*, *},
+        rhythm::beat_time::*,
+        time::*,
     };
 
     #[test]
@@ -74,14 +71,11 @@ mod test {
         );
 
         let beat_time_emitter =
-            BeatTimeRhythm::new(time_base.clone(), BeatTimeStep::Beats(2.0), note);
+            BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(2.0)).trigger(note);
 
-        let beat_time_pattern_emitter = BeatTimeSequenceRhythm::new(
-            time_base.clone(),
-            BeatTimeStep::Beats(2.0),
-            [1, 0, 0, 1],
-            note_vector,
-        );
+        let beat_time_pattern_emitter = BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(2.0))
+            .with_pattern([1, 0, 0, 1])
+            .trigger(note_vector);
 
         let mut phrase = Phrase::new(vec![
             Box::new(beat_time_emitter),

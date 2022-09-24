@@ -3,9 +3,7 @@
 use crate::{event::Event, SampleTime};
 
 pub mod beat_time;
-pub mod beat_time_sequence;
 pub mod second_time;
-pub mod second_time_sequence;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -19,6 +17,6 @@ pub mod second_time_sequence;
 /// change events, so all emitted events are fetched from some iterator as well and thus may
 /// dynamically change over time as well.
 pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> {
-    /// Resets/rewinds the pattern iterator to its initial state.
+    /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);
 }
