@@ -7,23 +7,30 @@ use afplay::{
 
 use afseq::prelude::*;
 
+#[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create player
     let audio_output = DefaultAudioOutput::open()?;
     let mut player = AudioFilePlayer::new(audio_output.sink(), None);
 
     // preload all samples
-    const KICK: InstrumentId = 0;
-    const SNARE: InstrumentId = 1;
-    const HIHAT: InstrumentId = 2;
-    const FX: InstrumentId = 3;
+    let KICK: InstrumentId = unique_instrument_id();
+    let SNARE: InstrumentId = unique_instrument_id();
+    let HIHAT: InstrumentId = unique_instrument_id();
+    let BASS: InstrumentId = unique_instrument_id();
+    let SYNTH: InstrumentId = unique_instrument_id();
+    let FX: InstrumentId = unique_instrument_id();
+
     let load_file = |file_name| {
         PreloadedFileSource::new(file_name, None, FilePlaybackOptions::default()).unwrap()
     };
+
     let sample_pool: HashMap<InstrumentId, PreloadedFileSource> = HashMap::from([
         (KICK, load_file("assets/kick.wav")),
         (SNARE, load_file("assets/snare.wav")),
         (HIHAT, load_file("assets/hat.wav")),
+        (BASS, load_file("assets/bass.wav")),
+        (SYNTH, load_file("assets/synth.wav")),
         (FX, load_file("assets/fx.wav")),
     ]);
 
@@ -88,29 +95,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }));
 
-    let hihat_rhythm = Phrase::new(vec![Box::new(hihat_pattern), Box::new(hihat_pattern2)]);
+    let hihat_rhythm = Phrase::new(
+        beat_time_base,
+        vec![Box::new(hihat_pattern), Box::new(hihat_pattern2)],
+    )
+    .with_offset(BeatTimeStep::Bar(4.0));
 
-    let fx_pattern =
-        second_time_base
-            .every_nth_seconds(beat_time_base.samples_to_seconds(
-                BeatTimeStep::Beats(7.0 / 4.0).to_samples(&beat_time_base) as u64,
-            ))
-            .with_pattern([1, 0, 1, 1])
-            .trigger(new_note_event(FX, 48, 0.2).map_notes({
-                let mut step = 2;
-                move |mut note| {
-                    note.note = 48 + step * 5;
-                    step = (step + 1) % 3;
-                    note
-                }
-            }));
+    let bass_pattern = beat_time_base
+        .every_nth_eighth(1.0)
+        .with_pattern([
+            1, 0, 0, 0, /**/ 1, 0, 1, 0, /**/ 0, 0, 0, 1, /**/ 0, 0, 0, 0, /**/
+            1, 0, 0, 0, /**/ 1, 0, 1, 0, /**/ 0, 0, 0, 0, /**/ 1, 0, 0, 0, /**/
+        ])
+        .trigger(new_note_event_sequence(vec![
+            (BASS, 60, 0.5),
+            (BASS, 60, 0.5),
+            (BASS, 65, 0.5),
+            (BASS, 58, 0.5),
+        ]));
 
-    let mut phrase = Phrase::new(vec![
-        Box::new(kick_pattern),
-        Box::new(snare_pattern),
-        Box::new(hihat_rhythm),
-        Box::new(fx_pattern),
-    ]);
+    let synth_pattern = beat_time_base
+        .every_nth_bar(4.0)
+        .with_offset(BeatTimeStep::Bar(8.0))
+        .trigger(new_polyphonic_note_sequence_event(vec![
+            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 55, 0.3)],
+            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 53, 0.3)],
+            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 55, 0.3)],
+            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 58, 0.3)],
+        ]));
+
+    let fx_pattern = second_time_base
+        .every_nth_seconds(8.0)
+        .with_offset(48.0)
+        .trigger(new_note_event_sequence(vec![
+            (FX, 48, 0.1),
+            (FX, 60, 0.1),
+            (FX, 65, 0.1),
+        ]));
+
+    let mut phrase = Phrase::new(
+        beat_time_base,
+        vec![
+            Box::new(kick_pattern),
+            Box::new(snare_pattern),
+            Box::new(hihat_rhythm),
+            Box::new(bass_pattern),
+            Box::new(synth_pattern),
+            Box::new(fx_pattern),
+        ],
+    );
 
     // emit notes and feed them into the player
     let print_event = |sample_time: SampleTime, event: &Option<Event>| {
