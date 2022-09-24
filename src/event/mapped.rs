@@ -1,4 +1,4 @@
-use crate::event::{Event, EventIter};
+use crate::event::{fixed::FixedEventIter, Event, EventIter};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -55,5 +55,24 @@ where
     fn reset(&mut self) {
         self.event = self.initial_event.clone();
         self.map = self.initial_map;
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub trait ToMappedEventIter<EventMap>
+where
+    EventMap: FnMut(Event) -> Event + Copy,
+{
+    fn map_events(self, map: EventMap) -> MappedEventIter<EventMap>;
+}
+
+impl<EventMap> ToMappedEventIter<EventMap> for FixedEventIter
+where
+    EventMap: FnMut(Event) -> Event + Copy,
+{
+    /// Upgrade a [`FixedEventIter`] to a [`MappedEventIter`].
+    fn map_events(self, map: EventMap) -> MappedEventIter<EventMap> {
+        MappedEventIter::new(self.event, map)
     }
 }

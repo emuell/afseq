@@ -1,4 +1,4 @@
-use crate::event::{Event, EventIter};
+use crate::event::{Event, EventIter, NoteEvent, ParameterChangeEvent};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -25,5 +25,32 @@ impl Iterator for FixedEventIter {
 impl EventIter for FixedEventIter {
     fn reset(&mut self) {
         // fixed values don't change, so there's nothing to reset
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub trait ToFixedEventValue {
+    fn to_event(self) -> FixedEventIter;
+}
+
+impl ToFixedEventValue for NoteEvent {
+    /// Wrap a [`NoteEvent`] to a new [`FixedEventIter`].
+    fn to_event(self) -> FixedEventIter {
+        FixedEventIter::new(Event::NoteEvents(vec![self]))
+    }
+}
+
+impl ToFixedEventValue for Vec<NoteEvent> {
+    /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`].
+    fn to_event(self) -> FixedEventIter {
+        FixedEventIter::new(Event::NoteEvents(self))
+    }
+}
+
+impl ToFixedEventValue for ParameterChangeEvent {
+    /// Wrap a [`ParameterChangeEvent`] into a new [`FixedEventIter`].
+    fn to_event(self) -> FixedEventIter {
+        FixedEventIter::new(Event::ParameterChangeEvent(self))
     }
 }

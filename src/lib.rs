@@ -2,7 +2,7 @@
 //! Part of the [afplay](https://github.com/emuell/afplay) crates.
 
 pub mod time;
-pub use time::SampleTime;
+pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
 
 pub mod event;
 pub use event::{Event, EventIter};
@@ -12,8 +12,6 @@ pub use rhythm::Rhythm;
 
 pub mod phrase;
 pub use phrase::Phrase;
-
-pub mod convert;
 
 pub mod prelude;
 
