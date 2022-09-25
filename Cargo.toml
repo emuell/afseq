@@ -11,7 +11,10 @@ categories = ["audio", "player", "sequencer"]
 paste = { version = "1.0.9"}
 
 [dev-dependencies]
-afplay = { path = "../afplay", default-features = false, features=["cpal-output"] }
+afplay = { path = "../afplay", default-features = false, features = ["cpal-output"] }
+
+[profile.release]
+debug = 1
 
 [[example]]
 name = "play"
