@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         samples_per_sec: player.output_sample_rate(),
     };
 
-    // generate a simple drum sequence
+    // generate a simple sequence
     let kick_pattern = beat_time_base
         .every_nth_sixteenth(1.0)
         .with_pattern([
@@ -53,31 +53,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
         ])
-        .trigger(new_note_event(KICK, 60, 1.0));
+        .trigger(new_note_event(KICK, "C_4", 1.0));
 
     let snare_pattern = beat_time_base
         .every_nth_beat(2.0)
         .with_offset(BeatTimeStep::Beats(1.0))
-        .trigger(new_note_event(SNARE, 60, 1.0));
+        .trigger(new_note_event(SNARE, "C_4", 1.0));
 
-    let hihat_pattern =
-        beat_time_base
-            .every_nth_sixteenth(2.0)
-            .trigger(new_note_event(HIHAT, 60, 1.0).map_notes({
-                let mut step = 0;
-                move |mut note| {
-                    note.velocity = 1.0 / (step + 1) as f32;
-                    step += 1;
-                    if step >= 3 {
-                        step = 0;
-                    }
-                    note
+    let hihat_pattern = beat_time_base.every_nth_sixteenth(2.0).trigger(
+        new_note_event(HIHAT, "C_4", 1.0).map_notes({
+            let mut step = 0;
+            move |mut note| {
+                note.velocity = 1.0 / (step + 1) as f32;
+                step += 1;
+                if step >= 3 {
+                    step = 0;
                 }
-            }));
+                note
+            }
+        }),
+    );
     let hihat_pattern2 = beat_time_base
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
-        .trigger(new_note_event(HIHAT, 60, 1.0).map_notes({
+        .trigger(new_note_event(HIHAT, "C_4", 1.0).map_notes({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |mut note| {
@@ -86,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if vel_step >= 3 {
                     vel_step = 0;
                 }
-                note.note = 60 + 32 - note_step;
+                note.note = Note::from((Note::C_4 as u8) + 32 - note_step);
                 note_step += 1;
                 if note_step >= 32 {
                     note_step = 0;
@@ -108,29 +107,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1, 0, 0, 0, /**/ 1, 0, 1, 0, /**/ 0, 0, 0, 0, /**/ 1, 0, 0, 0, /**/
         ])
         .trigger(new_note_event_sequence(vec![
-            (BASS, 60, 0.5),
-            (BASS, 60, 0.5),
-            (BASS, 65, 0.5),
-            (BASS, 58, 0.5),
+            (BASS, "C 4", 0.5),
+            (BASS, "C 4", 0.5),
+            (BASS, "F 4", 0.5),
+            (BASS, "A#3", 0.5),
         ]));
 
     let synth_pattern = beat_time_base
         .every_nth_bar(4.0)
         .with_offset(BeatTimeStep::Bar(8.0))
         .trigger(new_polyphonic_note_sequence_event(vec![
-            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 55, 0.3)],
-            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 53, 0.3)],
-            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 55, 0.3)],
-            vec![(SYNTH, 48, 0.3), (SYNTH, 51, 0.3), (SYNTH, 58, 0.3)],
+            vec![
+                (SYNTH, "C 3", 0.3),
+                (SYNTH, "D#3", 0.3),
+                (SYNTH, "G 3", 0.3),
+            ],
+            vec![
+                (SYNTH, "C 3", 0.3),
+                (SYNTH, "D#3", 0.3),
+                (SYNTH, "F 3", 0.3),
+            ],
+            vec![
+                (SYNTH, "C 3", 0.3),
+                (SYNTH, "D#3", 0.3),
+                (SYNTH, "G 3", 0.3),
+            ],
+            vec![
+                (SYNTH, "C 3", 0.3),
+                (SYNTH, "D#3", 0.3),
+                (SYNTH, "A#3", 0.3),
+            ],
         ]));
 
     let fx_pattern = second_time_base
         .every_nth_seconds(8.0)
         .with_offset(48.0)
         .trigger(new_note_event_sequence(vec![
-            (FX, 48, 0.1),
-            (FX, 60, 0.1),
-            (FX, 65, 0.1),
+            (FX, "C 3", 0.1),
+            (FX, "C 4", 0.1),
+            (FX, "F 4", 0.1),
         ]));
 
     let mut phrase = Phrase::new(
@@ -177,7 +192,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         player
                             .play_file_source(
                                 new_source,
-                                speed_from_note(note.note),
+                                speed_from_note(note.note as u8),
                                 Some(sample_time as u64 + playback_delay_in_samples),
                             )
                             .unwrap();
