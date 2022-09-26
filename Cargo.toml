@@ -9,6 +9,8 @@ categories = ["audio", "player", "sequencer"]
 
 [dependencies]
 paste = { version = "1.0.9"}
+rhai = { version = "1.10.1", optional = true, features = ["metadata"] }
+numtraits = { version = "0.0.1" }
 
 [dev-dependencies]
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"] }
@@ -16,5 +18,12 @@ afplay = { path = "../afplay", default-features = false, features = ["cpal-outpu
 [profile.release]
 debug = 1
 
+[features]
+scripting = ["rhai"]
+default = ["scripting"]
+
 [[example]]
 name = "play"
+[[example]]
+name = "play-script"
+required-features = ["scripting"]

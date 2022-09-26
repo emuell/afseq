@@ -22,5 +22,24 @@
       "args": [],
       "cwd": "${workspaceFolder}"
     },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'play-script'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=play-script",
+          "--features=scripting",
+          "--package=afseq"
+        ],
+        "filter": {
+          "name": "play-script",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
   ]
 }
