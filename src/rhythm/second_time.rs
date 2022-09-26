@@ -9,6 +9,7 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 /// Emits `Option(Event)` every nth [`SecondTimeStep`] with an optional pattern and offset.
+#[derive(Clone)]
 pub struct SecondTimeRhythm {
     time_base: SecondTimeBase,
     step: SecondTimeStep,
