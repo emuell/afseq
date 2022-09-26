@@ -10,12 +10,6 @@ pub struct BeatTimeBase {
     pub samples_per_sec: u32,
 }
 
-impl TimeBase for BeatTimeBase {
-    fn samples_per_second(&self) -> u32 {
-        self.samples_per_sec
-    }
-}
-
 impl BeatTimeBase {
     /// Time base's samples per beat, in order to convert beat to sample time and vice versa.
     pub fn samples_per_beat(&self) -> f64 {
@@ -24,6 +18,12 @@ impl BeatTimeBase {
     /// Time base's samples per bar, in order to convert bar to sample time and vice versa.
     pub fn samples_per_bar(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64 * self.beats_per_bar as f64
+    }
+}
+
+impl TimeBase for BeatTimeBase {
+    fn samples_per_second(&self) -> u32 {
+        self.samples_per_sec
     }
 }
 
