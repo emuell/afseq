@@ -12,5 +12,7 @@ pub use rhythm::Rhythm;
 
 pub mod phrase;
 pub use phrase::Phrase;
-
 pub mod prelude;
+
+#[cfg(feature = "scripting")]
+pub mod bindings;
