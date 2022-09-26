@@ -39,6 +39,23 @@ impl SecondTimeRhythm {
         }
     }
 
+    /// Get current time base.
+    pub fn time_base(&self) -> SecondTimeBase {
+        self.time_base
+    }
+    /// Get current step.
+    pub fn step(&self) -> SecondTimeStep {
+        self.step
+    }
+    /// Get current offset.
+    pub fn offset(&self) -> SecondTimeStep {
+        self.offset
+    }
+    /// Get current pattern.
+    pub fn pattern(&self) -> Vec<bool> {
+        self.pattern.to_vec()
+    }
+
     /// Apply the given second offset to all events.
     pub fn with_offset<O: Into<Option<SecondTimeStep>>>(&self, offset: O) -> Self {
         let offset = offset.into().unwrap_or(0.0);

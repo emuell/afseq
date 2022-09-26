@@ -39,6 +39,23 @@ impl BeatTimeRhythm {
         }
     }
 
+    /// Get current time base.
+    pub fn time_base(&self) -> BeatTimeBase {
+        self.time_base
+    }
+    /// Get current step.
+    pub fn step(&self) -> BeatTimeStep {
+        self.step
+    }
+    /// Get current offset.
+    pub fn offset(&self) -> BeatTimeStep {
+        self.offset
+    }
+    /// Get current pattern.
+    pub fn pattern(&self) -> Vec<bool> {
+        self.pattern.to_vec()
+    }
+
     /// Trigger events with the given pattern. Param `pattern` is evaluated as an array of boolean:
     /// when to trigger an event and when not, but can be specified as number array as well to notate
     /// things shorter: e.g. via \[0,1,1,1,0\].  
@@ -68,6 +85,12 @@ impl BeatTimeRhythm {
             event_iter_sample_time,
             ..*self
         }
+    }
+    /// Apply the given offset in out step's timing resolution to all events.
+    pub fn with_offset_in_step(&self, offset: f32) -> Self {
+        let mut offset_steps = self.step;
+        offset_steps.set_steps(offset);
+        self.with_offset(offset_steps)
     }
 
     /// Use the given [`EventIter`] to trigger events.

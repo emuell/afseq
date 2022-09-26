@@ -30,7 +30,7 @@ impl TimeBase for BeatTimeBase {
 // -------------------------------------------------------------------------------------------------
 
 /// Defines a number of steps in sixteenth, beat or bar amounts.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum BeatTimeStep {
     Sixteenth(f32),
     Eighth(f32),
@@ -48,13 +48,23 @@ impl BeatTimeStep {
             BeatTimeStep::Bar(amount) => amount,
         }
     }
+    /// Set number of steps in the current time range.
+    pub fn set_steps(&mut self, step: f32) {
+        match *self {
+            BeatTimeStep::Sixteenth(_) => *self = BeatTimeStep::Sixteenth(step),
+            BeatTimeStep::Eighth(_) => *self = BeatTimeStep::Eighth(step),
+            BeatTimeStep::Beats(_) => *self = BeatTimeStep::Beats(step),
+            BeatTimeStep::Bar(_) => *self = BeatTimeStep::Bar(step),
+        };
+    }
+
     /// Get number of samples for a single step.
     pub fn samples_per_step(&self, time_base: &BeatTimeBase) -> f64 {
         match *self {
             BeatTimeStep::Sixteenth(_) => time_base.samples_per_beat() / 4.0,
             BeatTimeStep::Eighth(_) => time_base.samples_per_beat() / 2.0,
-            BeatTimeStep::Beats(_) => time_base.samples_per_beat() as f64,
-            BeatTimeStep::Bar(_) => time_base.samples_per_bar() as f64,
+            BeatTimeStep::Beats(_) => time_base.samples_per_beat(),
+            BeatTimeStep::Bar(_) => time_base.samples_per_bar(),
         }
     }
     /// Convert a beat or bar step to samples for the given beat time base.
