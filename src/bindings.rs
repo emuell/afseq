@@ -1,31 +1,25 @@
 //! Rhai script bindings for the entire crate.
-use std::sync::atomic::{AtomicU32, AtomicUsize};
 
 use crate::prelude::*;
 use crate::{event::fixed::FixedEventIter, rhythm::beat_time::BeatTimeRhythm, BeatTimeBase};
 
 use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, NativeCallContext, FLOAT, INT};
 
-static SAMPLE_RATE: AtomicU32 = AtomicU32::new(44100);
-static INSTRUMENT_ID: AtomicUsize = AtomicUsize::new(usize::MAX);
-
 // ---------------------------------------------------------------------------------------------
 
-pub fn set_global_binding_state<I: Into<Option<InstrumentId>>>(sample_rate: u32, instrument_id: I) {
-    SAMPLE_RATE.store(sample_rate, std::sync::atomic::Ordering::Relaxed);
+pub fn register_bindings(
+    engine: &mut Engine,
+    default_time_base: BeatTimeBase,
+    default_instrument: Option<InstrumentId>,
+) {
+    // Defaults
+    engine
+        .register_fn("__default_instrument", move || default_instrument)
+        .register_fn("__default_beat_time", move || default_time_base);
 
-    let instrument_id = instrument_id.into();
-    INSTRUMENT_ID.store(
-        instrument_id.unwrap_or(usize::MAX),
-        std::sync::atomic::Ordering::Relaxed,
-    );
-}
-
-// ---------------------------------------------------------------------------------------------
-
-pub fn register_bindings(engine: &mut Engine) {
     // Global
     engine
+        .register_fn("beat_time", default_beat_time)
         .register_fn("beat_time", beat_time)
         .register_fn("note", note)
         .register_fn("note", note_vec)
@@ -48,34 +42,34 @@ pub fn register_bindings(engine: &mut Engine) {
 // ---------------------------------------------------------------------------------------------
 // Global
 
+fn default_beat_time(context: NativeCallContext) -> Result<BeatTimeBase, Box<EvalAltResult>> {
+    eval_default_beat_time(context.engine())
+}
+
 fn beat_time(
     context: NativeCallContext,
     beats_per_min: Dynamic,
     beats_per_bar: Dynamic,
 ) -> Result<BeatTimeBase, Box<EvalAltResult>> {
+    let default_beat_time = eval_default_beat_time(context.engine())?;
     let bpm = unwrap_float(&context, beats_per_min, "beats_per_min")? as f32;
     let bpb = unwrap_integer(&context, beats_per_bar, "beats_per_bar")? as u32;
     Ok(BeatTimeBase {
         beats_per_min: bpm,
         beats_per_bar: bpb,
-        samples_per_sec: SAMPLE_RATE.load(std::sync::atomic::Ordering::Relaxed),
+        samples_per_sec: default_beat_time.samples_per_second(),
     })
 }
 
 fn note(
     context: NativeCallContext,
-    s: ImmutableString,
+    string: ImmutableString,
     velocity: FLOAT,
 ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    let instrument = INSTRUMENT_ID.load(std::sync::atomic::Ordering::Relaxed);
-    let instrument = if instrument == usize::MAX {
-        None
-    } else {
-        Some(instrument)
-    };
+    let instrument = eval_default_instrument(context.engine())?;
     Ok(new_note_event(
         instrument,
-        unwrap_note_from_string(&context, s.as_str())?,
+        unwrap_note_from_string(&context, string.as_str())?,
         velocity as f32,
     ))
 }
@@ -84,12 +78,7 @@ fn note_vec(
     context: NativeCallContext,
     array: Array,
 ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    let instrument = INSTRUMENT_ID.load(std::sync::atomic::Ordering::Relaxed);
-    let instrument = if instrument == usize::MAX {
-        None
-    } else {
-        Some(instrument)
-    };
+    let instrument = eval_default_instrument(context.engine())?;
     let mut sequence = Vec::with_capacity(array.len());
     for item in array {
         let note_item_array = item.into_array()?;
@@ -120,12 +109,7 @@ fn note_vec_seq(
     // NB: array arg may be a:
     // [[NOTE, VEL], ..] -> sequence of single notes
     // [[[NOTE, VEL], ..], [[NOTE, VEL]]] -> sequence of poly notes
-    let instrument = INSTRUMENT_ID.load(std::sync::atomic::Ordering::Relaxed);
-    let instrument = if instrument == usize::MAX {
-        None
-    } else {
-        Some(instrument)
-    };
+    let instrument = eval_default_instrument(context.engine())?;
     let mut event_sequence = Vec::with_capacity(array.len());
     for item1_dyn in array {
         let item1_array_result = item1_dyn.into_array();
@@ -251,11 +235,19 @@ fn with_offset(
 }
 
 fn trigger_fixed_event(this: &mut BeatTimeRhythm, event: FixedEventIter) -> BeatTimeRhythm {
-    this.trigger::<FixedEventIter>(event)
+    this.trigger(event)
 }
 
 // ---------------------------------------------------------------------------------------------
 // Binding helpers
+
+fn eval_default_instrument(engine: &Engine) -> Result<Option<InstrumentId>, Box<EvalAltResult>> {
+    engine.eval_expression::<Option<InstrumentId>>("__default_instrument()")
+}
+
+fn eval_default_beat_time(engine: &Engine) -> Result<BeatTimeBase, Box<EvalAltResult>> {
+    engine.eval_expression::<BeatTimeBase>("__default_beat_time()")
+}
 
 fn unwrap_float(
     context: &NativeCallContext,
@@ -349,21 +341,53 @@ fn unwrap_note_from_string(
 #[cfg(test)]
 mod test {
     use crate::{
+        bindings::eval_default_instrument,
         event::{fixed::FixedEventIter, Event, Note},
         prelude::BeatTimeStep,
         rhythm::beat_time::BeatTimeRhythm,
         BeatTimeBase,
     };
 
-    use super::{register_bindings, set_global_binding_state};
+    use super::{eval_default_beat_time, register_bindings};
     use rhai::{Dynamic, Engine};
+
+    #[test]
+    fn defaults() {
+        // create a new engine and register bindings
+        let mut engine = Engine::new();
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 160.0,
+                beats_per_bar: 6,
+                samples_per_sec: 96000,
+            },
+            Some(76),
+        );
+
+        assert!(eval_default_beat_time(&engine).is_ok());
+        let default_beat_time = eval_default_beat_time(&engine).unwrap();
+        assert_eq!(default_beat_time.beats_per_min, 160.0);
+        assert_eq!(default_beat_time.beats_per_bar, 6);
+        assert_eq!(default_beat_time.samples_per_sec, 96000);
+
+        assert!(eval_default_instrument(&engine).is_ok());
+        assert_eq!(eval_default_instrument(&engine).unwrap(), Some(76));
+    }
 
     #[test]
     fn note() {
         // create a new engine and register bindings
         let mut engine = Engine::new();
-        set_global_binding_state(4800, None);
-        register_bindings(&mut engine); // NoteEvent
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 120.0,
+                beats_per_bar: 4,
+                samples_per_sec: 44100,
+            },
+            None,
+        );
 
         // Note
         assert!(engine.eval::<Dynamic>(r#"note("X#1", 0.5)"#).is_err());
@@ -464,10 +488,22 @@ mod test {
     fn beat_time() {
         // create a new engine and register bindings
         let mut engine = Engine::new();
-        set_global_binding_state(4800, None);
-        register_bindings(&mut engine);
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 120.0,
+                beats_per_bar: 4,
+                samples_per_sec: 44100,
+            },
+            None,
+        );
 
         // BeatTime
+        assert!(engine
+            .eval::<Dynamic>("beat_time()",)
+            .unwrap()
+            .try_cast::<BeatTimeBase>()
+            .is_some());
         assert!(engine
             // int -> float, float -> int casts
             .eval::<Dynamic>("beat_time(120, 4.0)",)
