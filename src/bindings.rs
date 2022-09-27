@@ -1,10 +1,8 @@
+//! Rhai script bindings for the entire crate.
 use std::sync::atomic::{AtomicU32, AtomicUsize};
 
 use crate::prelude::*;
-use crate::{
-    event::fixed::FixedEventIter, event::sequence::EventIterSequence,
-    rhythm::beat_time::BeatTimeRhythm, BeatTimeBase,
-};
+use crate::{event::fixed::FixedEventIter, rhythm::beat_time::BeatTimeRhythm, BeatTimeBase};
 
 use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, FLOAT, INT};
 
@@ -101,7 +99,7 @@ fn note_vec(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
     Ok(new_polyphonic_note_event(sequence))
 }
 
-fn note_vec_seq(array: Array) -> Result<EventIterSequence, Box<EvalAltResult>> {
+fn note_vec_seq(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
     // NB: array arg may be a:
     // [[NOTE, VEL], ..] -> sequence of single notes
     // [[[NOTE, VEL], ..], [[NOTE, VEL]]] -> sequence of poly notes
@@ -259,7 +257,7 @@ fn unwrap_integer(d: Dynamic, arg_name: &str, func_name: &str) -> Result<INT, Bo
 #[cfg(test)]
 mod test {
     use crate::{
-        event::{fixed::FixedEventIter, sequence::EventIterSequence, Event, Note},
+        event::{fixed::FixedEventIter, Event, Note},
         prelude::BeatTimeStep,
         rhythm::beat_time::BeatTimeRhythm,
         BeatTimeBase,
@@ -285,7 +283,7 @@ mod test {
         } else {
             let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
             assert!(
-                if let Event::NoteEvents(notes) = note_event.unwrap().event() {
+                if let Event::NoteEvents(notes) = &note_event.unwrap().events()[0] {
                     notes.len() == 1
                         && notes[0].note == Note::from("C#1")
                         && notes[0].velocity == 0.5
@@ -308,7 +306,7 @@ mod test {
         } else {
             let poly_note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
             assert!(poly_note_event.is_some());
-            let note_event = poly_note_event.unwrap().event();
+            let note_event = &poly_note_event.unwrap().events()[0];
             assert!(if let Event::NoteEvents(notes) = &note_event {
                 notes.len() == 2
                     && notes[0].note == Note::from("C#1")
@@ -325,7 +323,7 @@ mod test {
         if let Err(err) = eval_result {
             panic!("{}", err);
         } else {
-            let note_sequence_event = eval_result.unwrap().try_cast::<EventIterSequence>();
+            let note_sequence_event = eval_result.unwrap().try_cast::<FixedEventIter>();
             assert!(note_sequence_event.is_some());
             let note_events = note_sequence_event.unwrap().events();
             assert!(if let Event::NoteEvents(notes) = &note_events[0] {
@@ -347,7 +345,7 @@ mod test {
                    ])"#,
             )
             .unwrap()
-            .try_cast::<EventIterSequence>();
+            .try_cast::<FixedEventIter>();
         assert!(poly_note_sequence_event.is_some());
         let note_events = poly_note_sequence_event.unwrap().events();
         assert!(if let Event::NoteEvents(notes) = &note_events[0] {
