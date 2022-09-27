@@ -63,14 +63,18 @@ fn beat_time(
     })
 }
 
-fn note(s: ImmutableString, velocity: FLOAT) -> FixedEventIter {
+fn note(s: ImmutableString, velocity: FLOAT) -> Result<FixedEventIter, Box<EvalAltResult>> {
     let instrument = INSTRUMENT_ID.load(std::sync::atomic::Ordering::Relaxed);
     let instrument = if instrument == usize::MAX {
         None
     } else {
         Some(instrument)
     };
-    new_note_event(instrument, Note::from(s.as_str()), velocity as f32)
+    Ok(new_note_event(
+        instrument,
+        Note::try_from(s.as_str())?,
+        velocity as f32,
+    ))
 }
 
 fn note_vec(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -90,7 +94,7 @@ fn note_vec(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
             )
             .into());
         }
-        let note = Note::from(note_item_array[0].clone().into_string()?.as_str());
+        let note = Note::try_from(note_item_array[0].clone().into_string()?.as_str())?;
         let velocity = unwrap_float(note_item_array[1].clone(), "velocity", "seq_vec")? as f32;
         sequence.push((instrument, note, velocity));
     }
@@ -124,7 +128,7 @@ fn note_vec_seq(array: Array) -> Result<EventIterSequence, Box<EvalAltResult>> {
                 )
                 .into());
             }
-            let note = Note::from(item1_arr[0].clone().into_string()?.as_str());
+            let note = Note::try_from(item1_arr[0].clone().into_string()?.as_str())?;
             let velocity = unwrap_float(item1_arr[1].clone(), "velocity", "seq_vec")? as f32;
             note_events.push((instrument, note, velocity));
         } else {
@@ -142,7 +146,7 @@ fn note_vec_seq(array: Array) -> Result<EventIterSequence, Box<EvalAltResult>> {
                     )
                     .into());
                 }
-                let note = Note::from(item2_arr[0].clone().into_string()?.as_str());
+                let note = Note::try_from(item2_arr[0].clone().into_string()?.as_str())?;
                 let velocity = unwrap_float(item2_arr[1].clone(), "velocity", "seq_vec")? as f32;
                 note_events.push((instrument, note, velocity));
             }
@@ -272,6 +276,7 @@ mod test {
         register_bindings(&mut engine); // NoteEvent
 
         // Note
+        assert!(engine.eval::<Dynamic>(r#"note("X#1", 0.5)"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", "0.5")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5, 1.0)"#).is_err());
         let eval_result = engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#);
@@ -291,6 +296,9 @@ mod test {
         }
 
         let eval_result = engine.eval::<Dynamic>(r#"note([["C#1", 0.5], ["G2", 0.75]])"#);
+        assert!(engine
+            .eval::<Dynamic>(r#"note([["Note", 0.5, 1.0]])"#)
+            .is_err());
         assert!(engine
             .eval::<Dynamic>(r#"note([["C#1", 0.5, 1.0]])"#)
             .is_err());

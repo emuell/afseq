@@ -46,7 +46,7 @@ pub fn unique_instrument_id() -> InstrumentId {
 /// `C4` (plain), `C-1` (minus 1 octave), `C#1` (sharps), `Db1` (flats),
 /// `D_2` (using _ as optional separator), `G 5` (using space as optional separator)
 ///
-/// Beware: From<&str> wil panic when string to note parsing failed!
+/// Beware: From<&str> wil panic when string to note parsing failed! Use Note::try_from then instead.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 #[allow(non_camel_case_types)]
@@ -181,6 +181,108 @@ pub enum Note {
     G_9 = 0x7F,
 }
 
+impl Note {
+    /// Try converting the iven string to a Note
+    pub fn try_from(s: &str) -> Result<Self, String> {
+        fn is_sharp_symbol(s: &str, index: usize) -> bool {
+            if let Some(c) = s.chars().nth(index) {
+                if c == 'S' || c == 's' || c == '#' || c == '♮' {
+                    return true;
+                }
+            }
+            false
+        }
+        fn is_flat_symbol(s: &str, index: usize) -> bool {
+            if let Some(c) = s.chars().nth(index) {
+                if c == 'B' || c == 'b' || c == '♭' {
+                    return true;
+                }
+            }
+            false
+        }
+        fn is_empty_symbol(s: &str, index: usize) -> bool {
+            if let Some(c) = s.chars().nth(index) {
+                // NB: don't allow '-': it's used for negative octaves
+                if c == ' ' || c == '_' {
+                    return true;
+                }
+            }
+            false
+        }
+        fn octave_value_at(s: &str, index: usize) -> Result<i32, String> {
+            if let Some(c) = s.chars().nth(index) {
+                let octave = match c {
+                    '-' => match octave_value_at(s, index + 1) {
+                        Ok(octave) => -octave,
+                        Err(err) => return Err(err),
+                    },
+                    '0' => 0,
+                    '1' => 1,
+                    '2' => 2,
+                    '3' => 3,
+                    '4' => 4,
+                    '5' => 5,
+                    '6' => 6,
+                    '7' => 7,
+                    '8' => 8,
+                    '9' => 9,
+                    _ => {
+                        return Err(format!(
+                            "Unexpected note str {} (invalid octave character '{}')",
+                            s, c
+                        ))
+                    }
+                };
+                Ok(octave)
+            } else {
+                Err(format!("Invalid note str: {} (too short)", s))
+            }
+        }
+        fn note_value_at(s: &str, index: usize) -> Result<i8, String> {
+            if let Some(c) = s.chars().nth(index) {
+                let note = match c {
+                    'c' | 'C' => 0,
+                    'd' | 'D' => 2,
+                    'e' | 'E' => 4,
+                    'f' | 'F' => 5,
+                    'g' | 'G' => 7,
+                    'a' | 'A' => 9,
+                    'b' | 'B' => 11,
+                    _ => {
+                        return Err(format!(
+                            "Invalid note str '{}' (unexpected note character '{}')",
+                            s, c
+                        ))
+                    }
+                };
+                if is_sharp_symbol(s, 1) {
+                    Ok(note + 1)
+                } else if is_flat_symbol(s, 1) {
+                    Ok(note - 1)
+                } else {
+                    Ok(note)
+                }
+            } else {
+                return Err(format!("Invalid note str '{}' (too short)", s));
+            }
+        }
+
+        let note = note_value_at(s, 0)? as i32;
+        let octave = if is_sharp_symbol(s, 1) || is_flat_symbol(s, 1) || is_empty_symbol(s, 1) {
+            octave_value_at(s, 2)?
+        } else {
+            octave_value_at(s, 1)?
+        };
+        if octave < -1 || octave > 9 {
+            return Err(format!(
+                "Invalid note str '{}' (octave out of range '{}')",
+                s, octave
+            ));
+        }
+        Ok(((octave * 12 + 12 + note) as u8).into())
+    }
+}
+
 impl From<u8> for Note {
     #[inline(always)]
     fn from(n: u8) -> Note {
@@ -211,96 +313,10 @@ impl From<Note> for i8 {
 
 impl From<&str> for Note {
     fn from(s: &str) -> Self {
-        fn is_sharp_symbol(s: &str, index: usize) -> bool {
-            if let Some(c) = s.chars().nth(index) {
-                if c == 'S' || c == 's' || c == '#' || c == '♮' {
-                    return true;
-                }
-            }
-            false
+        match Self::try_from(s) {
+            Ok(n) => n,
+            Err(err) => panic!("{}", err),
         }
-        fn is_flat_symbol(s: &str, index: usize) -> bool {
-            if let Some(c) = s.chars().nth(index) {
-                if c == 'B' || c == 'b' || c == '♭' {
-                    return true;
-                }
-            }
-            false
-        }
-        fn is_empty_symbol(s: &str, index: usize) -> bool {
-            if let Some(c) = s.chars().nth(index) {
-                // NB: don't allow '-': it's used for negative octaves
-                if c == ' ' || c == '_' {
-                    return true;
-                }
-            }
-            false
-        }
-
-        fn octave_value_at(s: &str, index: usize) -> i32 {
-            if let Some(c) = s.chars().nth(index) {
-                match c {
-                    '-' => -octave_value_at(s, index + 1),
-                    '0' => 0,
-                    '1' => 1,
-                    '2' => 2,
-                    '3' => 3,
-                    '4' => 4,
-                    '5' => 5,
-                    '6' => 6,
-                    '7' => 7,
-                    '8' => 8,
-                    '9' => 9,
-                    _ => panic!(
-                        "Unexpected note str {} (invalid octave character '{}')",
-                        s, c
-                    ),
-                }
-            } else {
-                panic!("Invalid note str: {} (too short)", s)
-            }
-        }
-
-        fn note_value_at(s: &str, index: usize) -> i8 {
-            if let Some(c) = s.chars().nth(index) {
-                let note = match c {
-                    'c' | 'C' => 0,
-                    'd' | 'D' => 2,
-                    'e' | 'E' => 4,
-                    'f' | 'F' => 5,
-                    'g' | 'G' => 7,
-                    'a' | 'A' => 9,
-                    'b' | 'B' => 11,
-                    _ => panic!(
-                        "Invalid note str '{}' (unexpected note character '{}')",
-                        s, c
-                    ),
-                };
-                if is_sharp_symbol(s, 1) {
-                    note + 1
-                } else if is_flat_symbol(s, 1) {
-                    note - 1
-                } else {
-                    note
-                }
-            } else {
-                panic!("Invalid note str '{}' (too short)", s);
-            }
-        }
-
-        let note = note_value_at(s, 0) as i32;
-        let octave = if is_sharp_symbol(s, 1) || is_flat_symbol(s, 1) || is_empty_symbol(s, 1) {
-            octave_value_at(s, 2)
-        } else {
-            octave_value_at(s, 1)
-        };
-        if octave < -1 || octave > 9 {
-            panic!(
-                "Invalid note str '{}' (octave out of range '{}')",
-                s, octave
-            );
-        }
-        ((octave * 12 + 12 + note) as u8).into()
     }
 }
 
@@ -528,24 +544,12 @@ mod test {
 
     #[test]
     fn note_deserialization() {
-        use std::panic;
-
-        fn catch_unwind_silent<F: FnOnce() -> R + panic::UnwindSafe, R>(
-            f: F,
-        ) -> std::thread::Result<R> {
-            let prev_hook = panic::take_hook();
-            panic::set_hook(Box::new(|_| {}));
-            let result = panic::catch_unwind(f);
-            panic::set_hook(prev_hook);
-            result
-        }
-
-        assert!(catch_unwind_silent(|| Note::from("")).is_err());
-        assert!(catch_unwind_silent(|| Note::from("x4")).is_err());
-        assert!(catch_unwind_silent(|| Note::from("c-2")).is_err());
-        assert!(catch_unwind_silent(|| Note::from("cc2")).is_err());
-        assert!(catch_unwind_silent(|| Note::from("cbb2")).is_err());
-        assert!(catch_unwind_silent(|| Note::from("c##2")).is_err());
+        assert!(Note::try_from("").is_err());
+        assert!(Note::try_from("x4").is_err());
+        assert!(Note::try_from("c-2").is_err());
+        assert!(Note::try_from("cc2").is_err());
+        assert!(Note::try_from("cbb2").is_err());
+        assert!(Note::try_from("c##2").is_err());
         assert_eq!(Note::from("C4"), Note::C_4);
         assert_eq!(Note::from("Cb4"), Note::B_3);
         assert_eq!(Note::from("C#3"), Note::CS3);
