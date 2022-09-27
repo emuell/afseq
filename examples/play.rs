@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hihat_pattern = beat_time_base.every_nth_sixteenth(2.0).trigger(
         new_note_event(HIHAT, "C_4", 1.0).map_notes({
             let mut step = 0;
-            move |mut note| {
+            move |mut note, _voice_index| {
                 note.velocity = 1.0 / (step + 1) as f32;
                 step += 1;
                 if step >= 3 {
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .trigger(new_note_event(HIHAT, "C_4", 1.0).map_notes({
             let mut vel_step = 0;
             let mut note_step = 0;
-            move |mut note| {
+            move |mut note, _voice_index| {
                 note.velocity = 1.0 / (vel_step + 1) as f32 * 0.5;
                 vel_step += 1;
                 if vel_step >= 3 {

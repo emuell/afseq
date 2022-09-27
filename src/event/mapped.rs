@@ -9,24 +9,30 @@ pub struct MappedEventIter<F>
 where
     F: FnMut(Event) -> Event + Copy,
 {
-    event: Event,
-    initial_event: Event,
+    events: Vec<Event>,
+    initial_events: Vec<Event>,
     map: F,
     initial_map: F,
+    current: usize,
 }
 
 impl<F> MappedEventIter<F>
 where
     F: FnMut(Event) -> Event + Copy,
 {
-    pub fn new(event: Event, map: F) -> Self {
+    pub fn new(events: Vec<Event>, map: F) -> Self {
         let mut initial_map = map;
-        let initial_event = Self::mutate(event, &mut initial_map);
+        let mut initial_events = events;
+        if !initial_events.is_empty() {
+            initial_events[0] = Self::mutate(initial_events[0].clone(), &mut initial_map);
+        }
+        let current = 0;
         Self {
-            event: initial_event.clone(),
-            initial_event,
+            events: initial_events.clone(),
+            initial_events,
             map: initial_map,
             initial_map,
+            current,
         }
     }
 
@@ -42,8 +48,12 @@ where
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let current = self.event.clone();
-        self.event = Self::mutate(self.event.clone(), &mut self.map);
+        let current = self.events[self.current].clone();
+        self.events[self.current] = Self::mutate(current.clone(), &mut self.map);
+        self.current += 1;
+        if self.current >= self.events.len() {
+            self.current = 0;
+        }
         Some(current)
     }
 }
@@ -53,8 +63,9 @@ where
     F: FnMut(Event) -> Event + Copy,
 {
     fn reset(&mut self) {
-        self.event = self.initial_event.clone();
+        self.events = self.initial_events.clone();
         self.map = self.initial_map;
+        self.current = 0;
     }
 }
 
@@ -73,6 +84,6 @@ where
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedEventIter`].
     fn map_events(self, map: EventMap) -> MappedEventIter<EventMap> {
-        MappedEventIter::new(self.event(), map)
+        MappedEventIter::new(self.events(), map)
     }
 }

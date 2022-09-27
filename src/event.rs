@@ -1,9 +1,6 @@
 //! Value and value iters which get emitted by `Rhythms`.
 
-use self::{
-    fixed::{FixedEventIter, ToFixedEventValue},
-    sequence::{EventIterSequence, ToEventIterSequence},
-};
+use self::fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use std::{
@@ -15,7 +12,6 @@ pub mod empty;
 pub mod fixed;
 pub mod mapped;
 pub mod mapped_note;
-pub mod sequence;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -409,7 +405,7 @@ pub fn new_note_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 /// Shortcut for creating a new sequence of [`NoteEvent`] [`EventIter`].
 pub fn new_note_event_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     sequence: Vec<(I, N, f32)>,
-) -> EventIterSequence {
+) -> FixedEventIter {
     new_note_vector(sequence).to_event_sequence()
 }
 
@@ -425,7 +421,7 @@ pub fn new_polyphonic_note_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 /// e.g. a sequence of chords.
 pub fn new_polyphonic_note_sequence_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     polyphonic_sequence: Vec<Vec<(I, N, f32)>>,
-) -> EventIterSequence {
+) -> FixedEventIter {
     new_polyphonic_note_sequence(polyphonic_sequence).to_event_sequence()
 }
 
