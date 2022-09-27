@@ -224,14 +224,14 @@ impl Note {
                     '9' => 9,
                     _ => {
                         return Err(format!(
-                            "Unexpected note str {} (invalid octave character '{}')",
+                            "Invalid note str '{}' - octave character '{}' is invalid.",
                             s, c
                         ))
                     }
                 };
                 Ok(octave)
             } else {
-                Err(format!("Invalid note str: {} (too short)", s))
+                Err(format!("Invalid note str '{}' - string is too short.", s))
             }
         }
         fn note_value_at(s: &str, index: usize) -> Result<i8, String> {
@@ -246,7 +246,7 @@ impl Note {
                     'b' | 'B' => 11,
                     _ => {
                         return Err(format!(
-                            "Invalid note str '{}' (unexpected note character '{}')",
+                            "Invalid note str '{}' - note character '{}' is invalid.",
                             s, c
                         ))
                     }
@@ -259,7 +259,7 @@ impl Note {
                     Ok(note)
                 }
             } else {
-                return Err(format!("Invalid note str '{}' (too short)", s));
+                return Err(format!("Invalid note str '{}' - string is too short.", s));
             }
         }
 
@@ -271,7 +271,7 @@ impl Note {
         };
         if octave < -1 || octave > 9 {
             return Err(format!(
-                "Invalid note str '{}' (octave out of range '{}')",
+                "Invalid note str '{}' - octave '{}' is out of range.",
                 s, octave
             ));
         }

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU32, AtomicUsize};
 use crate::prelude::*;
 use crate::{event::fixed::FixedEventIter, rhythm::beat_time::BeatTimeRhythm, BeatTimeBase};
 
-use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, FLOAT, INT};
+use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, NativeCallContext, FLOAT, INT};
 
 static SAMPLE_RATE: AtomicU32 = AtomicU32::new(44100);
 static INSTRUMENT_ID: AtomicUsize = AtomicUsize::new(usize::MAX);
@@ -49,11 +49,12 @@ pub fn register_bindings(engine: &mut Engine) {
 // Global
 
 fn beat_time(
+    context: NativeCallContext,
     beats_per_min: Dynamic,
     beats_per_bar: Dynamic,
 ) -> Result<BeatTimeBase, Box<EvalAltResult>> {
-    let bpm = unwrap_float(beats_per_min, "beats_per_min", "beat_time")? as f32;
-    let bpb = unwrap_integer(beats_per_bar, "beats_per_bar", "beat_time")? as u32;
+    let bpm = unwrap_float(&context, beats_per_min, "beats_per_min")? as f32;
+    let bpb = unwrap_integer(&context, beats_per_bar, "beats_per_bar")? as u32;
     Ok(BeatTimeBase {
         beats_per_min: bpm,
         beats_per_bar: bpb,
@@ -61,7 +62,11 @@ fn beat_time(
     })
 }
 
-fn note(s: ImmutableString, velocity: FLOAT) -> Result<FixedEventIter, Box<EvalAltResult>> {
+fn note(
+    context: NativeCallContext,
+    s: ImmutableString,
+    velocity: FLOAT,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
     let instrument = INSTRUMENT_ID.load(std::sync::atomic::Ordering::Relaxed);
     let instrument = if instrument == usize::MAX {
         None
@@ -70,12 +75,15 @@ fn note(s: ImmutableString, velocity: FLOAT) -> Result<FixedEventIter, Box<EvalA
     };
     Ok(new_note_event(
         instrument,
-        Note::try_from(s.as_str())?,
+        unwrap_note_from_string(&context, s.as_str())?,
         velocity as f32,
     ))
 }
 
-fn note_vec(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
+fn note_vec(
+    context: NativeCallContext,
+    array: Array,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
     let instrument = INSTRUMENT_ID.load(std::sync::atomic::Ordering::Relaxed);
     let instrument = if instrument == usize::MAX {
         None
@@ -86,20 +94,29 @@ fn note_vec(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
     for item in array {
         let note_item_array = item.into_array()?;
         if note_item_array.len() != 2 {
-            return Err(format!(
-                "Expected 2 items in note array ['note', 'velocity'], got '{}' items",
-                note_item_array.len()
+            return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Expected 2 items in note array in function '{}', got '{}' items",
+                    context.fn_name(),
+                    note_item_array.len()
+                )
+                .into(),
+                context.position(),
             )
             .into());
         }
-        let note = Note::try_from(note_item_array[0].clone().into_string()?.as_str())?;
-        let velocity = unwrap_float(note_item_array[1].clone(), "velocity", "seq_vec")? as f32;
+        let note = unwrap_note(&context, note_item_array[0].clone())?;
+        let velocity = unwrap_float(&context, note_item_array[1].clone(), "velocity")? as f32;
         sequence.push((instrument, note, velocity));
     }
     Ok(new_polyphonic_note_event(sequence))
 }
 
-fn note_vec_seq(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
+fn note_vec_seq(
+    context: NativeCallContext,
+    array: Array,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
     // NB: array arg may be a:
     // [[NOTE, VEL], ..] -> sequence of single notes
     // [[[NOTE, VEL], ..], [[NOTE, VEL]]] -> sequence of poly notes
@@ -113,21 +130,37 @@ fn note_vec_seq(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
     for item1_dyn in array {
         let item1_array_result = item1_dyn.into_array();
         if let Err(other_type) = item1_array_result {
-            return Err(format!("Expected 'array', got '{}'", other_type).into());
+            return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Expected 'array' arg in function '{}', got '{}'",
+                    context.fn_name(),
+                    other_type
+                )
+                .into(),
+                context.position(),
+            )
+            .into());
         }
         let item1_arr = item1_array_result.unwrap();
         let mut note_events = Vec::with_capacity(item1_arr.len());
         if !item1_arr.is_empty() && item1_arr[0].type_name() == "string" {
             // Vec<Vec<NOTE, VEL>>
             if item1_arr.len() != 2 {
-                return Err(format!(
-                    "Expected 2 items in note array ['note', 'velocity'], got '{}' items",
-                    item1_arr.len()
+                return Err(EvalAltResult::ErrorInModule(
+                    "bindings".to_string(),
+                    format!(
+                        "Expected 2 items in note array in function '{}', got '{}' items",
+                        context.fn_name(),
+                        item1_arr.len()
+                    )
+                    .into(),
+                    context.position(),
                 )
                 .into());
             }
-            let note = Note::try_from(item1_arr[0].clone().into_string()?.as_str())?;
-            let velocity = unwrap_float(item1_arr[1].clone(), "velocity", "seq_vec")? as f32;
+            let note = unwrap_note(&context, item1_arr[0].clone())?;
+            let velocity = unwrap_float(&context, item1_arr[1].clone(), "velocity")? as f32;
             note_events.push((instrument, note, velocity));
         } else {
             // Vec<Vec<Vec<NOTE, VEL>>>
@@ -144,8 +177,8 @@ fn note_vec_seq(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
                     )
                     .into());
                 }
-                let note = Note::try_from(item2_arr[0].clone().into_string()?.as_str())?;
-                let velocity = unwrap_float(item2_arr[1].clone(), "velocity", "seq_vec")? as f32;
+                let note = unwrap_note(&context, item2_arr[0].clone())?;
+                let velocity = unwrap_float(&context, item2_arr[1].clone(), "velocity")? as f32;
                 note_events.push((instrument, note, velocity));
             }
         }
@@ -158,34 +191,38 @@ fn note_vec_seq(array: Array) -> Result<FixedEventIter, Box<EvalAltResult>> {
 // BeatTime
 
 fn every_nth_sixteenth(
+    context: NativeCallContext,
     this: &mut BeatTimeBase,
     sixteenth: Dynamic,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let step = unwrap_float(sixteenth, "step", "every_nth_beat")? as f32;
+    let step = unwrap_float(&context, sixteenth, "step")? as f32;
     Ok(this.every_nth_sixteenth(step))
 }
 
 fn every_nth_eighth(
+    context: NativeCallContext,
     this: &mut BeatTimeBase,
     beats: Dynamic,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let step = unwrap_float(beats, "step", "every_nth_beat")? as f32;
+    let step = unwrap_float(&context, beats, "step")? as f32;
     Ok(this.every_nth_eighth(step))
 }
 
 fn every_nth_beat(
+    context: NativeCallContext,
     this: &mut BeatTimeBase,
     beats: Dynamic,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let step = unwrap_float(beats, "step", "every_nth_beat")? as f32;
+    let step = unwrap_float(&context, beats, "step")? as f32;
     Ok(this.every_nth_beat(step))
 }
 
 fn every_nth_bar(
+    context: NativeCallContext,
     this: &mut BeatTimeBase,
     bars: Dynamic,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let step = unwrap_float(bars, "step", "every_nth_beat")? as f32;
+    let step = unwrap_float(&context, bars, "step")? as f32;
     Ok(this.every_nth_bar(step))
 }
 
@@ -193,21 +230,23 @@ fn every_nth_bar(
 // BeatTimeRhythm
 
 fn with_pattern(
+    context: NativeCallContext,
     this: &mut BeatTimeRhythm,
     pattern: Array,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
     let mut vec = Vec::with_capacity(pattern.len());
     for e in pattern {
-        vec.push(unwrap_integer(e, "array element", "with_pattern")?)
+        vec.push(unwrap_integer(&context, e, "array element")?)
     }
     Ok(this.with_pattern_vector(vec))
 }
 
 fn with_offset(
+    context: NativeCallContext,
     this: &mut BeatTimeRhythm,
     offset: Dynamic,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let offset = unwrap_float(offset, "offset", "with_offset")? as f32;
+    let offset = unwrap_float(&context, offset, "offset")? as f32;
     Ok(this.with_offset_in_step(offset))
 }
 
@@ -218,37 +257,90 @@ fn trigger_fixed_event(this: &mut BeatTimeRhythm, event: FixedEventIter) -> Beat
 // ---------------------------------------------------------------------------------------------
 // Binding helpers
 
-fn unwrap_float(d: Dynamic, arg_name: &str, func_name: &str) -> Result<FLOAT, Box<EvalAltResult>> {
+fn unwrap_float(
+    context: &NativeCallContext,
+    d: Dynamic,
+    arg_name: &str,
+) -> Result<FLOAT, Box<EvalAltResult>> {
     if let Some(float) = d.clone().try_cast::<FLOAT>() {
         Ok(float)
     } else if let Some(integer) = d.clone().try_cast::<INT>() {
         Ok(integer as f64)
     } else {
-        Err(format!(
-            "Invalid arg: '{}' in '{}' must be a number value, but is a '{}'",
-            arg_name,
-            func_name,
-            d.type_name()
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid arg: '{}' in '{}' must be a number value, but is a '{}'",
+                arg_name,
+                context.fn_name(),
+                d.type_name()
+            )
+            .into(),
+            context.position(),
         )
-        .as_str()
         .into())
     }
 }
 
-fn unwrap_integer(d: Dynamic, arg_name: &str, func_name: &str) -> Result<INT, Box<EvalAltResult>> {
+fn unwrap_integer(
+    context: &NativeCallContext,
+    d: Dynamic,
+    arg_name: &str,
+) -> Result<INT, Box<EvalAltResult>> {
     if let Some(float) = d.clone().try_cast::<FLOAT>() {
         Ok(float as INT)
     } else if let Some(integer) = d.clone().try_cast::<INT>() {
         Ok(integer)
     } else {
-        Err(format!(
-            "Invalid arg: '{}' in '{}' must be a number value, but is a '{}'",
-            arg_name,
-            func_name,
-            d.type_name()
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid arg: '{}' in '{}' must be a number value, but is a '{}'",
+                arg_name,
+                context.fn_name(),
+                d.type_name()
+            )
+            .into(),
+            context.position(),
         )
-        .as_str()
         .into())
+    }
+}
+
+fn unwrap_note(context: &NativeCallContext, d: Dynamic) -> Result<Note, Box<EvalAltResult>> {
+    match d.into_string() {
+        Ok(s) => unwrap_note_from_string(context, s.as_str()),
+        Err(other_type) => Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Failed to parse note in function '{}': Argument is not a string, but a '{}'.",
+                context.fn_name(),
+                other_type
+            )
+            .into(),
+            context.position(),
+        )
+        .into()),
+    }
+}
+
+fn unwrap_note_from_string(
+    context: &NativeCallContext,
+    s: &str,
+) -> Result<Note, Box<EvalAltResult>> {
+    match Note::try_from(s) {
+        Ok(note) => Ok(note),
+        Err(err) => Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Failed to parse note in function '{}': {}",
+                context.fn_name(),
+                err
+            )
+            .into(),
+            context.position(),
+        )
+        .into()),
     }
 }
 
