@@ -14,6 +14,11 @@ impl EventIterSequence {
         let current = 0;
         Self { events, current }
     }
+
+    // Get a copy of the events that we're triggering
+    pub fn events(&self) -> Vec<Event> {
+        self.events.clone()
+    }
 }
 
 impl Iterator for EventIterSequence {
@@ -42,6 +47,14 @@ impl EventIter for EventIterSequence {
 
 pub trait ToEventIterSequence {
     fn to_event_sequence(self) -> EventIterSequence;
+}
+
+impl ToEventIterSequence for NoteEvent {
+    /// Wrap a vector of  [`NoteEvent`] to a new [`EventIterSequence`].
+    fn to_event_sequence(self) -> EventIterSequence {
+        let sequence = vec![Event::NoteEvents(vec![self])];
+        EventIterSequence::new(sequence)
+    }
 }
 
 impl ToEventIterSequence for Vec<NoteEvent> {

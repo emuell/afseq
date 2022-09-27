@@ -5,12 +5,17 @@ use crate::event::{Event, EventIter, NoteEvent, ParameterChangeEvent};
 /// Endlessly emits a single, fixed [`Event`].
 #[derive(Clone)]
 pub struct FixedEventIter {
-    pub(crate) event: Event,
+    event: Event,
 }
 
 impl FixedEventIter {
     pub fn new(event: Event) -> Self {
         Self { event }
+    }
+
+    // Get a copy of the event that we're triggering
+    pub fn event(&self) -> Event {
+        self.event.clone()
     }
 }
 

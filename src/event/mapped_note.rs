@@ -83,6 +83,6 @@ where
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedNoteEventIter`].
     fn map_notes(self, map: NoteMap) -> MappedNoteEventIter<NoteMap> {
-        MappedNoteEventIter::new(self.event, map)
+        MappedNoteEventIter::new(self.event(), map)
     }
 }

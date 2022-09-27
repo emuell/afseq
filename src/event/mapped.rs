@@ -73,6 +73,6 @@ where
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedEventIter`].
     fn map_events(self, map: EventMap) -> MappedEventIter<EventMap> {
-        MappedEventIter::new(self.event, map)
+        MappedEventIter::new(self.event(), map)
     }
 }

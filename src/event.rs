@@ -341,9 +341,9 @@ pub fn new_note<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     }
 }
 
-/// Shortcut for creating a new sequence of [`NoteEvent`]:
+/// Shortcut for creating a vector of [`NoteEvent`]:
 /// e.g. a sequence of single notes
-pub fn new_note_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
+pub fn new_note_vector<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     sequence: Vec<(I, N, f32)>,
 ) -> Vec<NoteEvent> {
     let mut event_sequence = Vec::with_capacity(sequence.len());
@@ -394,7 +394,7 @@ pub fn new_note_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 pub fn new_note_event_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     sequence: Vec<(I, N, f32)>,
 ) -> EventIterSequence {
-    new_note_sequence(sequence).to_event_sequence()
+    new_note_vector(sequence).to_event_sequence()
 }
 
 /// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
@@ -402,7 +402,7 @@ pub fn new_note_event_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 pub fn new_polyphonic_note_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     polyphonic_events: Vec<(I, N, f32)>,
 ) -> FixedEventIter {
-    new_note_sequence(polyphonic_events).to_event()
+    new_note_vector(polyphonic_events).to_event()
 }
 
 /// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
@@ -552,8 +552,8 @@ mod test {
         assert_eq!(Note::from("D#-1"), Note::DSm1);
         assert_eq!(Note::from("E_7"), Note::E_7);
         assert_eq!(Note::from("f5"), Note::F_5);
-        assert_eq!(Note::from("g.9"), Note::G_9);
-        assert_eq!(Note::from("A.8"), Note::A_8);
+        assert_eq!(Note::from("g 9"), Note::G_9);
+        assert_eq!(Note::from("A 8"), Note::A_8);
         assert_eq!(Note::from("bb2"), Note::AS2);
     }
 }
