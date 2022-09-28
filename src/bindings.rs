@@ -20,6 +20,9 @@ pub fn register_bindings(
         .register_fn("__default_instrument", move || default_instrument)
         .register_fn("__default_beat_time", move || default_time_base);
 
+    // Std extensions
+    engine.register_fn("repeat", repeat_array);
+
     // Global
     engine
         .register_fn("beat_time", default_beat_time)
@@ -40,6 +43,32 @@ pub fn register_bindings(
         .register_fn("with_pattern", with_pattern)
         .register_fn("with_offset", with_offset)
         .register_fn("trigger", trigger_fixed_event);
+}
+
+// ---------------------------------------------------------------------------------------------
+
+fn repeat_array(
+    context: NativeCallContext,
+    this: Array,
+    count: INT,
+) -> Result<Array, Box<EvalAltResult>> {
+    if count < 0 {
+        return Err(EvalAltResult::ErrorArithmetic(
+            format!(
+                "Count argument in 'array.repeat' must be > 0, but is '{}'",
+                count
+            ),
+            context.position(),
+        )
+        .into());
+    }
+    let mut ret = Array::with_capacity(this.len() * count as usize);
+    for _ in 0..count {
+        for i in this.iter() {
+            ret.push(i.clone());
+        }
+    }
+    Ok(ret)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -373,6 +402,37 @@ mod test {
 
         assert!(eval_default_instrument(&engine).is_ok());
         assert_eq!(eval_default_instrument(&engine).unwrap(), Some(76));
+    }
+
+    #[test]
+    fn extensions() {
+        // create a new engine and register bindings
+        let mut engine = Engine::new();
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 160.0,
+                beats_per_bar: 6,
+                samples_per_sec: 96000,
+            },
+            Some(76),
+        );
+
+        // Array::repeat
+        assert!(engine.eval::<Dynamic>(r#"[1,2].repeat(-1)"#).is_err());
+        let eval_result = engine.eval::<Dynamic>(r#"[1,2].repeat(2)"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let array = eval_result.unwrap().into_array().unwrap();
+            assert!(
+                array.len() == 4
+                    && array[0].as_int() == Ok(1)
+                    && array[1].as_int() == Ok(2)
+                    && array[2].as_int() == Ok(1)
+                    && array[3].as_int() == Ok(2)
+            );
+        }
     }
 
     #[test]
