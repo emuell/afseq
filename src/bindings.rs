@@ -12,6 +12,9 @@ pub fn register_bindings(
     default_time_base: BeatTimeBase,
     default_instrument: Option<InstrumentId>,
 ) {
+    // Limits
+    engine.set_max_expr_depths(100, 100);
+
     // Defaults
     engine
         .register_fn("__default_instrument", move || default_instrument)
@@ -78,26 +81,22 @@ fn note_vec(
     context: NativeCallContext,
     array: Array,
 ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+    // NB: array arg may be a:
+    // [NOTE, VEL] -> single note
+    // [[NOTE, VEL], ..] -> poly notes
     let instrument = eval_default_instrument(context.engine())?;
     let mut sequence = Vec::with_capacity(array.len());
-    for item in array {
-        let note_item_array = item.into_array()?;
-        if note_item_array.len() != 2 {
-            return Err(EvalAltResult::ErrorInModule(
-                "bindings".to_string(),
-                format!(
-                    "Expected 2 items in note array in function '{}', got '{}' items",
-                    context.fn_name(),
-                    note_item_array.len()
-                )
-                .into(),
-                context.position(),
-            )
-            .into());
-        }
-        let note = unwrap_note(&context, note_item_array[0].clone())?;
-        let velocity = unwrap_float(&context, note_item_array[1].clone(), "velocity")? as f32;
+    if !array.is_empty() && array[0].type_name() == "string" {
+        // [NOTE, VEL]
+        let (note, velocity) = unwrap_note_event(&context, array)?;
         sequence.push((instrument, note, velocity));
+    } else {
+        // [[NOTE, VEL], ..]
+        for item in array {
+            let note_item_array = unwrap_array(&context, item)?;
+            let (note, velocity) = unwrap_note_event(&context, note_item_array)?;
+            sequence.push((instrument, note, velocity));
+        }
     }
     Ok(new_polyphonic_note_event(sequence))
 }
@@ -112,57 +111,17 @@ fn note_vec_seq(
     let instrument = eval_default_instrument(context.engine())?;
     let mut event_sequence = Vec::with_capacity(array.len());
     for item1_dyn in array {
-        let item1_array_result = item1_dyn.into_array();
-        if let Err(other_type) = item1_array_result {
-            return Err(EvalAltResult::ErrorInModule(
-                "bindings".to_string(),
-                format!(
-                    "Expected 'array' arg in function '{}', got '{}'",
-                    context.fn_name(),
-                    other_type
-                )
-                .into(),
-                context.position(),
-            )
-            .into());
-        }
-        let item1_arr = item1_array_result.unwrap();
+        let item1_arr = unwrap_array(&context, item1_dyn)?;
         let mut note_events = Vec::with_capacity(item1_arr.len());
         if !item1_arr.is_empty() && item1_arr[0].type_name() == "string" {
             // Vec<Vec<NOTE, VEL>>
-            if item1_arr.len() != 2 {
-                return Err(EvalAltResult::ErrorInModule(
-                    "bindings".to_string(),
-                    format!(
-                        "Expected 2 items in note array in function '{}', got '{}' items",
-                        context.fn_name(),
-                        item1_arr.len()
-                    )
-                    .into(),
-                    context.position(),
-                )
-                .into());
-            }
-            let note = unwrap_note(&context, item1_arr[0].clone())?;
-            let velocity = unwrap_float(&context, item1_arr[1].clone(), "velocity")? as f32;
+            let (note, velocity) = unwrap_note_event(&context, item1_arr)?;
             note_events.push((instrument, note, velocity));
         } else {
             // Vec<Vec<Vec<NOTE, VEL>>>
             for item2_dyn in item1_arr {
-                let item2_array_result = item2_dyn.into_array();
-                if let Err(other_type) = item2_array_result {
-                    return Err(format!("Expected 'array', got '{}'", other_type).into());
-                }
-                let item2_arr = item2_array_result.unwrap();
-                if item2_arr.len() != 2 {
-                    return Err(format!(
-                        "Expected 2 items in note array ['note', 'velocity'], got '{}' items",
-                        item2_arr.len()
-                    )
-                    .into());
-                }
-                let note = unwrap_note(&context, item2_arr[0].clone())?;
-                let velocity = unwrap_float(&context, item2_arr[1].clone(), "velocity")? as f32;
+                let item2_arr = unwrap_array(&context, item2_dyn)?;
+                let (note, velocity) = unwrap_note_event(&context, item2_arr)?;
                 note_events.push((instrument, note, velocity));
             }
         }
@@ -299,6 +258,24 @@ fn unwrap_integer(
     }
 }
 
+fn unwrap_array(context: &NativeCallContext, d: Dynamic) -> Result<Array, Box<EvalAltResult>> {
+    let array_result = d.into_array();
+    if let Err(other_type) = array_result {
+        return Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Expected 'array' arg in function '{}', got '{}'",
+                context.fn_name(),
+                other_type
+            )
+            .into(),
+            context.position(),
+        )
+        .into());
+    }
+    Ok(array_result.unwrap())
+}
+
 fn unwrap_note(context: &NativeCallContext, d: Dynamic) -> Result<Note, Box<EvalAltResult>> {
     match d.into_string() {
         Ok(s) => unwrap_note_from_string(context, s.as_str()),
@@ -334,6 +311,29 @@ fn unwrap_note_from_string(
         )
         .into()),
     }
+}
+
+fn unwrap_note_event(
+    context: &NativeCallContext,
+    array: Array,
+) -> Result<(Note, f32), Box<EvalAltResult>> {
+    if array.len() != 2 {
+        return Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Expected 2 items in note array in function '{}', got '{}' items",
+                context.fn_name(),
+                array.len()
+            )
+            .into(),
+            context.position(),
+        )
+        .into());
+    }
+    let note = unwrap_note(context, array[0].clone())?;
+    let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
+
+    Ok((note, velocity))
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -394,6 +394,27 @@ mod test {
         assert!(engine.eval::<Dynamic>(r#"note("C#1", "0.5")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5, 1.0)"#).is_err());
         let eval_result = engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
+            assert!(
+                if let Event::NoteEvents(notes) = &note_event.unwrap().events()[0] {
+                    notes.len() == 1
+                        && notes[0].note == Note::from("C#1")
+                        && notes[0].velocity == 0.5
+                } else {
+                    false
+                }
+            );
+        }
+
+        assert!(engine.eval::<Dynamic>(r#"note(["X#1", 0.5])"#).is_err());
+        assert!(engine.eval::<Dynamic>(r#"note(["C#1", "0.5"])"#).is_err());
+        assert!(engine
+            .eval::<Dynamic>(r#"note(["C#1", 0.5, 1.0])"#)
+            .is_err());
+        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1", 0.5])"#);
         if let Err(err) = eval_result {
             panic!("{}", err);
         } else {
