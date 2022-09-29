@@ -371,7 +371,8 @@ fn unwrap_note_event(
 mod test {
     use crate::{
         bindings::eval_default_instrument,
-        event::{fixed::FixedEventIter, Event, Note},
+        event::{fixed::FixedEventIter, Event},
+        midi::Note,
         prelude::BeatTimeStep,
         rhythm::beat_time::BeatTimeRhythm,
         BeatTimeBase,

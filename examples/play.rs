@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if vel_step >= 3 {
                     vel_step = 0;
                 }
-                note.note = Note::from((Note::C_4 as u8) + 32 - note_step);
+                note.note = Note::from((Note::C4 as u8) + 32 - note_step);
                 note_step += 1;
                 if note_step >= 32 {
                     note_step = 0;

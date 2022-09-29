@@ -4,6 +4,9 @@
 pub mod time;
 pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
 
+pub mod midi;
+pub use midi::Note;
+
 pub mod event;
 pub use event::{Event, EventIter};
 
