@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use rust_music_theory::{note::Notes, scale};
+
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlayer,
     AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
@@ -100,17 +102,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .with_offset(BeatTimeStep::Bar(4.0));
 
+    let bass_notes = scale::Scale::from_regex("c aeolian")?.notes();
     let bass_pattern = beat_time_base
         .every_nth_eighth(1.0)
-        .with_pattern([
-            1, 0, 0, 0, /**/ 1, 0, 1, 0, /**/ 0, 0, 0, 1, /**/ 0, 0, 0, 0, /**/
-            1, 0, 0, 0, /**/ 1, 0, 1, 0, /**/ 0, 0, 0, 0, /**/ 1, 0, 0, 0, /**/
-        ])
+        .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1])
         .trigger(new_note_event_sequence(vec![
-            (BASS, "C 4", 0.5),
-            (BASS, "C 4", 0.5),
-            (BASS, "F 4", 0.5),
-            (BASS, "A#3", 0.5),
+            (BASS, Note::from(&bass_notes[0]), 0.5),
+            (BASS, Note::from(&bass_notes[2]), 0.5),
+            (BASS, Note::from(&bass_notes[3]), 0.5),
+            (BASS, Note::from(&bass_notes[0]), 0.5),
+            (BASS, Note::from(&bass_notes[2]), 0.5),
+            (BASS, Note::from(&bass_notes[3]), 0.5),
+            (BASS, Note::from(&bass_notes[6]) - 12, 0.5),
         ]));
 
     let synth_pattern = beat_time_base

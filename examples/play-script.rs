@@ -108,6 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 load_script_with_fallback(KICK, "./assets/scripts/kick.rhai"),
                 load_script_with_fallback(SNARE, "./assets/scripts/snare.rhai"),
                 load_script_with_fallback(HIHAT, "./assets/scripts/hihat.rhai"),
+                load_script_with_fallback(BASS, "./assets/scripts/bass.rhai"),
             ],
         );
 

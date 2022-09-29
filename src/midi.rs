@@ -1,6 +1,12 @@
 //! Raw MIDI events used in `Event`.
 
-use std::{fmt::Display, mem};
+use std::{
+    fmt::Display,
+    mem,
+    ops::{Add, Sub},
+};
+
+use rust_music_theory::note as rmt_note;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -287,6 +293,26 @@ impl From<&str> for Note {
             Ok(n) => n,
             Err(err) => panic!("{}", err),
         }
+    }
+}
+
+impl From<&rmt_note::Note> for Note {
+    fn from(note: &rmt_note::Note) -> Self {
+        Self::from((note.pitch_class.into_u8() + 12 * note.octave + 12) as u8)
+    }
+}
+
+impl Add<u8> for Note {
+    type Output = Self;
+    fn add(self, rhs: u8) -> Self {
+        Note::from(((self as u8) as i32 + rhs as i32).min(0x7f) as u8)
+    }
+}
+
+impl Sub<u8> for Note {
+    type Output = Self;
+    fn sub(self, rhs: u8) -> Self {
+        Note::from(((self as u8) as i32 - rhs as i32).max(0) as u8)
     }
 }
 
