@@ -2,49 +2,53 @@ use crate::event::{fixed::FixedEventIter, Event, EventIter};
 
 // -------------------------------------------------------------------------------------------------
 
+/// Pointer to a function which mutates an Event.
+type EventMapFn = dyn FnMut(Event) -> Event + 'static;
+
+// -------------------------------------------------------------------------------------------------
+
 /// Endlessly emits [`Event`] which's value can be mutated/mapped in each iter step
 /// with a custom map function.
-#[derive(Clone)]
-pub struct MappedEventIter<F>
-where
-    F: FnMut(Event) -> Event + Copy,
-{
+///
+/// NB: This event iter is can not be cloned.
+pub struct MappedEventIter {
     events: Vec<Event>,
     initial_events: Vec<Event>,
-    map: F,
-    initial_map: F,
+    map: Box<EventMapFn>,
+    reset_map: Box<dyn Fn() -> Box<EventMapFn>>,
     current: usize,
 }
 
-impl<F> MappedEventIter<F>
-where
-    F: FnMut(Event) -> Event + Copy,
-{
-    pub fn new(events: Vec<Event>, map: F) -> Self {
-        let mut initial_map = map;
+impl MappedEventIter {
+    pub fn new<F>(events: Vec<Event>, map: F) -> Self
+    where
+        F: FnMut(Event) -> Event + Copy + 'static,
+    {
+        // capture initial map state
+        let initial_map = map;
+        // apply first mutation and memorize initial set of events
+        let mut map = Box::new(map);
         let mut initial_events = events;
         if !initial_events.is_empty() {
-            initial_events[0] = Self::mutate(initial_events[0].clone(), &mut initial_map);
+            initial_events[0] = Self::mutate(initial_events[0].clone(), &mut map);
         }
+        let events = initial_events.clone();
         let current = 0;
         Self {
-            events: initial_events.clone(),
+            events,
             initial_events,
-            map: initial_map,
-            initial_map,
+            reset_map: Box::new(move || Box::new(initial_map)),
+            map,
             current,
         }
     }
 
-    fn mutate(event: Event, map: &mut F) -> Event {
+    fn mutate(event: Event, map: &mut dyn FnMut(Event) -> Event) -> Event {
         (*map)(event)
     }
 }
 
-impl<F> Iterator for MappedEventIter<F>
-where
-    F: FnMut(Event) -> Event + Copy,
-{
+impl Iterator for MappedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -58,32 +62,29 @@ where
     }
 }
 
-impl<F> EventIter for MappedEventIter<F>
-where
-    F: FnMut(Event) -> Event + Copy,
-{
+impl EventIter for MappedEventIter {
     fn reset(&mut self) {
         self.events = self.initial_events.clone();
-        self.map = self.initial_map;
+        self.map = (self.reset_map)();
         self.current = 0;
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-pub trait ToMappedEventIter<EventMap>
+pub trait ToMappedEventIter<F>
 where
-    EventMap: FnMut(Event) -> Event + Copy,
+    F: FnMut(Event) -> Event + Copy + 'static,
 {
-    fn map_events(self, map: EventMap) -> MappedEventIter<EventMap>;
+    fn map_events(self, map: F) -> MappedEventIter;
 }
 
-impl<EventMap> ToMappedEventIter<EventMap> for FixedEventIter
+impl<F> ToMappedEventIter<F> for FixedEventIter
 where
-    EventMap: FnMut(Event) -> Event + Copy,
+    F: FnMut(Event) -> Event + Copy + 'static,
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedEventIter`].
-    fn map_events(self, map: EventMap) -> MappedEventIter<EventMap> {
+    fn map_events(self, map: F) -> MappedEventIter {
         MappedEventIter::new(self.events(), map)
     }
 }
