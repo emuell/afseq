@@ -16,7 +16,8 @@ use afplay::{
 use afseq::{bindings::register_bindings, prelude::*, rhythm::beat_time::BeatTimeRhythm};
 
 use notify::{RecursiveMode, Watcher};
-use rhai::{Dynamic, Engine, EvalAltResult};
+use rhai::{Dynamic, Engine, EvalAltResult, packages::Package};
+use rhai_sci::SciPackage;
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,6 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let HIHAT: InstrumentId = unique_instrument_id();
     let BASS: InstrumentId = unique_instrument_id();
     let SYNTH: InstrumentId = unique_instrument_id();
+    let TONE: InstrumentId = unique_instrument_id();
     let FX: InstrumentId = unique_instrument_id();
 
     let load_sample_file = |file_name| {
@@ -42,6 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (HIHAT, load_sample_file("assets/hat.wav")),
         (BASS, load_sample_file("assets/bass.wav")),
         (SYNTH, load_sample_file("assets/synth.wav")),
+        (TONE, load_sample_file("assets/tone.wav")),
         (FX, load_sample_file("assets/fx.wav")),
     ]);
 
@@ -56,19 +59,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let load_script = // _
         move |instrument: InstrumentId, file_name: &str|
           -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-        let mut engine = Engine::new();
-        register_bindings(&mut engine, beat_time_base, Some(instrument));
-        let result = engine.eval_file::<Dynamic>(PathBuf::from(file_name))?;
-        if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-            Ok(Box::new(beat_time_rhythm))
-        } else {
-            Err(EvalAltResult::ErrorMismatchDataType(
-                result.type_name().to_string(),
-                "Rhythm".to_string(),
-                rhai::Position::new(0, 0),
-            )
-            .into())
-        }
+            let mut engine = Engine::new();
+            engine.set_max_expr_depths(0, 0);
+
+            let contents = std::fs::read_to_string(PathBuf::from(file_name))?;
+            let ast = engine.compile(contents.as_str())?;
+            
+            let sci = SciPackage::new();
+            sci.register_into_engine(&mut engine);
+              
+            register_bindings(&mut engine, beat_time_base, Some(instrument), Some(ast.clone()));
+            
+            let result = engine.eval_ast::<Dynamic>(&ast)?;
+            if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
+                Ok(Box::new(beat_time_rhythm))
+            } else {
+                Err(EvalAltResult::ErrorMismatchDataType(
+                    result.type_name().to_string(),
+                    "Rhythm".to_string(),
+                    rhai::Position::new(0, 0),
+                )
+                .into())
+            }
     };
     let load_script_with_fallback =
         move |instrument: InstrumentId, file_name: &str| -> Box<dyn Rhythm> {
@@ -109,6 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 load_script_with_fallback(SNARE, "./assets/scripts/snare.rhai"),
                 load_script_with_fallback(HIHAT, "./assets/scripts/hihat.rhai"),
                 load_script_with_fallback(BASS, "./assets/scripts/bass.rhai"),
+                load_script_with_fallback(TONE, "./assets/scripts/tone.rhai"),
             ],
         );
 

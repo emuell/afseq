@@ -11,6 +11,7 @@ categories = ["audio", "player", "sequencer"]
 paste = { version = "1.0.9"}
 rust-music-theory = { version = "0.2.0" }
 rhai = { version = "1.10.1", optional = true, features = ["metadata"] }
+rhai-sci = { version = "0.1", optional = true }       
 
 [dev-dependencies]
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"] }
@@ -20,7 +21,7 @@ notify = { version = "5.0.0" }
 debug = 1
 
 [features]
-scripting = ["rhai"]
+scripting = ["rhai", "rhai-sci"]
 default = ["scripting"]
 
 [[example]]
