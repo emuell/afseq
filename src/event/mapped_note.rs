@@ -22,10 +22,10 @@ pub struct MappedNoteEventIter {
 impl MappedNoteEventIter {
     pub fn new<F>(events: Vec<Event>, map: F) -> Self
     where
-        F: FnMut(NoteEvent, usize) -> NoteEvent + 'static + Copy,
+        F: FnMut(NoteEvent, usize) -> NoteEvent + Clone + 'static,
     {
         // capture initial map state
-        let initial_map = map;
+        let initial_map = map.clone();
         // apply first mutation and memorize initial set of events
         let mut map = Box::new(map);
         let mut initial_events = events;
@@ -38,7 +38,7 @@ impl MappedNoteEventIter {
             events,
             initial_events,
             map,
-            reset_map: Box::new(move || Box::new(initial_map)),
+            reset_map: Box::new(move || Box::new(initial_map.clone())),
             current,
         }
     }
@@ -84,14 +84,14 @@ impl EventIter for MappedNoteEventIter {
 
 pub trait ToMappedNotesEventIter<F>
 where
-    F: FnMut(NoteEvent, usize) -> NoteEvent + Copy + 'static,
+    F: FnMut(NoteEvent, usize) -> NoteEvent + Clone + 'static,
 {
     fn map_notes(self, map: F) -> MappedNoteEventIter;
 }
 
 impl<F> ToMappedNotesEventIter<F> for FixedEventIter
 where
-    F: FnMut(NoteEvent, usize) -> NoteEvent + Copy + 'static,
+    F: FnMut(NoteEvent, usize) -> NoteEvent + Clone + 'static,
 {
     /// Upgrade a [`FixedEventIter`] to a [`MappedNoteEventIter`].
     fn map_notes(self, map: F) -> MappedNoteEventIter {
