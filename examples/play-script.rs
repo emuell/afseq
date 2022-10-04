@@ -1,10 +1,11 @@
+use lazy_static::*;
 use std::{
     collections::HashMap,
     path::Path,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock,
     },
 };
 
@@ -16,8 +17,105 @@ use afplay::{
 use afseq::{bindings::register_bindings, prelude::*, rhythm::beat_time::BeatTimeRhythm};
 
 use notify::{RecursiveMode, Watcher};
-use rhai::{Dynamic, Engine, EvalAltResult, packages::Package};
+use rhai::{packages::Package, Dynamic, Engine, EvalAltResult, NativeCallContext};
 use rhai_sci::SciPackage;
+
+// -------------------------------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct SamplePool {
+    samples: Arc<RwLock<HashMap<InstrumentId, Arc<PreloadedFileSource>>>>,
+}
+
+impl SamplePool {
+    fn new() -> Self {
+        Self {
+            samples: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    fn get_sample(&self, id: InstrumentId) -> Option<PreloadedFileSource> {
+        self.samples
+            .read()
+            .unwrap()
+            .get(&id)
+            .map(|sample| sample.as_ref().clone())
+    }
+
+    fn load_sample(&self, file_path: &str) -> Result<InstrumentId, Box<dyn std::error::Error>> {
+        let sample = PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default())?;
+        let id = unique_instrument_id();
+        self.samples.write().unwrap().insert(id, Arc::new(sample));
+        Ok(id)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// load and run a single script and return the rhytm created by the script or an error
+fn load_script(
+    sample_pool: &'static SamplePool,
+    instrument: InstrumentId,
+    time_base: BeatTimeBase,
+    file_name: &str,
+) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
+    let mut engine = Engine::new();
+    engine.set_max_expr_depths(0, 0);
+
+    let contents = std::fs::read_to_string(PathBuf::from(file_name))?;
+    let ast = engine.compile(contents.as_str())?;
+
+    let sci = SciPackage::new();
+    sci.register_into_engine(&mut engine);
+
+    register_bindings(&mut engine, time_base, Some(instrument), Some(ast.clone()));
+
+    engine.register_fn("sample_pool", move || -> &'static SamplePool {
+        sample_pool
+    });
+    engine.register_type::<SamplePool>().register_fn(
+        "load",
+        |context: NativeCallContext,
+         sample_pool: &SamplePool,
+         file_path: String|
+         -> Result<rhai::INT, Box<EvalAltResult>> {
+            match sample_pool.load_sample(&file_path) {
+                Ok(id) => Ok(id as rhai::INT),
+                Err(_err) => {
+                    Err(EvalAltResult::ErrorModuleNotFound(file_path, context.position()).into())
+                }
+            }
+        },
+    );
+
+    let result = engine.eval_ast::<Dynamic>(&ast)?;
+    if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
+        Ok(Box::new(beat_time_rhythm))
+    } else {
+        Err(EvalAltResult::ErrorMismatchDataType(
+            result.type_name().to_string(),
+            "Rhythm".to_string(),
+            rhai::Position::new(0, 0),
+        )
+        .into())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+fn load_script_with_fallback(
+    sample_pool: &'static SamplePool,
+    instrument: InstrumentId,
+    time_base: BeatTimeBase,
+    file_name: &str,
+) -> Box<dyn Rhythm> {
+    load_script(sample_pool, instrument, time_base, file_name).unwrap_or_else(|err| {
+        println!("script '{}' failed to compile: {}", file_name, err);
+        Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
+    })
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,73 +123,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let audio_output = DefaultAudioOutput::open()?;
     let mut player = AudioFilePlayer::new(audio_output.sink(), None);
 
-    // preload all samples
-    let KICK: InstrumentId = unique_instrument_id();
-    let SNARE: InstrumentId = unique_instrument_id();
-    let HIHAT: InstrumentId = unique_instrument_id();
-    let BASS: InstrumentId = unique_instrument_id();
-    let SYNTH: InstrumentId = unique_instrument_id();
-    let TONE: InstrumentId = unique_instrument_id();
-    let FX: InstrumentId = unique_instrument_id();
-
-    let load_sample_file = |file_name| {
-        PreloadedFileSource::new(file_name, None, FilePlaybackOptions::default()).unwrap()
-    };
-
-    let sample_pool: HashMap<InstrumentId, PreloadedFileSource> = HashMap::from([
-        (KICK, load_sample_file("assets/kick.wav")),
-        (SNARE, load_sample_file("assets/snare.wav")),
-        (HIHAT, load_sample_file("assets/hat.wav")),
-        (BASS, load_sample_file("assets/bass.wav")),
-        (SYNTH, load_sample_file("assets/synth.wav")),
-        (TONE, load_sample_file("assets/tone.wav")),
-        (FX, load_sample_file("assets/fx.wav")),
-    ]);
+    // create sample pool
+    lazy_static! {
+        static ref POOL: SamplePool = SamplePool::new();
+    }
+    let KICK: InstrumentId = POOL.load_sample("assets/kick.wav")?;
+    let SNARE: InstrumentId = POOL.load_sample("assets/snare.wav")?;
+    let HIHAT: InstrumentId = POOL.load_sample("assets/hat.wav")?;
+    let BASS: InstrumentId = POOL.load_sample("assets/bass.wav")?;
+    let _SYNTH: InstrumentId = POOL.load_sample("assets/synth.wav")?;
+    let TONE: InstrumentId = POOL.load_sample("assets/tone.wav")?;
+    let _FX: InstrumentId = POOL.load_sample("assets/fx.wav")?;
 
     // set default time base config
-    let beat_time_base = BeatTimeBase {
+    let beat_time = BeatTimeBase {
         beats_per_min: 120.0,
         beats_per_bar: 4,
         samples_per_sec: player.output_sample_rate(),
     };
-
-    // load and run a single script and return the rhytm created by the script or an error
-    let load_script = // _
-        move |instrument: InstrumentId, file_name: &str|
-          -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-            let mut engine = Engine::new();
-            engine.set_max_expr_depths(0, 0);
-
-            let contents = std::fs::read_to_string(PathBuf::from(file_name))?;
-            let ast = engine.compile(contents.as_str())?;
-            
-            let sci = SciPackage::new();
-            sci.register_into_engine(&mut engine);
-              
-            register_bindings(&mut engine, beat_time_base, Some(instrument), Some(ast.clone()));
-            
-            let result = engine.eval_ast::<Dynamic>(&ast)?;
-            if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-                Ok(Box::new(beat_time_rhythm))
-            } else {
-                Err(EvalAltResult::ErrorMismatchDataType(
-                    result.type_name().to_string(),
-                    "Rhythm".to_string(),
-                    rhai::Position::new(0, 0),
-                )
-                .into())
-            }
-    };
-    let load_script_with_fallback =
-        move |instrument: InstrumentId, file_name: &str| -> Box<dyn Rhythm> {
-            load_script(instrument, file_name).unwrap_or_else(|err| {
-                println!("script '{}' failed to compile: {}", file_name, err);
-                Box::new(BeatTimeRhythm::new(
-                    beat_time_base,
-                    BeatTimeStep::Beats(1.0),
-                ))
-            })
-        };
 
     // Watch for script changes, signaling in 'script_files_changed'
     let script_files_changed = Arc::new(AtomicBool::new(false));
@@ -115,13 +164,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // build final phrase
         let mut phrase = Phrase::new(
-            beat_time_base,
+            beat_time,
             vec![
-                load_script_with_fallback(KICK, "./assets/scripts/kick.rhai"),
-                load_script_with_fallback(SNARE, "./assets/scripts/snare.rhai"),
-                load_script_with_fallback(HIHAT, "./assets/scripts/hihat.rhai"),
-                load_script_with_fallback(BASS, "./assets/scripts/bass.rhai"),
-                load_script_with_fallback(TONE, "./assets/scripts/tone.rhai"),
+                load_script_with_fallback(&POOL, KICK, beat_time, "./assets/scripts/kick.rhai"),
+                load_script_with_fallback(&POOL, SNARE, beat_time, "./assets/scripts/snare.rhai"),
+                load_script_with_fallback(&POOL, HIHAT, beat_time, "./assets/scripts/hihat.rhai"),
+                load_script_with_fallback(&POOL, BASS, beat_time, "./assets/scripts/bass.rhai"),
+                load_script_with_fallback(&POOL, TONE, beat_time, "./assets/scripts/tone.rhai"),
             ],
         );
 
@@ -136,12 +185,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     for note in notes {
                         if let Some(instrument) = note.instrument {
-                            if let Some(sample) = sample_pool.get(&instrument) {
-                                let mut new_source = sample.clone();
-                                new_source.set_volume(note.velocity);
+                            if let Some(mut sample) = POOL.get_sample(instrument) {
+                                sample.set_volume(note.velocity);
                                 player
                                     .play_file_source(
-                                        new_source,
+                                        sample,
                                         speed_from_note(note.note as u8),
                                         Some(sample_time as u64 + playback_start_in_samples),
                                     )
@@ -156,14 +204,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             const PRELOAD_SECONDS: f64 = 2.0;
 
-            let seconds_emitted = beat_time_base.samples_to_seconds(emitted_sample_time);
-            let seconds_played = beat_time_base.samples_to_seconds(
+            let seconds_emitted = beat_time.samples_to_seconds(emitted_sample_time);
+            let seconds_played = beat_time.samples_to_seconds(
                 player.output_sample_frame_position() - playback_start_in_samples,
             );
             let seconds_to_emit = seconds_played - seconds_emitted + PRELOAD_SECONDS;
 
             if seconds_to_emit > 1.0 {
-                emitted_sample_time += beat_time_base.seconds_to_samples(seconds_to_emit);
+                emitted_sample_time += beat_time.seconds_to_samples(seconds_to_emit);
                 phrase.run_until_time(emitted_sample_time, |sample_time, event| {
                     // print_event(sample_time, event);
                     play_event(&mut player, sample_time, event);

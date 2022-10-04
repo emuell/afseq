@@ -4,6 +4,9 @@ let scales = [
 ];
 let note_step = 0;
 let scale_step = 0;
+let volume_step = 63;
+let volume_direction = 1.0;
+let transpose_step = 0;
 
 beat_time()
   .every_nth_sixteenth(1)
@@ -19,9 +22,21 @@ beat_time()
         scale_step = 0;
       }
     }
-    let vel = 0.05;
+    let vel = 0.3 * volume_step / 128.0 + 0.1;
     if note_step % 2 == 0 {
-      vel = 0.1;
+      vel = 0.3 * (1.0 - volume_step / 64) + 0.1;
     }
-    [note, vel * 0.5] 
+    volume_step += volume_direction;
+    if volume_step >= 64 || volume_step == 0 {
+      volume_direction = -volume_direction;
+    }
+    let transpose = 0;
+    /*transpose_step += 1;
+    if transpose_step > 128 && transpose_step < 256 {
+      transpose = 5;
+    } else if transpose_step == 256 {
+      transpose_step = 0;
+      transpose = 0;
+    }*/
+    [note + transpose, vel * 0.16] 
   })
