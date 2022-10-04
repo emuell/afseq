@@ -2,7 +2,7 @@
 
 use rhai::{Array, Dynamic, EvalAltResult, NativeCallContext, Position, FLOAT, INT};
 
-use crate::Note;
+use crate::{event::InstrumentId, Note};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -168,12 +168,13 @@ pub fn unwrap_note_from_int(
 pub fn unwrap_note_event(
     context: &ErrorCallContext,
     array: Array,
-) -> Result<(Note, f32), Box<EvalAltResult>> {
-    if array.len() != 2 {
+    default_instrument: Option<InstrumentId>,
+) -> Result<(Option<InstrumentId>, Note, f32), Box<EvalAltResult>> {
+    if array.len() != 2 && array.len() != 3 {
         return Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
-                "Expected 2 items in note array in function '{}', got '{}' items",
+                "Expected 2 or 3 items in note array in function '{}', got '{}' items",
                 context.fn_name(),
                 array.len()
             )
@@ -182,8 +183,14 @@ pub fn unwrap_note_event(
         )
         .into());
     }
-    let note = unwrap_note(context, array[0].clone())?;
-    let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
-
-    Ok((note, velocity))
+    if array.len() == 3 {
+        let instrument = unwrap_integer(context, array[0].clone(), "instrument")? as InstrumentId;
+        let note = unwrap_note(context, array[1].clone())?;
+        let velocity = unwrap_float(context, array[2].clone(), "velocity")? as f32;
+        Ok((Some(instrument), note, velocity))
+    } else {
+        let note = unwrap_note(context, array[0].clone())?;
+        let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
+        Ok((default_instrument, note, velocity))
+    }
 }

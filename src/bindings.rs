@@ -160,14 +160,16 @@ fn note_vec(
     let mut sequence = Vec::with_capacity(array.len());
     if !array.is_empty() && (array[0].type_name() == "string" || array[0].is::<INT>()) {
         // [NOTE, VEL]
-        let (note, velocity) = unwrap_note_event(&err_context, array)?;
-        sequence.push((instrument, note, velocity));
+        sequence.push(unwrap_note_event(&err_context, array, instrument)?);
     } else {
         // [[NOTE, VEL], ..]
         for item in array {
             let note_item_array = unwrap_array(&err_context, item)?;
-            let (note, velocity) = unwrap_note_event(&err_context, note_item_array)?;
-            sequence.push((instrument, note, velocity));
+            sequence.push(unwrap_note_event(
+                &err_context,
+                note_item_array,
+                instrument,
+            )?);
         }
     }
     Ok(new_polyphonic_note_event(sequence))
@@ -190,14 +192,12 @@ fn note_vec_seq(
             && (item1_arr[0].type_name() == "string" || item1_arr[0].is::<INT>())
         {
             // Vec<Vec<NOTE, VEL>>
-            let (note, velocity) = unwrap_note_event(&err_context, item1_arr)?;
-            note_events.push((instrument, note, velocity));
+            note_events.push(unwrap_note_event(&err_context, item1_arr, instrument)?);
         } else {
             // Vec<Vec<Vec<NOTE, VEL>>>
             for item2_dyn in item1_arr {
                 let item2_arr = unwrap_array(&err_context, item2_dyn)?;
-                let (note, velocity) = unwrap_note_event(&err_context, item2_arr)?;
-                note_events.push((instrument, note, velocity));
+                note_events.push(unwrap_note_event(&err_context, item2_arr, instrument)?);
             }
         }
         event_sequence.push(note_events)

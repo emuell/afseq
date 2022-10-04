@@ -77,14 +77,12 @@ impl FnEventIter {
         let mut sequence = Vec::with_capacity(array.len());
         if !array.is_empty() && (array[0].type_name() == "string" || array[0].is::<INT>()) {
             // [NOTE, VEL]
-            let (note, velocity) = unwrap_note_event(&context, array)?;
-            sequence.push((instrument, note, velocity));
+            sequence.push(unwrap_note_event(&context, array, instrument)?);
         } else {
             // [[NOTE, VEL], ..]
             for item in array {
                 let note_item_array = unwrap_array(&context, item)?;
-                let (note, velocity) = unwrap_note_event(&context, note_item_array)?;
-                sequence.push((instrument, note, velocity));
+                sequence.push(unwrap_note_event(&context, note_item_array, instrument)?);
             }
         }
         Ok(Event::NoteEvents(new_note_vector(sequence)))
