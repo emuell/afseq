@@ -93,9 +93,9 @@ fn load_script(
         Ok(Box::new(beat_time_rhythm))
     } else {
         Err(EvalAltResult::ErrorMismatchDataType(
-            result.type_name().to_string(),
             "Rhythm".to_string(),
-            rhai::Position::new(0, 0),
+            result.type_name().to_string(),
+            rhai::Position::new(1, 1),
         )
         .into())
     }
