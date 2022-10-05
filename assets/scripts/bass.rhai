@@ -12,4 +12,4 @@ beat_time()
   .every_nth_sixteenth(2)
   .with_pattern([1,0,1,0,0,0,1,0])
   .with_offset(2)
-  .trigger(note_seq([0,1,2].map(|i| [samples[i], notes[i], 0.5])))
+  .trigger(note_seq([0,1,2].map(|i| [samples[i], notes[i], 0.5])));
