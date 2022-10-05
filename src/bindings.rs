@@ -317,7 +317,7 @@ fn trigger_custom_event(
 mod test {
     use crate::{
         bindings::eval_default_instrument,
-        event::{fixed::FixedEventIter, Event},
+        event::{fixed::FixedEventIter, Event, InstrumentId},
         midi::Note,
         prelude::BeatTimeStep,
         rhythm::beat_time::BeatTimeRhythm,
@@ -338,7 +338,7 @@ mod test {
                 beats_per_bar: 6,
                 samples_per_sec: 96000,
             },
-            Some(76),
+            Some(InstrumentId::from(76)),
             None,
         );
 
@@ -349,7 +349,10 @@ mod test {
         assert_eq!(default_beat_time.samples_per_sec, 96000);
 
         assert!(eval_default_instrument(&engine).is_ok());
-        assert_eq!(eval_default_instrument(&engine).unwrap(), Some(76));
+        assert_eq!(
+            eval_default_instrument(&engine).unwrap(),
+            Some(InstrumentId::from(76))
+        );
     }
 
     #[test]
@@ -363,7 +366,7 @@ mod test {
                 beats_per_bar: 6,
                 samples_per_sec: 96000,
             },
-            Some(76),
+            Some(InstrumentId::from(76)),
             None,
         );
 
@@ -534,8 +537,11 @@ mod test {
             .is_err());
         assert_eq!(
             engine
-                .eval::<Vec<rhai::INT>>(r#"notes_in_scale("c major")"#)
-                .unwrap(),
+                .eval::<Vec<rhai::Dynamic>>(r#"notes_in_scale("c major")"#)
+                .unwrap()
+                .iter()
+                .map(|v| v.clone().cast::<rhai::INT>())
+                .collect::<Vec<rhai::INT>>(),
             vec![60, 62, 64, 65, 67, 69, 71, 72]
         );
     }

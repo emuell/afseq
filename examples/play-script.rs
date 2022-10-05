@@ -80,7 +80,7 @@ fn load_script(
          file_path: String|
          -> Result<rhai::INT, Box<EvalAltResult>> {
             match sample_pool.load_sample(&file_path) {
-                Ok(id) => Ok(id as rhai::INT),
+                Ok(id) => Ok(*id as rhai::INT),
                 Err(_err) => {
                     Err(EvalAltResult::ErrorModuleNotFound(file_path, context.position()).into())
                 }

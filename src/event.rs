@@ -3,8 +3,10 @@
 use crate::midi::Note;
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
+use derive_more::{Deref, Display, From, Into};
+
 use core::sync::atomic::{AtomicUsize, Ordering};
-use std::fmt::Debug;
+use std::fmt;
 
 pub mod empty;
 pub mod fixed;
@@ -14,16 +16,19 @@ pub mod mapped_note;
 // -------------------------------------------------------------------------------------------------
 
 /// Id to refer to a specific instrument in a NoteEvent.
-pub type InstrumentId = usize;
+#[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
+pub struct InstrumentId(usize);
+
 /// Id to refer to a specific parameter in a ParameterChangeEvent.
-pub type ParameterId = usize;
+#[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
+pub struct ParameterId(usize);
 
 // -------------------------------------------------------------------------------------------------
 
 /// Generate a new unique instrument id.
 pub fn unique_instrument_id() -> InstrumentId {
     static ID: AtomicUsize = AtomicUsize::new(0);
-    ID.fetch_add(1, Ordering::Relaxed)
+    InstrumentId(ID.fetch_add(1, Ordering::Relaxed))
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -169,8 +174,8 @@ pub trait EventIter: Iterator<Item = Event> {
 
 // -------------------------------------------------------------------------------------------------
 
-impl Debug for NoteEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for NoteEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
             "{} {} {:.2}",
             if let Some(instrument) = self.instrument {
@@ -184,8 +189,8 @@ impl Debug for NoteEvent {
     }
 }
 
-impl Debug for ParameterChangeEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for ParameterChangeEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
             "{} {}",
             if let Some(parameter) = self.parameter {
@@ -198,8 +203,8 @@ impl Debug for ParameterChangeEvent {
     }
 }
 
-impl Debug for Event {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Event::NoteEvents(note_vector) => f.write_fmt(format_args!(
                 "{:?}",

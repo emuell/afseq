@@ -184,10 +184,10 @@ pub fn unwrap_note_event(
         .into());
     }
     if array.len() == 3 {
-        let instrument = unwrap_integer(context, array[0].clone(), "instrument")? as InstrumentId;
+        let instrument = unwrap_integer(context, array[0].clone(), "instrument")? as usize;
         let note = unwrap_note(context, array[1].clone())?;
         let velocity = unwrap_float(context, array[2].clone(), "velocity")? as f32;
-        Ok((Some(instrument), note, velocity))
+        Ok((Some(InstrumentId::from(instrument)), note, velocity))
     } else {
         let note = unwrap_note(context, array[0].clone())?;
         let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
