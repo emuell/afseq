@@ -69,9 +69,13 @@ pub fn register(
     // BeatTime
     engine
         .register_fn("every_nth_sixteenth", every_nth_sixteenth)
+        .register_fn("every_sixteenth", every_sixteenth)
         .register_fn("every_nth_eighth", every_nth_eighth)
+        .register_fn("every_eighth", every_eighth)
         .register_fn("every_nth_beat", every_nth_beat)
-        .register_fn("every_nth_bar", every_nth_bar);
+        .register_fn("every_beat", every_beat)
+        .register_fn("every_nth_bar", every_nth_bar)
+        .register_fn("every_bar", every_bar);
 
     // BeatTimeRhythm
     engine
@@ -254,6 +258,13 @@ fn notes_in_scale(
 // ---------------------------------------------------------------------------------------------
 // BeatTime
 
+fn every_sixteenth(
+    context: NativeCallContext,
+    this: &mut BeatTimeBase,
+) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+    every_nth_sixteenth(context, this, Dynamic::from_float(1.0))
+}
+
 fn every_nth_sixteenth(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
@@ -262,6 +273,13 @@ fn every_nth_sixteenth(
     let err_context = ErrorCallContext::from(&context);
     let step = unwrap_float(&err_context, sixteenth, "step")? as f32;
     Ok(this.every_nth_sixteenth(step))
+}
+
+fn every_eighth(
+    context: NativeCallContext,
+    this: &mut BeatTimeBase,
+) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+    every_nth_eighth(context, this, Dynamic::from_float(1.0))
 }
 
 fn every_nth_eighth(
@@ -274,6 +292,13 @@ fn every_nth_eighth(
     Ok(this.every_nth_eighth(step))
 }
 
+fn every_beat(
+    context: NativeCallContext,
+    this: &mut BeatTimeBase,
+) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+    every_nth_beat(context, this, Dynamic::from_float(1.0))
+}
+
 fn every_nth_beat(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
@@ -282,6 +307,13 @@ fn every_nth_beat(
     let err_context = ErrorCallContext::from(&context);
     let step = unwrap_float(&err_context, beats, "step")? as f32;
     Ok(this.every_nth_beat(step))
+}
+
+fn every_bar(
+    context: NativeCallContext,
+    this: &mut BeatTimeBase,
+) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+    every_nth_bar(context, this, Dynamic::from_float(1.0))
 }
 
 fn every_nth_bar(
