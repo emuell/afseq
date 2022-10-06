@@ -155,11 +155,25 @@ pub enum Note {
     F9 = 0x7D,
     Fs9 = 0x7E,
     G9 = 0x7F,
+    // This is NOT a MIDI note, but only internally used
+    OFF = 0xFF,
 }
 
 impl Note {
+    /// Test if this note value is a note-on.
+    pub fn is_note_on(&self) -> bool {
+        *self != Note::OFF
+    }
+    /// Test if this note value is a note-off.
+    pub fn is_note_off(&self) -> bool {
+        *self == Note::OFF
+    }
+
     /// Try converting the given string to a Note
     pub fn try_from(s: &str) -> Result<Self, String> {
+        fn is_note_off(s: &str) -> bool {
+            s.to_lowercase() == "off"
+        }
         fn is_sharp_symbol(s: &str, index: usize) -> bool {
             if let Some(c) = s.chars().nth(index) {
                 if c == 'S' || c == 's' || c == '#' || c == '♮' {
@@ -243,6 +257,12 @@ impl Note {
             }
         }
 
+        // Note-Off
+        if is_note_off(s) {
+            return Ok(Note::OFF);
+        }
+
+        // Note-On
         let note = note_value_at(s, 0)? as i32;
         let octave = if is_sharp_symbol(s, 1) || is_flat_symbol(s, 1) || is_empty_symbol(s, 1) {
             octave_value_at(s, 2)?

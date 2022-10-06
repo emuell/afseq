@@ -179,13 +179,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // schedule events relative to the player's initial position
         let playback_start_in_samples = player.output_sample_frame_position();
         // emit notes and feed them into the player
-        let play_event =
-            |player: &mut AudioFilePlayer, sample_time: SampleTime, event: &Option<Event>| {
-                // play
-                if let Event::NoteEvents(notes) =
-                    event.as_ref().unwrap_or(&Event::NoteEvents(Vec::new()))
-                {
-                    for note in notes {
+        let play_event = |player: &mut AudioFilePlayer,
+                          _rhythm_index: usize,
+                          sample_time: SampleTime,
+                          event: &Option<Event>| {
+            // play
+            if let Some(Event::NoteEvents(notes)) = event {
+                for (_voice_index, note) in notes.iter().enumerate() {
+                    // TODO: stop playing note at (rhythm_index, voice_index) column
+                    if note.note.is_note_on() {
                         if let Some(instrument) = note.instrument {
                             if let Some(mut sample) = POOL.get_sample(instrument) {
                                 sample.set_volume(note.velocity);
@@ -200,7 +202,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
-            };
+            }
+        };
 
         let mut emitted_sample_time: u64 = 0;
         loop {
@@ -214,9 +217,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if seconds_to_emit > 1.0 {
                 emitted_sample_time += beat_time.seconds_to_samples(seconds_to_emit);
-                phrase.run_until_time(emitted_sample_time, |sample_time, event| {
+                phrase.run_until_time(emitted_sample_time, |rhythm_index, sample_time, event| {
                     // print_event(sample_time, event);
-                    play_event(&mut player, sample_time, event);
+                    play_event(&mut player, rhythm_index, sample_time, event);
                 });
             } else {
                 if script_files_changed.load(Ordering::Relaxed) {

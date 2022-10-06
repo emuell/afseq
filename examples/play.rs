@@ -192,22 +192,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         player.output_sample_frame_position() + beat_time_base.seconds_to_samples(0.5);
 
     let play_event = |player: &mut AudioFilePlayer,
+                      _rhythm_index: usize,
                       sample_time: SampleTime,
                       event: &Option<Event>| {
         // play
-        if let Event::NoteEvents(notes) = event.as_ref().unwrap_or(&Event::NoteEvents(Vec::new())) {
-            for note in notes {
-                if let Some(instrument) = note.instrument {
-                    if let Some(sample) = sample_pool.get(&instrument) {
-                        let mut new_source = sample.clone();
-                        new_source.set_volume(note.velocity);
-                        player
-                            .play_file_source(
-                                new_source,
-                                speed_from_note(note.note as u8),
-                                Some(sample_time as u64 + playback_delay_in_samples),
-                            )
-                            .unwrap();
+        if let Some(Event::NoteEvents(notes)) = event {
+            for (_voice_index, note) in notes.iter().enumerate() {
+                // TODO: stop playing note at (rhythm_index, voice_index) column
+                if note.note.is_note_on() {
+                    if let Some(instrument) = note.instrument {
+                        if let Some(sample) = sample_pool.get(&instrument) {
+                            let mut new_source = sample.clone();
+                            new_source.set_volume(note.velocity);
+                            player
+                                .play_file_source(
+                                    new_source,
+                                    speed_from_note(note.note as u8),
+                                    Some(sample_time as u64 + playback_delay_in_samples),
+                                )
+                                .unwrap();
+                        }
                     }
                 }
             }
@@ -225,9 +229,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if seconds_to_emit > 1.0 {
             emitted_sample_time += beat_time_base.seconds_to_samples(seconds_to_emit);
-            phrase.run_until_time(emitted_sample_time, |sample_time, event| {
+            phrase.run_until_time(emitted_sample_time, |rhythm_index, sample_time, event| {
                 print_event(sample_time, event);
-                play_event(&mut player, sample_time, event);
+                play_event(&mut player, rhythm_index, sample_time, event);
             });
         } else {
             let sleep_amount = 1.0 - seconds_to_emit;

@@ -6,6 +6,10 @@ use crate::{event::Event, prelude::BeatTimeStep, BeatTimeBase, Rhythm, SampleTim
 
 // -------------------------------------------------------------------------------------------------
 
+type RhythmIndex = usize;
+
+// -------------------------------------------------------------------------------------------------
+
 /// Combines multiple [`Rhythm`] into a new one, allowing to form more complex rhythms that are
 /// meant to run together. Further it allows to run/evaluate rhythms, until a specific sample time
 /// is reached.
@@ -19,8 +23,8 @@ pub struct Phrase {
     time_base: BeatTimeBase,
     offset: BeatTimeStep,
     rhythms: Rc<RefCell<Vec<Box<dyn Rhythm>>>>,
-    next_events: Vec<Option<(SampleTime, Option<Event>)>>,
-    held_back_event: Option<(SampleTime, Option<Event>)>,
+    next_events: Vec<Option<(RhythmIndex, SampleTime, Option<Event>)>>,
+    held_back_event: Option<(RhythmIndex, SampleTime, Option<Event>)>,
 }
 
 impl Phrase {
@@ -53,47 +57,48 @@ impl Phrase {
     /// function for all emitted events to consume them.
     pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, mut consumer: F)
     where
-        F: FnMut(SampleTime, &Option<Event>),
+        F: FnMut(RhythmIndex, SampleTime, &Option<Event>),
     {
         // emit last held back event first
-        if let Some((sample_time, event)) = &self.held_back_event {
+        if let Some((rhythm_index, sample_time, event)) = &self.held_back_event {
             if *sample_time < run_until_time {
-                consumer(*sample_time, event);
+                consumer(*rhythm_index, *sample_time, event);
                 self.held_back_event = None;
             }
         }
         // then emit next events until we've reached the desired sample_time
-        while let Some((sample_time, event)) = self.next() {
+        while let Some((rhythm_index, sample_time, event)) = self.next_event() {
             if sample_time >= run_until_time {
                 // hold this event back for the next run
-                self.held_back_event = Some((sample_time, event));
+                self.held_back_event = Some((rhythm_index, sample_time, event));
                 break;
             }
-            consumer(sample_time, &event);
+            consumer(rhythm_index, sample_time, &event);
         }
     }
-}
 
-impl Iterator for Phrase {
-    type Item = (SampleTime, Option<Event>);
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next_event(&mut self) -> Option<(RhythmIndex, SampleTime, Option<Event>)> {
         // fetch next events in all rhythms
-        for (rhythm, next_event) in self
+        for (rhythm_index, (rhythm, next_event)) in self
             .rhythms
             .borrow_mut()
             .iter_mut()
             .zip(self.next_events.iter_mut())
+            .enumerate()
         {
             if !next_event.is_some() {
-                *next_event = rhythm.next();
+                if let Some((sample_time, event)) = rhythm.next() {
+                    *next_event = Some((rhythm_index, sample_time, event));
+                } else {
+                    *next_event = None;
+                }
             }
         }
         // select the next from all pre-fetched events with the smallest sample time
         let next_due = self.next_events.iter_mut().reduce(|min, next| {
-            let (min_sample_time, _) = min.as_ref().unwrap();
-            let (next_sample_time, _) = next.as_ref().unwrap();
-            if *next_sample_time < *min_sample_time {
+            let (_, min_sample_time, _) = min.as_ref().unwrap();
+            let (_, next_sample_time, _) = next.as_ref().unwrap();
+            if next_sample_time < min_sample_time {
                 next
             } else {
                 min
@@ -102,12 +107,24 @@ impl Iterator for Phrase {
         if let Some(next_due) = next_due {
             let next = next_due.clone();
             *next_due = None; // consume
-            if let Some((sample_time, event)) = next {
+            if let Some((rhythm_index, sample_time, event)) = next {
                 let sample_offset = self.offset.to_samples(&self.time_base) as u64;
-                Some((sample_offset + sample_time, event))
+                Some((rhythm_index, sample_offset + sample_time, event))
             } else {
                 None
             }
+        } else {
+            None
+        }
+    }
+}
+
+impl Iterator for Phrase {
+    type Item = (SampleTime, Option<Event>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((_, sample_time, event)) = self.next_event() {
+            Some((sample_time, event))
         } else {
             None
         }

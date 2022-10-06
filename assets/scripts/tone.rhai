@@ -14,8 +14,7 @@ let volume_step = 63;
 let volume_direction = 1.0;
 
 beat_time()
-  .every_nth_sixteenth(1)
-  .with_pattern([1, 1, 1, 1])
+  .every_sixteenth()
   .trigger(|| {
     let notes = [0, 2, 3, 5, 2, 3, 5].map(|i| scales[scale_index[0]][scale_index[1]][i] - 12);
     let note = notes[note_step % notes.len()];

@@ -149,7 +149,11 @@ pub fn unwrap_note_from_int(
     context: &ErrorCallContext,
     note: INT,
 ) -> Result<Note, Box<EvalAltResult>> {
-    if !(0..=0x7f).contains(&note) {
+    if note == 0xff {
+        Ok(Note::OFF)
+    } else if (0..=0x7f).contains(&note) {
+        Ok(Note::from(note as u8))
+    } else {
         return Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
@@ -162,7 +166,6 @@ pub fn unwrap_note_from_int(
         )
         .into());
     }
-    Ok(Note::from(note as u8))
 }
 
 pub fn unwrap_note_event(
