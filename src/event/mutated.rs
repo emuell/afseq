@@ -7,11 +7,11 @@ type EventMapFn = dyn FnMut(Event) -> Event + 'static;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Endlessly emits [`Event`] which's value can be mutated/mapped in each iter step
-/// with a custom map function.
+/// Endlessly emits [`Event`] which's value can be mutated in each iter step
+/// with a custom closure.
 ///
-/// NB: This event iter is can not be cloned.
-pub struct MappedEventIter {
+/// NB: This event iter can not be cloned.
+pub struct MutatedEventIter {
     events: Vec<Event>,
     initial_events: Vec<Event>,
     map: Box<EventMapFn>,
@@ -19,7 +19,7 @@ pub struct MappedEventIter {
     current: usize,
 }
 
-impl MappedEventIter {
+impl MutatedEventIter {
     pub fn new<F>(events: Vec<Event>, map: F) -> Self
     where
         F: FnMut(Event) -> Event + Clone + 'static,
@@ -48,7 +48,7 @@ impl MappedEventIter {
     }
 }
 
-impl Iterator for MappedEventIter {
+impl Iterator for MutatedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -62,7 +62,7 @@ impl Iterator for MappedEventIter {
     }
 }
 
-impl EventIter for MappedEventIter {
+impl EventIter for MutatedEventIter {
     fn reset(&mut self) {
         self.events = self.initial_events.clone();
         self.map = (self.reset_map)();
@@ -72,19 +72,19 @@ impl EventIter for MappedEventIter {
 
 // -------------------------------------------------------------------------------------------------
 
-pub trait ToMappedEventIter<F>
+pub trait ToMutatedEventIter<F>
 where
     F: FnMut(Event) -> Event + Clone + 'static,
 {
-    fn map_events(self, map: F) -> MappedEventIter;
+    fn mutate(self, map: F) -> MutatedEventIter;
 }
 
-impl<F> ToMappedEventIter<F> for FixedEventIter
+impl<F> ToMutatedEventIter<F> for FixedEventIter
 where
     F: FnMut(Event) -> Event + Clone + 'static,
 {
-    /// Upgrade a [`FixedEventIter`] to a [`MappedEventIter`].
-    fn map_events(self, map: F) -> MappedEventIter {
-        MappedEventIter::new(self.events(), map)
+    /// Upgrade a [`FixedEventIter`] to a [`MutatedEventIter`].
+    fn mutate(self, map: F) -> MutatedEventIter {
+        MutatedEventIter::new(self.events(), map)
     }
 }

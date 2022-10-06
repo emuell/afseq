@@ -10,8 +10,9 @@ use std::fmt;
 
 pub mod empty;
 pub mod fixed;
-pub mod mapped;
-pub mod mapped_note;
+pub mod mutated;
+#[cfg(feature = "scripting")]
+pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 

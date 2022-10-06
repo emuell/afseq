@@ -62,37 +62,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_offset(BeatTimeStep::Beats(1.0))
         .trigger(new_note_event(SNARE, "C_4", 1.0));
 
-    let hihat_pattern = beat_time_base.every_nth_sixteenth(2.0).trigger(
-        new_note_event(HIHAT, "C_4", 1.0).map_notes({
-            let mut step = 0;
-            move |mut note, _voice_index| {
-                note.velocity = 1.0 / (step + 1) as f32;
-                step += 1;
-                if step >= 3 {
-                    step = 0;
+    let hihat_pattern =
+        beat_time_base
+            .every_nth_sixteenth(2.0)
+            .trigger(new_note_event(HIHAT, "C_4", 1.0).mutate({
+                let mut step = 0;
+                move |mut event| {
+                    if let Event::NoteEvents(notes) = &mut event {
+                        for (_index, note) in notes.iter_mut().enumerate() {
+                            note.velocity = 1.0 / (step + 1) as f32;
+                            step += 1;
+                            if step >= 3 {
+                                step = 0;
+                            }
+                        }
+                    }
+                    event
                 }
-                note
-            }
-        }),
-    );
+            }));
     let hihat_pattern2 = beat_time_base
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
-        .trigger(new_note_event(HIHAT, "C_4", 1.0).map_notes({
+        .trigger(new_note_event(HIHAT, "C_4", 1.0).mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
-            move |mut note, _voice_index| {
-                note.velocity = 1.0 / (vel_step + 1) as f32 * 0.5;
-                vel_step += 1;
-                if vel_step >= 3 {
-                    vel_step = 0;
+            move |mut event| {
+                if let Event::NoteEvents(notes) = &mut event {
+                    for (_index, note) in notes.iter_mut().enumerate() {
+                        note.velocity = 1.0 / (vel_step + 1) as f32 * 0.5;
+                        vel_step += 1;
+                        if vel_step >= 3 {
+                            vel_step = 0;
+                        }
+                        note.note = Note::from((Note::C4 as u8) + 32 - note_step);
+                        note_step += 1;
+                        if note_step >= 32 {
+                            note_step = 0;
+                        }
+                    }
                 }
-                note.note = Note::from((Note::C4 as u8) + 32 - note_step);
-                note_step += 1;
-                if note_step >= 32 {
-                    note_step = 0;
-                }
-                note
+                event
             }
         }));
 

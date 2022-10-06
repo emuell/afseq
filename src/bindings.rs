@@ -1,7 +1,11 @@
 //! Rhai script bindings for the entire crate.
 
 use crate::prelude::*;
-use crate::{event::fixed::FixedEventIter, rhythm::beat_time::BeatTimeRhythm, BeatTimeBase};
+use crate::{
+    event::{fixed::FixedEventIter, scripted::ScriptedEventIter},
+    rhythm::beat_time::BeatTimeRhythm,
+    BeatTimeBase,
+};
 
 use rhai::{
     packages::Package, Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString,
@@ -15,11 +19,8 @@ use rust_music_theory::{note::Notes, scale};
 
 // ---------------------------------------------------------------------------------------------
 
-mod unwrap;
+pub(crate) mod unwrap;
 use unwrap::*;
-
-mod event_iter;
-use event_iter::*;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -107,7 +108,7 @@ fn repeat_array(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Global
+// Defaults
 
 fn eval_default_instrument(engine: &Engine) -> Result<Option<InstrumentId>, Box<EvalAltResult>> {
     engine.eval::<Option<InstrumentId>>("default_instrument()")
@@ -116,6 +117,9 @@ fn eval_default_instrument(engine: &Engine) -> Result<Option<InstrumentId>, Box<
 fn eval_default_beat_time(engine: &Engine) -> Result<BeatTimeBase, Box<EvalAltResult>> {
     engine.eval::<BeatTimeBase>("default_beat_time()")
 }
+
+// ---------------------------------------------------------------------------------------------
+// Global
 
 fn default_beat_time(context: NativeCallContext) -> Result<BeatTimeBase, Box<EvalAltResult>> {
     eval_default_beat_time(context.engine())
@@ -325,7 +329,8 @@ fn trigger_custom_event(
     this: &mut BeatTimeRhythm,
     func: FnPtr,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    Ok(this.trigger(FnEventIter::new(&context, func)?))
+    let instrument = eval_default_instrument(context.engine())?;
+    Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
 }
 
 // -------------------------------------------------------------------------------------------------
