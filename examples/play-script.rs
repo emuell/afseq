@@ -1,4 +1,5 @@
 use lazy_static::*;
+
 use std::{
     collections::HashMap,
     path::Path,
@@ -14,11 +15,14 @@ use afplay::{
     AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
 };
 
-use afseq::{bindings::register_bindings, prelude::*, rhythm::beat_time::BeatTimeRhythm};
+use afseq::{
+    bindings::{self},
+    prelude::*,
+    rhythm::beat_time::BeatTimeRhythm,
+};
 
 use notify::{RecursiveMode, Watcher};
-use rhai::{packages::Package, Dynamic, Engine, EvalAltResult, NativeCallContext};
-use rhai_sci::SciPackage;
+use rhai::{Dynamic, EvalAltResult, NativeCallContext};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -59,27 +63,21 @@ fn load_script(
     time_base: BeatTimeBase,
     file_name: &str,
 ) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-    let mut engine = Engine::new();
-    engine.set_max_expr_depths(0, 0);
+    // create a new engine
+    let mut engine = bindings::new_engine();
+    bindings::register(&mut engine, time_base, Some(instrument));
 
-    let contents = std::fs::read_to_string(PathBuf::from(file_name))?;
-    let ast = engine.compile(contents.as_str())?;
-
-    let sci = SciPackage::new();
-    sci.register_into_engine(&mut engine);
-
-    register_bindings(&mut engine, time_base, Some(instrument), Some(ast.clone()));
-
+    // register sample pool API
     engine.register_fn("sample_pool", move || -> &'static SamplePool {
         sample_pool
     });
     engine.register_type::<SamplePool>().register_fn(
         "load",
         |context: NativeCallContext,
-         sample_pool: &SamplePool,
+         this: &SamplePool,
          file_path: String|
          -> Result<rhai::INT, Box<EvalAltResult>> {
-            match sample_pool.load_sample(&file_path) {
+            match this.load_sample(&file_path) {
                 Ok(id) => Ok(*id as rhai::INT),
                 Err(_err) => {
                     Err(EvalAltResult::ErrorModuleNotFound(file_path, context.position()).into())
@@ -88,7 +86,11 @@ fn load_script(
         },
     );
 
+    // compile and evaluate script
+    let ast = engine.compile_file(PathBuf::from(file_name))?;
     let result = engine.eval_ast::<Dynamic>(&ast)?;
+
+    // hande script result
     if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
         Ok(Box::new(beat_time_rhythm))
     } else {

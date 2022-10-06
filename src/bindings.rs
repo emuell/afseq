@@ -4,9 +4,12 @@ use crate::prelude::*;
 use crate::{event::fixed::FixedEventIter, rhythm::beat_time::BeatTimeRhythm, BeatTimeBase};
 
 use rhai::{
-    Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString, NativeCallContext, AST, FLOAT,
-    INT,
+    packages::Package, Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString,
+    NativeCallContext, FLOAT, INT,
 };
+
+use rhai_rand::RandomPackage;
+use rhai_sci::SciPackage;
 
 use rust_music_theory::{note::Notes, scale};
 
@@ -20,20 +23,34 @@ use event_iter::*;
 
 // ---------------------------------------------------------------------------------------------
 
-pub fn register_bindings(
+/// Create a new rhai engine with preloaded packages and our default configuation
+pub fn new_engine() -> Engine {
+    let mut engine = Engine::new();
+
+    // Configure engine limits
+    engine.set_max_expr_depths(1000, 1000);
+
+    // load default packages
+    let sci = SciPackage::new();
+    sci.register_into_engine(&mut engine);
+    let rand = RandomPackage::new();
+    rand.register_into_engine(&mut engine);
+
+    engine
+}
+
+// ---------------------------------------------------------------------------------------------
+
+/// Register afseq API bindings into the rhai engine.  
+pub fn register(
     engine: &mut Engine,
     default_time_base: BeatTimeBase,
     default_instrument: Option<InstrumentId>,
-    callback_context: Option<AST>,
 ) {
-    // Limits
-    engine.set_max_expr_depths(0, 0);
-
     // Defaults
     engine
-        .register_fn("__default_instrument", move || default_instrument)
-        .register_fn("__default_beat_time", move || default_time_base)
-        .register_fn("__callback_context", move || callback_context.clone());
+        .register_fn("default_instrument", move || default_instrument)
+        .register_fn("default_beat_time", move || default_time_base);
 
     // Std extensions
     engine.register_fn("repeat", repeat_array);
@@ -93,11 +110,11 @@ fn repeat_array(
 // Global
 
 fn eval_default_instrument(engine: &Engine) -> Result<Option<InstrumentId>, Box<EvalAltResult>> {
-    engine.eval_expression::<Option<InstrumentId>>("__default_instrument()")
+    engine.eval::<Option<InstrumentId>>("default_instrument()")
 }
 
 fn eval_default_beat_time(engine: &Engine) -> Result<BeatTimeBase, Box<EvalAltResult>> {
-    engine.eval_expression::<BeatTimeBase>("__default_beat_time()")
+    engine.eval::<BeatTimeBase>("default_beat_time()")
 }
 
 fn default_beat_time(context: NativeCallContext) -> Result<BeatTimeBase, Box<EvalAltResult>> {
@@ -316,7 +333,7 @@ fn trigger_custom_event(
 #[cfg(test)]
 mod test {
     use crate::{
-        bindings::eval_default_instrument,
+        bindings::{eval_default_instrument, new_engine},
         event::{fixed::FixedEventIter, Event, InstrumentId},
         midi::Note,
         prelude::BeatTimeStep,
@@ -324,14 +341,14 @@ mod test {
         BeatTimeBase,
     };
 
-    use super::{eval_default_beat_time, register_bindings};
+    use super::{eval_default_beat_time, register};
     use rhai::{Dynamic, Engine};
 
     #[test]
     fn defaults() {
         // create a new engine and register bindings
-        let mut engine = Engine::new();
-        register_bindings(
+        let mut engine = new_engine();
+        register(
             &mut engine,
             BeatTimeBase {
                 beats_per_min: 160.0,
@@ -339,7 +356,6 @@ mod test {
                 samples_per_sec: 96000,
             },
             Some(InstrumentId::from(76)),
-            None,
         );
 
         assert!(eval_default_beat_time(&engine).is_ok());
@@ -359,7 +375,7 @@ mod test {
     fn extensions() {
         // create a new engine and register bindings
         let mut engine = Engine::new();
-        register_bindings(
+        register(
             &mut engine,
             BeatTimeBase {
                 beats_per_min: 160.0,
@@ -367,7 +383,6 @@ mod test {
                 samples_per_sec: 96000,
             },
             Some(InstrumentId::from(76)),
-            None,
         );
 
         // Array::repeat
@@ -390,15 +405,14 @@ mod test {
     #[test]
     fn note() {
         // create a new engine and register bindings
-        let mut engine = Engine::new();
-        register_bindings(
+        let mut engine = new_engine();
+        register(
             &mut engine,
             BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            None,
             None,
         );
 
@@ -549,15 +563,14 @@ mod test {
     #[test]
     fn beat_time() {
         // create a new engine and register bindings
-        let mut engine = Engine::new();
-        register_bindings(
+        let mut engine = new_engine();
+        register(
             &mut engine,
             BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            None,
             None,
         );
 

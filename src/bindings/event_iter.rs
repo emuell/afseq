@@ -1,7 +1,6 @@
-use rhai::{
-    packages::Package, Array, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, AST, INT,
-};
-use rhai_sci::SciPackage;
+use std::path::PathBuf;
+
+use rhai::{Array, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, AST, INT};
 
 use super::{
     eval_default_instrument,
@@ -27,20 +26,13 @@ impl FnEventIter {
     pub fn new(context: &NativeCallContext, fn_ptr: FnPtr) -> Result<Self, Box<EvalAltResult>> {
         // fetch default instrument from calling context
         let instrument = eval_default_instrument(context.engine())?;
-
-        // create a new engine and fetch AST for the callback context
-        let mut engine = Engine::new();
-        engine.set_max_expr_depths(0, 0);
-
-        let sci = SciPackage::new();
-        sci.register_into_engine(&mut engine);
-
-        let ast = context
-            .engine()
-            .eval_expression::<Option<AST>>("__callback_context()")?;
-
-        if let Some(ast) = ast {
-            // immediately fetch first event, so we can immediately show errors from the fn_ptrs
+        // create a new engine
+        let engine = super::new_engine();
+        // compile AST from the callback context's source
+        let source_file = context.source();
+        if let Some(source_file) = source_file {
+            let ast = context.engine().compile_file(PathBuf::from(source_file))?;
+            // immediately fetch/evaluate the first event, so we can immediately show errors
             let event = Self::next_event_from(&engine, &ast, &fn_ptr, instrument)?;
             Ok(Self {
                 engine,
@@ -50,9 +42,8 @@ impl FnEventIter {
                 instrument,
             })
         } else {
-            Err(EvalAltResult::ErrorMismatchDataType(
-                "AST".to_string(),
-                "None".to_string(),
+            Err(EvalAltResult::ErrorModuleNotFound(
+                fn_ptr.fn_name().to_string(),
                 context.position(),
             )
             .into())
