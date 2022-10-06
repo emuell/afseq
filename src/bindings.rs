@@ -62,6 +62,8 @@ pub fn register(
         .register_fn("beat_time", beat_time)
         .register_fn("note", note_from_number)
         .register_fn("note", note_from_string)
+        .register_fn("note", note_from_number_with_velocity)
+        .register_fn("note", note_from_string_with_velocity)
         .register_fn("note", note_vec)
         .register_fn("note_seq", note_vec_seq)
         .register_fn("notes_in_scale", notes_in_scale);
@@ -148,6 +150,32 @@ fn beat_time(
 fn note_from_string(
     context: NativeCallContext,
     note: ImmutableString,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
+    let err_context = ErrorCallContext::from(&context);
+    let instrument = eval_default_instrument(context.engine())?;
+    Ok(new_note_event(
+        instrument,
+        unwrap_note_from_string(&err_context, note.as_str())?,
+        1.0_f32,
+    ))
+}
+
+fn note_from_number(
+    context: NativeCallContext,
+    note: INT,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
+    let err_context = ErrorCallContext::from(&context);
+    let instrument = eval_default_instrument(context.engine())?;
+    Ok(new_note_event(
+        instrument,
+        unwrap_note_from_int(&err_context, note)?,
+        1.0_f32,
+    ))
+}
+
+fn note_from_string_with_velocity(
+    context: NativeCallContext,
+    note: ImmutableString,
     velocity: FLOAT,
 ) -> Result<FixedEventIter, Box<EvalAltResult>> {
     let err_context = ErrorCallContext::from(&context);
@@ -159,7 +187,7 @@ fn note_from_string(
     ))
 }
 
-fn note_from_number(
+fn note_from_number_with_velocity(
     context: NativeCallContext,
     note: INT,
     velocity: FLOAT,
@@ -371,10 +399,9 @@ fn trigger_custom_event(
 mod test {
     use crate::{
         bindings::{eval_default_instrument, new_engine},
-        event::{fixed::FixedEventIter, Event, InstrumentId},
-        midi::Note,
-        prelude::BeatTimeStep,
+        event::{fixed::FixedEventIter, new_note, Event, InstrumentId},
         rhythm::beat_time::BeatTimeRhythm,
+        time::BeatTimeStep,
         BeatTimeBase,
     };
 
@@ -454,6 +481,19 @@ mod test {
         );
 
         // Note
+        assert!(engine.eval::<Dynamic>(r#"note("X#1")"#).is_err());
+        assert!(engine.eval::<Dynamic>(r#"note("C#-2"#).is_err());
+        let eval_result = engine.eval::<Dynamic>(r#"note("g#1")"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
+            assert_eq!(
+                note_event.unwrap().events()[0],
+                Event::NoteEvents(vec![new_note(None, "g#1", 1.0)])
+            );
+        }
+
         assert!(engine.eval::<Dynamic>(r#"note("X#1", 0.5)"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", "0.5")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5, 1.0)"#).is_err());
@@ -462,14 +502,21 @@ mod test {
             panic!("{}", err);
         } else {
             let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert!(
-                if let Event::NoteEvents(notes) = &note_event.unwrap().events()[0] {
-                    notes.len() == 1
-                        && notes[0].note == Note::from("C#1")
-                        && notes[0].velocity == 0.5
-                } else {
-                    false
-                }
+            assert_eq!(
+                note_event.unwrap().events()[0],
+                Event::NoteEvents(vec![new_note(None, "c#1", 0.5)])
+            );
+        }
+
+        assert!(engine.eval::<Dynamic>(r#"note(["X#1"])"#).is_err());
+        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1"])"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
+            assert_eq!(
+                note_event.unwrap().events()[0],
+                Event::NoteEvents(vec![new_note(None, "c#1", 1.0)])
             );
         }
 
@@ -483,14 +530,9 @@ mod test {
             panic!("{}", err);
         } else {
             let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert!(
-                if let Event::NoteEvents(notes) = &note_event.unwrap().events()[0] {
-                    notes.len() == 1
-                        && notes[0].note == Note::from("C#1")
-                        && notes[0].velocity == 0.5
-                } else {
-                    false
-                }
+            assert_eq!(
+                note_event.unwrap().events()[0],
+                Event::NoteEvents(vec![new_note(None, "c#1", 0.5)])
             );
         }
 
@@ -499,16 +541,12 @@ mod test {
             panic!("{}", err);
         } else {
             let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert!(
-                if let Event::NoteEvents(notes) = &note_event.unwrap().events()[0] {
-                    notes.len() == 1 && notes[0].note == Note::D4 && notes[0].velocity == 0.5
-                } else {
-                    false
-                }
+            assert_eq!(
+                note_event.unwrap().events(),
+                vec![Event::NoteEvents(vec![new_note(None, "d4", 0.5)])]
             );
         }
 
-        let eval_result = engine.eval::<Dynamic>(r#"note([["C#1", 0.5], ["G2", 0.75]])"#);
         assert!(engine
             .eval::<Dynamic>(r#"note([["Note", 0.5, 1.0]])"#)
             .is_err());
@@ -516,71 +554,50 @@ mod test {
             .eval::<Dynamic>(r#"note([["C#1", 0.5, 1.0]])"#)
             .is_err());
         assert!(engine.eval::<Dynamic>(r#"note([["C#1", "0.5"]])"#).is_err());
+        let eval_result = engine.eval::<Dynamic>(r#"note([["C#1", 0.5], ["G2", 0.75]])"#);
         if let Err(err) = eval_result {
             panic!("{}", err);
         } else {
             let poly_note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
             assert!(poly_note_event.is_some());
-            let note_event = &poly_note_event.unwrap().events()[0];
-            assert!(if let Event::NoteEvents(notes) = &note_event {
-                notes.len() == 2
-                    && notes[0].note == Note::from("C#1")
-                    && notes[0].velocity == 0.5
-                    && notes[1].note == Note::from("G2")
-                    && notes[1].velocity == 0.75
-            } else {
-                false
-            });
+            assert_eq!(
+                poly_note_event.unwrap().events()[0],
+                Event::NoteEvents(vec![new_note(None, "c#1", 0.5), new_note(None, "g2", 0.75)])
+            );
         }
 
         // NoteEventSequence
-        let eval_result = engine.eval::<Dynamic>(r#"note_seq([["C#1", 0.5], ["G_2", 0.75]])"#);
+        let eval_result = engine.eval::<Dynamic>(r#"note_seq([["C#1", 0.5], ["G_2"]])"#);
         if let Err(err) = eval_result {
             panic!("{}", err);
         } else {
             let note_sequence_event = eval_result.unwrap().try_cast::<FixedEventIter>();
             assert!(note_sequence_event.is_some());
-            let note_events = note_sequence_event.unwrap().events();
-            assert!(if let Event::NoteEvents(notes) = &note_events[0] {
-                notes.len() == 1 && notes[0].note == Note::from("C#1") && notes[0].velocity == 0.5
-            } else {
-                false
-            });
-            assert!(if let Event::NoteEvents(notes) = &note_events[1] {
-                notes.len() == 1 && notes[0].note == Note::from("G2") && notes[0].velocity == 0.75
-            } else {
-                false
-            });
+            assert_eq!(
+                note_sequence_event.unwrap().events(),
+                vec![
+                    Event::NoteEvents(vec![new_note(None, "c#1", 0.5)]),
+                    Event::NoteEvents(vec![new_note(None, "g2", 1.0)])
+                ]
+            );
         }
         let poly_note_sequence_event = engine
             .eval::<Dynamic>(
                 r#"note_seq([
-                     [["C#1", 0.5], ["G_2", 0.75]], 
+                     [["C#1"], ["G_2", 0.75]], 
                      [["A#5", 0.2], ["B_1", 0.1]]
                    ])"#,
             )
             .unwrap()
             .try_cast::<FixedEventIter>();
         assert!(poly_note_sequence_event.is_some());
-        let note_events = poly_note_sequence_event.unwrap().events();
-        assert!(if let Event::NoteEvents(notes) = &note_events[0] {
-            notes.len() == 2
-                && notes[0].note == Note::from("C#1")
-                && notes[0].velocity == 0.5
-                && notes[1].note == Note::from("G2")
-                && notes[1].velocity == 0.75
-        } else {
-            false
-        });
-        assert!(if let Event::NoteEvents(notes) = &note_events[1] {
-            notes.len() == 2
-                && notes[0].note == Note::from("A#5")
-                && notes[0].velocity == 0.2
-                && notes[1].note == Note::from("B1")
-                && notes[1].velocity == 0.1
-        } else {
-            false
-        });
+        assert_eq!(
+            poly_note_sequence_event.unwrap().events(),
+            vec![
+                Event::NoteEvents(vec![new_note(None, "c#1", 1.0), new_note(None, "g2", 0.75)]),
+                Event::NoteEvents(vec![new_note(None, "a#5", 0.2), new_note(None, "b1", 0.1)])
+            ]
+        );
 
         // Notes in Scale
         assert!(engine

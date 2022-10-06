@@ -170,11 +170,11 @@ pub fn unwrap_note_event(
     array: Array,
     default_instrument: Option<InstrumentId>,
 ) -> Result<(Option<InstrumentId>, Note, f32), Box<EvalAltResult>> {
-    if array.len() != 2 && array.len() != 3 {
+    if !(1..=3).contains(&array.len()) {
         return Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
-                "Expected 2 or 3 items in note array in function '{}', got '{}' items",
+                "Expected 1, 2 or 3 items in note array in function '{}', got '{}' items",
                 context.fn_name(),
                 array.len()
             )
@@ -188,9 +188,12 @@ pub fn unwrap_note_event(
         let note = unwrap_note(context, array[1].clone())?;
         let velocity = unwrap_float(context, array[2].clone(), "velocity")? as f32;
         Ok((Some(InstrumentId::from(instrument)), note, velocity))
-    } else {
+    } else if array.len() == 2 {
         let note = unwrap_note(context, array[0].clone())?;
         let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
         Ok((default_instrument, note, velocity))
+    } else {
+        let note = unwrap_note(context, array[0].clone())?;
+        Ok((default_instrument, note, 1.0))
     }
 }
