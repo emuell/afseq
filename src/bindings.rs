@@ -397,7 +397,21 @@ fn every_nth_sixteenth(
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
     let err_context = ErrorCallContext::from(&context);
     let step = unwrap_float(&err_context, sixteenth, "step")? as f32;
-    Ok(this.every_nth_sixteenth(step))
+    if step <= 0.0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid step arg: '{}' in '{}'. step must be > 0",
+                step,
+                err_context.fn_name()
+            )
+            .into(),
+            err_context.position(),
+        )
+        .into())
+    } else {
+        Ok(this.every_nth_sixteenth(step))
+    }
 }
 
 fn every_eighth(
@@ -414,7 +428,21 @@ fn every_nth_eighth(
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
     let err_context = ErrorCallContext::from(&context);
     let step = unwrap_float(&err_context, beats, "step")? as f32;
-    Ok(this.every_nth_eighth(step))
+    if step <= 0.0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid step arg: '{}' in '{}'. step must be > 0",
+                step,
+                err_context.fn_name()
+            )
+            .into(),
+            err_context.position(),
+        )
+        .into())
+    } else {
+        Ok(this.every_nth_eighth(step))
+    }
 }
 
 fn every_beat(
@@ -431,7 +459,21 @@ fn every_nth_beat(
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
     let err_context = ErrorCallContext::from(&context);
     let step = unwrap_float(&err_context, beats, "step")? as f32;
-    Ok(this.every_nth_beat(step))
+    if step <= 0.0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid step arg: '{}' in '{}'. step must be > 0",
+                step,
+                err_context.fn_name()
+            )
+            .into(),
+            err_context.position(),
+        )
+        .into())
+    } else {
+        Ok(this.every_nth_beat(step))
+    }
 }
 
 fn every_bar(
@@ -448,7 +490,21 @@ fn every_nth_bar(
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
     let err_context = ErrorCallContext::from(&context);
     let step = unwrap_float(&err_context, bars, "step")? as f32;
-    Ok(this.every_nth_bar(step))
+    if step <= 0.0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid step arg: '{}' in '{}'. step must be > 0",
+                step,
+                err_context.fn_name()
+            )
+            .into(),
+            err_context.position(),
+        )
+        .into())
+    } else {
+        Ok(this.every_nth_bar(step))
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

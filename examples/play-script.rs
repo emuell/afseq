@@ -133,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let SNARE: InstrumentId = POOL.load_sample("assets/snare.wav")?;
     let HIHAT: InstrumentId = POOL.load_sample("assets/hat.wav")?;
     let BASS: InstrumentId = POOL.load_sample("assets/bass.wav")?;
-    let _SYNTH: InstrumentId = POOL.load_sample("assets/synth.wav")?;
+    let SYNTH: InstrumentId = POOL.load_sample("assets/synth.wav")?;
     let TONE: InstrumentId = POOL.load_sample("assets/tone.wav")?;
     let _FX: InstrumentId = POOL.load_sample("assets/fx.wav")?;
 
@@ -172,6 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 load_script_with_fallback(&POOL, SNARE, beat_time, "./assets/scripts/snare.rhai"),
                 load_script_with_fallback(&POOL, HIHAT, beat_time, "./assets/scripts/hihat.rhai"),
                 load_script_with_fallback(&POOL, BASS, beat_time, "./assets/scripts/bass.rhai"),
+                load_script_with_fallback(&POOL, SYNTH, beat_time, "./assets/scripts/synth.rhai"),
                 load_script_with_fallback(&POOL, TONE, beat_time, "./assets/scripts/tone.rhai"),
             ],
         );

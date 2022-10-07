@@ -1,16 +1,16 @@
 let scales = [[
-    notes_in_scale("c mixolydian"), 
-    notes_in_scale("g mixolydian"), 
+    notes_in_scale("c major"), 
+    notes_in_scale("g major"), 
   ], [
-    notes_in_scale("f major7"), 
-    notes_in_scale("a# major7"), 
+    notes_in_scale("f major"), 
+    notes_in_scale("a# major"), 
   ]];
 
 let note_step = 0;
 let transpose_step = 0;
 let scale_index = [0, 0];
 
-let volume_step = 0;
+let volume_step = 16;
 let volume_direction = 1.0;
 
 beat_time()
@@ -33,4 +33,4 @@ beat_time()
       volume_direction = -volume_direction;
     }
     [note, vel * 0.16] 
-  })
+  });
