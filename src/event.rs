@@ -42,6 +42,11 @@ pub struct NoteEvent {
     pub velocity: f32,
 }
 
+/// Shortcut for creating an empty [`NoteEvent`] [`EventIter`].
+pub fn new_empty_note() -> Option<NoteEvent> {
+    None
+}
+
 /// Shortcut for creating a new [`NoteEvent`].
 pub fn new_note<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     instrument: I,
@@ -59,42 +64,63 @@ pub fn new_note<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 
 /// Shortcut for creating a vector of [`NoteEvent`]:
 /// e.g. a sequence of single notes
-pub fn new_note_vector<I: Into<Option<InstrumentId>>, N: Into<Note>>(
-    sequence: Vec<(I, N, f32)>,
-) -> Vec<NoteEvent> {
+pub fn new_note_vector<
+    I: Into<Option<InstrumentId>>,
+    N: Into<Note>,
+    T: Into<Option<(I, N, f32)>>,
+>(
+    sequence: Vec<T>,
+) -> Vec<Option<NoteEvent>> {
     let mut event_sequence = Vec::with_capacity(sequence.len());
-    for (instrument, note, velocity) in sequence {
-        let instrument = instrument.into();
-        let note = note.into();
-        event_sequence.push(NoteEvent {
-            instrument,
-            note,
-            velocity,
-        });
+    for event in sequence {
+        if let Some((instrument, note, velocity)) = event.into() {
+            let instrument = instrument.into();
+            let note = note.into();
+            event_sequence.push(Some(NoteEvent {
+                instrument,
+                note,
+                velocity,
+            }));
+        } else {
+            event_sequence.push(None);
+        }
     }
     event_sequence
 }
 
 /// Shortcut for creating a new sequence of polyphonic [`NoteEvent`]:
 /// e.g. a sequence of chords
-pub fn new_polyphonic_note_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
-    polyphonic_sequence: Vec<Vec<(I, N, f32)>>,
-) -> Vec<Vec<NoteEvent>> {
+pub fn new_polyphonic_note_sequence<
+    I: Into<Option<InstrumentId>>,
+    N: Into<Note>,
+    T: Into<Option<(I, N, f32)>>,
+>(
+    polyphonic_sequence: Vec<Vec<T>>,
+) -> Vec<Vec<Option<NoteEvent>>> {
     let mut polyphonic_event_sequence = Vec::with_capacity(polyphonic_sequence.len());
     for sequence in polyphonic_sequence {
         let mut event_sequence = Vec::with_capacity(sequence.len());
-        for (instrument, note, velocity) in sequence {
-            let instrument = instrument.into();
-            let note = note.into();
-            event_sequence.push(NoteEvent {
-                instrument,
-                note,
-                velocity,
-            });
+        for event in sequence {
+            if let Some((instrument, note, velocity)) = event.into() {
+                let instrument = instrument.into();
+                let note = note.into();
+                event_sequence.push(Some(NoteEvent {
+                    instrument,
+                    note,
+                    velocity,
+                }));
+            } else {
+                event_sequence.push(None)
+            }
         }
         polyphonic_event_sequence.push(event_sequence);
     }
     polyphonic_event_sequence
+}
+
+/// Shortcut for creating a new empty [`NoteEvent`] [`EventIter`].
+pub fn new_empty_note_event() -> FixedEventIter {
+    new_empty_note().to_event()
 }
 
 /// Shortcut for creating a new [`NoteEvent`] [`EventIter`].
@@ -107,8 +133,12 @@ pub fn new_note_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 }
 
 /// Shortcut for creating a new sequence of [`NoteEvent`] [`EventIter`].
-pub fn new_note_event_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
-    sequence: Vec<(I, N, f32)>,
+pub fn new_note_event_sequence<
+    I: Into<Option<InstrumentId>>,
+    N: Into<Note>,
+    T: Into<Option<(I, N, f32)>>,
+>(
+    sequence: Vec<T>,
 ) -> FixedEventIter {
     new_note_vector(sequence).to_event_sequence()
 }
@@ -116,15 +146,19 @@ pub fn new_note_event_sequence<I: Into<Option<InstrumentId>>, N: Into<Note>>(
 /// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
 /// e.g. a chord.
 pub fn new_polyphonic_note_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
-    polyphonic_events: Vec<(I, N, f32)>,
+    polyphonic_events: Vec<Option<(I, N, f32)>>,
 ) -> FixedEventIter {
     new_note_vector(polyphonic_events).to_event()
 }
 
 /// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
 /// e.g. a sequence of chords.
-pub fn new_polyphonic_note_sequence_event<I: Into<Option<InstrumentId>>, N: Into<Note>>(
-    polyphonic_sequence: Vec<Vec<(I, N, f32)>>,
+pub fn new_polyphonic_note_sequence_event<
+    I: Into<Option<InstrumentId>>,
+    N: Into<Note>,
+    T: Into<Option<(I, N, f32)>>,
+>(
+    polyphonic_sequence: Vec<Vec<T>>,
 ) -> FixedEventIter {
     new_polyphonic_note_sequence(polyphonic_sequence).to_event_sequence()
 }
@@ -160,7 +194,7 @@ pub fn new_parameter_change_event<Parameter: Into<Option<ParameterId>>>(
 /// Event which gets emitted by an [`EventIter`].
 #[derive(Clone, PartialEq)]
 pub enum Event {
-    NoteEvents(Vec<NoteEvent>),
+    NoteEvents(Vec<Option<NoteEvent>>),
     ParameterChangeEvent(ParameterChangeEvent),
 }
 

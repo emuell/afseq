@@ -53,11 +53,29 @@ impl ToFixedEventIter for NoteEvent {
     /// Wrap a [`NoteEvent`] to a new [`FixedEventIter`]
     /// resulting into a single monophonic event.
     fn to_event(self) -> FixedEventIter {
+        FixedEventIter::new(vec![Event::NoteEvents(vec![Some(self)])])
+    }
+}
+impl ToFixedEventIter for Option<NoteEvent> {
+    /// Wrap a [`NoteEvent`] to a new [`FixedEventIter`]
+    /// resulting into a single monophonic event.
+    fn to_event(self) -> FixedEventIter {
         FixedEventIter::new(vec![Event::NoteEvents(vec![self])])
     }
 }
 
 impl ToFixedEventIter for Vec<NoteEvent> {
+    /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`].
+    /// resulting into a single polyphonic event.
+    fn to_event(self) -> FixedEventIter {
+        FixedEventIter::new(vec![Event::NoteEvents(
+            self.iter()
+                .map(|v| Some(v.clone()))
+                .collect::<Vec<Option<NoteEvent>>>(),
+        )])
+    }
+}
+impl ToFixedEventIter for Vec<Option<NoteEvent>> {
     /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`].
     /// resulting into a single polyphonic event.
     fn to_event(self) -> FixedEventIter {
@@ -78,7 +96,7 @@ pub trait ToFixedEventIterSequence {
     fn to_event_sequence(self) -> FixedEventIter;
 }
 
-impl ToFixedEventIterSequence for Vec<NoteEvent> {
+impl ToFixedEventIterSequence for Vec<Option<NoteEvent>> {
     /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`]
     /// resulting into a sequence of single note events.
     fn to_event_sequence(self) -> FixedEventIter {
@@ -90,7 +108,7 @@ impl ToFixedEventIterSequence for Vec<NoteEvent> {
     }
 }
 
-impl ToFixedEventIterSequence for Vec<Vec<NoteEvent>> {
+impl ToFixedEventIterSequence for Vec<Vec<Option<NoteEvent>>> {
     /// Wrap a vector of vectors of [`NoteEvent`] to a new [`FixedEventIter`]
     /// resulting into a sequence of polyphonic note events.
     fn to_event_sequence(self) -> FixedEventIter {

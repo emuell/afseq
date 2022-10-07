@@ -125,6 +125,15 @@ pub fn unwrap_note(context: &ErrorCallContext, d: Dynamic) -> Result<Note, Box<E
     }
 }
 
+pub fn is_empty_note_value(d: &Dynamic) -> bool {
+    d.is::<()>()
+        || (d.type_name() == "string" && is_empty_note_string(d.clone().cast::<String>().as_str()))
+}
+
+pub fn is_empty_note_string(s: &str) -> bool {
+    matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
+}
+
 pub fn unwrap_note_from_string(
     context: &ErrorCallContext,
     s: &str,

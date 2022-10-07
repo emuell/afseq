@@ -186,18 +186,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // play
             if let Some(Event::NoteEvents(notes)) = event {
                 for (_voice_index, note) in notes.iter().enumerate() {
-                    // TODO: stop playing note at (rhythm_index, voice_index) column
-                    if note.note.is_note_on() {
-                        if let Some(instrument) = note.instrument {
-                            if let Some(mut sample) = POOL.get_sample(instrument) {
-                                sample.set_volume(note.velocity);
-                                player
-                                    .play_file_source(
-                                        sample,
-                                        speed_from_note(note.note as u8),
-                                        Some(sample_time as u64 + playback_start_in_samples),
-                                    )
-                                    .unwrap();
+                    if let Some(note) = note {
+                        // TODO: stop playing note at (rhythm_index, voice_index) column
+                        if note.note.is_note_on() {
+                            if let Some(instrument) = note.instrument {
+                                if let Some(mut sample) = POOL.get_sample(instrument) {
+                                    sample.set_volume(note.velocity);
+                                    player
+                                        .play_file_source(
+                                            sample,
+                                            speed_from_note(note.note as u8),
+                                            Some(sample_time as u64 + playback_start_in_samples),
+                                        )
+                                        .unwrap();
+                                }
                             }
                         }
                     }

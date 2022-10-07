@@ -4,7 +4,7 @@ use rhai::{Array, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, AST
 
 use crate::bindings::{
     new_engine,
-    unwrap::{unwrap_array, unwrap_note_event, ErrorCallContext},
+    unwrap::{is_empty_note_value, unwrap_array, unwrap_note_event, ErrorCallContext},
 };
 
 use crate::{
@@ -69,14 +69,33 @@ impl ScriptedEventIter {
         // [NOTE, VEL] -> single note
         // [[NOTE, VEL], ..] -> poly notes
         let mut sequence = Vec::with_capacity(array.len());
-        if !array.is_empty() && (array[0].type_name() == "string" || array[0].is::<INT>()) {
+        if array.is_empty() {
+            // []
+            sequence.push(None);
+        } else if array[0].type_name() == "string" || array[0].is::<INT>() || array[0].is::<()>() {
             // [NOTE, VEL]
-            sequence.push(unwrap_note_event(&context, array, instrument)?);
+            if is_empty_note_value(&array[0]) {
+                sequence.push(None);
+            } else {
+                sequence.push(Some(unwrap_note_event(&context, array, instrument)?));
+            }
         } else {
             // [[NOTE, VEL], ..]
             for item in array {
-                let note_item_array = unwrap_array(&context, item)?;
-                sequence.push(unwrap_note_event(&context, note_item_array, instrument)?);
+                if item.is::<()>() {
+                    sequence.push(None);
+                } else {
+                    let note_item_array = unwrap_array(&context, item)?;
+                    if note_item_array.is_empty() || is_empty_note_value(&note_item_array[0]) {
+                        sequence.push(None);
+                    } else {
+                        sequence.push(Some(unwrap_note_event(
+                            &context,
+                            note_item_array,
+                            instrument,
+                        )?));
+                    }
+                }
             }
         }
         Ok(Event::NoteEvents(new_note_vector(sequence)))

@@ -4,7 +4,6 @@ use crate::prelude::*;
 use crate::{
     event::{fixed::FixedEventIter, scripted::ScriptedEventIter},
     rhythm::beat_time::BeatTimeRhythm,
-    BeatTimeBase,
 };
 
 use rhai::{
@@ -62,8 +61,10 @@ pub fn register(
         .register_fn("beat_time", beat_time)
         .register_fn("note", note_from_number)
         .register_fn("note", note_from_string)
+        .register_fn("note", note_from_dynamic)
         .register_fn("note", note_from_number_with_velocity)
         .register_fn("note", note_from_string_with_velocity)
+        .register_fn("note", note_from_dynamic_with_velocity)
         .register_fn("note", note_vec)
         .register_fn("note_seq", note_vec_seq)
         .register_fn("notes_in_scale", notes_in_scale);
@@ -147,17 +148,46 @@ fn beat_time(
     })
 }
 
+fn note_from_dynamic(
+    context: NativeCallContext,
+    d: Dynamic,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
+    if d.is::<()>() {
+        Ok(new_empty_note_event())
+    } else if d.is::<ImmutableString>() || d.is::<String>() {
+        Ok(note_from_string(context, d.cast())?)
+    } else if d.is::<INT>() {
+        Ok(note_from_number(context, d.cast())?)
+    } else {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Failed to parse note in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
+                context.fn_name(),
+                d.type_name()
+            )
+            .into(),
+            context.position(),
+        )
+        .into())
+    }
+}
+
 fn note_from_string(
     context: NativeCallContext,
     note: ImmutableString,
 ) -> Result<FixedEventIter, Box<EvalAltResult>> {
     let err_context = ErrorCallContext::from(&context);
     let instrument = eval_default_instrument(context.engine())?;
-    Ok(new_note_event(
-        instrument,
-        unwrap_note_from_string(&err_context, note.as_str())?,
-        1.0_f32,
-    ))
+    if is_empty_note_string(note.as_str()) {
+        Ok(new_empty_note_event())
+    } else {
+        Ok(new_note_event(
+            instrument,
+            unwrap_note_from_string(&err_context, note.as_str())?,
+            1.0_f32,
+        ))
+    }
 }
 
 fn note_from_number(
@@ -171,6 +201,32 @@ fn note_from_number(
         unwrap_note_from_int(&err_context, note)?,
         1.0_f32,
     ))
+}
+
+fn note_from_dynamic_with_velocity(
+    context: NativeCallContext,
+    d: Dynamic,
+    velocity: FLOAT,
+) -> Result<FixedEventIter, Box<EvalAltResult>> {
+    if d.is::<()>() {
+        Ok(new_empty_note_event())
+    } else if d.is::<ImmutableString>() || d.is::<String>() {
+        Ok(note_from_string_with_velocity(context, d.cast(), velocity)?)
+    } else if d.is::<INT>() {
+        Ok(note_from_number_with_velocity(context, d.cast(), velocity)?)
+    } else {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Failed to parse note in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
+                context.fn_name(),
+                d.type_name()
+            )
+            .into(),
+            context.position(),
+        )
+        .into())
+    }
 }
 
 fn note_from_string_with_velocity(
@@ -211,18 +267,33 @@ fn note_vec(
     let err_context = ErrorCallContext::from(&context);
     let instrument = eval_default_instrument(context.engine())?;
     let mut sequence = Vec::with_capacity(array.len());
-    if !array.is_empty() && (array[0].type_name() == "string" || array[0].is::<INT>()) {
+    if array.is_empty() {
+        // []
+        sequence.push(None);
+    } else if array[0].type_name() == "string" || array[0].is::<INT>() || array[0].is::<()>() {
         // [NOTE, VEL]
-        sequence.push(unwrap_note_event(&err_context, array, instrument)?);
+        if is_empty_note_value(&array[0]) {
+            sequence.push(None);
+        } else {
+            sequence.push(Some(unwrap_note_event(&err_context, array, instrument)?));
+        }
     } else {
         // [[NOTE, VEL], ..]
         for item in array {
-            let note_item_array = unwrap_array(&err_context, item)?;
-            sequence.push(unwrap_note_event(
-                &err_context,
-                note_item_array,
-                instrument,
-            )?);
+            if item.is::<()>() {
+                sequence.push(None);
+            } else {
+                let note_item_array = unwrap_array(&err_context, item)?;
+                if note_item_array.is_empty() || is_empty_note_value(&note_item_array[0]) {
+                    sequence.push(None);
+                } else {
+                    sequence.push(Some(unwrap_note_event(
+                        &err_context,
+                        note_item_array,
+                        instrument,
+                    )?));
+                }
+            }
         }
     }
     Ok(new_polyphonic_note_event(sequence))
@@ -239,21 +310,46 @@ fn note_vec_seq(
     let instrument = eval_default_instrument(context.engine())?;
     let mut event_sequence = Vec::with_capacity(array.len());
     for item1_dyn in array {
-        let item1_arr = unwrap_array(&err_context, item1_dyn)?;
-        let mut note_events = Vec::with_capacity(item1_arr.len());
-        if !item1_arr.is_empty()
-            && (item1_arr[0].type_name() == "string" || item1_arr[0].is::<INT>())
-        {
-            // Vec<Vec<NOTE, VEL>>
-            note_events.push(unwrap_note_event(&err_context, item1_arr, instrument)?);
+        if item1_dyn.is::<()>() {
+            event_sequence.push(vec![None]);
         } else {
-            // Vec<Vec<Vec<NOTE, VEL>>>
-            for item2_dyn in item1_arr {
-                let item2_arr = unwrap_array(&err_context, item2_dyn)?;
-                note_events.push(unwrap_note_event(&err_context, item2_arr, instrument)?);
+            let item1_arr = unwrap_array(&err_context, item1_dyn)?;
+            let mut note_events = Vec::with_capacity(item1_arr.len());
+            if item1_arr.is_empty() {
+                // Vec<()>
+                note_events.push(None);
+            } else if item1_arr[0].type_name() == "string" || item1_arr[0].is::<INT>() {
+                // Vec<Vec<NOTE, VEL>>
+                if item1_arr.is_empty() || is_empty_note_value(&item1_arr[0]) {
+                    note_events.push(None);
+                } else {
+                    note_events.push(Some(unwrap_note_event(
+                        &err_context,
+                        item1_arr,
+                        instrument,
+                    )?));
+                }
+            } else {
+                // Vec<Vec<Vec<NOTE, VEL>>>
+                for item2_dyn in item1_arr {
+                    if item2_dyn.is::<()>() {
+                        note_events.push(None);
+                    } else {
+                        let item2_arr = unwrap_array(&err_context, item2_dyn)?;
+                        if item2_arr.is_empty() || is_empty_note_value(&item2_arr[0]) {
+                            note_events.push(None);
+                        } else {
+                            note_events.push(Some(unwrap_note_event(
+                                &err_context,
+                                item2_arr,
+                                instrument,
+                            )?));
+                        }
+                    }
+                }
             }
+            event_sequence.push(note_events)
         }
-        event_sequence.push(note_events)
     }
     Ok(new_polyphonic_note_sequence_event(event_sequence))
 }
@@ -398,14 +494,13 @@ fn trigger_custom_event(
 #[cfg(test)]
 mod test {
     use crate::{
-        bindings::{eval_default_instrument, new_engine},
+        bindings::{eval_default_beat_time, eval_default_instrument, new_engine, register},
         event::{fixed::FixedEventIter, new_note, Event, InstrumentId},
         rhythm::beat_time::BeatTimeRhythm,
         time::BeatTimeStep,
         BeatTimeBase,
     };
 
-    use super::{eval_default_beat_time, register};
     use rhai::{Dynamic, Engine};
 
     #[test]
@@ -480,72 +575,58 @@ mod test {
             None,
         );
 
-        // Note
+        // Empty Note
+        let eval_result = engine.eval::<Dynamic>(r#"note("---")"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(note_event.events()[0], Event::NoteEvents(vec![None]));
+
+        // Note Off
         assert!(engine.eval::<Dynamic>(r#"note("X#1")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#-2"#).is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note("g#1")"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert_eq!(
-                note_event.unwrap().events()[0],
-                Event::NoteEvents(vec![new_note(None, "g#1", 1.0)])
-            );
-        }
+        let eval_result = engine.eval::<Dynamic>(r#"note("g#1")"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events()[0],
+            Event::NoteEvents(vec![Some(new_note(None, "g#1", 1.0))])
+        );
 
+        // Note
         assert!(engine.eval::<Dynamic>(r#"note("X#1", 0.5)"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", "0.5")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5, 1.0)"#).is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert_eq!(
-                note_event.unwrap().events()[0],
-                Event::NoteEvents(vec![new_note(None, "c#1", 0.5)])
-            );
-        }
+        let eval_result = engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events()[0],
+            Event::NoteEvents(vec![Some(new_note(None, "c#1", 0.5))])
+        );
 
         assert!(engine.eval::<Dynamic>(r#"note(["X#1"])"#).is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1"])"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert_eq!(
-                note_event.unwrap().events()[0],
-                Event::NoteEvents(vec![new_note(None, "c#1", 1.0)])
-            );
-        }
+        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1"])"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events()[0],
+            Event::NoteEvents(vec![Some(new_note(None, "c#1", 1.0))])
+        );
 
         assert!(engine.eval::<Dynamic>(r#"note(["X#1", 0.5])"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note(["C#1", "0.5"])"#).is_err());
         assert!(engine
             .eval::<Dynamic>(r#"note(["C#1", 0.5, 1.0])"#)
             .is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1", 0.5])"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert_eq!(
-                note_event.unwrap().events()[0],
-                Event::NoteEvents(vec![new_note(None, "c#1", 0.5)])
-            );
-        }
+        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1", 0.5])"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events()[0],
+            Event::NoteEvents(vec![Some(new_note(None, "c#1", 0.5))])
+        );
 
-        let eval_result = engine.eval::<Dynamic>(r#"note([0x3E, 0.5])"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert_eq!(
-                note_event.unwrap().events(),
-                vec![Event::NoteEvents(vec![new_note(None, "d4", 0.5)])]
-            );
-        }
+        let eval_result = engine.eval::<Dynamic>(r#"note([0x3E, 0.5])"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events(),
+            vec![Event::NoteEvents(vec![Some(new_note(None, "d4", 0.5))])]
+        );
 
         assert!(engine
             .eval::<Dynamic>(r#"note([["Note", 0.5, 1.0]])"#)
@@ -554,48 +635,55 @@ mod test {
             .eval::<Dynamic>(r#"note([["C#1", 0.5, 1.0]])"#)
             .is_err());
         assert!(engine.eval::<Dynamic>(r#"note([["C#1", "0.5"]])"#).is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note([["C#1", 0.5], ["G2", 0.75]])"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let poly_note_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert!(poly_note_event.is_some());
-            assert_eq!(
-                poly_note_event.unwrap().events()[0],
-                Event::NoteEvents(vec![new_note(None, "c#1", 0.5), new_note(None, "g2", 0.75)])
-            );
-        }
+        let eval_result = engine
+            .eval::<Dynamic>(r#"note([["C#1", 0.5], ["G2", 0.75], []])"#)
+            .unwrap();
+        let poly_note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            poly_note_event.events()[0],
+            Event::NoteEvents(vec![
+                Some(new_note(None, "c#1", 0.5)),
+                Some(new_note(None, "g2", 0.75)),
+                None
+            ])
+        );
 
-        // NoteEventSequence
-        let eval_result = engine.eval::<Dynamic>(r#"note_seq([["C#1", 0.5], ["G_2"]])"#);
-        if let Err(err) = eval_result {
-            panic!("{}", err);
-        } else {
-            let note_sequence_event = eval_result.unwrap().try_cast::<FixedEventIter>();
-            assert!(note_sequence_event.is_some());
-            assert_eq!(
-                note_sequence_event.unwrap().events(),
-                vec![
-                    Event::NoteEvents(vec![new_note(None, "c#1", 0.5)]),
-                    Event::NoteEvents(vec![new_note(None, "g2", 1.0)])
-                ]
-            );
-        }
-        let poly_note_sequence_event = engine
+        // NoteSequence
+        let eval_result = engine
+            .eval::<Dynamic>(r#"note_seq([["C#1", 0.5], ["---"], ["G_2"]])"#)
+            .unwrap();
+        let note_sequence_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_sequence_event.events(),
+            vec![
+                Event::NoteEvents(vec![Some(new_note(None, "c#1", 0.5))]),
+                Event::NoteEvents(vec![None]),
+                Event::NoteEvents(vec![Some(new_note(None, "g2", 1.0))])
+            ]
+        );
+
+        let eval_result = engine
             .eval::<Dynamic>(
                 r#"note_seq([
-                     [["C#1"], ["G_2", 0.75]], 
-                     [["A#5", 0.2], ["B_1", 0.1]]
+                     [["C#1"], (), ["G_2", 0.75]], 
+                     [["A#5", 0.2], ["---"], ["B_1", 0.1]]
                    ])"#,
             )
-            .unwrap()
-            .try_cast::<FixedEventIter>();
-        assert!(poly_note_sequence_event.is_some());
+            .unwrap();
+        let poly_note_sequence_event = eval_result.try_cast::<FixedEventIter>().unwrap();
         assert_eq!(
-            poly_note_sequence_event.unwrap().events(),
+            poly_note_sequence_event.events(),
             vec![
-                Event::NoteEvents(vec![new_note(None, "c#1", 1.0), new_note(None, "g2", 0.75)]),
-                Event::NoteEvents(vec![new_note(None, "a#5", 0.2), new_note(None, "b1", 0.1)])
+                Event::NoteEvents(vec![
+                    Some(new_note(None, "c#1", 1.0)),
+                    None,
+                    Some(new_note(None, "g2", 0.75)),
+                ]),
+                Event::NoteEvents(vec![
+                    Some(new_note(None, "a#5", 0.2)),
+                    None,
+                    Some(new_note(None, "b1", 0.1))
+                ])
             ]
         );
 
