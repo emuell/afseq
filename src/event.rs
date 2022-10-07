@@ -245,7 +245,11 @@ impl fmt::Debug for Event {
                 "{:?}",
                 note_vector
                     .iter()
-                    .map(|f| format!("{:?}", f))
+                    .map(|n| if let Some(v) = n {
+                        format!("{:?}", v)
+                    } else {
+                        String::from("---")
+                    })
                     .collect::<Vec<String>>()
                     .join(" | ")
             )),
