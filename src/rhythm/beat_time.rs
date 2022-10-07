@@ -6,6 +6,8 @@ use crate::{
     Rhythm, SampleTime,
 };
 
+use super::euclidian::euclidean;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Emits `Option(Event)` every nth [`BeatTimeStep`] with an optional pattern and offset.
@@ -72,6 +74,11 @@ impl BeatTimeRhythm {
     }
     pub fn with_pattern<const N: usize, T: Ord + Default + Clone>(&self, pattern: [T; N]) -> Self {
         self.with_pattern_vector(pattern.to_vec())
+    }
+
+    pub fn with_euclidian_pattern(&self, pulses: u32, steps: u32) -> Self {
+        let pattern = euclidean(pulses, steps);
+        self.with_pattern_vector(pattern)
     }
 
     /// Apply the given beat-time step offset to all events.

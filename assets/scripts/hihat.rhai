@@ -1,6 +1,9 @@
+let note_step = 0;
 beat_time()
   .every_nth_sixteenth(1)
-  .with_pattern([1,0,1,0].repeat(15) + [1,1,1,1])
-  .trigger(note_seq(
-    [["C_5", 0.25], ["G_4", 1.0]].repeat(15) + [["C_5", 0.25],  ["G_4", 0.5], ["G_4", 1.0], ["G_4", 1.0]],
-  ));
+  .with_pattern(12, 16)
+  .trigger(|| {
+    note_step += 1;
+    let vel = 1.0 - (note_step % 2) * 0.8;
+    ["G_4", vel]
+  });

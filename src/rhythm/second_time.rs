@@ -6,6 +6,8 @@ use crate::{
     Rhythm, SampleTime,
 };
 
+use super::euclidian::euclidean;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Emits `Option(Event)` every nth [`SecondTimeStep`] with an optional pattern and offset.
@@ -72,7 +74,7 @@ impl SecondTimeRhythm {
     /// Trigger events with the given pattern. Param `pattern` is evaluated as an array of boolean:
     /// when to trigger an event and when not, but can be specified as number array as well to notate
     /// things shorter: e.g. via \[0,1,1,1,0\].  
-    pub fn with_pattern<const N: usize, T: Ord + Default>(&self, pattern: [T; N]) -> Self {
+    pub fn with_pattern_vector<T: Ord + Default>(&self, pattern: Vec<T>) -> Self {
         let pattern_vec = pattern
             .iter()
             .map(|f| *f != T::default())
@@ -82,6 +84,15 @@ impl SecondTimeRhythm {
             event_iter: self.event_iter.clone(),
             ..*self
         }
+    }
+
+    pub fn with_pattern<const N: usize, T: Ord + Default + Clone>(&self, pattern: [T; N]) -> Self {
+        self.with_pattern_vector(pattern.to_vec())
+    }
+
+    pub fn with_euclidian_pattern(&self, pulses: u32, steps: u32) -> Self {
+        let pattern = euclidean(pulses, steps);
+        self.with_pattern_vector(pattern)
     }
 
     /// Use the given [`EventIter`] to trigger events.

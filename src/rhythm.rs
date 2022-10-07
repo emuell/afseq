@@ -3,6 +3,7 @@
 use crate::{event::Event, SampleTime};
 
 pub mod beat_time;
+pub mod euclidian;
 pub mod second_time;
 
 // -------------------------------------------------------------------------------------------------

@@ -83,6 +83,7 @@ pub fn register(
     // BeatTimeRhythm
     engine
         .register_fn("with_pattern", with_pattern)
+        .register_fn("with_pattern", with_euclidian_pattern)
         .register_fn("with_offset", with_offset)
         .register_fn("trigger", trigger_fixed_event)
         .register_fn("trigger", trigger_custom_event);
@@ -464,6 +465,43 @@ fn with_pattern(
         vec.push(unwrap_integer(&err_context, e, "array element")?)
     }
     Ok(this.with_pattern_vector(vec))
+}
+
+fn with_euclidian_pattern(
+    context: NativeCallContext,
+    this: &mut BeatTimeRhythm,
+    pulses: INT,
+    steps: INT,
+) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+    if pulses <= 0 || steps <= 0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid arguments in fn '{}': 'pulse' (is {}) and 'step' (is {}) must be > 0'",
+                context.fn_name(),
+                pulses,
+                steps
+            )
+            .into(),
+            context.position(),
+        )
+        .into())
+    } else if pulses > steps {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid arguments in fn '{}': 'pulse' (is {}) must be <= 'step' (is {})",
+                context.fn_name(),
+                pulses,
+                steps
+            )
+            .into(),
+            context.position(),
+        )
+        .into())
+    } else {
+        Ok(this.with_euclidian_pattern(pulses as u32, steps as u32))
+    }
 }
 
 fn with_offset(
