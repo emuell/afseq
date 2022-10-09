@@ -58,6 +58,7 @@ impl SamplePool {
 pub struct SamplePlayer {
     player: AudioFilePlayer,
     sample_pool: Rc<RefCell<SamplePool>>,
+    show_events: bool,
 }
 
 impl SamplePlayer {
@@ -65,15 +66,26 @@ impl SamplePlayer {
         // create player
         let audio_output = DefaultAudioOutput::open()?;
         let player = AudioFilePlayer::new(audio_output.sink(), None);
+        let show_events = false;
         Ok(Self {
             player,
             sample_pool,
+            show_events,
         })
     }
 
     /// The actual audio output sample rate.
     pub fn sample_rate(&self) -> u32 {
         self.player.output_sample_rate()
+    }
+
+    /// true when events are dumped to stdout while playing them.
+    pub fn show_events(&self) -> bool {
+        self.show_events
+    }
+    /// by default false: set to true to dump events to stdout while playing them.
+    pub fn set_show_events(&mut self, show: bool) {
+        self.show_events = show;
     }
 
     /// Run/play the given phrase until it stops.
@@ -130,14 +142,16 @@ impl SamplePlayer {
     ) {
         phrase.run_until_time(sample_time, |_rhythm_index, sample_time, event| {
             // print
-            println!(
-                "{:08} -> {}",
-                sample_time,
-                match event {
-                    Some(event) => format!("{:?}", event),
-                    None => "---".to_string(),
-                }
-            );
+            if self.show_events {
+                println!(
+                    "{:08} -> {}",
+                    sample_time,
+                    match event {
+                        Some(event) => format!("{:?}", event),
+                        None => "---".to_string(),
+                    }
+                );
+            }
             // play
             if let Some(Event::NoteEvents(notes)) = event {
                 for (_voice_index, note) in notes.iter().enumerate() {

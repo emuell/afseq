@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create event player
     let mut player = SamplePlayer::new(sample_pool)?;
+    player.set_show_events(true);
 
     // define our time bases
     let second_time = SecondTimeBase {
@@ -161,7 +162,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     );
 
-    // play the phrase
+    // play the phrase and dump events to stdout
     player.run(&mut phrase, &beat_time);
 
     Ok(())
