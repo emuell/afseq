@@ -90,8 +90,8 @@ impl SecondTimeRhythm {
         self.with_pattern_vector(pattern.to_vec())
     }
 
-    pub fn with_euclidian_pattern(&self, pulses: u32, steps: u32) -> Self {
-        let pattern = euclidean(pulses, steps);
+    pub fn with_euclidian_pattern(&self, pulses: u32, steps: u32, offset: i32) -> Self {
+        let pattern = euclidean(pulses, steps, offset);
         self.with_pattern_vector(pattern)
     }
 

@@ -1,5 +1,5 @@
-/// Generates an euclidian rhythm pattern with the given pulse and step count
-pub fn euclidean(pulses: u32, steps: u32) -> Vec<bool> {
+/// Generates an euclidian rhythm pattern with the given pulse, step count and rotation offset.
+pub fn euclidean(pulses: u32, steps: u32, offset: i32) -> Vec<bool> {
     type Group = Vec<bool>;
     type Groups = Vec<Group>;
 
@@ -35,6 +35,13 @@ pub fn euclidean(pulses: u32, steps: u32) -> Vec<bool> {
                 rhythm.push(i);
             }
         }
+
+        if offset > 0 {
+            rhythm.rotate_right(offset as usize);
+        } else if offset < 0 {
+            rhythm.rotate_left(-offset as usize)
+        }
+
         rhythm
     } else {
         vec![true; steps as usize]

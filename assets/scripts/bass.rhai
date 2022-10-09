@@ -10,7 +10,7 @@ let samples = [
 
 beat_time()
   .every_nth_eighth(1)
-  .with_pattern(3, 8)
+  .with_pattern(euclidian(3, 8))
   .with_offset(1)
   .trigger(note_seq([
     [samples[0], scale_c[0], 0.5], 

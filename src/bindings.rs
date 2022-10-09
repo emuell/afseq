@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::{
     event::{fixed::FixedEventIter, scripted::ScriptedEventIter},
-    rhythm::beat_time::BeatTimeRhythm,
+    rhythm::{beat_time::BeatTimeRhythm, euclidian::euclidean},
 };
 
 use rhai::{
@@ -59,6 +59,8 @@ pub fn register(
     engine
         .register_fn("beat_time", default_beat_time)
         .register_fn("beat_time", beat_time)
+        .register_fn("euclidian", euclidian_rhythm)
+        .register_fn("euclidian", euclidian_rhythm_with_offset)
         .register_fn("note", note_from_number)
         .register_fn("note", note_from_string)
         .register_fn("note", note_from_dynamic)
@@ -83,7 +85,6 @@ pub fn register(
     // BeatTimeRhythm
     engine
         .register_fn("with_pattern", with_pattern)
-        .register_fn("with_pattern", with_euclidian_pattern)
         .register_fn("with_offset", with_offset)
         .register_fn("trigger", trigger_fixed_event)
         .register_fn("trigger", trigger_custom_event);
@@ -380,6 +381,61 @@ fn notes_in_scale(
     }
 }
 
+fn euclidian_rhythm(
+    context: NativeCallContext,
+    pulses: INT,
+    steps: INT,
+) -> Result<Array, Box<EvalAltResult>> {
+    euclidian_rhythm_with_offset(context, pulses, steps, 0)
+}
+
+fn euclidian_rhythm_with_offset(
+    context: NativeCallContext,
+    pulses: INT,
+    steps: INT,
+    offset: INT,
+) -> Result<Array, Box<EvalAltResult>> {
+    if pulses <= 0 || steps <= 0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid arguments in fn '{}': 'pulse' (is {}) and 'step' (is {}) must be > 0'",
+                context.fn_name(),
+                pulses,
+                steps
+            )
+            .into(),
+            context.position(),
+        )
+        .into())
+    } else if pulses > steps {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid arguments in fn '{}': 'pulse' (is {}) must be <= 'step' (is {})",
+                context.fn_name(),
+                pulses,
+                steps
+            )
+            .into(),
+            context.position(),
+        )
+        .into())
+    } else {
+        let pattern = euclidean(pulses as u32, steps as u32, offset as i32);
+        Ok(pattern
+            .iter()
+            .map(|v| {
+                if *v {
+                    Dynamic::from(1 as INT)
+                } else {
+                    Dynamic::from(0 as INT)
+                }
+            })
+            .collect::<Array>())
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // BeatTime
 
@@ -521,43 +577,6 @@ fn with_pattern(
         vec.push(unwrap_integer(&err_context, e, "array element")?)
     }
     Ok(this.with_pattern_vector(vec))
-}
-
-fn with_euclidian_pattern(
-    context: NativeCallContext,
-    this: &mut BeatTimeRhythm,
-    pulses: INT,
-    steps: INT,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    if pulses <= 0 || steps <= 0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid arguments in fn '{}': 'pulse' (is {}) and 'step' (is {}) must be > 0'",
-                context.fn_name(),
-                pulses,
-                steps
-            )
-            .into(),
-            context.position(),
-        )
-        .into())
-    } else if pulses > steps {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid arguments in fn '{}': 'pulse' (is {}) must be <= 'step' (is {})",
-                context.fn_name(),
-                pulses,
-                steps
-            )
-            .into(),
-            context.position(),
-        )
-        .into())
-    } else {
-        Ok(this.with_euclidian_pattern(pulses as u32, steps as u32))
-    }
 }
 
 fn with_offset(
