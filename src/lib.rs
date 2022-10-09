@@ -19,3 +19,6 @@ pub mod prelude;
 
 #[cfg(feature = "scripting")]
 pub mod bindings;
+
+#[cfg(feature = "player")]
+pub mod player;

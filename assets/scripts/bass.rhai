@@ -3,9 +3,9 @@ let scale_f = notes_in_scale("f major");
 let scale_d = notes_in_scale("d# major");
 
 let samples = [
-  sample_pool().load("assets/sequence/MOOGBA4.wav"),
-  sample_pool().load("assets/sequence/MOOGBA5.wav"),
-  sample_pool().load("assets/sequence/MOOGBA8.wav"),
+  load_sample("assets/sequence/MOOGBA4.wav"),
+  load_sample("assets/sequence/MOOGBA5.wav"),
+  load_sample("assets/sequence/MOOGBA8.wav"),
 ];
 
 beat_time()

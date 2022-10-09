@@ -12,6 +12,7 @@
         "args": [
           "build",
           "--example=play",
+          "--features=player",
           "--package=afseq"
         ],
         "filter": {
@@ -30,7 +31,7 @@
         "args": [
           "build",
           "--example=play-script",
-          "--features=scripting",
+          "--features=scripting,player",
           "--package=afseq"
         ],
         "filter": {
