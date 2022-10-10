@@ -36,10 +36,10 @@ pub fn euclidean(pulses: u32, steps: u32, offset: i32) -> Vec<bool> {
             }
         }
 
-        if offset > 0 {
-            rhythm.rotate_right(offset as usize);
-        } else if offset < 0 {
-            rhythm.rotate_left(-offset as usize)
+        match offset {
+            n if n > 0 => rhythm.rotate_right((n as usize) % (steps as usize)),
+            n if n < 0 => rhythm.rotate_left((-n as usize) % (steps as usize)),
+            _ => (),
         }
 
         rhythm
