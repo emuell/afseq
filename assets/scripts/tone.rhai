@@ -31,5 +31,5 @@ beat_time()
     if volume_step >= 32 || volume_step == 0 {
       volume_direction = -volume_direction;
     }
-    [note, vel * 0.16] 
+    [note, vel * 0.14] 
   });
