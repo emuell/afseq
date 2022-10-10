@@ -1,6 +1,9 @@
 //! Combine multiple `Rythm` iterators into a single one.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
 
 use crate::{event::Event, prelude::BeatTimeStep, BeatTimeBase, Rhythm, SampleTime};
 
@@ -40,6 +43,11 @@ impl Phrase {
             next_events,
             held_back_event,
         }
+    }
+
+    /// Read-only access to our rhythms
+    pub fn rhythms(&self) -> Ref<Vec<Box<dyn Rhythm>>> {
+        self.rhythms.borrow()
     }
 
     /// Apply the given beat-time step offset to all events.

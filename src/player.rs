@@ -2,14 +2,14 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use afplay::{
-    source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlayer,
-    AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
+    source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
+    AudioFilePlayer, AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
 };
 
 use crate::{
     event::{unique_instrument_id, InstrumentId},
     time::TimeBase,
-    Event, Phrase, SampleTime,
+    Event, Note, Phrase, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -53,11 +53,24 @@ impl SamplePool {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Behaviour when playing a new note on the same voice channel.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum NewNoteAction {
+    /// Continue playing the old note and start a new one.
+    Continue,
+    /// Stop the playing note before starting a new one.
+    Stop,
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// An simple example player implementation, which plays back a `Phrase` via the `afplay` crate
 /// using the default audio output device using plain samples loaded from a file as instruments.
 pub struct SamplePlayer {
     player: AudioFilePlayer,
     sample_pool: Rc<RefCell<SamplePool>>,
+    playing_notes: Vec<HashMap<usize, (AudioFilePlaybackId, Note)>>,
+    new_note_action: NewNoteAction,
     show_events: bool,
 }
 
@@ -66,10 +79,14 @@ impl SamplePlayer {
         // create player
         let audio_output = DefaultAudioOutput::open()?;
         let player = AudioFilePlayer::new(audio_output.sink(), None);
+        let playing_notes = Vec::new();
+        let new_note_action = NewNoteAction::Continue;
         let show_events = false;
         Ok(Self {
             player,
             sample_pool,
+            playing_notes,
+            new_note_action,
             show_events,
         })
     }
@@ -88,6 +105,15 @@ impl SamplePlayer {
         self.show_events = show;
     }
 
+    /// get current new note action behaviour.
+    pub fn new_note_action(&self) -> NewNoteAction {
+        self.new_note_action
+    }
+    // set a new new note action behaviour.
+    pub fn set_new_note_action(&mut self, action: NewNoteAction) {
+        self.new_note_action = action
+    }
+
     /// Run/play the given phrase until it stops.
     pub fn run(&mut self, phrase: &mut Phrase, time_base: &dyn TimeBase) {
         let dont_stop = || false;
@@ -101,12 +127,17 @@ impl SamplePlayer {
         time_base: &dyn TimeBase,
         stop_fn: StopFn,
     ) {
+        // rebuild playing notes vec
+        self.playing_notes.clear();
+        self.playing_notes
+            .resize(phrase.rhythms().len(), HashMap::new());
+
         // stop whatever is playing in case we're restarting
         self.player
-            .stop_all_playing_sources()
+            .stop_all_sources()
             .expect("failed to stop all playing samples");
 
-        // run until stop_fn signals to stop
+        // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
         let start_offset = self.player.output_sample_frame_position();
         let mut emitted_sample_time: u64 = 0;
         loop {
@@ -140,7 +171,7 @@ impl SamplePlayer {
         start_offset: SampleTime,
         sample_time: SampleTime,
     ) {
-        phrase.run_until_time(sample_time, |_rhythm_index, sample_time, event| {
+        phrase.run_until_time(sample_time, |rhythm_index, sample_time, event| {
             // print
             if self.show_events {
                 println!(
@@ -153,23 +184,41 @@ impl SamplePlayer {
                 );
             }
             // play
+            let playing_notes_in_rhythm = &mut self.playing_notes[rhythm_index];
             if let Some(Event::NoteEvents(notes)) = event {
-                for (_voice_index, note) in notes.iter().enumerate() {
+                for (voice_index, note) in notes.iter().enumerate() {
                     if let Some(note) = note {
-                        // TODO: stop playing note at (rhythm_index, voice_index) column
+                        // stop playing samples on this voice channel
+                        if let Some((playback_id, _)) = playing_notes_in_rhythm.get(&voice_index) {
+                            if self.new_note_action == NewNoteAction::Stop
+                                || note.note.is_note_off()
+                            {
+                                self.player
+                                    .stop_source_at_sample_time(
+                                        *playback_id,
+                                        start_offset + sample_time,
+                                    )
+                                    .unwrap();
+                                playing_notes_in_rhythm.remove(&voice_index);
+                            }
+                        }
+                        // start a new sample - when this is a note off, we already stopped it above
                         if note.note.is_note_on() {
                             if let Some(instrument) = note.instrument {
                                 if let Some(mut sample) =
                                     self.sample_pool.borrow().get_sample(instrument)
                                 {
                                     sample.set_volume(note.velocity);
-                                    self.player
+                                    let playback_id = self
+                                        .player
                                         .play_file_source(
                                             sample,
                                             speed_from_note(note.note as u8),
                                             Some(start_offset + sample_time),
                                         )
                                         .unwrap();
+                                    playing_notes_in_rhythm
+                                        .insert(voice_index, (playback_id, note.note));
                                 }
                             }
                         }
