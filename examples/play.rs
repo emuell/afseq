@@ -144,10 +144,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fx_pattern = second_time
         .every_nth_seconds(8.0)
         .with_offset(48.0)
-        .trigger(new_note_event_sequence(vec![
-            (FX, "C 3", 0.1),
-            (FX, "C 4", 0.1),
-            (FX, "F 4", 0.1),
+        .trigger(new_polyphonic_note_sequence_event(vec![
+            vec![Some((FX, "C 3", 0.2)), None, None],
+            vec![None, Some((FX, "C 4", 0.2)), None],
+            vec![None, None, Some((FX, "F 4", 0.2))],
         ]));
 
     let mut phrase = Phrase::new(
