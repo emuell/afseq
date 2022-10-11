@@ -187,12 +187,12 @@ impl SamplePlayer {
             // play
             let playing_notes_in_rhythm = &mut self.playing_notes[rhythm_index];
             if let Some(Event::NoteEvents(notes)) = event {
-                for (voice_index, note) in notes.iter().enumerate() {
-                    if let Some(note) = note {
+                for (voice_index, note_event) in notes.iter().enumerate() {
+                    if let Some(note_event) = note_event {
                         // stop playing samples on this voice channel
                         if let Some((playback_id, _)) = playing_notes_in_rhythm.get(&voice_index) {
                             if self.new_note_action == NewNoteAction::Stop
-                                || note.note.is_note_off()
+                                || note_event.note.is_note_off()
                             {
                                 self.player
                                     .stop_source_at_sample_time(
@@ -204,23 +204,23 @@ impl SamplePlayer {
                             }
                         }
                         // start a new sample - when this is a note off, we already stopped it above
-                        if note.note.is_note_on() {
-                            if let Some(instrument) = note.instrument {
+                        if note_event.note.is_note_on() {
+                            if let Some(instrument) = note_event.instrument {
                                 if let Some(mut sample) =
                                     self.sample_pool.borrow().get_sample(instrument)
                                 {
-                                    sample.set_volume(note.velocity);
+                                    sample.set_volume(note_event.velocity);
                                     let playback_id = self
                                         .player
                                         .play_file_source(
                                             sample,
-                                            speed_from_note(note.note as u8),
+                                            speed_from_note(note_event.note as u8),
                                             Some(start_offset + sample_time),
                                             ResamplingQuality::Default,
                                         )
                                         .unwrap();
                                     playing_notes_in_rhythm
-                                        .insert(voice_index, (playback_id, note.note));
+                                        .insert(voice_index, (playback_id, note_event.note));
                                 }
                             }
                         }
