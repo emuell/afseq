@@ -2,8 +2,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use afplay::{
-    source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlayer, AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
+    source::{file::preloaded::PreloadedFileSource, resampled::ResamplingQuality},
+    utils::speed_from_note,
+    AudioFilePlaybackId, AudioFilePlayer, AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
 };
 
 use crate::{
@@ -215,6 +216,7 @@ impl SamplePlayer {
                                             sample,
                                             speed_from_note(note.note as u8),
                                             Some(start_offset + sample_time),
+                                            ResamplingQuality::Default,
                                         )
                                         .unwrap();
                                     playing_notes_in_rhythm
