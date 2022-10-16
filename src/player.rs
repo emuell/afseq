@@ -2,9 +2,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use afplay::{
-    source::{file::preloaded::PreloadedFileSource, resampled::ResamplingQuality},
-    utils::speed_from_note,
-    AudioFilePlaybackId, AudioFilePlayer, AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
+    source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
+    AudioFilePlayer, AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
 };
 
 use crate::{
@@ -34,9 +33,22 @@ impl SamplePool {
         }
     }
 
-    /// Fetch a clone of a preloaded sample.
-    pub fn get_sample(&self, id: InstrumentId) -> Option<PreloadedFileSource> {
-        self.pool.get(&id).cloned()
+    /// Fetch a clone of a preloaded sample with the given plaback options.
+    pub fn get_sample(
+        &self,
+        id: InstrumentId,
+        playback_options: FilePlaybackOptions,
+        playback_sample_rate: u32,
+    ) -> Option<PreloadedFileSource> {
+        if let Some(sample) = self.pool.get(&id) {
+            Some(
+                sample
+                    .clone(playback_options, playback_sample_rate)
+                    .expect("Failed to clone sample file"),
+            )
+        } else {
+            None
+        }
     }
 
     /// Load a sample file into a PreloadedFileSource and return its id.
@@ -45,7 +57,8 @@ impl SamplePool {
         &mut self,
         file_path: &str,
     ) -> Result<InstrumentId, Box<dyn std::error::Error>> {
-        let sample = PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default())?;
+        let sample =
+            PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
         let id = unique_instrument_id();
         self.pool.insert(id, sample);
         Ok(id)
@@ -206,18 +219,18 @@ impl SamplePlayer {
                         // start a new sample - when this is a note off, we already stopped it above
                         if note_event.note.is_note_on() {
                             if let Some(instrument) = note_event.instrument {
-                                if let Some(mut sample) =
-                                    self.sample_pool.borrow().get_sample(instrument)
-                                {
+                                let playback_options = FilePlaybackOptions::default()
+                                    .speed(speed_from_note(note_event.note as u8));
+                                let playback_sample_rate = self.player.output_sample_rate();
+                                if let Some(mut sample) = self.sample_pool.borrow().get_sample(
+                                    instrument,
+                                    playback_options,
+                                    playback_sample_rate,
+                                ) {
                                     sample.set_volume(note_event.velocity);
                                     let playback_id = self
                                         .player
-                                        .play_file_source(
-                                            sample,
-                                            speed_from_note(note_event.note as u8),
-                                            Some(start_offset + sample_time),
-                                            ResamplingQuality::Default,
-                                        )
+                                        .play_file_source(sample, Some(start_offset + sample_time))
                                         .unwrap();
                                     playing_notes_in_rhythm
                                         .insert(voice_index, (playback_id, note_event.note));
