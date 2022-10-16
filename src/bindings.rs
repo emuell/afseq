@@ -54,6 +54,8 @@ pub fn register(
 
     // Std extensions
     engine.register_fn("repeat", repeat_array);
+    engine.register_fn("reverse", reverse_array);
+    engine.register_fn("rotate", rotate_array);
 
     // Global
     engine
@@ -114,6 +116,28 @@ fn repeat_array(
         }
     }
     Ok(ret)
+}
+
+// ---------------------------------------------------------------------------------------------
+
+fn reverse_array(this: Array) -> Array {
+    this.iter().rev().cloned().collect::<Array>()
+}
+
+// ---------------------------------------------------------------------------------------------
+
+fn rotate_array(this: Array, offset: INT) -> Array {
+    if this.is_empty() {
+        return Array::new();
+    }
+    let mut ret = this.clone();
+    let size = ret.len();
+    match offset {
+        n if n > 0 => ret.rotate_right((n as usize) % size),
+        n if n < 0 => ret.rotate_left((-n as usize) % size),
+        _ => (),
+    }
+    ret
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -614,7 +638,7 @@ mod test {
         BeatTimeBase,
     };
 
-    use rhai::{Dynamic, Engine};
+    use rhai::{Dynamic, Engine, INT};
 
     #[test]
     fn defaults() {
@@ -663,14 +687,72 @@ mod test {
         if let Err(err) = eval_result {
             panic!("{}", err);
         } else {
-            let array = eval_result.unwrap().into_array().unwrap();
-            assert!(
-                array.len() == 4
-                    && array[0].as_int() == Ok(1)
-                    && array[1].as_int() == Ok(2)
-                    && array[2].as_int() == Ok(1)
-                    && array[3].as_int() == Ok(2)
-            );
+            let array = eval_result
+                .unwrap()
+                .into_array()
+                .unwrap()
+                .iter()
+                .map(|f| f.as_int().unwrap())
+                .collect::<Vec<INT>>();
+            assert_eq!(array, vec![1, 2, 1, 2]);
+        }
+
+        // Array::reverse
+        assert!(engine.eval::<Dynamic>(r#"[].reverse()"#).is_ok());
+        let eval_result = engine.eval::<Dynamic>(r#"[1,2].reverse()"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let array = eval_result
+                .unwrap()
+                .into_array()
+                .unwrap()
+                .iter()
+                .map(|f| f.as_int().unwrap())
+                .collect::<Vec<INT>>();
+            assert_eq!(array, vec![2, 1]);
+        }
+
+        // Array::rotate
+        assert!(engine.eval::<Dynamic>(r#"[1,2,3].rotate(0)"#).is_ok());
+        let eval_result = engine.eval::<Dynamic>(r#"[1,2,3].rotate(1)"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let array = eval_result
+                .unwrap()
+                .into_array()
+                .unwrap()
+                .iter()
+                .map(|f| f.as_int().unwrap())
+                .collect::<Vec<INT>>();
+            assert_eq!(array, vec![3, 1, 2]);
+        }
+        let eval_result = engine.eval::<Dynamic>(r#"[1,2,3].rotate(-1)"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let array = eval_result
+                .unwrap()
+                .into_array()
+                .unwrap()
+                .iter()
+                .map(|f| f.as_int().unwrap())
+                .collect::<Vec<INT>>();
+            assert_eq!(array, vec![2, 3, 1]);
+        }
+        let eval_result = engine.eval::<Dynamic>(r#"[1,2,3].rotate(3)"#);
+        if let Err(err) = eval_result {
+            panic!("{}", err);
+        } else {
+            let array = eval_result
+                .unwrap()
+                .into_array()
+                .unwrap()
+                .iter()
+                .map(|f| f.as_int().unwrap())
+                .collect::<Vec<INT>>();
+            assert_eq!(array, vec![1, 2, 3]);
         }
     }
 
