@@ -152,9 +152,10 @@ impl SamplePlayer {
         self.player
             .stop_all_sources()
             .expect("failed to stop all playing samples");
-
-        // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
+        // start playing at the player's current time with a little delay to avoid clicks
+        let start_delay = self.player.output_sample_rate() as u64 / 8;
         let start_offset = self.player.output_sample_frame_position();
+        // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
         let mut emitted_sample_time: u64 = 0;
         loop {
             const PRELOAD_SECONDS: f64 = 2.0;
@@ -167,7 +168,7 @@ impl SamplePlayer {
                 let samples_to_emit = time_base.seconds_to_samples(seconds_to_emit);
                 self.run_phrase_until_time(
                     phrase,
-                    start_offset,
+                    start_offset + start_delay,
                     emitted_sample_time + samples_to_emit,
                 );
                 emitted_sample_time += samples_to_emit;
