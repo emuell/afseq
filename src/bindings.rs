@@ -52,112 +52,22 @@ pub fn register(
         .register_fn("default_instrument", move || default_instrument)
         .register_fn("default_beat_time", move || default_time_base);
 
-    // Std extensions
-    engine.register_fn("repeat", repeat_array);
-    engine.register_fn("reverse", reverse_array);
-    engine.register_fn("rotate", rotate_array);
+    // Std Extensions
+    array::register(engine);
 
-    // Global
-    engine
-        // time constructors
-        .register_fn("beat_time", default_beat_time)
-        .register_fn("beat_time", beat_time)
-        .register_fn("second_time", second_time)
-        // rhythm constructors
-        .register_fn("euclidian", euclidian_rhythm)
-        .register_fn("euclidian", euclidian_rhythm_with_offset)
-        // note constructors
-        .register_fn("note", note_from_number)
-        .register_fn("note", note_from_string)
-        .register_fn("note", note_from_dynamic)
-        .register_fn("note", note_from_number_with_velocity)
-        .register_fn("note", note_from_string_with_velocity)
-        .register_fn("note", note_from_dynamic_with_velocity)
-        .register_fn("note", note_vec)
-        .register_fn("note_seq", note_vec_seq)
-        // note array constructors
-        .register_fn("notes_in_scale", notes_in_scale);
+    // Globals
+    globals::register(engine);
 
-    // BeatTime
-    engine
-        .register_fn("every_nth_sixteenth", beat_time_every_nth_sixteenth)
-        .register_fn("every_sixteenth", beat_time_every_sixteenth)
-        .register_fn("every_nth_eighth", beat_time_every_nth_eighth)
-        .register_fn("every_eighth", beat_time_every_eighth)
-        .register_fn("every_nth_beat", beat_time_every_nth_beat)
-        .register_fn("every_beat", beat_time_every_beat)
-        .register_fn("every_nth_bar", beat_time_every_nth_bar)
-        .register_fn("every_bar", beat_time_every_bar);
+    // TimeBase
+    beat_time::register(engine);
+    second_time::register(engine);
 
-    // SecondTime
-    engine.register_fn("every_nth_second", second_time_every_nth_second);
-    engine.register_fn("every_nth_seconds", second_time_every_nth_second);
-
-    // BeatTimeRhythm
-    engine
-        .register_fn("with_pattern", beat_time_rhythm_with_pattern)
-        .register_fn("with_offset", beat_time_rhythm_with_offset)
-        .register_fn("trigger", beat_time_rhythm_trigger_fixed_event)
-        .register_fn("trigger", beat_time_rhythm_trigger_custom_event);
-
-    // SecondTimeRhythm
-    engine
-        .register_fn("with_pattern", second_time_rhythm_with_pattern)
-        .register_fn("with_offset", second_time_rhythm_with_offset)
-        .register_fn("trigger", second_time_rhythm_trigger_fixed_event)
-        .register_fn("trigger", second_time_rhythm_trigger_custom_event);
+    // Rhythm
+    beat_time_rhythm::register(engine);
+    second_time_rhythm::register(engine);
 }
 
 // ---------------------------------------------------------------------------------------------
-
-fn repeat_array(
-    context: NativeCallContext,
-    this: Array,
-    count: INT,
-) -> Result<Array, Box<EvalAltResult>> {
-    if count < 0 {
-        return Err(EvalAltResult::ErrorArithmetic(
-            format!(
-                "Count argument in 'array.repeat' must be > 0, but is '{}'",
-                count
-            ),
-            context.position(),
-        )
-        .into());
-    }
-    let mut ret = Array::with_capacity(this.len() * count as usize);
-    for _ in 0..count {
-        for i in this.iter() {
-            ret.push(i.clone());
-        }
-    }
-    Ok(ret)
-}
-
-// ---------------------------------------------------------------------------------------------
-
-fn reverse_array(this: Array) -> Array {
-    this.iter().rev().cloned().collect::<Array>()
-}
-
-// ---------------------------------------------------------------------------------------------
-
-fn rotate_array(this: Array, offset: INT) -> Array {
-    if this.is_empty() {
-        return Array::new();
-    }
-    let mut ret = this.clone();
-    let size = ret.len();
-    match offset {
-        n if n > 0 => ret.rotate_right((n as usize) % size),
-        n if n < 0 => ret.rotate_left((-n as usize) % size),
-        _ => (),
-    }
-    ret
-}
-
-// ---------------------------------------------------------------------------------------------
-// Defaults
 
 fn eval_default_instrument(engine: &Engine) -> Result<Option<InstrumentId>, Box<EvalAltResult>> {
     engine.eval::<Option<InstrumentId>>("default_instrument()")
@@ -168,47 +78,126 @@ fn eval_default_beat_time(engine: &Engine) -> Result<BeatTimeBase, Box<EvalAltRe
 }
 
 // ---------------------------------------------------------------------------------------------
-// Global
 
-fn default_beat_time(context: NativeCallContext) -> Result<BeatTimeBase, Box<EvalAltResult>> {
-    eval_default_beat_time(context.engine())
+mod array {
+    use super::*;
+
+    pub fn register(engine: &mut Engine) {
+        engine
+            .register_fn("repeat", repeat)
+            .register_fn("reverse", reverse)
+            .register_fn("rotate", rotate);
+    }
+
+    fn repeat(
+        context: NativeCallContext,
+        this: Array,
+        count: INT,
+    ) -> Result<Array, Box<EvalAltResult>> {
+        if count < 0 {
+            return Err(EvalAltResult::ErrorArithmetic(
+                format!(
+                    "Count argument in 'array.repeat' must be > 0, but is '{}'",
+                    count
+                ),
+                context.position(),
+            )
+            .into());
+        }
+        let mut ret = Array::with_capacity(this.len() * count as usize);
+        for _ in 0..count {
+            for i in this.iter() {
+                ret.push(i.clone());
+            }
+        }
+        Ok(ret)
+    }
+
+    fn reverse(this: Array) -> Array {
+        this.iter().rev().cloned().collect::<Array>()
+    }
+
+    fn rotate(this: Array, offset: INT) -> Array {
+        if this.is_empty() {
+            return Array::new();
+        }
+        let mut ret = this.clone();
+        let size = ret.len();
+        match offset {
+            n if n > 0 => ret.rotate_right((n as usize) % size),
+            n if n < 0 => ret.rotate_left((-n as usize) % size),
+            _ => (),
+        }
+        ret
+    }
 }
 
-fn beat_time(
-    context: NativeCallContext,
-    beats_per_min: Dynamic,
-    beats_per_bar: Dynamic,
-) -> Result<BeatTimeBase, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let default_beat_time = eval_default_beat_time(context.engine())?;
-    let bpm = unwrap_float(&err_context, beats_per_min, "beats_per_min")? as f32;
-    let bpb = unwrap_integer(&err_context, beats_per_bar, "beats_per_bar")? as u32;
-    Ok(BeatTimeBase {
-        beats_per_min: bpm,
-        beats_per_bar: bpb,
-        samples_per_sec: default_beat_time.samples_per_second(),
-    })
-}
+// ---------------------------------------------------------------------------------------------
 
-fn second_time(context: NativeCallContext) -> Result<SecondTimeBase, Box<EvalAltResult>> {
-    let default_beat_time = eval_default_beat_time(context.engine())?;
-    Ok(SecondTimeBase {
-        samples_per_sec: default_beat_time.samples_per_sec,
-    })
-}
+mod globals {
+    use super::*;
 
-fn note_from_dynamic(
-    context: NativeCallContext,
-    d: Dynamic,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    if d.is::<()>() {
-        Ok(new_empty_note_event())
-    } else if d.is::<ImmutableString>() || d.is::<String>() {
-        Ok(note_from_string(context, d.cast())?)
-    } else if d.is::<INT>() {
-        Ok(note_from_number(context, d.cast())?)
-    } else {
-        Err(EvalAltResult::ErrorInModule(
+    pub fn register(engine: &mut Engine) {
+        engine
+            // time constructors
+            .register_fn("beat_time", default_beat_time)
+            .register_fn("beat_time", beat_time)
+            .register_fn("second_time", second_time)
+            // rhythm constructors
+            .register_fn("euclidian", euclidian_rhythm)
+            .register_fn("euclidian", euclidian_rhythm_with_offset)
+            // note constructors
+            .register_fn("note", note_from_number)
+            .register_fn("note", note_from_string)
+            .register_fn("note", note_from_dynamic)
+            .register_fn("note", note_from_number_with_velocity)
+            .register_fn("note", note_from_string_with_velocity)
+            .register_fn("note", note_from_dynamic_with_velocity)
+            .register_fn("note", note_vec)
+            .register_fn("note_seq", note_vec_seq)
+            // note array constructors
+            .register_fn("notes_in_scale", notes_in_scale);
+    }
+
+    fn default_beat_time(context: NativeCallContext) -> Result<BeatTimeBase, Box<EvalAltResult>> {
+        eval_default_beat_time(context.engine())
+    }
+
+    fn beat_time(
+        context: NativeCallContext,
+        beats_per_min: Dynamic,
+        beats_per_bar: Dynamic,
+    ) -> Result<BeatTimeBase, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let default_beat_time = eval_default_beat_time(context.engine())?;
+        let bpm = unwrap_float(&err_context, beats_per_min, "beats_per_min")? as f32;
+        let bpb = unwrap_integer(&err_context, beats_per_bar, "beats_per_bar")? as u32;
+        Ok(BeatTimeBase {
+            beats_per_min: bpm,
+            beats_per_bar: bpb,
+            samples_per_sec: default_beat_time.samples_per_second(),
+        })
+    }
+
+    fn second_time(context: NativeCallContext) -> Result<SecondTimeBase, Box<EvalAltResult>> {
+        let default_beat_time = eval_default_beat_time(context.engine())?;
+        Ok(SecondTimeBase {
+            samples_per_sec: default_beat_time.samples_per_sec,
+        })
+    }
+
+    fn note_from_dynamic(
+        context: NativeCallContext,
+        d: Dynamic,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        if d.is::<()>() {
+            Ok(new_empty_note_event())
+        } else if d.is::<ImmutableString>() || d.is::<String>() {
+            Ok(note_from_string(context, d.cast())?)
+        } else if d.is::<INT>() {
+            Ok(note_from_number(context, d.cast())?)
+        } else {
+            Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
                 "Failed to parse note in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
@@ -219,52 +208,52 @@ fn note_from_dynamic(
             context.position(),
         )
         .into())
+        }
     }
-}
 
-fn note_from_string(
-    context: NativeCallContext,
-    note: ImmutableString,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let instrument = eval_default_instrument(context.engine())?;
-    if is_empty_note_string(note.as_str()) {
-        Ok(new_empty_note_event())
-    } else {
+    fn note_from_string(
+        context: NativeCallContext,
+        note: ImmutableString,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
+        if is_empty_note_string(note.as_str()) {
+            Ok(new_empty_note_event())
+        } else {
+            Ok(new_note_event(
+                instrument,
+                unwrap_note_from_string(&err_context, note.as_str())?,
+                1.0_f32,
+            ))
+        }
+    }
+
+    fn note_from_number(
+        context: NativeCallContext,
+        note: INT,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
         Ok(new_note_event(
             instrument,
-            unwrap_note_from_string(&err_context, note.as_str())?,
+            unwrap_note_from_int(&err_context, note)?,
             1.0_f32,
         ))
     }
-}
 
-fn note_from_number(
-    context: NativeCallContext,
-    note: INT,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let instrument = eval_default_instrument(context.engine())?;
-    Ok(new_note_event(
-        instrument,
-        unwrap_note_from_int(&err_context, note)?,
-        1.0_f32,
-    ))
-}
-
-fn note_from_dynamic_with_velocity(
-    context: NativeCallContext,
-    d: Dynamic,
-    velocity: FLOAT,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    if d.is::<()>() {
-        Ok(new_empty_note_event())
-    } else if d.is::<ImmutableString>() || d.is::<String>() {
-        Ok(note_from_string_with_velocity(context, d.cast(), velocity)?)
-    } else if d.is::<INT>() {
-        Ok(note_from_number_with_velocity(context, d.cast(), velocity)?)
-    } else {
-        Err(EvalAltResult::ErrorInModule(
+    fn note_from_dynamic_with_velocity(
+        context: NativeCallContext,
+        d: Dynamic,
+        velocity: FLOAT,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        if d.is::<()>() {
+            Ok(new_empty_note_event())
+        } else if d.is::<ImmutableString>() || d.is::<String>() {
+            Ok(note_from_string_with_velocity(context, d.cast(), velocity)?)
+        } else if d.is::<INT>() {
+            Ok(note_from_number_with_velocity(context, d.cast(), velocity)?)
+        } else {
+            Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
                 "Failed to parse note in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
@@ -275,450 +264,489 @@ fn note_from_dynamic_with_velocity(
             context.position(),
         )
         .into())
-    }
-}
-
-fn note_from_string_with_velocity(
-    context: NativeCallContext,
-    note: ImmutableString,
-    velocity: FLOAT,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let instrument = eval_default_instrument(context.engine())?;
-    Ok(new_note_event(
-        instrument,
-        unwrap_note_from_string(&err_context, note.as_str())?,
-        velocity as f32,
-    ))
-}
-
-fn note_from_number_with_velocity(
-    context: NativeCallContext,
-    note: INT,
-    velocity: FLOAT,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let instrument = eval_default_instrument(context.engine())?;
-    Ok(new_note_event(
-        instrument,
-        unwrap_note_from_int(&err_context, note)?,
-        velocity as f32,
-    ))
-}
-
-fn note_vec(
-    context: NativeCallContext,
-    array: Array,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    // NB: array arg may be a:
-    // [NOTE, VEL] -> single note
-    // [[NOTE, VEL], ..] -> poly notes
-    let err_context = ErrorCallContext::from(&context);
-    let instrument = eval_default_instrument(context.engine())?;
-    let mut sequence = Vec::with_capacity(array.len());
-    if array.is_empty() {
-        // []
-        sequence.push(None);
-    } else if array[0].type_name() == "string" || array[0].is::<INT>() || array[0].is::<()>() {
-        // [NOTE, VEL]
-        if is_empty_note_value(&array[0]) {
-            sequence.push(None);
-        } else {
-            sequence.push(Some(unwrap_note_event(&err_context, array, instrument)?));
         }
-    } else {
-        // [[NOTE, VEL], ..]
-        for item in array {
-            if item.is::<()>() {
+    }
+
+    fn note_from_string_with_velocity(
+        context: NativeCallContext,
+        note: ImmutableString,
+        velocity: FLOAT,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
+        Ok(new_note_event(
+            instrument,
+            unwrap_note_from_string(&err_context, note.as_str())?,
+            velocity as f32,
+        ))
+    }
+
+    fn note_from_number_with_velocity(
+        context: NativeCallContext,
+        note: INT,
+        velocity: FLOAT,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
+        Ok(new_note_event(
+            instrument,
+            unwrap_note_from_int(&err_context, note)?,
+            velocity as f32,
+        ))
+    }
+
+    fn note_vec(
+        context: NativeCallContext,
+        array: Array,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        // NB: array arg may be a:
+        // [NOTE, VEL] -> single note
+        // [[NOTE, VEL], ..] -> poly notes
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
+        let mut sequence = Vec::with_capacity(array.len());
+        if array.is_empty() {
+            // []
+            sequence.push(None);
+        } else if array[0].type_name() == "string" || array[0].is::<INT>() || array[0].is::<()>() {
+            // [NOTE, VEL]
+            if is_empty_note_value(&array[0]) {
                 sequence.push(None);
             } else {
-                let note_item_array = unwrap_array(&err_context, item)?;
-                if note_item_array.is_empty() || is_empty_note_value(&note_item_array[0]) {
+                sequence.push(Some(unwrap_note_event(&err_context, array, instrument)?));
+            }
+        } else {
+            // [[NOTE, VEL], ..]
+            for item in array {
+                if item.is::<()>() {
                     sequence.push(None);
                 } else {
-                    sequence.push(Some(unwrap_note_event(
-                        &err_context,
-                        note_item_array,
-                        instrument,
-                    )?));
-                }
-            }
-        }
-    }
-    Ok(new_polyphonic_note_event(sequence))
-}
-
-fn note_vec_seq(
-    context: NativeCallContext,
-    array: Array,
-) -> Result<FixedEventIter, Box<EvalAltResult>> {
-    // NB: array arg may be a:
-    // [[NOTE, VEL], ..] -> sequence of single notes
-    // [[[NOTE, VEL], ..], [[NOTE, VEL]]] -> sequence of poly notes
-    let err_context = ErrorCallContext::from(&context);
-    let instrument = eval_default_instrument(context.engine())?;
-    let mut event_sequence = Vec::with_capacity(array.len());
-    for item1_dyn in array {
-        if item1_dyn.is::<()>() {
-            event_sequence.push(vec![None]);
-        } else {
-            let item1_arr = unwrap_array(&err_context, item1_dyn)?;
-            let mut note_events = Vec::with_capacity(item1_arr.len());
-            if item1_arr.is_empty() {
-                // Vec<()>
-                note_events.push(None);
-            } else if item1_arr[0].type_name() == "string" || item1_arr[0].is::<INT>() {
-                // Vec<Vec<NOTE, VEL>>
-                if item1_arr.is_empty() || is_empty_note_value(&item1_arr[0]) {
-                    note_events.push(None);
-                } else {
-                    note_events.push(Some(unwrap_note_event(
-                        &err_context,
-                        item1_arr,
-                        instrument,
-                    )?));
-                }
-            } else {
-                // Vec<Vec<Vec<NOTE, VEL>>>
-                for item2_dyn in item1_arr {
-                    if item2_dyn.is::<()>() {
-                        note_events.push(None);
+                    let note_item_array = unwrap_array(&err_context, item)?;
+                    if note_item_array.is_empty() || is_empty_note_value(&note_item_array[0]) {
+                        sequence.push(None);
                     } else {
-                        let item2_arr = unwrap_array(&err_context, item2_dyn)?;
-                        if item2_arr.is_empty() || is_empty_note_value(&item2_arr[0]) {
-                            note_events.push(None);
-                        } else {
-                            note_events.push(Some(unwrap_note_event(
-                                &err_context,
-                                item2_arr,
-                                instrument,
-                            )?));
-                        }
+                        sequence.push(Some(unwrap_note_event(
+                            &err_context,
+                            note_item_array,
+                            instrument,
+                        )?));
                     }
                 }
             }
-            event_sequence.push(note_events)
+        }
+        Ok(new_polyphonic_note_event(sequence))
+    }
+
+    fn note_vec_seq(
+        context: NativeCallContext,
+        array: Array,
+    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
+        // NB: array arg may be a:
+        // [[NOTE, VEL], ..] -> sequence of single notes
+        // [[[NOTE, VEL], ..], [[NOTE, VEL]]] -> sequence of poly notes
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
+        let mut event_sequence = Vec::with_capacity(array.len());
+        for item1_dyn in array {
+            if item1_dyn.is::<()>() {
+                event_sequence.push(vec![None]);
+            } else {
+                let item1_arr = unwrap_array(&err_context, item1_dyn)?;
+                let mut note_events = Vec::with_capacity(item1_arr.len());
+                if item1_arr.is_empty() {
+                    // Vec<()>
+                    note_events.push(None);
+                } else if item1_arr[0].type_name() == "string" || item1_arr[0].is::<INT>() {
+                    // Vec<Vec<NOTE, VEL>>
+                    if item1_arr.is_empty() || is_empty_note_value(&item1_arr[0]) {
+                        note_events.push(None);
+                    } else {
+                        note_events.push(Some(unwrap_note_event(
+                            &err_context,
+                            item1_arr,
+                            instrument,
+                        )?));
+                    }
+                } else {
+                    // Vec<Vec<Vec<NOTE, VEL>>>
+                    for item2_dyn in item1_arr {
+                        if item2_dyn.is::<()>() {
+                            note_events.push(None);
+                        } else {
+                            let item2_arr = unwrap_array(&err_context, item2_dyn)?;
+                            if item2_arr.is_empty() || is_empty_note_value(&item2_arr[0]) {
+                                note_events.push(None);
+                            } else {
+                                note_events.push(Some(unwrap_note_event(
+                                    &err_context,
+                                    item2_arr,
+                                    instrument,
+                                )?));
+                            }
+                        }
+                    }
+                }
+                event_sequence.push(note_events)
+            }
+        }
+        Ok(new_polyphonic_note_sequence_event(event_sequence))
+    }
+
+    fn notes_in_scale(
+        context: NativeCallContext,
+        string: ImmutableString,
+    ) -> Result<Array, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        match scale::Scale::from_regex(string.as_str()) {
+            Ok(scale) => Ok(scale
+                .notes()
+                .iter()
+                .map(|n| Dynamic::from_int(Note::from(n) as u8 as INT))
+                .collect::<Array>()),
+            Err(_) => Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid scale arg: '{}' in '{}'. Valid scale args are e.g. 'c major'",
+                    string,
+                    err_context.fn_name()
+                )
+                .into(),
+                err_context.position(),
+            )
+            .into()),
         }
     }
-    Ok(new_polyphonic_note_sequence_event(event_sequence))
-}
 
-fn notes_in_scale(
-    context: NativeCallContext,
-    string: ImmutableString,
-) -> Result<Array, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    match scale::Scale::from_regex(string.as_str()) {
-        Ok(scale) => Ok(scale
-            .notes()
-            .iter()
-            .map(|n| Dynamic::from_int(Note::from(n) as u8 as INT))
-            .collect::<Array>()),
-        Err(_) => Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid scale arg: '{}' in '{}'. Valid scale args are e.g. 'c major'",
-                string,
-                err_context.fn_name()
-            )
-            .into(),
-            err_context.position(),
-        )
-        .into()),
+    fn euclidian_rhythm(
+        context: NativeCallContext,
+        pulses: INT,
+        steps: INT,
+    ) -> Result<Array, Box<EvalAltResult>> {
+        euclidian_rhythm_with_offset(context, pulses, steps, 0)
     }
-}
 
-fn euclidian_rhythm(
-    context: NativeCallContext,
-    pulses: INT,
-    steps: INT,
-) -> Result<Array, Box<EvalAltResult>> {
-    euclidian_rhythm_with_offset(context, pulses, steps, 0)
-}
-
-fn euclidian_rhythm_with_offset(
-    context: NativeCallContext,
-    pulses: INT,
-    steps: INT,
-    offset: INT,
-) -> Result<Array, Box<EvalAltResult>> {
-    if pulses <= 0 || steps <= 0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid arguments in fn '{}': 'pulse' (is {}) and 'step' (is {}) must be > 0'",
-                context.fn_name(),
-                pulses,
-                steps
+    fn euclidian_rhythm_with_offset(
+        context: NativeCallContext,
+        pulses: INT,
+        steps: INT,
+        offset: INT,
+    ) -> Result<Array, Box<EvalAltResult>> {
+        if pulses <= 0 || steps <= 0 {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid arguments in fn '{}': 'pulse' (is {}) and 'step' (is {}) must be > 0'",
+                    context.fn_name(),
+                    pulses,
+                    steps
+                )
+                .into(),
+                context.position(),
             )
-            .into(),
-            context.position(),
-        )
-        .into())
-    } else if pulses > steps {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid arguments in fn '{}': 'pulse' (is {}) must be <= 'step' (is {})",
-                context.fn_name(),
-                pulses,
-                steps
+            .into())
+        } else if pulses > steps {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid arguments in fn '{}': 'pulse' (is {}) must be <= 'step' (is {})",
+                    context.fn_name(),
+                    pulses,
+                    steps
+                )
+                .into(),
+                context.position(),
             )
-            .into(),
-            context.position(),
-        )
-        .into())
-    } else {
-        let pattern = euclidean(pulses as u32, steps as u32, offset as i32);
-        Ok(pattern
-            .iter()
-            .map(|v| {
-                if *v {
-                    Dynamic::from(1 as INT)
-                } else {
-                    Dynamic::from(0 as INT)
-                }
-            })
-            .collect::<Array>())
+            .into())
+        } else {
+            let pattern = euclidean(pulses as u32, steps as u32, offset as i32);
+            Ok(pattern
+                .iter()
+                .map(|v| {
+                    if *v {
+                        Dynamic::from(1 as INT)
+                    } else {
+                        Dynamic::from(0 as INT)
+                    }
+                })
+                .collect::<Array>())
+        }
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// BeatTime
 
-fn beat_time_every_sixteenth(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    beat_time_every_nth_sixteenth(context, this, Dynamic::from_float(1.0))
-}
+mod beat_time {
+    use super::*;
 
-fn beat_time_every_nth_sixteenth(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-    sixteenth: Dynamic,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let step = unwrap_float(&err_context, sixteenth, "step")? as f32;
-    if step <= 0.0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid step arg: '{}' in '{}'. step must be > 0",
-                step,
-                err_context.fn_name()
-            )
-            .into(),
-            err_context.position(),
-        )
-        .into())
-    } else {
-        Ok(this.every_nth_sixteenth(step))
+    pub fn register(engine: &mut Engine) {
+        engine
+            .register_fn("every_nth_sixteenth", every_nth_sixteenth)
+            .register_fn("every_sixteenth", every_sixteenth)
+            .register_fn("every_nth_eighth", every_nth_eighth)
+            .register_fn("every_eighth", every_eighth)
+            .register_fn("every_nth_beat", every_nth_beat)
+            .register_fn("every_beat", every_beat)
+            .register_fn("every_nth_bar", every_nth_bar)
+            .register_fn("every_bar", every_bar);
     }
-}
 
-fn beat_time_every_eighth(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    beat_time_every_nth_eighth(context, this, Dynamic::from_float(1.0))
-}
-
-fn beat_time_every_nth_eighth(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-    beats: Dynamic,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let step = unwrap_float(&err_context, beats, "step")? as f32;
-    if step <= 0.0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid step arg: '{}' in '{}'. step must be > 0",
-                step,
-                err_context.fn_name()
-            )
-            .into(),
-            err_context.position(),
-        )
-        .into())
-    } else {
-        Ok(this.every_nth_eighth(step))
+    fn every_sixteenth(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        every_nth_sixteenth(context, this, Dynamic::from_float(1.0))
     }
-}
 
-fn beat_time_every_beat(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    beat_time_every_nth_beat(context, this, Dynamic::from_float(1.0))
-}
-
-fn beat_time_every_nth_beat(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-    beats: Dynamic,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let step = unwrap_float(&err_context, beats, "step")? as f32;
-    if step <= 0.0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid step arg: '{}' in '{}'. step must be > 0",
-                step,
-                err_context.fn_name()
+    fn every_nth_sixteenth(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+        sixteenth: Dynamic,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let step = unwrap_float(&err_context, sixteenth, "step")? as f32;
+        if step <= 0.0 {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid step arg: '{}' in '{}'. step must be > 0",
+                    step,
+                    err_context.fn_name()
+                )
+                .into(),
+                err_context.position(),
             )
-            .into(),
-            err_context.position(),
-        )
-        .into())
-    } else {
-        Ok(this.every_nth_beat(step))
+            .into())
+        } else {
+            Ok(this.every_nth_sixteenth(step))
+        }
     }
-}
 
-fn beat_time_every_bar(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    beat_time_every_nth_bar(context, this, Dynamic::from_float(1.0))
-}
+    fn every_eighth(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        every_nth_eighth(context, this, Dynamic::from_float(1.0))
+    }
 
-fn beat_time_every_nth_bar(
-    context: NativeCallContext,
-    this: &mut BeatTimeBase,
-    bars: Dynamic,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let step = unwrap_float(&err_context, bars, "step")? as f32;
-    if step <= 0.0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid step arg: '{}' in '{}'. step must be > 0",
-                step,
-                err_context.fn_name()
+    fn every_nth_eighth(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+        beats: Dynamic,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let step = unwrap_float(&err_context, beats, "step")? as f32;
+        if step <= 0.0 {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid step arg: '{}' in '{}'. step must be > 0",
+                    step,
+                    err_context.fn_name()
+                )
+                .into(),
+                err_context.position(),
             )
-            .into(),
-            err_context.position(),
-        )
-        .into())
-    } else {
-        Ok(this.every_nth_bar(step))
+            .into())
+        } else {
+            Ok(this.every_nth_eighth(step))
+        }
+    }
+
+    fn every_beat(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        every_nth_beat(context, this, Dynamic::from_float(1.0))
+    }
+
+    fn every_nth_beat(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+        beats: Dynamic,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let step = unwrap_float(&err_context, beats, "step")? as f32;
+        if step <= 0.0 {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid step arg: '{}' in '{}'. step must be > 0",
+                    step,
+                    err_context.fn_name()
+                )
+                .into(),
+                err_context.position(),
+            )
+            .into())
+        } else {
+            Ok(this.every_nth_beat(step))
+        }
+    }
+
+    fn every_bar(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        every_nth_bar(context, this, Dynamic::from_float(1.0))
+    }
+
+    fn every_nth_bar(
+        context: NativeCallContext,
+        this: &mut BeatTimeBase,
+        bars: Dynamic,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let step = unwrap_float(&err_context, bars, "step")? as f32;
+        if step <= 0.0 {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid step arg: '{}' in '{}'. step must be > 0",
+                    step,
+                    err_context.fn_name()
+                )
+                .into(),
+                err_context.position(),
+            )
+            .into())
+        } else {
+            Ok(this.every_nth_bar(step))
+        }
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// SecondTime
 
-fn second_time_every_nth_second(
-    context: NativeCallContext,
-    this: &mut SecondTimeBase,
-    seconds: Dynamic,
-) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let step = unwrap_float(&err_context, seconds, "step")? as f64;
-    if step <= 0.0 {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Invalid step arg: '{}' in '{}'. step must be > 0",
-                step,
-                err_context.fn_name()
+mod second_time {
+    use super::*;
+
+    pub fn register(engine: &mut Engine) {
+        engine.register_fn("every_nth_seconds", every_nth_second);
+    }
+
+    fn every_nth_second(
+        context: NativeCallContext,
+        this: &mut SecondTimeBase,
+        seconds: Dynamic,
+    ) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let step = unwrap_float(&err_context, seconds, "step")? as f64;
+        if step <= 0.0 {
+            Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid seconds arg: '{}' in '{}'. seconds must be > 0",
+                    step,
+                    err_context.fn_name()
+                )
+                .into(),
+                err_context.position(),
             )
-            .into(),
-            err_context.position(),
-        )
-        .into())
-    } else {
-        Ok(this.every_nth_seconds(step))
+            .into())
+        } else {
+            Ok(this.every_nth_seconds(step))
+        }
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// BeatTimeRhythm
 
-fn beat_time_rhythm_with_pattern(
-    context: NativeCallContext,
-    this: &mut BeatTimeRhythm,
-    pattern: Array,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let mut vec = Vec::with_capacity(pattern.len());
-    for e in pattern {
-        vec.push(unwrap_integer(&err_context, e, "array element")?)
+mod beat_time_rhythm {
+    use super::*;
+
+    pub fn register(engine: &mut Engine) {
+        engine
+            .register_fn("with_pattern", with_pattern)
+            .register_fn("with_offset", with_offset)
+            .register_fn("trigger", trigger_fixed_event)
+            .register_fn("trigger", trigger_custom_event);
     }
-    Ok(this.with_pattern_vector(vec))
-}
 
-fn beat_time_rhythm_with_offset(
-    context: NativeCallContext,
-    this: &mut BeatTimeRhythm,
-    offset: Dynamic,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let offset = unwrap_float(&err_context, offset, "offset")? as f32;
-    Ok(this.with_offset_in_step(offset))
-}
+    fn with_pattern(
+        context: NativeCallContext,
+        this: &mut BeatTimeRhythm,
+        pattern: Array,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let mut vec = Vec::with_capacity(pattern.len());
+        for e in pattern {
+            vec.push(unwrap_integer(&err_context, e, "array element")?)
+        }
+        Ok(this.with_pattern_vector(vec))
+    }
 
-fn beat_time_rhythm_trigger_fixed_event(
-    this: &mut BeatTimeRhythm,
-    event: FixedEventIter,
-) -> BeatTimeRhythm {
-    this.trigger(event)
-}
+    fn with_offset(
+        context: NativeCallContext,
+        this: &mut BeatTimeRhythm,
+        offset: Dynamic,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let offset = unwrap_float(&err_context, offset, "offset")? as f32;
+        Ok(this.with_offset_in_step(offset))
+    }
 
-fn beat_time_rhythm_trigger_custom_event(
-    context: NativeCallContext,
-    this: &mut BeatTimeRhythm,
-    func: FnPtr,
-) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    let instrument = eval_default_instrument(context.engine())?;
-    Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
+    fn trigger_fixed_event(this: &mut BeatTimeRhythm, event: FixedEventIter) -> BeatTimeRhythm {
+        this.trigger(event)
+    }
+
+    fn trigger_custom_event(
+        context: NativeCallContext,
+        this: &mut BeatTimeRhythm,
+        func: FnPtr,
+    ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+        let instrument = eval_default_instrument(context.engine())?;
+        Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
-// SecondTimeRhythm
 
-fn second_time_rhythm_with_pattern(
-    context: NativeCallContext,
-    this: &mut SecondTimeRhythm,
-    pattern: Array,
-) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let mut vec = Vec::with_capacity(pattern.len());
-    for e in pattern {
-        vec.push(unwrap_integer(&err_context, e, "array element")?)
+mod second_time_rhythm {
+    use super::*;
+
+    pub fn register(engine: &mut Engine) {
+        engine
+            .register_fn("with_pattern", with_pattern)
+            .register_fn("with_offset", with_offset)
+            .register_fn("trigger", trigger_fixed_event)
+            .register_fn("trigger", trigger_custom_event);
     }
-    Ok(this.with_pattern_vector(vec))
-}
 
-fn second_time_rhythm_with_offset(
-    context: NativeCallContext,
-    this: &mut SecondTimeRhythm,
-    offset: Dynamic,
-) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
-    let err_context = ErrorCallContext::from(&context);
-    let offset = unwrap_float(&err_context, offset, "offset")? as f64;
-    Ok(this.with_offset(offset))
-}
+    fn with_pattern(
+        context: NativeCallContext,
+        this: &mut SecondTimeRhythm,
+        pattern: Array,
+    ) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let mut vec = Vec::with_capacity(pattern.len());
+        for e in pattern {
+            vec.push(unwrap_integer(&err_context, e, "array element")?)
+        }
+        Ok(this.with_pattern_vector(vec))
+    }
 
-fn second_time_rhythm_trigger_fixed_event(
-    this: &mut SecondTimeRhythm,
-    event: FixedEventIter,
-) -> SecondTimeRhythm {
-    this.trigger(event)
-}
+    fn with_offset(
+        context: NativeCallContext,
+        this: &mut SecondTimeRhythm,
+        offset: Dynamic,
+    ) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+        let err_context = ErrorCallContext::from(&context);
+        let offset = unwrap_float(&err_context, offset, "offset")? as f64;
+        Ok(this.with_offset(offset))
+    }
 
-fn second_time_rhythm_trigger_custom_event(
-    context: NativeCallContext,
-    this: &mut SecondTimeRhythm,
-    func: FnPtr,
-) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
-    let instrument = eval_default_instrument(context.engine())?;
-    Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
+    fn trigger_fixed_event(this: &mut SecondTimeRhythm, event: FixedEventIter) -> SecondTimeRhythm {
+        this.trigger(event)
+    }
+
+    fn trigger_custom_event(
+        context: NativeCallContext,
+        this: &mut SecondTimeRhythm,
+        func: FnPtr,
+    ) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+        let instrument = eval_default_instrument(context.engine())?;
+        Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
