@@ -9,13 +9,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     player.set_show_events(true);
 
     // preload samples
-    let KICK = player.sample_pool().load_sample("assets/kick.wav")?;
-    let SNARE = player.sample_pool().load_sample("assets/snare.wav")?;
-    let HIHAT = player.sample_pool().load_sample("assets/hat.wav")?;
-    let BASS = player.sample_pool().load_sample("assets/bass.wav")?;
-    let SYNTH = player.sample_pool().load_sample("assets/synth.wav")?;
-    // let TONE = player.sample_pool().load_sample("assets/tone.wav")?;
-    let FX = player.sample_pool().load_sample("assets/fx.wav")?;
+    let KICK = player.load_sample("assets/kick.wav")?;
+    let SNARE = player.load_sample("assets/snare.wav")?;
+    let HIHAT = player.load_sample("assets/hihat.wav")?;
+    let BASS = player.load_sample("assets/bass.wav")?;
+    let SYNTH = player.load_sample("assets/synth.wav")?;
+    // let TONE = player.load_sample("assets/tone.wav")?;
+    let FX = player.load_sample("assets/fx.wav")?;
 
     // define our time bases
     let second_time = SecondTimeBase {

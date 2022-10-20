@@ -58,13 +58,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut player = SamplePlayer::new()?;
 
     // preload samples
-    let KICK = player.sample_pool().load_sample("assets/kick.wav")?;
-    let SNARE = player.sample_pool().load_sample("assets/snare.wav")?;
-    let HIHAT = player.sample_pool().load_sample("assets/hat.wav")?;
-    let BASS = player.sample_pool().load_sample("assets/bass.wav")?;
-    let SYNTH = player.sample_pool().load_sample("assets/synth.wav")?;
-    let TONE = player.sample_pool().load_sample("assets/tone.wav")?;
-    let FX = player.sample_pool().load_sample("assets/fx.wav")?;
+    let KICK = player.load_sample("assets/kick.wav")?;
+    let SNARE = player.load_sample("assets/snare.wav")?;
+    let HIHAT = player.load_sample("assets/hihat.wav")?;
+    let BASS = player.load_sample("assets/bass.wav")?;
+    let SYNTH = player.load_sample("assets/synth.wav")?;
+    let TONE = player.load_sample("assets/tone.wav")?;
+    let FX = player.load_sample("assets/fx.wav")?;
 
     // set default time base config
     let beat_time = BeatTimeBase {
@@ -86,21 +86,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => println!("File watch error: {:?}", e),
         }
     })?;
-    watcher.watch(Path::new("./assets/scripts"), RecursiveMode::Recursive)?;
+    watcher.watch(Path::new("./assets"), RecursiveMode::Recursive)?;
 
     // (re)run all scripts
     loop {
         // build final phrase
+        let load = |id: InstrumentId, file_name: &str| {
+            load_script(id, beat_time, format!("./assets/{file_name}").as_str())
+        };
         let mut phrase = Phrase::new(
             beat_time,
             vec![
-                load_script(KICK, beat_time, "./assets/scripts/kick.rhai"),
-                load_script(SNARE, beat_time, "./assets/scripts/snare.rhai"),
-                load_script(HIHAT, beat_time, "./assets/scripts/hihat.rhai"),
-                load_script(BASS, beat_time, "./assets/scripts/bass.rhai"),
-                load_script(SYNTH, beat_time, "./assets/scripts/synth.rhai"),
-                load_script(TONE, beat_time, "./assets/scripts/tone.rhai"),
-                load_script(FX, beat_time, "./assets/scripts/fx.rhai"),
+                load(KICK, "kick.rhai"),
+                load(SNARE, "snare.rhai"),
+                load(HIHAT, "hihat.rhai"),
+                load(BASS, "bass.rhai"),
+                load(SYNTH, "synth.rhai"),
+                load(TONE, "tone.rhai"),
+                load(FX, "fx.rhai"),
             ],
         );
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlayer, AudioOutput, DefaultAudioOutput, FilePlaybackOptions,
+    AudioFilePlayer, AudioOutput, DefaultAudioOutput, Error, FilePlaybackOptions,
 };
 
 use crate::{
@@ -49,10 +49,7 @@ impl SamplePool {
 
     /// Load a sample file into a PreloadedFileSource and return its id.
     /// A copy of this sample can then later on be fetched with `get_sample` with the returned id.  
-    pub fn load_sample(
-        &mut self,
-        file_path: &str,
-    ) -> Result<InstrumentId, Box<dyn std::error::Error>> {
+    pub fn load_sample(&mut self, file_path: &str) -> Result<InstrumentId, Error> {
         let sample =
             PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
         let id = unique_instrument_id();
@@ -102,11 +99,6 @@ impl SamplePlayer {
         })
     }
 
-    /// Access to the player's sample pool.
-    pub fn sample_pool(&mut self) -> &mut SamplePool {
-        &mut self.sample_pool
-    }
-
     /// The actual audio output sample rate.
     pub fn sample_rate(&self) -> u32 {
         self.player.output_sample_rate()
@@ -128,6 +120,11 @@ impl SamplePlayer {
     // set a new new note action behaviour.
     pub fn set_new_note_action(&mut self, action: NewNoteAction) {
         self.new_note_action = action
+    }
+
+    /// Create a new instrument from a single sample file.
+    pub fn load_sample(&mut self, file_path: &str) -> Result<InstrumentId, Error> {
+        self.sample_pool.load_sample(file_path)
     }
 
     /// Run/play the given phrase until it stops.
