@@ -1,6 +1,6 @@
 second_time()
   .every_nth_seconds(8.0)
-  .with_offset(36.0)
+  .with_offset(64)
   .trigger(note_seq([
     [["C 3", 0.2], ["---"     ], ["---"     ]],
     [["---"     ], ["C 4", 0.2], ["---"     ]],
