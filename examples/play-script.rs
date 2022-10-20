@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // set default time base config
     let beat_time = BeatTimeBase {
-        beats_per_min: 120.0,
+        beats_per_min: 124.0,
         beats_per_bar: 4,
         samples_per_sec: player.sample_rate(),
     };
