@@ -1,26 +1,21 @@
-use std::{cell::RefCell, rc::Rc};
-
 use rust_music_theory::{note::Notes, scale};
 
 use afseq::prelude::*;
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // create sample pool
-    let sample_pool = Rc::new(RefCell::new(SamplePool::new()));
+    // create event player
+    let mut player = SamplePlayer::new()?;
+    player.set_show_events(true);
 
     // preload samples
-    let KICK = sample_pool.borrow_mut().load_sample("assets/kick.wav")?;
-    let SNARE = sample_pool.borrow_mut().load_sample("assets/snare.wav")?;
-    let HIHAT = sample_pool.borrow_mut().load_sample("assets/hat.wav")?;
-    let BASS = sample_pool.borrow_mut().load_sample("assets/bass.wav")?;
-    let SYNTH = sample_pool.borrow_mut().load_sample("assets/synth.wav")?;
-    let _TONE = sample_pool.borrow_mut().load_sample("assets/tone.wav")?;
-    let FX = sample_pool.borrow_mut().load_sample("assets/fx.wav")?;
-
-    // create event player
-    let mut player = SamplePlayer::new(sample_pool)?;
-    player.set_show_events(true);
+    let KICK = player.sample_pool().load_sample("assets/kick.wav")?;
+    let SNARE = player.sample_pool().load_sample("assets/snare.wav")?;
+    let HIHAT = player.sample_pool().load_sample("assets/hat.wav")?;
+    let BASS = player.sample_pool().load_sample("assets/bass.wav")?;
+    let SYNTH = player.sample_pool().load_sample("assets/synth.wav")?;
+    // let TONE = player.sample_pool().load_sample("assets/tone.wav")?;
+    let FX = player.sample_pool().load_sample("assets/fx.wav")?;
 
     // define our time bases
     let second_time = SecondTimeBase {

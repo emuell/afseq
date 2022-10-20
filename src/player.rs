@@ -1,5 +1,5 @@
 //! Example player implementation, which plays back a `Phrase` via the `afplay` crate.
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
@@ -78,17 +78,18 @@ pub enum NewNoteAction {
 /// using the default audio output device using plain samples loaded from a file as instruments.
 pub struct SamplePlayer {
     player: AudioFilePlayer,
-    sample_pool: Rc<RefCell<SamplePool>>,
+    sample_pool: SamplePool,
     playing_notes: Vec<HashMap<usize, (AudioFilePlaybackId, Note)>>,
     new_note_action: NewNoteAction,
     show_events: bool,
 }
 
 impl SamplePlayer {
-    pub fn new(sample_pool: Rc<RefCell<SamplePool>>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // create player
         let audio_output = DefaultAudioOutput::open()?;
         let player = AudioFilePlayer::new(audio_output.sink(), None);
+        let sample_pool = SamplePool::new();
         let playing_notes = Vec::new();
         let new_note_action = NewNoteAction::Continue;
         let show_events = false;
@@ -99,6 +100,11 @@ impl SamplePlayer {
             new_note_action,
             show_events,
         })
+    }
+
+    /// Access to the player's sample pool.
+    pub fn sample_pool(&mut self) -> &mut SamplePool {
+        &mut self.sample_pool
     }
 
     /// The actual audio output sample rate.
@@ -218,7 +224,7 @@ impl SamplePlayer {
                                 let playback_options = FilePlaybackOptions::default()
                                     .speed(speed_from_note(note_event.note as u8));
                                 let playback_sample_rate = self.player.output_sample_rate();
-                                if let Some(mut sample) = self.sample_pool.borrow().get_sample(
+                                if let Some(mut sample) = self.sample_pool.get_sample(
                                     instrument,
                                     playback_options,
                                     playback_sample_rate,

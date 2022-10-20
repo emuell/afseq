@@ -1,8 +1,6 @@
 use std::{
-    cell::RefCell,
     path::Path,
     path::PathBuf,
-    rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -12,13 +10,12 @@ use std::{
 use afseq::prelude::*;
 
 use notify::{RecursiveMode, Watcher};
-use rhai::{Dynamic, EvalAltResult, NativeCallContext};
+use rhai::{Dynamic, EvalAltResult};
 
 // -------------------------------------------------------------------------------------------------
 
 // load and run a single script and return a fallback rhythm on errors
 fn load_script(
-    sample_pool: Rc<RefCell<SamplePool>>,
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     file_name: &str,
@@ -27,23 +24,6 @@ fn load_script(
         // create a new engine
         let mut engine = bindings::new_engine();
         bindings::register(&mut engine, time_base, Some(instrument));
-
-        // register sample pool API
-        engine.register_fn(
-            "load_sample",
-            move |context: NativeCallContext,
-                  file_path: String|
-                  -> Result<rhai::INT, Box<EvalAltResult>> {
-                match sample_pool.borrow_mut().load_sample(&file_path) {
-                    Ok(id) => Ok(*id as rhai::INT),
-                    Err(_err) => Err(EvalAltResult::ErrorModuleNotFound(
-                        file_path,
-                        context.position(),
-                    )
-                    .into()),
-                }
-            },
-        );
 
         // compile and evaluate script
         let ast = engine.compile_file(PathBuf::from(file_name))?;
@@ -74,19 +54,17 @@ fn load_script(
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // create sample pool
-    let sample_pool = Rc::new(RefCell::new(SamplePool::new()));
-
-    let KICK = sample_pool.borrow_mut().load_sample("assets/kick.wav")?;
-    let SNARE = sample_pool.borrow_mut().load_sample("assets/snare.wav")?;
-    let HIHAT = sample_pool.borrow_mut().load_sample("assets/hat.wav")?;
-    let BASS = sample_pool.borrow_mut().load_sample("assets/bass.wav")?;
-    let SYNTH = sample_pool.borrow_mut().load_sample("assets/synth.wav")?;
-    let TONE = sample_pool.borrow_mut().load_sample("assets/tone.wav")?;
-    let FX = sample_pool.borrow_mut().load_sample("assets/fx.wav")?;
-
     // create event player
-    let mut player = SamplePlayer::new(sample_pool.clone())?;
+    let mut player = SamplePlayer::new()?;
+
+    // preload samples
+    let KICK = player.sample_pool().load_sample("assets/kick.wav")?;
+    let SNARE = player.sample_pool().load_sample("assets/snare.wav")?;
+    let HIHAT = player.sample_pool().load_sample("assets/hat.wav")?;
+    let BASS = player.sample_pool().load_sample("assets/bass.wav")?;
+    let SYNTH = player.sample_pool().load_sample("assets/synth.wav")?;
+    let TONE = player.sample_pool().load_sample("assets/tone.wav")?;
+    let FX = player.sample_pool().load_sample("assets/fx.wav")?;
 
     // set default time base config
     let beat_time = BeatTimeBase {
@@ -116,48 +94,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut phrase = Phrase::new(
             beat_time,
             vec![
-                load_script(
-                    sample_pool.clone(),
-                    KICK,
-                    beat_time,
-                    "./assets/scripts/kick.rhai",
-                ),
-                load_script(
-                    sample_pool.clone(),
-                    SNARE,
-                    beat_time,
-                    "./assets/scripts/snare.rhai",
-                ),
-                load_script(
-                    sample_pool.clone(),
-                    HIHAT,
-                    beat_time,
-                    "./assets/scripts/hihat.rhai",
-                ),
-                load_script(
-                    sample_pool.clone(),
-                    BASS,
-                    beat_time,
-                    "./assets/scripts/bass.rhai",
-                ),
-                load_script(
-                    sample_pool.clone(),
-                    SYNTH,
-                    beat_time,
-                    "./assets/scripts/synth.rhai",
-                ),
-                load_script(
-                    sample_pool.clone(),
-                    TONE,
-                    beat_time,
-                    "./assets/scripts/tone.rhai",
-                ),
-                load_script(
-                    sample_pool.clone(),
-                    FX,
-                    beat_time,
-                    "./assets/scripts/fx.rhai",
-                ),
+                load_script(KICK, beat_time, "./assets/scripts/kick.rhai"),
+                load_script(SNARE, beat_time, "./assets/scripts/snare.rhai"),
+                load_script(HIHAT, beat_time, "./assets/scripts/hihat.rhai"),
+                load_script(BASS, beat_time, "./assets/scripts/bass.rhai"),
+                load_script(SYNTH, beat_time, "./assets/scripts/synth.rhai"),
+                load_script(TONE, beat_time, "./assets/scripts/tone.rhai"),
+                load_script(FX, beat_time, "./assets/scripts/fx.rhai"),
             ],
         );
 

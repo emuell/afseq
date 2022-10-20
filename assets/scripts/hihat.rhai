@@ -3,9 +3,14 @@ let note_step = 0;
 beat_time()
   .every_sixteenth()
   .with_offset(16 * 8)
-  .with_pattern(euclidian(11, 16).rotate(6))
+  .with_pattern(euclidian(14, 16).rotate(6))
   .trigger(|| {
     note_step += 1;
     let vel = 1.0 - (note_step % 4) / 4.0;
-    ["C_5", vel]
+    let note = "C 5";
+    if (note_step % 3 == 0) { 
+      note = "C 4"; 
+      vel *= 0.6;
+    }
+    [note, vel]
   })

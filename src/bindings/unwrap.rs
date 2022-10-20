@@ -186,7 +186,7 @@ pub fn unwrap_note_event(
         return Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
-                "Expected 1, 2 or 3 items in note array in function '{}', got '{}' items",
+                "Expected 1 or 2 items in note array in function '{}', got '{}' items",
                 context.fn_name(),
                 array.len()
             )
@@ -195,12 +195,7 @@ pub fn unwrap_note_event(
         )
         .into());
     }
-    if array.len() == 3 {
-        let instrument = unwrap_integer(context, array[0].clone(), "instrument")? as usize;
-        let note = unwrap_note(context, array[1].clone())?;
-        let velocity = unwrap_float(context, array[2].clone(), "velocity")? as f32;
-        Ok((Some(InstrumentId::from(instrument)), note, velocity))
-    } else if array.len() == 2 {
+    if array.len() == 2 {
         let note = unwrap_note(context, array[0].clone())?;
         let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
         Ok((default_instrument, note, velocity))
