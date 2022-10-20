@@ -52,6 +52,8 @@ fn load_script(
         // hande script result
         if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
             Ok(Box::new(beat_time_rhythm))
+        } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
+            Ok(Box::new(second_time_rhythm))
         } else {
             Err(EvalAltResult::ErrorMismatchDataType(
                 "Rhythm".to_string(),
@@ -81,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let BASS = sample_pool.borrow_mut().load_sample("assets/bass.wav")?;
     let SYNTH = sample_pool.borrow_mut().load_sample("assets/synth.wav")?;
     let TONE = sample_pool.borrow_mut().load_sample("assets/tone.wav")?;
-    let _FX = sample_pool.borrow_mut().load_sample("assets/fx.wav")?;
+    let FX = sample_pool.borrow_mut().load_sample("assets/fx.wav")?;
 
     // create event player
     let mut player = SamplePlayer::new(sample_pool.clone())?;
@@ -149,6 +151,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     TONE,
                     beat_time,
                     "./assets/scripts/tone.rhai",
+                ),
+                load_script(
+                    sample_pool.clone(),
+                    FX,
+                    beat_time,
+                    "./assets/scripts/fx.rhai",
                 ),
             ],
         );

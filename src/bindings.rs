@@ -59,10 +59,14 @@ pub fn register(
 
     // Global
     engine
+        // time constructors
         .register_fn("beat_time", default_beat_time)
         .register_fn("beat_time", beat_time)
+        .register_fn("second_time", second_time)
+        // rhythm constructors
         .register_fn("euclidian", euclidian_rhythm)
         .register_fn("euclidian", euclidian_rhythm_with_offset)
+        // note constructors
         .register_fn("note", note_from_number)
         .register_fn("note", note_from_string)
         .register_fn("note", note_from_dynamic)
@@ -71,25 +75,37 @@ pub fn register(
         .register_fn("note", note_from_dynamic_with_velocity)
         .register_fn("note", note_vec)
         .register_fn("note_seq", note_vec_seq)
+        // note array constructors
         .register_fn("notes_in_scale", notes_in_scale);
 
     // BeatTime
     engine
-        .register_fn("every_nth_sixteenth", every_nth_sixteenth)
-        .register_fn("every_sixteenth", every_sixteenth)
-        .register_fn("every_nth_eighth", every_nth_eighth)
-        .register_fn("every_eighth", every_eighth)
-        .register_fn("every_nth_beat", every_nth_beat)
-        .register_fn("every_beat", every_beat)
-        .register_fn("every_nth_bar", every_nth_bar)
-        .register_fn("every_bar", every_bar);
+        .register_fn("every_nth_sixteenth", beat_time_every_nth_sixteenth)
+        .register_fn("every_sixteenth", beat_time_every_sixteenth)
+        .register_fn("every_nth_eighth", beat_time_every_nth_eighth)
+        .register_fn("every_eighth", beat_time_every_eighth)
+        .register_fn("every_nth_beat", beat_time_every_nth_beat)
+        .register_fn("every_beat", beat_time_every_beat)
+        .register_fn("every_nth_bar", beat_time_every_nth_bar)
+        .register_fn("every_bar", beat_time_every_bar);
+
+    // SecondTime
+    engine.register_fn("every_nth_second", second_time_every_nth_second);
+    engine.register_fn("every_nth_seconds", second_time_every_nth_second);
 
     // BeatTimeRhythm
     engine
-        .register_fn("with_pattern", with_pattern)
-        .register_fn("with_offset", with_offset)
-        .register_fn("trigger", trigger_fixed_event)
-        .register_fn("trigger", trigger_custom_event);
+        .register_fn("with_pattern", beat_time_rhythm_with_pattern)
+        .register_fn("with_offset", beat_time_rhythm_with_offset)
+        .register_fn("trigger", beat_time_rhythm_trigger_fixed_event)
+        .register_fn("trigger", beat_time_rhythm_trigger_custom_event);
+
+    // SecondTimeRhythm
+    engine
+        .register_fn("with_pattern", second_time_rhythm_with_pattern)
+        .register_fn("with_offset", second_time_rhythm_with_offset)
+        .register_fn("trigger", second_time_rhythm_trigger_fixed_event)
+        .register_fn("trigger", second_time_rhythm_trigger_custom_event);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -171,6 +187,13 @@ fn beat_time(
         beats_per_min: bpm,
         beats_per_bar: bpb,
         samples_per_sec: default_beat_time.samples_per_second(),
+    })
+}
+
+fn second_time(context: NativeCallContext) -> Result<SecondTimeBase, Box<EvalAltResult>> {
+    let default_beat_time = eval_default_beat_time(context.engine())?;
+    Ok(SecondTimeBase {
+        samples_per_sec: default_beat_time.samples_per_sec,
     })
 }
 
@@ -463,14 +486,14 @@ fn euclidian_rhythm_with_offset(
 // ---------------------------------------------------------------------------------------------
 // BeatTime
 
-fn every_sixteenth(
+fn beat_time_every_sixteenth(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    every_nth_sixteenth(context, this, Dynamic::from_float(1.0))
+    beat_time_every_nth_sixteenth(context, this, Dynamic::from_float(1.0))
 }
 
-fn every_nth_sixteenth(
+fn beat_time_every_nth_sixteenth(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
     sixteenth: Dynamic,
@@ -494,14 +517,14 @@ fn every_nth_sixteenth(
     }
 }
 
-fn every_eighth(
+fn beat_time_every_eighth(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    every_nth_eighth(context, this, Dynamic::from_float(1.0))
+    beat_time_every_nth_eighth(context, this, Dynamic::from_float(1.0))
 }
 
-fn every_nth_eighth(
+fn beat_time_every_nth_eighth(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
     beats: Dynamic,
@@ -525,14 +548,14 @@ fn every_nth_eighth(
     }
 }
 
-fn every_beat(
+fn beat_time_every_beat(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    every_nth_beat(context, this, Dynamic::from_float(1.0))
+    beat_time_every_nth_beat(context, this, Dynamic::from_float(1.0))
 }
 
-fn every_nth_beat(
+fn beat_time_every_nth_beat(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
     beats: Dynamic,
@@ -556,14 +579,14 @@ fn every_nth_beat(
     }
 }
 
-fn every_bar(
+fn beat_time_every_bar(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
-    every_nth_bar(context, this, Dynamic::from_float(1.0))
+    beat_time_every_nth_bar(context, this, Dynamic::from_float(1.0))
 }
 
-fn every_nth_bar(
+fn beat_time_every_nth_bar(
     context: NativeCallContext,
     this: &mut BeatTimeBase,
     bars: Dynamic,
@@ -588,9 +611,36 @@ fn every_nth_bar(
 }
 
 // ---------------------------------------------------------------------------------------------
+// SecondTime
+
+fn second_time_every_nth_second(
+    context: NativeCallContext,
+    this: &mut SecondTimeBase,
+    seconds: Dynamic,
+) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+    let err_context = ErrorCallContext::from(&context);
+    let step = unwrap_float(&err_context, seconds, "step")? as f64;
+    if step <= 0.0 {
+        Err(EvalAltResult::ErrorInModule(
+            "bindings".to_string(),
+            format!(
+                "Invalid step arg: '{}' in '{}'. step must be > 0",
+                step,
+                err_context.fn_name()
+            )
+            .into(),
+            err_context.position(),
+        )
+        .into())
+    } else {
+        Ok(this.every_nth_seconds(step))
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
 // BeatTimeRhythm
 
-fn with_pattern(
+fn beat_time_rhythm_with_pattern(
     context: NativeCallContext,
     this: &mut BeatTimeRhythm,
     pattern: Array,
@@ -603,7 +653,7 @@ fn with_pattern(
     Ok(this.with_pattern_vector(vec))
 }
 
-fn with_offset(
+fn beat_time_rhythm_with_offset(
     context: NativeCallContext,
     this: &mut BeatTimeRhythm,
     offset: Dynamic,
@@ -613,15 +663,60 @@ fn with_offset(
     Ok(this.with_offset_in_step(offset))
 }
 
-fn trigger_fixed_event(this: &mut BeatTimeRhythm, event: FixedEventIter) -> BeatTimeRhythm {
+fn beat_time_rhythm_trigger_fixed_event(
+    this: &mut BeatTimeRhythm,
+    event: FixedEventIter,
+) -> BeatTimeRhythm {
     this.trigger(event)
 }
 
-fn trigger_custom_event(
+fn beat_time_rhythm_trigger_custom_event(
     context: NativeCallContext,
     this: &mut BeatTimeRhythm,
     func: FnPtr,
 ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
+    let instrument = eval_default_instrument(context.engine())?;
+    Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
+}
+
+// ---------------------------------------------------------------------------------------------
+// SecondTimeRhythm
+
+fn second_time_rhythm_with_pattern(
+    context: NativeCallContext,
+    this: &mut SecondTimeRhythm,
+    pattern: Array,
+) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+    let err_context = ErrorCallContext::from(&context);
+    let mut vec = Vec::with_capacity(pattern.len());
+    for e in pattern {
+        vec.push(unwrap_integer(&err_context, e, "array element")?)
+    }
+    Ok(this.with_pattern_vector(vec))
+}
+
+fn second_time_rhythm_with_offset(
+    context: NativeCallContext,
+    this: &mut SecondTimeRhythm,
+    offset: Dynamic,
+) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
+    let err_context = ErrorCallContext::from(&context);
+    let offset = unwrap_float(&err_context, offset, "offset")? as f64;
+    Ok(this.with_offset(offset))
+}
+
+fn second_time_rhythm_trigger_fixed_event(
+    this: &mut SecondTimeRhythm,
+    event: FixedEventIter,
+) -> SecondTimeRhythm {
+    this.trigger(event)
+}
+
+fn second_time_rhythm_trigger_custom_event(
+    context: NativeCallContext,
+    this: &mut SecondTimeRhythm,
+    func: FnPtr,
+) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
     let instrument = eval_default_instrument(context.engine())?;
     Ok(this.trigger(ScriptedEventIter::new(&context, func, instrument)?))
 }
@@ -633,9 +728,9 @@ mod test {
     use crate::{
         bindings::{eval_default_beat_time, eval_default_instrument, new_engine, register},
         event::{fixed::FixedEventIter, new_note, Event, InstrumentId},
-        rhythm::beat_time::BeatTimeRhythm,
+        rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
         time::BeatTimeStep,
-        BeatTimeBase,
+        BeatTimeBase, SecondTimeBase,
     };
 
     use rhai::{Dynamic, Engine, INT};
@@ -951,6 +1046,48 @@ mod test {
         );
         assert_eq!(
             beat_time_rhythm.unwrap().pattern(),
+            vec![true, false, true, false]
+        );
+    }
+
+    #[test]
+    fn second_time() {
+        // create a new engine and register bindings
+        let mut engine = new_engine();
+        register(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 120.0,
+                beats_per_bar: 4,
+                samples_per_sec: 44100,
+            },
+            None,
+        );
+
+        // SecondTime
+        assert!(engine
+            .eval::<Dynamic>("second_time()",)
+            .unwrap()
+            .try_cast::<SecondTimeBase>()
+            .is_some());
+
+        // SecondTimeRhythm
+        let second_time_rhythm = engine
+            .eval::<Dynamic>(
+                r#"
+                  second_time()
+                    .every_nth_second(2)
+                    .with_offset(3)
+                    .with_pattern([1,0,1,0]);
+                "#,
+            )
+            .unwrap()
+            .try_cast::<SecondTimeRhythm>();
+        assert!(second_time_rhythm.is_some());
+        assert_eq!(second_time_rhythm.clone().unwrap().step(), 2.0);
+        assert_eq!(second_time_rhythm.clone().unwrap().offset(), 3.0);
+        assert_eq!(
+            second_time_rhythm.unwrap().pattern(),
             vec![true, false, true, false]
         );
     }
