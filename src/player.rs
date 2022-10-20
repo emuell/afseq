@@ -40,15 +40,11 @@ impl SamplePool {
         playback_options: FilePlaybackOptions,
         playback_sample_rate: u32,
     ) -> Option<PreloadedFileSource> {
-        if let Some(sample) = self.pool.get(&id) {
-            Some(
-                sample
-                    .clone(playback_options, playback_sample_rate)
-                    .expect("Failed to clone sample file"),
-            )
-        } else {
-            None
-        }
+        self.pool.get(&id).map(|sample| {
+            sample
+                .clone(playback_options, playback_sample_rate)
+                .expect("Failed to clone sample file")
+        })
     }
 
     /// Load a sample file into a PreloadedFileSource and return its id.

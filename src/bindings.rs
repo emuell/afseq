@@ -121,7 +121,7 @@ mod array {
         if this.is_empty() {
             return Array::new();
         }
-        let mut ret = this.clone();
+        let mut ret = this;
         let size = ret.len();
         match offset {
             n if n > 0 => ret.rotate_right((n as usize) % size),
