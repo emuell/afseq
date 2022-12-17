@@ -10,10 +10,11 @@ categories = ["audio", "player", "sequencer"]
 [dependencies]
 paste = { version = "1.0.9"}
 derive_more = { version = "0.99.17" }
+crossbeam-channel = { version = "0.5.6" }
 rust-music-theory = { version = "0.2.0" }
 rhai = { version = "1.10.1", optional = true, features = ["metadata", "internals"] }
-rhai-sci = { version = "0.1", optional = true }       
-rhai-rand = { version = "0.1", optional = true }
+rhai-sci = { version = "0.1.7", optional = true }       
+rhai-rand = { version = "0.1.4", optional = true }
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"], optional = true }
 
 [dev-dependencies]

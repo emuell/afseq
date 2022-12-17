@@ -1,9 +1,10 @@
 //! Example player implementation, which plays back a `Phrase` via the `afplay` crate.
 use std::collections::HashMap;
+use crossbeam_channel::Sender;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlayer, AudioOutput, DefaultAudioOutput, Error, FilePlaybackOptions,
+    AudioFilePlayer, AudioOutput, DefaultAudioOutput, Error, FilePlaybackOptions, AudioFilePlaybackStatusEvent
 };
 
 use crate::{
@@ -82,10 +83,10 @@ pub struct SamplePlayer {
 }
 
 impl SamplePlayer {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>) -> Result<Self, Box<dyn std::error::Error>> {
         // create player
         let audio_output = DefaultAudioOutput::open()?;
-        let player = AudioFilePlayer::new(audio_output.sink(), None);
+        let player = AudioFilePlayer::new(audio_output.sink(), playback_status_sender);
         let sample_pool = SamplePool::new();
         let playing_notes = Vec::new();
         let new_note_action = NewNoteAction::Continue;
@@ -99,9 +100,14 @@ impl SamplePlayer {
         })
     }
 
-    /// The actual audio output sample rate.
-    pub fn sample_rate(&self) -> u32 {
-        self.player.output_sample_rate()
+    /// Access to our file player.
+    pub fn file_player(&mut self) -> &mut AudioFilePlayer {
+        &mut self.player
+    }
+
+    /// Access to our sampel pool.
+    pub fn sample_pool(&mut self) -> &mut SamplePool {
+        &mut self.sample_pool
     }
 
     /// true when events are dumped to stdout while playing them.
@@ -120,11 +126,6 @@ impl SamplePlayer {
     // set a new new note action behaviour.
     pub fn set_new_note_action(&mut self, action: NewNoteAction) {
         self.new_note_action = action
-    }
-
-    /// Create a new instrument from a single sample file.
-    pub fn load_sample(&mut self, file_path: &str) -> Result<InstrumentId, Error> {
-        self.sample_pool.load_sample(file_path)
     }
 
     /// Run/play the given phrase until it stops.

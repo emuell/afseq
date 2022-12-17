@@ -55,22 +55,22 @@ fn load_script(
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create event player
-    let mut player = SamplePlayer::new()?;
+    let mut player = SamplePlayer::new(None)?;
 
     // preload samples
-    let KICK = player.load_sample("assets/kick.wav")?;
-    let SNARE = player.load_sample("assets/snare.wav")?;
-    let HIHAT = player.load_sample("assets/hihat.wav")?;
-    let BASS = player.load_sample("assets/bass.wav")?;
-    let SYNTH = player.load_sample("assets/synth.wav")?;
-    let TONE = player.load_sample("assets/tone.wav")?;
-    let FX = player.load_sample("assets/fx.wav")?;
+    let KICK = player.sample_pool().load_sample("assets/kick.wav")?;
+    let SNARE = player.sample_pool().load_sample("assets/snare.wav")?;
+    let HIHAT = player.sample_pool().load_sample("assets/hihat.wav")?;
+    let BASS = player.sample_pool().load_sample("assets/bass.wav")?;
+    let SYNTH = player.sample_pool().load_sample("assets/synth.wav")?;
+    let TONE = player.sample_pool().load_sample("assets/tone.wav")?;
+    let FX = player.sample_pool().load_sample("assets/fx.wav")?;
 
     // set default time base config
     let beat_time = BeatTimeBase {
         beats_per_min: 124.0,
         beats_per_bar: 4,
-        samples_per_sec: player.sample_rate(),
+        samples_per_sec: player.file_player().output_sample_rate(),
     };
 
     // Watch for script changes, signaling in 'script_files_changed'
