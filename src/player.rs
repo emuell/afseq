@@ -1,10 +1,11 @@
 //! Example player implementation, which plays back a `Phrase` via the `afplay` crate.
-use std::collections::HashMap;
 use crossbeam_channel::Sender;
+use std::collections::HashMap;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlayer, AudioOutput, DefaultAudioOutput, Error, FilePlaybackOptions, AudioFilePlaybackStatusEvent
+    AudioFilePlaybackStatusEvent, AudioFilePlayer, AudioOutput, DefaultAudioOutput, Error,
+    FilePlaybackOptions,
 };
 
 use crate::{
@@ -83,7 +84,9 @@ pub struct SamplePlayer {
 }
 
 impl SamplePlayer {
-    pub fn new(playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         // create player
         let audio_output = DefaultAudioOutput::open()?;
         let player = AudioFilePlayer::new(audio_output.sink(), playback_status_sender);

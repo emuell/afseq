@@ -1,6 +1,5 @@
 use std::{
     path::Path,
-    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -10,45 +9,6 @@ use std::{
 use afseq::prelude::*;
 
 use notify::{RecursiveMode, Watcher};
-use rhai::{Dynamic, EvalAltResult};
-
-// -------------------------------------------------------------------------------------------------
-
-// load and run a single script and return a fallback rhythm on errors
-fn load_script(
-    instrument: InstrumentId,
-    time_base: BeatTimeBase,
-    file_name: &str,
-) -> Box<dyn Rhythm> {
-    let do_load = || -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-        // create a new engine
-        let mut engine = bindings::new_engine();
-        bindings::register(&mut engine, time_base, Some(instrument));
-
-        // compile and evaluate script
-        let ast = engine.compile_file(PathBuf::from(file_name))?;
-        let result = engine.eval_ast::<Dynamic>(&ast)?;
-
-        // hande script result
-        if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-            Ok(Box::new(beat_time_rhythm))
-        } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
-            Ok(Box::new(second_time_rhythm))
-        } else {
-            Err(EvalAltResult::ErrorMismatchDataType(
-                "Rhythm".to_string(),
-                result.type_name().to_string(),
-                rhai::Position::new(1, 1),
-            )
-            .into())
-        }
-    };
-
-    do_load().unwrap_or_else(|err| {
-        println!("script '{}' failed to compile: {}", file_name, err);
-        Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
-    })
-}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -92,7 +52,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         // build final phrase
         let load = |id: InstrumentId, file_name: &str| {
-            load_script(id, beat_time, format!("./assets/{file_name}").as_str())
+            bindings::new_rhythm_from_script(
+                id,
+                beat_time,
+                format!("./assets/{file_name}").as_str(),
+            )
         };
         let mut phrase = Phrase::new(
             beat_time,
