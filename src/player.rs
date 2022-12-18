@@ -1,6 +1,6 @@
 //! Example player implementation, which plays back a `Phrase` via the `afplay` crate.
 use crossbeam_channel::Sender;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{RwLock, Arc}};
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
@@ -22,16 +22,20 @@ use crate::{
 ///
 /// When files are accessed, the stored file sources are cloned, which avoids loading and decoding
 /// the files again. Cloned FileSources are using a shared Buffer, so cloning is very cheap.
+/// 
+/// Uses a RefCell to maintain the internal list of samples, so the pool can be accessed as non mut 
+/// ref via a RWLock by the player. Only one thread may load new samples though and multiple other 
+/// threads may access them.
 #[derive(Default)]
 pub struct SamplePool {
-    pool: HashMap<InstrumentId, PreloadedFileSource>,
+    pool: RwLock<HashMap<InstrumentId, PreloadedFileSource>>,
 }
 
 impl SamplePool {
     /// Create a new pool
     pub fn new() -> Self {
         Self {
-            pool: HashMap::new(),
+            pool: RwLock::new(HashMap::new()),
         }
     }
 
@@ -42,7 +46,7 @@ impl SamplePool {
         playback_options: FilePlaybackOptions,
         playback_sample_rate: u32,
     ) -> Option<PreloadedFileSource> {
-        self.pool.get(&id).map(|sample| {
+        self.pool.try_read().unwrap().get(&id).map(|sample| {
             sample
                 .clone(playback_options, playback_sample_rate)
                 .expect("Failed to clone sample file")
@@ -51,11 +55,11 @@ impl SamplePool {
 
     /// Load a sample file into a PreloadedFileSource and return its id.
     /// A copy of this sample can then later on be fetched with `get_sample` with the returned id.  
-    pub fn load_sample(&mut self, file_path: &str) -> Result<InstrumentId, Error> {
+    pub fn load_sample(&self, file_path: &str) -> Result<InstrumentId, Error> {
         let sample =
             PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
         let id = unique_instrument_id();
-        self.pool.insert(id, sample);
+        self.pool.try_write().unwrap().insert(id, sample);
         Ok(id)
     }
 }
@@ -75,9 +79,11 @@ pub enum NewNoteAction {
 
 /// An simple example player implementation, which plays back a `Phrase` via the `afplay` crate
 /// using the default audio output device using plain samples loaded from a file as instruments.
+/// 
+/// Works on an existing sample pool, which can be used outside of the player as well.
 pub struct SamplePlayer {
     player: AudioFilePlayer,
-    sample_pool: SamplePool,
+    sample_pool: Arc<RwLock<SamplePool>>,
     playing_notes: Vec<HashMap<usize, (AudioFilePlaybackId, Note)>>,
     new_note_action: NewNoteAction,
     show_events: bool,
@@ -85,12 +91,12 @@ pub struct SamplePlayer {
 
 impl SamplePlayer {
     pub fn new(
+        sample_pool: Arc<RwLock<SamplePool>>,
         playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // create player
         let audio_output = DefaultAudioOutput::open()?;
         let player = AudioFilePlayer::new(audio_output.sink(), playback_status_sender);
-        let sample_pool = SamplePool::new();
         let playing_notes = Vec::new();
         let new_note_action = NewNoteAction::Continue;
         let show_events = false;
@@ -104,15 +110,13 @@ impl SamplePlayer {
     }
 
     /// Access to our file player.
-    pub fn file_player(&mut self) -> &mut AudioFilePlayer {
+    pub fn file_player(&self) -> &AudioFilePlayer {
+        &self.player
+    }
+    pub fn file_player_mut(&mut self) -> &mut AudioFilePlayer {
         &mut self.player
     }
-
-    /// Access to our sampel pool.
-    pub fn sample_pool(&mut self) -> &mut SamplePool {
-        &mut self.sample_pool
-    }
-
+    
     /// true when events are dumped to stdout while playing them.
     pub fn show_events(&self) -> bool {
         self.show_events
@@ -226,7 +230,7 @@ impl SamplePlayer {
                                 let playback_options = FilePlaybackOptions::default()
                                     .speed(speed_from_note(note_event.note as u8));
                                 let playback_sample_rate = self.player.output_sample_rate();
-                                if let Some(mut sample) = self.sample_pool.get_sample(
+                                if let Some(mut sample) = self.sample_pool.try_read().unwrap().get_sample(
                                     instrument,
                                     playback_options,
                                     playback_sample_rate,

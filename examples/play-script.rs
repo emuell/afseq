@@ -2,7 +2,7 @@ use std::{
     path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock,
     },
 };
 
@@ -14,17 +14,19 @@ use notify::{RecursiveMode, Watcher};
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // create event player
-    let mut player = SamplePlayer::new(None)?;
-
+    
     // preload samples
-    let KICK = player.sample_pool().load_sample("assets/kick.wav")?;
-    let SNARE = player.sample_pool().load_sample("assets/snare.wav")?;
-    let HIHAT = player.sample_pool().load_sample("assets/hihat.wav")?;
-    let BASS = player.sample_pool().load_sample("assets/bass.wav")?;
-    let SYNTH = player.sample_pool().load_sample("assets/synth.wav")?;
-    let TONE = player.sample_pool().load_sample("assets/tone.wav")?;
-    let FX = player.sample_pool().load_sample("assets/fx.wav")?;
+    let sample_pool = SamplePool::new();
+    let KICK = sample_pool.load_sample("assets/kick.wav")?;
+    let SNARE = sample_pool.load_sample("assets/snare.wav")?;
+    let HIHAT = sample_pool.load_sample("assets/hihat.wav")?;
+    let BASS = sample_pool.load_sample("assets/bass.wav")?;
+    let SYNTH = sample_pool.load_sample("assets/synth.wav")?;
+    let TONE = sample_pool.load_sample("assets/tone.wav")?;
+    let FX = sample_pool.load_sample("assets/fx.wav")?;
+    
+    // create event player
+    let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
 
     // set default time base config
     let beat_time = BeatTimeBase {
