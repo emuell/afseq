@@ -43,76 +43,84 @@ pub fn new_engine() -> Engine {
 
 // -------------------------------------------------------------------------------------------------
 
-// evaluate a script which creates and returns a Rhai rhythm to a Rust rhythm,
-// returning a fallback rhythm on errors
+// evaluate a script which creates and returns a Rhai rhythm to a Rust rhythm
 pub fn new_rhythm_from_script(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     file_name: &str,
+) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
+    // create a new engine
+    let mut engine = new_engine();
+    bindings::register(&mut engine, time_base, Some(instrument));
+
+    // compile and evaluate script
+    let ast = engine.compile_file(PathBuf::from(file_name))?;
+    let result = engine.eval_ast::<Dynamic>(&ast)?;
+
+    // hande script result
+    if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
+        Ok(Box::new(beat_time_rhythm))
+    } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
+        Ok(Box::new(second_time_rhythm))
+    } else {
+        Err(EvalAltResult::ErrorMismatchDataType(
+            "Rhythm".to_string(),
+            result.type_name().to_string(),
+            rhai::Position::new(1, 1),
+        )
+        .into())
+    }
+}// evaluate a script which creates and returns a Rhai rhythm to a Rust rhythm,
+// returning a fallback rhythm on errors
+pub fn new_rhythm_from_script_with_fallback(
+    instrument: InstrumentId,
+    time_base: BeatTimeBase,
+    file_name: &str,
 ) -> Box<dyn Rhythm> {
-    let do_load = || -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-        // create a new engine
-        let mut engine = new_engine();
-        bindings::register(&mut engine, time_base, Some(instrument));
-
-        // compile and evaluate script
-        let ast = engine.compile_file(PathBuf::from(file_name))?;
-        let result = engine.eval_ast::<Dynamic>(&ast)?;
-
-        // hande script result
-        if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-            Ok(Box::new(beat_time_rhythm))
-        } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
-            Ok(Box::new(second_time_rhythm))
-        } else {
-            Err(EvalAltResult::ErrorMismatchDataType(
-                "Rhythm".to_string(),
-                result.type_name().to_string(),
-                rhai::Position::new(1, 1),
-            )
-            .into())
-        }
-    };
-
-    do_load().unwrap_or_else(|err| {
+    new_rhythm_from_script(instrument, time_base, file_name).unwrap_or_else(|err| {
         println!("script '{}' failed to compile: {}", file_name, err);
         Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
     })
 }
 
+// evaluate an expression which creates and returns a Rhai rhythm to a Rust rhythm
+pub fn new_rhythm_from_expression(
+    instrument: InstrumentId,
+    time_base: BeatTimeBase,
+    expression: &str,
+) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
+    // create a new engine
+    let mut engine = new_engine();
+    bindings::register(&mut engine, time_base, Some(instrument));
+
+    // compile and evaluate script
+    let ast = engine.compile_expression(expression)?;
+    let result = engine.eval_ast::<Dynamic>(&ast)?;
+
+    // hande script result
+    if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
+        Ok(Box::new(beat_time_rhythm))
+    } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
+        Ok(Box::new(second_time_rhythm))
+    } else {
+        Err(EvalAltResult::ErrorMismatchDataType(
+            "Rhythm".to_string(),
+            result.type_name().to_string(),
+            rhai::Position::new(1, 1),
+        )
+        .into())
+    }
+}
+
 // evaluate an expression which creates and returns a Rhai rhythm to a Rust rhythm,
 // returning a fallback rhythm on errors
-pub fn new_rhythm_from_expression(
+pub fn new_rhythm_from_expression_with_fallback(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     expression: &str,
     expression_identifier: &str,
 ) -> Box<dyn Rhythm> {
-    let do_load = || -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-        // create a new engine
-        let mut engine = new_engine();
-        bindings::register(&mut engine, time_base, Some(instrument));
-
-        // compile and evaluate script
-        let ast = engine.compile_expression(expression)?;
-        let result = engine.eval_ast::<Dynamic>(&ast)?;
-
-        // hande script result
-        if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-            Ok(Box::new(beat_time_rhythm))
-        } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
-            Ok(Box::new(second_time_rhythm))
-        } else {
-            Err(EvalAltResult::ErrorMismatchDataType(
-                "Rhythm".to_string(),
-                result.type_name().to_string(),
-                rhai::Position::new(1, 1),
-            )
-            .into())
-        }
-    };
-
-    do_load().unwrap_or_else(|err| {
+    new_rhythm_from_expression(instrument, time_base, expression).unwrap_or_else(|err| {
         println!(
             "script '{}' failed to compile: {}",
             expression_identifier, err
