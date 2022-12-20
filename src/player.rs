@@ -1,6 +1,9 @@
 //! Example player implementation, which plays back a `Phrase` via the `afplay` crate.
 use crossbeam_channel::Sender;
-use std::{collections::HashMap, sync::{RwLock, Arc}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
@@ -22,9 +25,9 @@ use crate::{
 ///
 /// When files are accessed, the stored file sources are cloned, which avoids loading and decoding
 /// the files again. Cloned FileSources are using a shared Buffer, so cloning is very cheap.
-/// 
-/// Uses a RefCell to maintain the internal list of samples, so the pool can be accessed as non mut 
-/// ref via a RWLock by the player. Only one thread may load new samples though and multiple other 
+///
+/// Uses a RefCell to maintain the internal list of samples, so the pool can be accessed as non mut
+/// ref via a RWLock by the player. Only one thread may load new samples though and multiple other
 /// threads may access them.
 #[derive(Default)]
 pub struct SamplePool {
@@ -46,7 +49,8 @@ impl SamplePool {
         playback_options: FilePlaybackOptions,
         playback_sample_rate: u32,
     ) -> Option<PreloadedFileSource> {
-        self.pool.try_read().unwrap().get(&id).map(|sample| {
+        let pool = self.pool.read().expect("Failed to access sample pool");
+        pool.get(&id).map(|sample| {
             sample
                 .clone(playback_options, playback_sample_rate)
                 .expect("Failed to clone sample file")
@@ -59,7 +63,8 @@ impl SamplePool {
         let sample =
             PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
         let id = unique_instrument_id();
-        self.pool.try_write().unwrap().insert(id, sample);
+        let mut pool = self.pool.write().expect("Failed to access sample pool");
+        pool.insert(id, sample);
         Ok(id)
     }
 }
@@ -79,7 +84,7 @@ pub enum NewNoteAction {
 
 /// An simple example player implementation, which plays back a `Phrase` via the `afplay` crate
 /// using the default audio output device using plain samples loaded from a file as instruments.
-/// 
+///
 /// Works on an existing sample pool, which can be used outside of the player as well.
 pub struct SamplePlayer {
     player: AudioFilePlayer,
@@ -116,7 +121,7 @@ impl SamplePlayer {
     pub fn file_player_mut(&mut self) -> &mut AudioFilePlayer {
         &mut self.player
     }
-    
+
     /// true when events are dumped to stdout while playing them.
     pub fn show_events(&self) -> bool {
         self.show_events
@@ -220,7 +225,7 @@ impl SamplePlayer {
                                         *playback_id,
                                         start_offset + sample_time,
                                     )
-                                    .unwrap();
+                                    .expect("Failed to stop sample source");
                                 playing_notes_in_rhythm.remove(&voice_index);
                             }
                         }
@@ -230,7 +235,11 @@ impl SamplePlayer {
                                 let playback_options = FilePlaybackOptions::default()
                                     .speed(speed_from_note(note_event.note as u8));
                                 let playback_sample_rate = self.player.output_sample_rate();
-                                if let Some(mut sample) = self.sample_pool.try_read().unwrap().get_sample(
+                                let sample_pool = self
+                                    .sample_pool
+                                    .read()
+                                    .expect("Failed to access sample pool");
+                                if let Some(mut sample) = sample_pool.get_sample(
                                     instrument,
                                     playback_options,
                                     playback_sample_rate,
@@ -239,7 +248,7 @@ impl SamplePlayer {
                                     let playback_id = self
                                         .player
                                         .play_file_source(sample, Some(start_offset + sample_time))
-                                        .unwrap();
+                                        .expect("Failed to play file source");
                                     playing_notes_in_rhythm
                                         .insert(voice_index, (playback_id, note_event.note));
                                 }
