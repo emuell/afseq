@@ -44,7 +44,7 @@ pub fn new_engine() -> Engine {
 // -------------------------------------------------------------------------------------------------
 
 // evaluate a script which creates and returns a Rhai rhythm to a Rust rhythm
-pub fn new_rhythm_from_script(
+pub fn new_rhythm_from_file(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     file_name: &str,
@@ -70,31 +70,33 @@ pub fn new_rhythm_from_script(
         )
         .into())
     }
-}// evaluate a script which creates and returns a Rhai rhythm to a Rust rhythm,
+}
+
+// evaluate a script which creates and returns a Rhai rhythm to a Rust rhythm,
 // returning a fallback rhythm on errors
-pub fn new_rhythm_from_script_with_fallback(
+pub fn new_rhythm_from_file_with_fallback(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     file_name: &str,
 ) -> Box<dyn Rhythm> {
-    new_rhythm_from_script(instrument, time_base, file_name).unwrap_or_else(|err| {
+    new_rhythm_from_file(instrument, time_base, file_name).unwrap_or_else(|err| {
         println!("script '{}' failed to compile: {}", file_name, err);
         Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
     })
 }
 
 // evaluate an expression which creates and returns a Rhai rhythm to a Rust rhythm
-pub fn new_rhythm_from_expression(
+pub fn new_rhythm_from_string(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
-    expression: &str,
+    script: &str,
 ) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
     // create a new engine
     let mut engine = new_engine();
     bindings::register(&mut engine, time_base, Some(instrument));
 
     // compile and evaluate script
-    let ast = engine.compile_expression(expression)?;
+    let ast = engine.compile(script)?;
     let result = engine.eval_ast::<Dynamic>(&ast)?;
 
     // hande script result
@@ -114,13 +116,13 @@ pub fn new_rhythm_from_expression(
 
 // evaluate an expression which creates and returns a Rhai rhythm to a Rust rhythm,
 // returning a fallback rhythm on errors
-pub fn new_rhythm_from_expression_with_fallback(
+pub fn new_rhythm_from_string_with_fallback(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     expression: &str,
     expression_identifier: &str,
 ) -> Box<dyn Rhythm> {
-    new_rhythm_from_expression(instrument, time_base, expression).unwrap_or_else(|err| {
+    new_rhythm_from_string(instrument, time_base, expression).unwrap_or_else(|err| {
         println!(
             "script '{}' failed to compile: {}",
             expression_identifier, err

@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         // build final phrase
         let load = |id: InstrumentId, file_name: &str| {
-            bindings::new_rhythm_from_script_with_fallback(
+            bindings::new_rhythm_from_file_with_fallback(
                 id,
                 beat_time,
                 format!("./assets/{file_name}").as_str(),
