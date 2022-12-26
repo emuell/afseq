@@ -32,7 +32,7 @@ impl ScriptedEventIter {
         // create a new engine
         let engine = new_engine();
         // compile AST from the callback context's source
-        let source_file = context.source();
+        let source_file = context.global_runtime_state().source();
         if let Some(source_file) = source_file {
             let ast = context.engine().compile_file(PathBuf::from(source_file))?;
             // immediately fetch/evaluate the first event, so we can immediately show errors

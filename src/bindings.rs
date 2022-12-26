@@ -1,6 +1,6 @@
 //! Rhai script bindings for the entire crate.
 
-use std::path::PathBuf;
+use std::{fs::{File, remove_file}, io::Write, path::PathBuf, env::temp_dir};
 
 use crate::prelude::*;
 use crate::{
@@ -91,27 +91,20 @@ pub fn new_rhythm_from_string(
     time_base: BeatTimeBase,
     script: &str,
 ) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-    // create a new engine
-    let mut engine = new_engine();
-    bindings::register(&mut engine, time_base, Some(instrument));
 
-    // compile and evaluate script
-    let ast = engine.compile(script)?;
-    let result = engine.eval_ast::<Dynamic>(&ast)?;
+    // HACK: Need to write the string to a file, so ScriptedEventIter can resolve functions
+    let mut temp_file_name = temp_dir();
+    temp_file_name.push("afseq/");
+    std::fs::create_dir_all(temp_file_name.clone())?;
+    temp_file_name.push(format!("{}.rhai", uuid::Uuid::new_v4()));
 
-    // hande script result
-    if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-        Ok(Box::new(beat_time_rhythm))
-    } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
-        Ok(Box::new(second_time_rhythm))
-    } else {
-        Err(EvalAltResult::ErrorMismatchDataType(
-            "Rhythm".to_string(),
-            result.type_name().to_string(),
-            rhai::Position::new(1, 1),
-        )
-        .into())
-    }
+    let result = {
+        let file = &mut File::create(temp_file_name.clone())?;
+        file.write_all(script.as_bytes())?;
+        new_rhythm_from_file(instrument, time_base, &temp_file_name.to_string_lossy())
+    };
+    remove_file(temp_file_name)?;
+    result
 }
 
 // evaluate an expression which creates and returns a Rhai rhythm to a Rust rhythm,
