@@ -242,7 +242,7 @@ impl fmt::Debug for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Event::NoteEvents(note_vector) => f.write_fmt(format_args!(
-                "{:?}",
+                "{}",
                 note_vector
                     .iter()
                     .map(|n| if let Some(v) = n {
