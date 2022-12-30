@@ -11,10 +11,12 @@ categories = ["audio", "player", "sequencer"]
 paste = { version = "1.0.9"}
 derive_more = { version = "0.99.17" }
 crossbeam-channel = { version = "0.5.6" }
+string-error = { version = "0.1.0" }
+serde = { version = "1.0.152" }
+serde_json = { version = "1.0.91" }
 uuid = {version = "1.2.2", features = [ "v4", "fast-rng" ]}
 rust-music-theory = { version = "0.2.0" }
-rhai = { version = "1.10.1", optional = true, features = ["metadata", "internals"] }
-rhai-sci = { version = "0.1.7", optional = true }       
+rhai = { version = "1.11.0", optional = true, features = ["metadata", "internals", "serde"] }
 rhai-rand = { version = "0.1.4", optional = true }
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"], optional = true }
 
@@ -26,7 +28,7 @@ lazy_static = { version = "1.4.0" }
 debug = 1
 
 [features]
-scripting = ["rhai", "rhai-sci", "rhai-rand"]
+scripting = ["rhai", "rhai-rand"]
 player = ["afplay"]
 default = ["scripting", "player"]
 

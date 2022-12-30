@@ -1,6 +1,11 @@
 //! Rhai script bindings for the entire crate.
 
-use std::{fs::{File, remove_file}, io::Write, path::PathBuf, env::temp_dir};
+use std::{
+    env::temp_dir,
+    fs::{remove_file, File},
+    io::Write,
+    path::PathBuf,
+};
 
 use crate::prelude::*;
 use crate::{
@@ -14,7 +19,6 @@ use rhai::{
 };
 
 use rhai_rand::RandomPackage;
-use rhai_sci::SciPackage;
 
 use rust_music_theory::{note::Notes, scale};
 
@@ -33,12 +37,115 @@ pub fn new_engine() -> Engine {
     engine.set_max_expr_depths(1000, 1000);
 
     // load default packages
-    let sci = SciPackage::new();
-    sci.register_into_engine(&mut engine);
     let rand = RandomPackage::new();
     rand.register_into_engine(&mut engine);
 
     engine
+}
+
+// -------------------------------------------------------------------------------------------------
+pub struct FnMetaDataParam {
+    pub name: Option<String>,
+    pub type_: Option<String>,
+}
+
+pub struct FnMetaData {
+    pub namespace: String,
+    pub doc_comments: Vec<String>,
+    pub signature: String,
+    pub name: String,
+    pub num_params: usize,
+    pub params: Vec<FnMetaDataParam>,
+    pub return_type: String,
+}
+
+pub fn registered_functions(
+    engine: &Engine,
+) -> Result<Vec<FnMetaData>, Box<dyn std::error::Error>> {
+    let include_standard_packages = false;
+    // dump metadata json: see https://rhai.rs/book/engine/metadata/export_to_json.html
+    let string = engine.gen_fn_metadata_to_json(include_standard_packages)?;
+    // deserialize from json, all other meta data access is private
+    let value: serde_json::Value = serde_json::from_str(&string)?;
+    let mut metadata = Vec::new();
+    if let Some(array) = value["functions"].as_array() {
+        for array_item in array.iter() {
+            let get_string = move |name| {
+                if let Some(value) = array_item.get(name) {
+                    value.as_str().unwrap_or("").to_string()
+                } else {
+                    "".to_string()
+                }
+            };
+            let get_string_list = move |name| {
+                if let Some(value) = array_item.get(name) {
+                    let mut strings = Vec::new();
+                    for iter in value.as_array().unwrap_or(&Vec::new()) {
+                        strings.push(iter.as_str().unwrap_or("").to_string())
+                    }
+                    strings
+                } else {
+                    Vec::new()
+                }
+            };
+            let get_number = move |name| {
+                if let Some(value) = array_item.get(name) {
+                    value.as_u64().unwrap_or(0_u64) as usize
+                } else {
+                    0_usize
+                }
+            };
+            let get_params = move || -> Result<Vec<FnMetaDataParam>, Box<dyn std::error::Error>> {
+                if let Some(value) = array_item.get("params") {
+                    let mut result: Vec<FnMetaDataParam> = Vec::new();
+                    let array = value
+                        .as_array()
+                        .ok_or_else(|| string_error::new_err("Unexpected params array object"))?;
+                    for item in array {
+                        let object = item
+                            .as_object()
+                            .ok_or_else(|| string_error::new_err("Unexpected params array item"))?;
+                        let mut param_name = None;
+                        if let Some(name) = object.get("name") {
+                            param_name = Some(name.as_str().unwrap_or("").to_string());
+                        }
+                        let mut param_type = None;
+                        if let Some(type_) = object.get("type") {
+                            param_type = Some(type_.as_str().unwrap_or("").to_string());
+                        }
+                        result.push(FnMetaDataParam {
+                            name: param_name,
+                            type_: param_type,
+                        });
+                    }
+                    Ok(result)
+                } else {
+                    Ok(Vec::new())
+                }
+            };
+            // only include public functions
+            if get_string("access") == "public" && get_string("type") == "native" {
+                metadata.push(FnMetaData {
+                    namespace: get_string("namespace"),
+                    doc_comments: get_string_list("docComments"),
+                    signature: get_string("signature"),
+                    name: get_string("name"),
+                    return_type: get_string("returnType"),
+                    num_params: get_number("numParams"),
+                    params: get_params()?,
+                });
+            } else {
+                debug_assert!(
+                    false,
+                    "Unexpected internal script function: {:?}",
+                    array_item
+                );
+            }
+        }
+        Ok(metadata)
+    } else {
+        Err(string_error::static_err("Unexpected meta data JSON"))
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -80,7 +187,7 @@ pub fn new_rhythm_from_file_with_fallback(
     file_name: &str,
 ) -> Box<dyn Rhythm> {
     new_rhythm_from_file(instrument, time_base, file_name).unwrap_or_else(|err| {
-        println!("script '{}' failed to compile: {}", file_name, err);
+        println!("Script '{}' failed to compile: {}", file_name, err);
         Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
     })
 }
@@ -91,7 +198,6 @@ pub fn new_rhythm_from_string(
     time_base: BeatTimeBase,
     script: &str,
 ) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
-
     // HACK: Need to write the string to a file, so ScriptedEventIter can resolve functions
     let mut temp_file_name = temp_dir();
     temp_file_name.push("afseq/");
@@ -117,7 +223,7 @@ pub fn new_rhythm_from_string_with_fallback(
 ) -> Box<dyn Rhythm> {
     new_rhythm_from_string(instrument, time_base, expression).unwrap_or_else(|err| {
         println!(
-            "script '{}' failed to compile: {}",
+            "Script '{}' failed to compile: {}",
             expression_identifier, err
         );
         Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
@@ -873,6 +979,23 @@ mod test {
             eval_default_instrument(&engine).unwrap(),
             Some(InstrumentId::from(76))
         );
+    }
+
+    #[test]
+    fn registered_functions() {
+        // create a new engine and register bindings
+        let mut engine = new_engine();
+        register(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 160.0,
+                beats_per_bar: 6,
+                samples_per_sec: 96000,
+            },
+            Some(InstrumentId::from(76)),
+        );
+
+        assert!(super::registered_functions(&engine).is_ok());
     }
 
     #[test]
