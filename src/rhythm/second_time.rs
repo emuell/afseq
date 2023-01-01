@@ -133,7 +133,7 @@ impl Iterator for SecondTimeRhythm {
 
 impl Rhythm for SecondTimeRhythm {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
-        Box::new(self.time_base.clone())
+        Box::new(self.time_base)
     }
 
     fn reset(&mut self) {
