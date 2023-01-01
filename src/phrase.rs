@@ -74,6 +74,9 @@ impl Phrase {
             if *sample_time < run_until_time {
                 consumer(*rhythm_index, *sample_time, event);
                 self.held_back_event = None;
+            } else {
+                // held back event is not yet due
+                return;
             }
         }
         // then emit next events until we've reached the desired sample_time

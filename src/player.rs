@@ -14,7 +14,7 @@ use afplay::{
 use crate::{
     event::{unique_instrument_id, InstrumentId},
     time::TimeBase,
-    Event, Note, Phrase, SampleTime,
+    Event, Note, Phrase, Rhythm, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -162,31 +162,27 @@ impl SamplePlayer {
         self.player
             .stop_all_sources()
             .expect("failed to stop all playing samples");
-        // start playing at the player's current time with a little delay to avoid clicks
-        let start_delay = self.player.output_sample_rate() as u64 / 8;
+        // fetch player's actual position and use it as start offset
         let start_offset = self.player.output_sample_frame_position();
         // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
         let mut emitted_sample_time: u64 = 0;
-        loop {
-            const PRELOAD_SECONDS: f64 = 2.0;
+        while !stop_fn() {
+            const PRELOAD_SECONDS: f64 = 0.25;
             let seconds_emitted = time_base.samples_to_seconds(emitted_sample_time);
             let seconds_played = time_base
                 .samples_to_seconds(self.player.output_sample_frame_position() - start_offset);
             let seconds_to_emit = seconds_played - seconds_emitted + PRELOAD_SECONDS;
 
-            if seconds_to_emit > 1.0 {
+            if seconds_to_emit >= PRELOAD_SECONDS || emitted_sample_time == 0 {
                 let samples_to_emit = time_base.seconds_to_samples(seconds_to_emit);
                 self.run_phrase_until_time(
                     phrase,
-                    start_offset + start_delay,
+                    start_offset,
                     emitted_sample_time + samples_to_emit,
                 );
                 emitted_sample_time += samples_to_emit;
             } else {
-                if stop_fn() {
-                    break;
-                }
-                let sleep_amount = (1.0 - seconds_to_emit).max(0.0);
+                let sleep_amount = (PRELOAD_SECONDS - seconds_to_emit).max(0.0);
                 std::thread::sleep(std::time::Duration::from_secs_f64(sleep_amount));
             }
         }
@@ -198,12 +194,13 @@ impl SamplePlayer {
         start_offset: SampleTime,
         sample_time: SampleTime,
     ) {
+        let time_display = phrase.time_display();
         phrase.run_until_time(sample_time, |rhythm_index, sample_time, event| {
             // print
             if self.show_events {
                 println!(
-                    "{:08} -> {}",
-                    sample_time,
+                    "{} | {}",
+                    time_display.display(sample_time),
                     match event {
                         Some(event) => format!("{:?}", event),
                         None => "---".to_string(),
