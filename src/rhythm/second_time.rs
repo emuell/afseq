@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter},
-    time::{SecondTimeBase, SecondTimeStep, TimeBase},
+    time::{SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
     Rhythm, SampleTime,
 };
 
@@ -132,6 +132,10 @@ impl Iterator for SecondTimeRhythm {
 }
 
 impl Rhythm for SecondTimeRhythm {
+    fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
+        Box::new(self.time_base.clone())
+    }
+
     fn reset(&mut self) {
         self.event_iter.borrow_mut().reset();
         self.event_iter_sample_time = self.time_base.samples_per_second() as f64 * self.offset;

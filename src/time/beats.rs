@@ -1,4 +1,8 @@
-use crate::{rhythm::beat_time::BeatTimeRhythm, time::TimeBase};
+use crate::{
+    rhythm::beat_time::BeatTimeRhythm,
+    time::{SampleTimeDisplay, TimeBase},
+    SampleTime,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -24,6 +28,19 @@ impl BeatTimeBase {
 impl TimeBase for BeatTimeBase {
     fn samples_per_second(&self) -> u32 {
         self.samples_per_sec
+    }
+}
+
+impl SampleTimeDisplay for BeatTimeBase {
+    /// generate a bar.beat.ppq string representation of the the given sample time
+    fn display(&self, sample_time: SampleTime) -> String {
+        let total_beats = sample_time as u64 / self.samples_per_beat() as u64;
+        let total_beats_f = sample_time as f64 / self.samples_per_beat();
+        let beat_frations = total_beats_f - total_beats as f64;
+        let bars = total_beats / self.beats_per_bar as u64;
+        let beats = total_beats - self.beats_per_bar as u64 * bars;
+        let ppq = (beat_frations * 960.0 + 0.5) as u64;
+        format!("{}.{}.{:03}", bars + 1, beats + 1, ppq)
     }
 }
 

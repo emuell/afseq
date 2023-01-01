@@ -5,7 +5,9 @@ use std::{
     rc::Rc,
 };
 
-use crate::{event::Event, prelude::BeatTimeStep, BeatTimeBase, Rhythm, SampleTime};
+use crate::{
+    event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm, SampleTime,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -140,6 +142,10 @@ impl Iterator for Phrase {
 }
 
 impl Rhythm for Phrase {
+    fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
+        Box::new(self.time_base.clone())
+    }
+
     fn reset(&mut self) {
         // reset our own iter state
         self.next_events.fill(None);

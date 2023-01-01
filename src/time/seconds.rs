@@ -1,4 +1,8 @@
-use crate::{rhythm::second_time::SecondTimeRhythm, time::TimeBase};
+use crate::{
+    rhythm::second_time::SecondTimeRhythm,
+    time::{SampleTimeDisplay, TimeBase},
+    SampleTime,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -11,6 +15,13 @@ pub struct SecondTimeBase {
 impl TimeBase for SecondTimeBase {
     fn samples_per_second(&self) -> u32 {
         self.samples_per_sec
+    }
+}
+
+impl SampleTimeDisplay for SecondTimeBase {
+    /// generate a second string representation of the the given sample time
+    fn display(&self, sample_time: SampleTime) -> String {
+        format!("{}s", sample_time as f32 / self.samples_per_second() as f32)
     }
 }
 

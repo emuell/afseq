@@ -13,6 +13,14 @@ pub type SampleTime = u64;
 
 // -------------------------------------------------------------------------------------------------
 
+/// Displays sample times as strings in various formats
+pub trait SampleTimeDisplay {
+    /// generate a string representation of the the given sample time
+    fn display(&self, sample_time: SampleTime) -> String;
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Basic time trait, providing samples <-> second rate conversion only.
 pub trait TimeBase {
     /// Sample rate for the time base.  
