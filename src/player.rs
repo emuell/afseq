@@ -2,7 +2,8 @@
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock}, time::Duration,
+    sync::{Arc, RwLock},
+    time::Duration,
 };
 
 use afplay::{
@@ -228,12 +229,12 @@ impl SamplePlayer {
                             if self.new_note_action == NewNoteAction::Stop
                                 || note_event.note.is_note_off()
                             {
-                                self.player
-                                    .stop_source_at_sample_time(
-                                        *playback_id,
-                                        start_offset + sample_time,
-                                    )
-                                    .expect("Failed to stop sample source");
+                                if let Err(_err) = self.player.stop_source_at_sample_time(
+                                    *playback_id,
+                                    start_offset + sample_time,
+                                ) {
+                                    // this is expected when the sample played to end
+                                }
                                 playing_notes_in_rhythm.remove(&voice_index);
                             }
                         }
