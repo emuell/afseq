@@ -2,7 +2,7 @@
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock}, time::Duration,
 };
 
 use afplay::{
@@ -91,6 +91,7 @@ pub struct SamplePlayer {
     sample_pool: Arc<RwLock<SamplePool>>,
     playing_notes: Vec<HashMap<usize, (AudioFilePlaybackId, Note)>>,
     new_note_action: NewNoteAction,
+    playback_pos_emit_rate: Duration,
     show_events: bool,
 }
 
@@ -104,12 +105,14 @@ impl SamplePlayer {
         let player = AudioFilePlayer::new(audio_output.sink(), playback_status_sender);
         let playing_notes = Vec::new();
         let new_note_action = NewNoteAction::Continue;
+        let playback_pos_emit_rate = Duration::from_secs(1);
         let show_events = false;
         Ok(Self {
             player,
             sample_pool,
             playing_notes,
             new_note_action,
+            playback_pos_emit_rate,
             show_events,
         })
     }
@@ -129,6 +132,14 @@ impl SamplePlayer {
     /// by default false: set to true to dump events to stdout while playing them.
     pub fn set_show_events(&mut self, show: bool) {
         self.show_events = show;
+    }
+
+    /// playback pos emit rate of triggered files. by default one second.
+    pub fn playback_pos_emit_rate(&self) -> Duration {
+        self.playback_pos_emit_rate
+    }
+    pub fn set_playback_pos_emit_rate(&mut self, emit_rate: Duration) {
+        self.playback_pos_emit_rate = emit_rate;
     }
 
     /// get current new note action behaviour.
@@ -230,7 +241,8 @@ impl SamplePlayer {
                         if note_event.note.is_note_on() {
                             if let Some(instrument) = note_event.instrument {
                                 let playback_options = FilePlaybackOptions::default()
-                                    .speed(speed_from_note(note_event.note as u8));
+                                    .speed(speed_from_note(note_event.note as u8))
+                                    .playback_pos_emit_rate(self.playback_pos_emit_rate);
                                 let playback_sample_rate = self.player.output_sample_rate();
                                 let sample_pool = self
                                     .sample_pool
