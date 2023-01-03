@@ -111,7 +111,7 @@ impl Iterator for ScriptedEventIter {
             Ok(event) => Some(event),
             Err(err) => {
                 self.event = None;
-                println!(
+                log::warn!(
                     "Failed to run custom event emitter func '{}': {}",
                     self.function.fn_name(),
                     err

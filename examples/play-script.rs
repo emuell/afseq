@@ -6,15 +6,26 @@ use std::{
     },
 };
 
-use afseq::prelude::*;
-
 use notify::{RecursiveMode, Watcher};
+use simplelog::*;
+
+use afseq::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    
+    // init logging
+    TermLogger::init(
+        log::STATIC_MAX_LEVEL,
+        ConfigBuilder::default().build(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .unwrap_or_else(|err| {
+        log::error!("init_logger error: {:?}", err);
+    });
+
     // preload samples
     let sample_pool = SamplePool::new();
     let KICK = sample_pool.load_sample("assets/kick.wav")?;
@@ -24,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let SYNTH = sample_pool.load_sample("assets/synth.wav")?;
     let TONE = sample_pool.load_sample("assets/tone.wav")?;
     let FX = sample_pool.load_sample("assets/fx.wav")?;
-    
+
     // create event player
     let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
 
@@ -42,10 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let script_files_changed = script_files_changed.clone();
         move |res| match res {
             Ok(event) => {
-                println!("File change event: {:?}", event);
+                log::info!("File change event: {:?}", event);
                 script_files_changed.store(true, Ordering::Relaxed);
             }
-            Err(e) => println!("File watch error: {:?}", e),
+            Err(err) => log::error!("File watch error: {}", err),
         }
     })?;
     watcher.watch(Path::new("./assets"), RecursiveMode::Recursive)?;
@@ -78,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             move || {
                 if script_files_changed.load(Ordering::Relaxed) {
                     script_files_changed.store(false, Ordering::Relaxed);
-                    println!("Rebuilding all rhythms...");
+                    log::info!("Rebuilding all rhythms...");
                     true
                 } else {
                     false

@@ -1,11 +1,23 @@
-use std::sync::{RwLock, Arc};
+use std::sync::{Arc, RwLock};
 
 use rust_music_theory::{note::Notes, scale};
+use simplelog::*;
 
 use afseq::prelude::*;
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // init logging
+    TermLogger::init(
+        log::STATIC_MAX_LEVEL,
+        ConfigBuilder::default().build(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .unwrap_or_else(|err| {
+        log::error!("init_logger error: {:?}", err);
+    });
+
     // preload samples
     let sample_pool = SamplePool::new();
     let KICK = sample_pool.load_sample("assets/kick.wav")?;
