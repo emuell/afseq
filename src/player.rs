@@ -8,8 +8,8 @@ use std::{
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlaybackStatusEvent, AudioFilePlayer, AudioOutput, DefaultAudioOutput, Error,
-    FilePlaybackOptions,
+    AudioFilePlaybackStatusContext, AudioFilePlaybackStatusEvent, AudioFilePlayer, AudioOutput,
+    DefaultAudioOutput, Error, FilePlaybackOptions,
 };
 
 use crate::{
@@ -79,6 +79,29 @@ pub enum NewNoteAction {
     Continue,
     /// Stop the playing note before starting a new one.
     Stop,
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Context, passed along serialized when triggering new notes from the sample player.   
+#[derive(Clone)]
+pub struct SamplePlaybackContext {
+    pub rhythm_index: isize,
+    pub voice_index: isize,
+}
+
+impl SamplePlaybackContext {
+    pub fn from_event(context: Option<AudioFilePlaybackStatusContext>) -> Self {
+        if let Some(context) = context {
+            if let Some(context) = context.downcast_ref::<SamplePlaybackContext>() {
+                return context.clone();
+            }
+        }
+        SamplePlaybackContext {
+            rhythm_index: -1,
+            voice_index: -1,
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -255,9 +278,17 @@ impl SamplePlayer {
                                     playback_sample_rate,
                                 ) {
                                     sample.set_volume(note_event.velocity);
+                                    let context = Arc::new(SamplePlaybackContext {
+                                        rhythm_index: rhythm_index as isize,
+                                        voice_index: voice_index as isize,
+                                    });
                                     let playback_id = self
                                         .player
-                                        .play_file_source(sample, Some(start_offset + sample_time))
+                                        .play_file_source_with_context(
+                                            sample,
+                                            Some(start_offset + sample_time),
+                                            Some(context),
+                                        )
                                         .expect("Failed to play file source");
                                     playing_notes_in_rhythm
                                         .insert(voice_index, (playback_id, note_event.note));
