@@ -187,7 +187,7 @@ pub fn new_rhythm_from_file_with_fallback(
     file_name: &str,
 ) -> Box<dyn Rhythm> {
     new_rhythm_from_file(instrument, time_base, file_name).unwrap_or_else(|err| {
-        println!("Script '{}' failed to compile: {}", file_name, err);
+        log::warn!("Script '{}' failed to compile: {}", file_name, err);
         Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
     })
 }
@@ -222,9 +222,10 @@ pub fn new_rhythm_from_string_with_fallback(
     expression_identifier: &str,
 ) -> Box<dyn Rhythm> {
     new_rhythm_from_string(instrument, time_base, expression).unwrap_or_else(|err| {
-        println!(
+        log::warn!(
             "Script '{}' failed to compile: {}",
-            expression_identifier, err
+            expression_identifier,
+            err
         );
         Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
     })
