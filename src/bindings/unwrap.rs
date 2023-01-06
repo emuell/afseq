@@ -182,7 +182,7 @@ pub fn unwrap_note_event(
     array: Array,
     default_instrument: Option<InstrumentId>,
 ) -> Result<(Option<InstrumentId>, Note, f32), Box<EvalAltResult>> {
-    if !(1..=3).contains(&array.len()) {
+    if !(1..=2).contains(&array.len()) {
         return Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
