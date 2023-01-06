@@ -240,9 +240,10 @@ pub fn register(
     default_instrument: Option<InstrumentId>,
 ) {
     // Defaults
-    engine
-        .register_fn("default_instrument", move || default_instrument)
-        .register_fn("default_beat_time", move || default_time_base);
+    let mut defaults = Module::new();
+    defaults.set_var("DEFAULT_INSTRUMENT", Dynamic::from(default_instrument));
+    defaults.set_var("DEFAULT_BEAT_TIME", Dynamic::from(default_time_base));
+    engine.register_global_module(defaults.into());
 
     // Array Extensions
     let array = exported_module!(array_module);
@@ -268,11 +269,11 @@ pub fn register(
 // ---------------------------------------------------------------------------------------------
 
 fn eval_default_instrument(engine: &Engine) -> Result<Option<InstrumentId>, Box<EvalAltResult>> {
-    engine.eval::<Option<InstrumentId>>("default_instrument()")
+    engine.eval::<Option<InstrumentId>>("DEFAULT_INSTRUMENT")
 }
 
 fn eval_default_beat_time(engine: &Engine) -> Result<BeatTimeBase, Box<EvalAltResult>> {
-    engine.eval::<BeatTimeBase>("default_beat_time()")
+    engine.eval::<BeatTimeBase>("DEFAULT_BEAT_TIME")
 }
 
 // ---------------------------------------------------------------------------------------------
