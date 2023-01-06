@@ -14,7 +14,7 @@ use crate::{
 };
 
 use rhai::{
-    packages::Package, Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString,
+    packages::Package, plugin::*, Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString,
     NativeCallContext, FLOAT, INT,
 };
 
@@ -243,19 +243,25 @@ pub fn register(
         .register_fn("default_instrument", move || default_instrument)
         .register_fn("default_beat_time", move || default_time_base);
 
-    // Std Extensions
-    array::register(engine);
+    // Array Extensions
+    let array = exported_module!(array_module);
+    engine.register_global_module(array.into());
 
     // Globals
-    globals::register(engine);
+    let globals = exported_module!(globals_module);
+    engine.register_global_module(globals.into());
 
     // TimeBase
-    beat_time::register(engine);
-    second_time::register(engine);
+    let beat_time = exported_module!(beat_time_module);
+    engine.register_global_module(beat_time.into());
+    let second_time = exported_module!(second_time_module);
+    engine.register_global_module(second_time.into());
 
     // Rhythm
-    beat_time_rhythm::register(engine);
-    second_time_rhythm::register(engine);
+    let beat_time_rhythm = exported_module!(beat_time_rhythm_module);
+    engine.register_global_module(beat_time_rhythm.into());
+    let second_time_rhythm = exported_module!(second_time_rhythm_module);
+    engine.register_global_module(second_time_rhythm.into());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -270,17 +276,15 @@ fn eval_default_beat_time(engine: &Engine) -> Result<BeatTimeBase, Box<EvalAltRe
 
 // ---------------------------------------------------------------------------------------------
 
-mod array {
+#[export_module]
+mod array_module {
     use super::*;
 
-    pub fn register(engine: &mut Engine) {
-        engine
-            .register_fn("repeat", repeat)
-            .register_fn("reverse", reverse)
-            .register_fn("rotate", rotate);
-    }
-
-    fn repeat(
+    /// Repeats/duplicates an array n times.
+    /// @param count: how many times the array should be repeated
+    /// @return The repeated, duplicated array.
+    #[rhai_fn(name = "repeat", return_raw)]
+    pub fn repeat(
         context: NativeCallContext,
         this: Array,
         count: INT,
@@ -304,11 +308,18 @@ mod array {
         Ok(ret)
     }
 
-    fn reverse(this: Array) -> Array {
+    /// Reverse entries in an array.
+    /// @return A copy of the reversed array.
+    #[rhai_fn(name = "reverse")]
+    pub fn reverse(this: Array) -> Array {
         this.iter().rev().cloned().collect::<Array>()
     }
 
-    fn rotate(this: Array, offset: INT) -> Array {
+    /// Rotate entries in an array.
+    /// param offset positive or negative shifting offset.
+    /// @return A copy of the rotated array.
+    #[rhai_fn(name = "rotate")]
+    pub fn rotate(this: Array, offset: INT) -> Array {
         if this.is_empty() {
             return Array::new();
         }
@@ -325,36 +336,19 @@ mod array {
 
 // ---------------------------------------------------------------------------------------------
 
-mod globals {
+#[export_module]
+mod globals_module {
     use super::*;
 
-    pub fn register(engine: &mut Engine) {
-        engine
-            // time constructors
-            .register_fn("beat_time", default_beat_time)
-            .register_fn("beat_time", beat_time)
-            .register_fn("second_time", second_time)
-            // rhythm constructors
-            .register_fn("euclidian", euclidian_rhythm)
-            .register_fn("euclidian", euclidian_rhythm_with_offset)
-            // note constructors
-            .register_fn("note", note_from_number)
-            .register_fn("note", note_from_string)
-            .register_fn("note", note_from_dynamic)
-            .register_fn("note", note_from_number_with_velocity)
-            .register_fn("note", note_from_string_with_velocity)
-            .register_fn("note", note_from_dynamic_with_velocity)
-            .register_fn("note", note_vec)
-            .register_fn("note_seq", note_vec_seq)
-            // note array constructors
-            .register_fn("notes_in_scale", notes_in_scale);
-    }
-
-    fn default_beat_time(context: NativeCallContext) -> Result<BeatTimeBase, Box<EvalAltResult>> {
+    #[rhai_fn(name = "beat_time", return_raw)]
+    pub fn beat_time_default(
+        context: NativeCallContext,
+    ) -> Result<BeatTimeBase, Box<EvalAltResult>> {
         eval_default_beat_time(context.engine())
     }
 
-    fn beat_time(
+    #[rhai_fn(name = "beat_time", return_raw)]
+    pub fn beat_time(
         context: NativeCallContext,
         beats_per_min: Dynamic,
         beats_per_bar: Dynamic,
@@ -370,14 +364,16 @@ mod globals {
         })
     }
 
-    fn second_time(context: NativeCallContext) -> Result<SecondTimeBase, Box<EvalAltResult>> {
+    #[rhai_fn(name = "second_time", return_raw)]
+    pub fn second_time(context: NativeCallContext) -> Result<SecondTimeBase, Box<EvalAltResult>> {
         let default_beat_time = eval_default_beat_time(context.engine())?;
         Ok(SecondTimeBase {
             samples_per_sec: default_beat_time.samples_per_sec,
         })
     }
 
-    fn note_from_dynamic(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_from_dynamic(
         context: NativeCallContext,
         d: Dynamic,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -402,7 +398,8 @@ mod globals {
         }
     }
 
-    fn note_from_string(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_from_string(
         context: NativeCallContext,
         note: ImmutableString,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -419,7 +416,8 @@ mod globals {
         }
     }
 
-    fn note_from_number(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_from_number(
         context: NativeCallContext,
         note: INT,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -432,7 +430,8 @@ mod globals {
         ))
     }
 
-    fn note_from_dynamic_with_velocity(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_from_dynamic_with_velocity(
         context: NativeCallContext,
         d: Dynamic,
         velocity: FLOAT,
@@ -458,7 +457,8 @@ mod globals {
         }
     }
 
-    fn note_from_string_with_velocity(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_from_string_with_velocity(
         context: NativeCallContext,
         note: ImmutableString,
         velocity: FLOAT,
@@ -472,7 +472,8 @@ mod globals {
         ))
     }
 
-    fn note_from_number_with_velocity(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_from_number_with_velocity(
         context: NativeCallContext,
         note: INT,
         velocity: FLOAT,
@@ -486,7 +487,8 @@ mod globals {
         ))
     }
 
-    fn note_vec(
+    #[rhai_fn(name = "note", return_raw)]
+    pub fn note_vec(
         context: NativeCallContext,
         array: Array,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -528,7 +530,8 @@ mod globals {
         Ok(new_polyphonic_note_event(sequence))
     }
 
-    fn note_vec_seq(
+    #[rhai_fn(name = "note_seq", return_raw)]
+    pub fn note_vec_seq(
         context: NativeCallContext,
         array: Array,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -583,7 +586,8 @@ mod globals {
         Ok(new_polyphonic_note_sequence_event(event_sequence))
     }
 
-    fn notes_in_scale(
+    #[rhai_fn(name = "notes_in_scale", return_raw)]
+    pub fn notes_in_scale(
         context: NativeCallContext,
         string: ImmutableString,
     ) -> Result<Array, Box<EvalAltResult>> {
@@ -608,7 +612,8 @@ mod globals {
         }
     }
 
-    fn euclidian_rhythm(
+    #[rhai_fn(name = "euclidian", return_raw)]
+    pub fn euclidian_rhythm(
         context: NativeCallContext,
         pulses: INT,
         steps: INT,
@@ -616,7 +621,8 @@ mod globals {
         euclidian_rhythm_with_offset(context, pulses, steps, 0)
     }
 
-    fn euclidian_rhythm_with_offset(
+    #[rhai_fn(name = "euclidian", return_raw)]
+    pub fn euclidian_rhythm_with_offset(
         context: NativeCallContext,
         pulses: INT,
         steps: INT,
@@ -666,29 +672,20 @@ mod globals {
 
 // ---------------------------------------------------------------------------------------------
 
-mod beat_time {
+#[export_module]
+mod beat_time_module {
     use super::*;
 
-    pub fn register(engine: &mut Engine) {
-        engine
-            .register_fn("every_nth_sixteenth", every_nth_sixteenth)
-            .register_fn("every_sixteenth", every_sixteenth)
-            .register_fn("every_nth_eighth", every_nth_eighth)
-            .register_fn("every_eighth", every_eighth)
-            .register_fn("every_nth_beat", every_nth_beat)
-            .register_fn("every_beat", every_beat)
-            .register_fn("every_nth_bar", every_nth_bar)
-            .register_fn("every_bar", every_bar);
-    }
-
-    fn every_sixteenth(
+    #[rhai_fn(name = "every_sixteenth", return_raw)]
+    pub fn every_sixteenth(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
     ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
         every_nth_sixteenth(context, this, Dynamic::from_float(1.0))
     }
 
-    fn every_nth_sixteenth(
+    #[rhai_fn(name = "every_nth_sixteenth", return_raw)]
+    pub fn every_nth_sixteenth(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
         sixteenth: Dynamic,
@@ -712,14 +709,16 @@ mod beat_time {
         }
     }
 
-    fn every_eighth(
+    #[rhai_fn(name = "every_eighth", return_raw)]
+    pub fn every_eighth(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
     ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
         every_nth_eighth(context, this, Dynamic::from_float(1.0))
     }
 
-    fn every_nth_eighth(
+    #[rhai_fn(name = "every_nth_eighth", return_raw)]
+    pub fn every_nth_eighth(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
         beats: Dynamic,
@@ -743,14 +742,16 @@ mod beat_time {
         }
     }
 
-    fn every_beat(
+    #[rhai_fn(name = "every_beat", return_raw)]
+    pub fn every_beat(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
     ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
         every_nth_beat(context, this, Dynamic::from_float(1.0))
     }
 
-    fn every_nth_beat(
+    #[rhai_fn(name = "every_nth_beat", return_raw)]
+    pub fn every_nth_beat(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
         beats: Dynamic,
@@ -774,14 +775,16 @@ mod beat_time {
         }
     }
 
-    fn every_bar(
+    #[rhai_fn(name = "every_bar", return_raw)]
+    pub fn every_bar(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
     ) -> Result<BeatTimeRhythm, Box<EvalAltResult>> {
         every_nth_bar(context, this, Dynamic::from_float(1.0))
     }
 
-    fn every_nth_bar(
+    #[rhai_fn(name = "every_nth_bar", return_raw)]
+    pub fn every_nth_bar(
         context: NativeCallContext,
         this: &mut BeatTimeBase,
         bars: Dynamic,
@@ -808,14 +811,12 @@ mod beat_time {
 
 // ---------------------------------------------------------------------------------------------
 
-mod second_time {
+#[export_module]
+mod second_time_module {
     use super::*;
 
-    pub fn register(engine: &mut Engine) {
-        engine.register_fn("every_nth_seconds", every_nth_second);
-    }
-
-    fn every_nth_second(
+    #[rhai_fn(name = "every_nth_second", return_raw)]
+    pub fn every_nth_second(
         context: NativeCallContext,
         this: &mut SecondTimeBase,
         seconds: Dynamic,
@@ -842,18 +843,12 @@ mod second_time {
 
 // ---------------------------------------------------------------------------------------------
 
-mod beat_time_rhythm {
+#[export_module]
+mod beat_time_rhythm_module {
     use super::*;
 
-    pub fn register(engine: &mut Engine) {
-        engine
-            .register_fn("with_pattern", with_pattern)
-            .register_fn("with_offset", with_offset)
-            .register_fn("trigger", trigger_fixed_event)
-            .register_fn("trigger", trigger_custom_event);
-    }
-
-    fn with_pattern(
+    #[rhai_fn(name = "with_pattern", return_raw)]
+    pub fn with_pattern(
         context: NativeCallContext,
         this: &mut BeatTimeRhythm,
         pattern: Array,
@@ -866,7 +861,8 @@ mod beat_time_rhythm {
         Ok(this.with_pattern_vector(vec))
     }
 
-    fn with_offset(
+    #[rhai_fn(name = "with_offset", return_raw)]
+    pub fn with_offset(
         context: NativeCallContext,
         this: &mut BeatTimeRhythm,
         offset: Dynamic,
@@ -876,11 +872,13 @@ mod beat_time_rhythm {
         Ok(this.with_offset_in_step(offset))
     }
 
-    fn trigger_fixed_event(this: &mut BeatTimeRhythm, event: FixedEventIter) -> BeatTimeRhythm {
+    #[rhai_fn(name = "trigger")]
+    pub fn trigger_fixed_event(this: &mut BeatTimeRhythm, event: FixedEventIter) -> BeatTimeRhythm {
         this.trigger(event)
     }
 
-    fn trigger_custom_event(
+    #[rhai_fn(name = "trigger", return_raw)]
+    pub fn trigger_custom_event(
         context: NativeCallContext,
         this: &mut BeatTimeRhythm,
         func: FnPtr,
@@ -892,18 +890,12 @@ mod beat_time_rhythm {
 
 // ---------------------------------------------------------------------------------------------
 
-mod second_time_rhythm {
+#[export_module]
+mod second_time_rhythm_module {
     use super::*;
 
-    pub fn register(engine: &mut Engine) {
-        engine
-            .register_fn("with_pattern", with_pattern)
-            .register_fn("with_offset", with_offset)
-            .register_fn("trigger", trigger_fixed_event)
-            .register_fn("trigger", trigger_custom_event);
-    }
-
-    fn with_pattern(
+    #[rhai_fn(name = "with_pattern", return_raw)]
+    pub fn with_pattern(
         context: NativeCallContext,
         this: &mut SecondTimeRhythm,
         pattern: Array,
@@ -916,7 +908,8 @@ mod second_time_rhythm {
         Ok(this.with_pattern_vector(vec))
     }
 
-    fn with_offset(
+    #[rhai_fn(name = "with_offset", return_raw)]
+    pub fn with_offset(
         context: NativeCallContext,
         this: &mut SecondTimeRhythm,
         offset: Dynamic,
@@ -926,11 +919,16 @@ mod second_time_rhythm {
         Ok(this.with_offset(offset))
     }
 
-    fn trigger_fixed_event(this: &mut SecondTimeRhythm, event: FixedEventIter) -> SecondTimeRhythm {
+    #[rhai_fn(name = "trigger")]
+    pub fn trigger_fixed_event(
+        this: &mut SecondTimeRhythm,
+        event: FixedEventIter,
+    ) -> SecondTimeRhythm {
         this.trigger(event)
     }
 
-    fn trigger_custom_event(
+    #[rhai_fn(name = "trigger", return_raw)]
+    pub fn trigger_custom_event(
         context: NativeCallContext,
         this: &mut SecondTimeRhythm,
         func: FnPtr,
