@@ -117,6 +117,9 @@ pub struct SamplePlayer {
     new_note_action: NewNoteAction,
     playback_pos_emit_rate: Duration,
     show_events: bool,
+    playback_sample_time: SampleTime,
+    emitted_sample_time: SampleTime,
+    emitted_beats: u32,
 }
 
 impl SamplePlayer {
@@ -131,6 +134,9 @@ impl SamplePlayer {
         let new_note_action = NewNoteAction::Continue;
         let playback_pos_emit_rate = Duration::from_secs(1);
         let show_events = false;
+        let playback_sample_time = player.output_sample_frame_position();
+        let emitted_sample_time = 0;
+        let emitted_beats = 0;
         Ok(Self {
             player,
             sample_pool,
@@ -138,6 +144,9 @@ impl SamplePlayer {
             new_note_action,
             playback_pos_emit_rate,
             show_events,
+            playback_sample_time,
+            emitted_sample_time,
+            emitted_beats,
         })
     }
 
@@ -176,9 +185,9 @@ impl SamplePlayer {
     }
 
     /// Run/play the given phrase until it stops.
-    pub fn run(&mut self, phrase: &mut Phrase, time_base: &dyn TimeBase) {
+    pub fn run(&mut self, phrase: &mut Phrase, time_base: &dyn TimeBase, reset_playback_pos: bool) {
         let dont_stop = || false;
-        self.run_until(phrase, time_base, dont_stop);
+        self.run_until(phrase, time_base, reset_playback_pos, dont_stop);
     }
 
     /// Run the given phrase until it stops or the passed stop condition function returns true.
@@ -186,41 +195,64 @@ impl SamplePlayer {
         &mut self,
         phrase: &mut Phrase,
         time_base: &dyn TimeBase,
+        reset_playback_pos: bool,
         stop_fn: StopFn,
     ) {
-        // rebuild playing notes vec
-        self.playing_notes.clear();
-        self.playing_notes
-            .resize(phrase.rhythms().len(), HashMap::new());
-
-        // stop whatever is playing in case we're restarting
-        self.player
-            .stop_all_sources()
-            .expect("failed to stop all playing samples");
-        // fetch player's actual position and use it as start offset
-        let start_offset = self.player.output_sample_frame_position();
-        // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
-        let mut emitted_sample_time: u64 = 0;
+        // reset time counters when starting the first time or when explicitely requested, else continue
+        // playing from our previous time to avoid interrupting playback streams
+        if reset_playback_pos || self.emitted_sample_time == 0 {
+            self.reset_playback_position(phrase);
+        } else {
+            // match playing notes state to the passed rhythm
+            self.playing_notes
+                .resize(phrase.rhythms().len(), HashMap::new());
+            // seek new phase to our previously played time
+            self.seek_phrase_until_time(phrase, self.emitted_sample_time);
+        }
         while !stop_fn() {
-            const PRELOAD_SECONDS: f64 = 0.25;
-            let seconds_emitted = time_base.samples_to_seconds(emitted_sample_time);
-            let seconds_played = time_base
-                .samples_to_seconds(self.player.output_sample_frame_position() - start_offset);
+            // calculate emitted and playback time differences
+            const PRELOAD_SECONDS: f64 = 0.5;
+            let seconds_emitted = time_base.samples_to_seconds(self.emitted_sample_time);
+            let seconds_played = time_base.samples_to_seconds(
+                self.player.output_sample_frame_position() - self.playback_sample_time,
+            );
             let seconds_to_emit = seconds_played - seconds_emitted + PRELOAD_SECONDS;
-
-            if seconds_to_emit >= PRELOAD_SECONDS || emitted_sample_time == 0 {
+            // run phrase ahead of player up to PRELOAD_SECONDS
+            if seconds_to_emit >= PRELOAD_SECONDS || self.emitted_sample_time == 0 {
                 let samples_to_emit = time_base.seconds_to_samples(seconds_to_emit);
                 self.run_phrase_until_time(
                     phrase,
-                    start_offset,
-                    emitted_sample_time + samples_to_emit,
+                    self.playback_sample_time,
+                    self.emitted_sample_time + samples_to_emit,
                 );
-                emitted_sample_time += samples_to_emit;
+                self.emitted_sample_time += samples_to_emit;
             } else {
                 let sleep_amount = (PRELOAD_SECONDS - seconds_to_emit).max(0.0);
                 std::thread::sleep(std::time::Duration::from_secs_f64(sleep_amount));
             }
         }
+    }
+
+    fn reset_playback_position(&mut self, phrase: &Phrase) {
+        // rebuild playing notes vec
+        self.playing_notes.clear();
+        self.playing_notes
+            .resize(phrase.rhythms().len(), HashMap::new());
+        // stop whatever is playing in case we're restarting
+        self.player
+            .stop_all_sources()
+            .expect("failed to stop all playing samples");
+        // fetch player's actual position and use it as start offset
+        self.playback_sample_time = self.player.output_sample_frame_position();
+        // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
+        self.emitted_sample_time = 0;
+        self.emitted_beats = 0;
+    }
+
+    fn seek_phrase_until_time(&mut self, phrase: &mut Phrase, sample_time: SampleTime) {
+        phrase.run_until_time(sample_time, |_, _, _| {
+            // ignore all events
+        });
     }
 
     fn run_phrase_until_time(

@@ -84,7 +84,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ],
         );
 
-        player.run_until(&mut phrase, &beat_time, {
+        let reset_playback_pos = false;
+        player.run_until(&mut phrase, &beat_time, reset_playback_pos, {
             let script_files_changed = script_files_changed.clone();
             move || {
                 if script_files_changed.load(Ordering::Relaxed) {
