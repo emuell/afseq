@@ -42,6 +42,25 @@ pub struct NoteEvent {
     pub velocity: f32,
 }
 
+impl NoteEvent {
+    pub fn to_string(&self, show_instruments: bool) -> String {
+        if show_instruments {
+            format!(
+                "{} {} {:.2}",
+                if let Some(instrument) = self.instrument {
+                    format!("{:02}", instrument)
+                } else {
+                    "NA".to_string()
+                },
+                self.note,
+                self.velocity
+            )
+        } else {
+            format!("{} {:.3}", self.note, self.velocity)
+        }
+    }
+}
+
 /// Shortcut for creating an empty [`NoteEvent`] [`EventIter`].
 pub fn new_empty_note() -> Option<NoteEvent> {
     None
@@ -172,6 +191,24 @@ pub struct ParameterChangeEvent {
     pub value: f32,
 }
 
+impl ParameterChangeEvent {
+    pub fn to_string(&self, show_parameter: bool) -> String {
+        if show_parameter {
+            format!(
+                "{} {:.3}",
+                if let Some(parameter) = self.parameter {
+                    format!("{:02}", parameter)
+                } else {
+                    "NA".to_string()
+                },
+                self.value,
+            )
+        } else {
+            format!("{:.3}", self.value)
+        }
+    }
+}
+
 /// Shortcut for creating a new [`ParameterChangeEvent`].
 pub fn new_parameter_change<Parameter: Into<Option<ParameterId>>>(
     parameter: Parameter,
@@ -198,6 +235,25 @@ pub enum Event {
     ParameterChangeEvent(ParameterChangeEvent),
 }
 
+impl Event {
+    pub fn to_string(&self, show_instruments_and_parameters: bool) -> String {
+        match self {
+            Event::NoteEvents(note_vector) => note_vector
+                    .iter()
+                    .map(|n| if let Some(v) = n {
+                        v.to_string(show_instruments_and_parameters)
+                    } else {
+                        "---".to_string()
+                    })
+                    .collect::<Vec<String>>()
+                    .join(" | "),
+            Event::ParameterChangeEvent(change) => {
+                change.to_string(show_instruments_and_parameters)
+            }
+        }
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// A resettable [`Event`] iterator, which typically will be used in
@@ -209,51 +265,23 @@ pub trait EventIter: Iterator<Item = Event> {
 
 // -------------------------------------------------------------------------------------------------
 
-impl fmt::Debug for NoteEvent {
+impl fmt::Display for NoteEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!(
-            "{} {} {:.2}",
-            if let Some(instrument) = self.instrument {
-                format!("{:02}", instrument)
-            } else {
-                "NA".to_string()
-            },
-            self.note,
-            self.velocity
-        ))
+        const SHOW_INSTRUMENTS: bool = true;
+        f.write_fmt(format_args!("{}", self.to_string(SHOW_INSTRUMENTS)))
     }
 }
 
-impl fmt::Debug for ParameterChangeEvent {
+impl fmt::Display for ParameterChangeEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!(
-            "{} {}",
-            if let Some(parameter) = self.parameter {
-                format!("{:02}", parameter)
-            } else {
-                "NA".to_string()
-            },
-            self.value,
-        ))
+        const SHOW_PARAMETERS: bool = true;
+        f.write_fmt(format_args!("{}", self.to_string(SHOW_PARAMETERS)))
     }
 }
 
-impl fmt::Debug for Event {
+impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Event::NoteEvents(note_vector) => f.write_fmt(format_args!(
-                "{}",
-                note_vector
-                    .iter()
-                    .map(|n| if let Some(v) = n {
-                        format!("{:?}", v)
-                    } else {
-                        String::from("---")
-                    })
-                    .collect::<Vec<String>>()
-                    .join(" | ")
-            )),
-            Event::ParameterChangeEvent(change) => f.write_fmt(format_args!("{:?}", change)),
-        }
+        const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
+        f.write_fmt(format_args!("{}", self.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS)))
     }
 }

@@ -265,11 +265,12 @@ impl SamplePlayer {
         phrase.run_until_time(sample_time, |rhythm_index, sample_time, event| {
             // print
             if self.show_events {
+                const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
                 println!(
-                    "{} | {}",
+                    "{}: {}",
                     time_display.display(sample_time),
                     match event {
-                        Some(event) => format!("{:?}", event),
+                        Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
                         None => "---".to_string(),
                     }
                 );

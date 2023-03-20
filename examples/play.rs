@@ -173,7 +173,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // play the phrase and dump events to stdout
-    player.run(&mut phrase, &beat_time);
+    const RESET_PLAYBACK_POS: bool = true;
+    player.run(&mut phrase, &beat_time, RESET_PLAYBACK_POS);
 
     Ok(())
 }
