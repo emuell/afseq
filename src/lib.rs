@@ -15,6 +15,10 @@ pub use rhythm::Rhythm;
 
 pub mod phrase;
 pub use phrase::Phrase;
+
+pub mod sequence;
+pub use sequence::Sequence;
+
 pub mod prelude;
 
 #[cfg(feature = "scripting")]

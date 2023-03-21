@@ -15,13 +15,14 @@ pub use super::{
         unique_instrument_id, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId,
     },
     midi::Note,
+    phrase::{Phrase, RhythmSlot},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
     time::{BeatTimeBase, BeatTimeStep, SecondTimeBase, SecondTimeStep, TimeBase},
-    Event, EventIter, Phrase, Rhythm, SampleTime,
+    Event, EventIter, Rhythm, SampleTime, Sequence,
 };
 
 #[cfg(feature = "scripting")]
 pub use super::bindings::{self};
 
 #[cfg(feature = "player")]
-pub use super::player::{SamplePlayer, SamplePool, NewNoteAction};
+pub use super::player::{NewNoteAction, SamplePlayer, SamplePool};

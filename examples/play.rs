@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         samples_per_sec: second_time.samples_per_sec,
     };
 
-    // generate a simple phrase
+    // generate a few phrases
     let kick_pattern = beat_time
         .every_nth_sixteenth(1.0)
         .with_pattern([
@@ -105,11 +105,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }));
 
+    // combine two hi hat rhythms into a phrase
     let hihat_rhythm = Phrase::new(
         beat_time,
-        vec![Box::new(hihat_pattern), Box::new(hihat_pattern2)],
-    )
-    .with_offset(BeatTimeStep::Bar(4.0));
+        vec![hihat_pattern, hihat_pattern2],
+        BeatTimeStep::Bar(4.0)
+    );
 
     let bass_notes = scale::Scale::from_regex("c aeolian")?.notes();
     let bass_pattern = beat_time
@@ -127,7 +128,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let synth_pattern = beat_time
         .every_nth_bar(4.0)
-        .with_offset(BeatTimeStep::Bar(8.0))
         .trigger(new_polyphonic_note_sequence_event(vec![
             vec![
                 (SYNTH, "C 3", 0.3),
@@ -151,30 +151,82 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ],
         ]));
 
-    let fx_pattern = second_time
-        .every_nth_seconds(8.0)
-        .with_offset(48.0)
-        .trigger(new_polyphonic_note_sequence_event(vec![
-            vec![Some((FX, "C 3", 0.2)), None, None],
-            vec![None, Some((FX, "C 4", 0.2)), None],
-            vec![None, None, Some((FX, "F 4", 0.2))],
-        ]));
+    let fx_pattern =
+        second_time
+            .every_nth_seconds(8.0)
+            .trigger(new_polyphonic_note_sequence_event(vec![
+                vec![Some((FX, "C 3", 0.2)), None, None],
+                vec![None, Some((FX, "C 4", 0.2)), None],
+                vec![None, None, Some((FX, "F 4", 0.2))],
+            ]));
 
-    let mut phrase = Phrase::new(
+    // combine 
+    let intro = Phrase::new(
         beat_time,
         vec![
-            Box::new(kick_pattern),
-            Box::new(snare_pattern),
-            Box::new(hihat_rhythm),
-            Box::new(bass_pattern),
-            Box::new(synth_pattern),
-            Box::new(fx_pattern),
+            kick_pattern.clone().into(),
+            snare_pattern.clone().into(),
+            RhythmSlot::Stop,
+            RhythmSlot::Stop,
+            RhythmSlot::Stop,
+            RhythmSlot::Stop,
+        ],
+        BeatTimeStep::Bar(4.0)
+    );
+    let intro_with_bass = Phrase::new(
+        beat_time,
+        vec![
+            kick_pattern.clone().into(),
+            snare_pattern.clone().into(),
+            hihat_rhythm.clone().into(),
+            bass_pattern.clone().into(),
+            RhythmSlot::Stop,
+            RhythmSlot::Stop,
+        ],
+        BeatTimeStep::Bar(4.0)
+    );
+    let main = Phrase::new(
+        beat_time,
+        vec![
+            kick_pattern.clone().into(),
+            snare_pattern.clone().into(),
+            hihat_rhythm.clone().into(),
+            bass_pattern.clone().into(),
+            synth_pattern.clone().into(),
+            RhythmSlot::Stop,
+        ],
+        BeatTimeStep::Bar(16.0)
+    );
+
+    let main_with_fx = Phrase::new(
+        beat_time,
+        vec![
+            kick_pattern.into(),
+            snare_pattern.into(),
+            hihat_rhythm.into(),
+            bass_pattern.into(),
+            synth_pattern.into(),
+            fx_pattern.into(),
+        ] as Vec<RhythmSlot>,
+        BeatTimeStep::Bar(16.0)
+    );
+
+    // form a sequence from phrases
+    let mut sequence = Sequence::new(
+        beat_time,
+        vec![
+            intro,
+            intro_with_bass,
+            main.clone(),
+            main,
+            main_with_fx.clone(),
+            main_with_fx,
         ],
     );
 
-    // play the phrase and dump events to stdout
+    // play the sequence and dump events to stdout
     const RESET_PLAYBACK_POS: bool = true;
-    player.run(&mut phrase, &beat_time, RESET_PLAYBACK_POS);
+    player.run(&mut sequence, &beat_time, RESET_PLAYBACK_POS);
 
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! Example player implementation, which plays back a `Phrase` via the `afplay` crate.
+//! Example player implementation, which plays back a `Sequence` via the `afplay` crate.
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,
@@ -15,7 +15,7 @@ use afplay::{
 use crate::{
     event::{unique_instrument_id, InstrumentId},
     time::TimeBase,
-    Event, Note, Phrase, Rhythm, SampleTime,
+    Event, Note, Rhythm, SampleTime, Sequence,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ impl SamplePlaybackContext {
 
 // -------------------------------------------------------------------------------------------------
 
-/// An simple example player implementation, which plays back a `Phrase` via the `afplay` crate
+/// An simple example player implementation, which plays back a `Sequence` via the `afplay` crate
 /// using the default audio output device using plain samples loaded from a file as instruments.
 ///
 /// Works on an existing sample pool, which can be used outside of the player as well.
@@ -184,16 +184,16 @@ impl SamplePlayer {
         self.new_note_action = action
     }
 
-    /// Run/play the given phrase until it stops.
-    pub fn run(&mut self, phrase: &mut Phrase, time_base: &dyn TimeBase, reset_playback_pos: bool) {
+    /// Run/play the given sequence until it stops.
+    pub fn run(&mut self, sequence: &mut Sequence, time_base: &dyn TimeBase, reset_playback_pos: bool) {
         let dont_stop = || false;
-        self.run_until(phrase, time_base, reset_playback_pos, dont_stop);
+        self.run_until(sequence, time_base, reset_playback_pos, dont_stop);
     }
 
-    /// Run the given phrase until it stops or the passed stop condition function returns true.
+    /// Run the given sequence until it stops or the passed stop condition function returns true.
     pub fn run_until<StopFn: Fn() -> bool>(
         &mut self,
-        phrase: &mut Phrase,
+        sequence: &mut Sequence,
         time_base: &dyn TimeBase,
         reset_playback_pos: bool,
         stop_fn: StopFn,
@@ -201,13 +201,13 @@ impl SamplePlayer {
         // reset time counters when starting the first time or when explicitely requested, else continue
         // playing from our previous time to avoid interrupting playback streams
         if reset_playback_pos || self.emitted_sample_time == 0 {
-            self.reset_playback_position(phrase);
+            self.reset_playback_position(sequence);
         } else {
             // match playing notes state to the passed rhythm
             self.playing_notes
-                .resize(phrase.rhythms().len(), HashMap::new());
+                .resize(sequence.phrases().first().unwrap().rhythms().len(), HashMap::new());
             // seek new phase to our previously played time
-            self.seek_phrase_until_time(phrase, self.emitted_sample_time);
+            self.seek_sequence_until_time(sequence, self.emitted_sample_time);
         }
         while !stop_fn() {
             // calculate emitted and playback time differences
@@ -217,11 +217,11 @@ impl SamplePlayer {
                 self.player.output_sample_frame_position() - self.playback_sample_time,
             );
             let seconds_to_emit = seconds_played - seconds_emitted + PRELOAD_SECONDS;
-            // run phrase ahead of player up to PRELOAD_SECONDS
+            // run sequence ahead of player up to PRELOAD_SECONDS
             if seconds_to_emit >= PRELOAD_SECONDS || self.emitted_sample_time == 0 {
                 let samples_to_emit = time_base.seconds_to_samples(seconds_to_emit);
-                self.run_phrase_until_time(
-                    phrase,
+                self.run_until_time(
+                    sequence,
                     self.playback_sample_time,
                     self.emitted_sample_time + samples_to_emit,
                 );
@@ -233,11 +233,11 @@ impl SamplePlayer {
         }
     }
 
-    fn reset_playback_position(&mut self, phrase: &Phrase) {
+    fn reset_playback_position(&mut self, sequence: &Sequence) {
         // rebuild playing notes vec
         self.playing_notes.clear();
         self.playing_notes
-            .resize(phrase.rhythms().len(), HashMap::new());
+            .resize(sequence.phrases().first().unwrap().rhythms().len(), HashMap::new());
         // stop whatever is playing in case we're restarting
         self.player
             .stop_all_sources()
@@ -249,20 +249,20 @@ impl SamplePlayer {
         self.emitted_beats = 0;
     }
 
-    fn seek_phrase_until_time(&mut self, phrase: &mut Phrase, sample_time: SampleTime) {
-        phrase.run_until_time(sample_time, |_, _, _| {
+    fn seek_sequence_until_time(&mut self, sequence: &mut Sequence, sample_time: SampleTime) {
+        sequence.run_until_time(sample_time, |_, _, _| {
             // ignore all events
         });
     }
 
-    fn run_phrase_until_time(
+    fn run_until_time(
         &mut self,
-        phrase: &mut Phrase,
+        sequence: &mut Sequence,
         start_offset: SampleTime,
         sample_time: SampleTime,
     ) {
-        let time_display = phrase.time_display();
-        phrase.run_until_time(sample_time, |rhythm_index, sample_time, event| {
+        let time_display = sequence.time_display();
+        sequence.run_until_time(sample_time, |rhythm_index, sample_time, event| {
             // print
             if self.show_events {
                 const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;

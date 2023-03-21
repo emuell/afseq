@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format!("./assets/{file_name}").as_str(),
             )
         };
-        let mut phrase = Phrase::new(
+        let phrase = Phrase::new(
             beat_time,
             vec![
                 load(KICK, "kick.rhai"),
@@ -82,10 +82,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 load(TONE, "tone.rhai"),
                 load(FX, "fx.rhai"),
             ],
+            BeatTimeStep::Bar(4.0),
         );
 
+        // wrap phrase into a sequence
+        let mut sequence = Sequence::new(beat_time, vec![phrase]);
+
         let reset_playback_pos = false;
-        player.run_until(&mut phrase, &beat_time, reset_playback_pos, {
+        player.run_until(&mut sequence, &beat_time, reset_playback_pos, {
             let script_files_changed = script_files_changed.clone();
             move || {
                 if script_files_changed.load(Ordering::Relaxed) {

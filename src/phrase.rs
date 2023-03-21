@@ -1,7 +1,8 @@
-//! Combine multiple `Rythm` iterators into a single one.
+//! Combine multiple `Rythm` iterators into a single one to play them at the same time.
 
 use std::{
     cell::{Ref, RefCell},
+    cmp::Ordering,
     rc::Rc,
 };
 
@@ -9,47 +10,105 @@ use crate::{
     event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm, SampleTime,
 };
 
+#[cfg(doc)]
+use crate::Sequence;
+
 // -------------------------------------------------------------------------------------------------
 
 type RhythmIndex = usize;
 
+/// A single slot in a [`Phrase`] vector.
+pub enum RhythmSlot {
+    /// Stop previous playing rhythm and play nothing new.
+    /// This can be useful in [`Sequence`] to create empty placeholder slots.
+    Stop,
+    /// TODO: Continue playing previous playing rhythm.
+    /// This is only meaningful in [`Sequence`] rhythms to repeat a rhythm instead
+    /// of restarting it at a new sequence position.
+    Continue,
+    /// Play the given boxed rhytm in this slot.
+    Rhythm(Box<dyn Rhythm>),
+}
+
+impl RhythmSlot {
+    /// Create a new RhythmSlot from an unboxed [`Rhythm`] instance.
+    pub fn from_rhythm<R>(rhythm: R) -> Self
+    where
+        R: Rhythm + 'static,
+    {
+        Self::Rhythm(Box::new(rhythm))
+    }
+    /// Create a new RhythmSlot from a boxed [`Rhythm`] instance.
+    pub fn from_boxed_rhythm(rhythm: Box<dyn Rhythm>) -> Self {
+        Self::Rhythm(rhythm)
+    }
+}
+
+/// Convert an unboxed rhythm to a RhythmSlot
+impl<R> From<R> for RhythmSlot
+where
+    R: Rhythm + 'static,
+{
+    fn from(r: R) -> RhythmSlot {
+        RhythmSlot::Rhythm(Box::new(r))
+    }
+}
+
+/// Convert an boxed rhythm to a RhythmSlot
+impl From<Box<dyn Rhythm>> for RhythmSlot {
+    fn from(r: Box<dyn Rhythm>) -> RhythmSlot {
+        RhythmSlot::Rhythm(r)
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Combines multiple [`Rhythm`] into a new one, allowing to form more complex rhythms that are
-/// meant to run together. Further it allows to run/evaluate rhythms, until a specific sample time
+/// meant to run together. Further it allows to run/evaluate rhythms until a specific sample time
 /// is reached.
 ///
 /// An example phrase is a drum-kit pattern where each instrument's pattern is defined separately
 /// and then is combined into a single "big" pattern to play the entire kit together.
 ///
-/// The `run_until_time` function can then be used to feed the entire phrase into a player engine.
+/// The `run_until_time` function is also used by [`Sequence`] to play a phrase with a player engine.
 #[derive(Clone)]
 pub struct Phrase {
     time_base: BeatTimeBase,
     offset: BeatTimeStep,
-    rhythms: Rc<RefCell<Vec<Box<dyn Rhythm>>>>,
+    sample_offset: SampleTime,
+    length: BeatTimeStep,
+    rhythm_slots: Rc<RefCell<Vec<RhythmSlot>>>,
     next_events: Vec<Option<(RhythmIndex, SampleTime, Option<Event>)>>,
     held_back_event: Option<(RhythmIndex, SampleTime, Option<Event>)>,
 }
 
 impl Phrase {
-    /// Create a new phrase from a vector of boxed `Rhythms`.
-    pub fn new(time_base: BeatTimeBase, rhythms: Vec<Box<dyn Rhythm>>) -> Self {
+    /// Create a new phrase from a vector of [`RhythmSlot`] and the given length.
+    /// RhythmSlot has `Into` implementastions, so you can also pass a vector of 
+    /// unboxed rhythm instance here.
+    pub fn new<R: Into<RhythmSlot>>(
+        time_base: BeatTimeBase,
+        rhythm_slots: Vec<R>,
+        length: BeatTimeStep,
+    ) -> Self {
         let offset = BeatTimeStep::Beats(0.0);
-        let next_events = vec![None; rhythms.len()];
+        let sample_offset = 0;
+        let next_events = vec![None; rhythm_slots.len()];
         let held_back_event = None;
         Self {
             time_base,
             offset,
-            rhythms: Rc::new(RefCell::new(rhythms)),
+            sample_offset,
+            length,
+            rhythm_slots: Rc::new(RefCell::new(
+                rhythm_slots
+                    .into_iter()
+                    .map(|rhythm| rhythm.into())
+                    .collect::<Vec<_>>(),
+            )),
             next_events,
             held_back_event,
         }
-    }
-
-    /// Read-only access to our rhythms
-    pub fn rhythms(&self) -> Ref<Vec<Box<dyn Rhythm>>> {
-        self.rhythms.borrow()
     }
 
     /// Apply the given beat-time step offset to all events.
@@ -57,15 +116,36 @@ impl Phrase {
         Self {
             time_base: self.time_base,
             offset: offset.into().unwrap_or(BeatTimeStep::Beats(0.0)),
-            rhythms: self.rhythms.clone(),
+            sample_offset: self.sample_offset,
+            length: self.length,
+            rhythm_slots: self.rhythm_slots.clone(),
             next_events: self.next_events.clone(),
             held_back_event: self.held_back_event.clone(),
         }
     }
 
+    /// Read-only access to our phrase length.
+    /// This is only applied in [`Sequence`].
+    pub fn length(&self) -> BeatTimeStep {
+        self.length
+    }
+
+    ///
+    pub fn sample_offset(&self) -> SampleTime {
+        self.sample_offset
+    }
+    pub fn set_sample_offset(&mut self, sample_offset: SampleTime) {
+        self.sample_offset = sample_offset
+    }
+
+    /// Read-only access to our rhythm slots
+    pub fn rhythms(&self) -> Ref<Vec<RhythmSlot>> {
+        self.rhythm_slots.borrow()
+    }
+
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
     /// function for all emitted events to consume them.
-    pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, mut consumer: F)
+    pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
         F: FnMut(RhythmIndex, SampleTime, &Option<Event>),
     {
@@ -92,36 +172,48 @@ impl Phrase {
 
     fn next_event(&mut self) -> Option<(RhythmIndex, SampleTime, Option<Event>)> {
         // fetch next events in all rhythms
-        for (rhythm_index, (rhythm, next_event)) in self
-            .rhythms
+        for (rhythm_index, (rhythm_slot, next_event)) in self
+            .rhythm_slots
             .borrow_mut()
             .iter_mut()
             .zip(self.next_events.iter_mut())
             .enumerate()
         {
             if !next_event.is_some() {
-                if let Some((sample_time, event)) = rhythm.next() {
-                    *next_event = Some((rhythm_index, sample_time, event));
-                } else {
-                    *next_event = None;
+                match rhythm_slot {
+                    RhythmSlot::Stop => *next_event = None,
+                    RhythmSlot::Continue => todo!(),
+                    RhythmSlot::Rhythm(rhythm) => {
+                        if let Some((sample_time, event)) = rhythm.next() {
+                            *next_event = Some((rhythm_index, sample_time, event));
+                        } else {
+                            *next_event = None;
+                        }
+                    }
                 }
             }
         }
         // select the next from all pre-fetched events with the smallest sample time
         let next_due = self.next_events.iter_mut().reduce(|min, next| {
-            let (_, min_sample_time, _) = min.as_ref().unwrap();
-            let (_, next_sample_time, _) = next.as_ref().unwrap();
-            if next_sample_time < min_sample_time {
-                next
+            if let Some((_, min_sample_time, _)) = min {
+                if let Some((_, next_sample_time, _)) = next {
+                    match min_sample_time.cmp(&next_sample_time) {
+                        Ordering::Less | Ordering::Equal => min,
+                        Ordering::Greater => next,
+                    }
+                } else {
+                    min
+                }
             } else {
-                min
+                next
             }
         });
         if let Some(next_due) = next_due {
             let next = next_due.clone();
             *next_due = None; // consume
             if let Some((rhythm_index, sample_time, event)) = next {
-                let sample_offset = self.offset.to_samples(&self.time_base) as u64;
+                let sample_offset =
+                    self.sample_offset + self.offset.to_samples(&self.time_base) as u64;
                 Some((rhythm_index, sample_offset + sample_time, event))
             } else {
                 None
@@ -154,8 +246,10 @@ impl Rhythm for Phrase {
         self.next_events.fill(None);
         self.held_back_event = None;
         // reset all our rhythm iters
-        for rhythm in self.rhythms.borrow_mut().iter_mut() {
-            rhythm.reset();
+        for rhythm_slot in self.rhythm_slots.borrow_mut().iter_mut() {
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.reset()
+            }
         }
     }
 }
