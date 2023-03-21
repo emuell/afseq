@@ -824,7 +824,7 @@ mod second_time_module {
         seconds: Dynamic,
     ) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
         let err_context = ErrorCallContext::from(&context);
-        let step = unwrap_float(&err_context, seconds, "step")? as f64;
+        let step = unwrap_float(&err_context, seconds, "step")?;
         if step <= 0.0 {
             Err(EvalAltResult::ErrorInModule(
                 "bindings".to_string(),
@@ -917,7 +917,7 @@ mod second_time_rhythm_module {
         offset: Dynamic,
     ) -> Result<SecondTimeRhythm, Box<EvalAltResult>> {
         let err_context = ErrorCallContext::from(&context);
-        let offset = unwrap_float(&err_context, offset, "offset")? as f64;
+        let offset = unwrap_float(&err_context, offset, "offset")?;
         Ok(this.with_offset(offset))
     }
 

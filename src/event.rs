@@ -35,7 +35,7 @@ pub fn unique_instrument_id() -> InstrumentId {
 // -------------------------------------------------------------------------------------------------
 
 /// Single note event in a [`Event`].
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct NoteEvent {
     pub instrument: Option<InstrumentId>,
     pub note: Note,
@@ -185,7 +185,7 @@ pub fn new_polyphonic_note_sequence_event<
 // -------------------------------------------------------------------------------------------------
 
 /// Single parameter change event in a [`Event`].
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct ParameterChangeEvent {
     pub parameter: Option<ParameterId>,
     pub value: f32,
@@ -229,7 +229,7 @@ pub fn new_parameter_change_event<Parameter: Into<Option<ParameterId>>>(
 // -------------------------------------------------------------------------------------------------
 
 /// Event which gets emitted by an [`EventIter`].
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Event {
     NoteEvents(Vec<Option<NoteEvent>>),
     ParameterChangeEvent(ParameterChangeEvent),

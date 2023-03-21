@@ -32,6 +32,6 @@ pub trait TimeBase {
     }
     /// Convert given second duration in samples, using this time bases' samples per second rate.
     fn seconds_to_samples(&self, seconds: f64) -> SampleTime {
-        (seconds as f64 * self.samples_per_second() as f64) as SampleTime
+        (seconds * self.samples_per_second() as f64).trunc() as SampleTime
     }
 }

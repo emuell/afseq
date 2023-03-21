@@ -34,7 +34,7 @@ impl TimeBase for BeatTimeBase {
 impl SampleTimeDisplay for BeatTimeBase {
     /// generate a bar.beat.ppq string representation of the the given sample time
     fn display(&self, sample_time: SampleTime) -> String {
-        let total_beats = sample_time as u64 / self.samples_per_beat() as u64;
+        let total_beats = sample_time / self.samples_per_beat() as u64;
         let total_beats_f = sample_time as f64 / self.samples_per_beat();
         let beat_frations = total_beats_f - total_beats as f64;
         let bars = total_beats / self.beats_per_bar as u64;

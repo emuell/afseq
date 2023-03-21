@@ -269,7 +269,7 @@ impl Note {
         } else {
             octave_value_at(s, 1)?
         };
-        if octave < -1 || octave > 9 {
+        if !(-1..=9).contains(&octave) {
             return Err(format!(
                 "Invalid note str '{}' - octave '{}' is out of range.",
                 s, octave
@@ -318,7 +318,7 @@ impl From<&str> for Note {
 
 impl From<&rmt_note::Note> for Note {
     fn from(note: &rmt_note::Note) -> Self {
-        Self::from((note.pitch_class.into_u8() + 12 * note.octave + 12) as u8)
+        Self::from(note.pitch_class.into_u8() + 12 * note.octave + 12)
     }
 }
 
