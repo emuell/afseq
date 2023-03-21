@@ -71,7 +71,7 @@ impl ToFixedEventIter for Vec<NoteEvent> {
         FixedEventIter::new(vec![Event::NoteEvents(
             self.iter()
                 .map(|v| Some(v.clone()))
-                .collect::<Vec<Option<NoteEvent>>>(),
+                .collect::<Vec<_>>(),
         )])
     }
 }

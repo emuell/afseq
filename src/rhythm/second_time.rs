@@ -78,7 +78,7 @@ impl SecondTimeRhythm {
         let pattern_vec = pattern
             .iter()
             .map(|f| *f != T::default())
-            .collect::<Vec<bool>>();
+            .collect::<Vec<_>>();
         Self {
             pattern: Rc::new(pattern_vec),
             event_iter: self.event_iter.clone(),

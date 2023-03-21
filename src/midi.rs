@@ -15,8 +15,8 @@ use rust_music_theory::note as rmt_note;
 /// Because it only uses the least significant 7 bits, any value can be interpreted as either an i8
 /// or a u8 for free (as the representation is the same in both)
 ///
-/// Note implements From<u8>, Into<u8> as well as From<i8>, Into<i8> and From<&str> so the enum names
-/// usually should be completely ignored.
+/// Note implements From\<u8\>, Into\<u8\> as well as From\<i8\>, Into\<i8\> and From\<&str\> so the 
+/// enum names usually should be completely ignored.
 ///
 /// For From<&str> conversions, the following notation is supported:
 /// `C4` (plain), `C-1` (minus 1 octave), `C#1` (sharps), `Db1` (flats),

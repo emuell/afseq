@@ -245,7 +245,7 @@ impl Event {
                     } else {
                         "---".to_string()
                     })
-                    .collect::<Vec<String>>()
+                    .collect::<Vec<_>>()
                     .join(" | "),
             Event::ParameterChangeEvent(change) => {
                 change.to_string(show_instruments_and_parameters)
