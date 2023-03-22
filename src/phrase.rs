@@ -3,6 +3,7 @@
 use std::{
     cell::{Ref, RefCell},
     cmp::Ordering,
+    fmt::Debug,
     rc::Rc,
 };
 
@@ -24,6 +25,7 @@ pub type RhythmEvent = (RhythmIndex, SampleTime, Option<Event>);
 // -------------------------------------------------------------------------------------------------
 
 /// A single slot in a [`Phrase`] vector.
+#[derive(Debug)]
 pub enum RhythmSlot {
     /// Stop previous playing rhythm and/or simply play nothing.
     /// This can be useful to create empty placeholder slots in e.g. a [`Sequence`].
@@ -61,7 +63,7 @@ impl From<Box<dyn Rhythm>> for RhythmSlot {
 /// and then is combined into a single "big" pattern to play the entire kit together.
 ///
 /// The `run_until_time` function is also used by [`Sequence`] to play a phrase with a player engine.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Phrase {
     time_base: BeatTimeBase,
     offset: BeatTimeStep,

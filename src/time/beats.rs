@@ -7,7 +7,7 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 /// Beat & bar timing base for beat based [Rhythm](`crate::Rhythm`) impls.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct BeatTimeBase {
     pub beats_per_min: f32,
     pub beats_per_bar: u32,

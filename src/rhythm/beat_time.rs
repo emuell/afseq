@@ -11,7 +11,7 @@ use super::euclidian::euclidean;
 // -------------------------------------------------------------------------------------------------
 
 /// Emits `Option(Event)` every nth [`BeatTimeStep`] with an optional pattern and offset.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BeatTimeRhythm {
     time_base: BeatTimeBase,
     step: BeatTimeStep,

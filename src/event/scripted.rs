@@ -15,6 +15,9 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 /// EventIter impl, which calls an existing rhai script function to generate new events.
+///
+/// NB: This event iter can not be cloned.
+#[derive(Debug)]
 pub struct ScriptedEventIter {
     engine: Engine,
     ast: AST,

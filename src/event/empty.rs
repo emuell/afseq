@@ -3,7 +3,7 @@ use crate::event::{Event, EventIter};
 // -------------------------------------------------------------------------------------------------
 
 /// Emits an empty, None [`Event`].
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EmptyEventIter {}
 
 impl Iterator for EmptyEventIter {

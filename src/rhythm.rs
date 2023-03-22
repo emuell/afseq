@@ -1,6 +1,8 @@
 //! Periodically emit `Events` via an `EventIter` on a given time base.
 
-use crate::{event::Event, time::SampleTimeDisplay, SampleTime, SampleOffset};
+use std::fmt::Debug;
+
+use crate::{event::Event, time::SampleTimeDisplay, SampleOffset, SampleTime};
 
 pub mod beat_time;
 pub mod euclidian;
@@ -17,7 +19,7 @@ pub mod second_time;
 /// Rhythm impls will typically use a [EventIter][`super::EventIter`] to produce note or parameter
 /// change events, so all emitted events are fetched from some iterator as well and thus may
 /// dynamically change over time as well.
-pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> {
+pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     /// create a time display printer, which serializes the given sample time to the Rhythm's
     /// time base (seconds or beats)
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;

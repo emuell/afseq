@@ -7,7 +7,7 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 /// Second time timing base for beat based [Rhythm](`crate::Rhythm`) impls.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct SecondTimeBase {
     pub samples_per_sec: u32,
 }

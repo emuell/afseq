@@ -5,8 +5,7 @@ use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use derive_more::{Deref, Display, From, Into};
 
-use core::sync::atomic::{AtomicUsize, Ordering};
-use std::fmt;
+use core::{sync::atomic::{AtomicUsize, Ordering}, fmt::Debug, fmt::Display};
 
 pub mod empty;
 pub mod fixed;
@@ -58,6 +57,13 @@ impl NoteEvent {
         } else {
             format!("{} {:.3}", self.note, self.velocity)
         }
+    }
+}
+
+impl Display for NoteEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const SHOW_INSTRUMENTS: bool = true;
+        f.write_fmt(format_args!("{}", self.to_string(SHOW_INSTRUMENTS)))
     }
 }
 
@@ -209,6 +215,13 @@ impl ParameterChangeEvent {
     }
 }
 
+impl Display for ParameterChangeEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const SHOW_PARAMETERS: bool = true;
+        f.write_fmt(format_args!("{}", self.to_string(SHOW_PARAMETERS)))
+    }
+}
+
 /// Shortcut for creating a new [`ParameterChangeEvent`].
 pub fn new_parameter_change<Parameter: Into<Option<ParameterId>>>(
     parameter: Parameter,
@@ -254,34 +267,18 @@ impl Event {
     }
 }
 
+impl Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
+        f.write_fmt(format_args!("{}", self.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS)))
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// A resettable [`Event`] iterator, which typically will be used in
 /// [Rhythm](`super::Rhythm`) trait impls to sequencially emit new events.
-pub trait EventIter: Iterator<Item = Event> {
+pub trait EventIter: Iterator<Item = Event> + Debug {
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
-}
-
-// -------------------------------------------------------------------------------------------------
-
-impl fmt::Display for NoteEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        const SHOW_INSTRUMENTS: bool = true;
-        f.write_fmt(format_args!("{}", self.to_string(SHOW_INSTRUMENTS)))
-    }
-}
-
-impl fmt::Display for ParameterChangeEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        const SHOW_PARAMETERS: bool = true;
-        f.write_fmt(format_args!("{}", self.to_string(SHOW_PARAMETERS)))
-    }
-}
-
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
-        f.write_fmt(format_args!("{}", self.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS)))
-    }
 }

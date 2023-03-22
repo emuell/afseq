@@ -1,9 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter},
     time::{SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
-    Rhythm, SampleTime, SampleOffset
+    Rhythm, SampleOffset, SampleTime,
 };
 
 use super::euclidian::euclidean;
@@ -11,7 +11,7 @@ use super::euclidian::euclidean;
 // -------------------------------------------------------------------------------------------------
 
 /// Emits `Option(Event)` every nth [`SecondTimeStep`] with an optional pattern and offset.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SecondTimeRhythm {
     time_base: SecondTimeBase,
     step: SecondTimeStep,
@@ -40,7 +40,7 @@ impl SecondTimeRhythm {
             pattern_pos,
             event_iter,
             event_iter_sample_time,
-            sample_offset
+            sample_offset,
         }
     }
 

@@ -18,7 +18,7 @@ use crate::EventIter;
 /// Sequencially arrange [`Phrase`] into a new [`EventIter`] to form simple arrangements.
 ///
 /// The `run_until_time` function can be used to feed the entire sequence into a player engine.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Sequence {
     time_base: BeatTimeBase,
     phrases: Rc<RefCell<Vec<Phrase>>>,

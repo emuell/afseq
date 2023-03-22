@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::event::{fixed::FixedEventIter, Event, EventIter};
 
 // -------------------------------------------------------------------------------------------------
@@ -45,6 +47,16 @@ impl MutatedEventIter {
 
     fn mutate(event: Event, map: &mut dyn FnMut(Event) -> Event) -> Event {
         (*map)(event)
+    }
+}
+
+impl Debug for MutatedEventIter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("MutatedEventIter")
+            .field("events", &self.events)
+            .field("initial_events", &self.initial_events)
+            .field("current", &self.current)
+            .finish()
     }
 }
 

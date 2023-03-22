@@ -1,5 +1,7 @@
 //! The time base that `Rhythms` can run on.
 
+use std::fmt::Debug;
+
 mod beats;
 pub use beats::{BeatTimeBase, BeatTimeStep};
 
@@ -15,7 +17,7 @@ pub type SampleOffset = i64;
 // -------------------------------------------------------------------------------------------------
 
 /// Displays sample times as strings in various formats
-pub trait SampleTimeDisplay {
+pub trait SampleTimeDisplay: Debug {
     /// generate a string representation of the the given sample time
     fn display(&self, sample_time: SampleTime) -> String;
 }
@@ -23,7 +25,7 @@ pub trait SampleTimeDisplay {
 // -------------------------------------------------------------------------------------------------
 
 /// Basic time trait, providing samples <-> second rate conversion only.
-pub trait TimeBase {
+pub trait TimeBase: Debug {
     /// Sample rate for the time base.  
     fn samples_per_second(&self) -> u32;
 

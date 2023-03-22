@@ -3,7 +3,7 @@ use crate::event::{Event, EventIter, NoteEvent, ParameterChangeEvent};
 // -------------------------------------------------------------------------------------------------
 
 /// Endlessly emits a single, fixed [`Event`].
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FixedEventIter {
     events: Vec<Event>,
     current: usize,
@@ -69,9 +69,7 @@ impl ToFixedEventIter for Vec<NoteEvent> {
     /// resulting into a single polyphonic event.
     fn to_event(self) -> FixedEventIter {
         FixedEventIter::new(vec![Event::NoteEvents(
-            self.iter()
-                .map(|v| Some(v.clone()))
-                .collect::<Vec<_>>(),
+            self.iter().map(|v| Some(v.clone())).collect::<Vec<_>>(),
         )])
     }
 }
