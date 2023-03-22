@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter},
     time::{BeatTimeBase, BeatTimeStep, SampleTimeDisplay},
-    Rhythm, SampleOffset, SampleTime,
+    Rhythm, SampleTime,
 };
 
 use super::euclidian::euclidean;
@@ -20,7 +20,7 @@ pub struct BeatTimeRhythm {
     pattern_pos: usize,
     event_iter: Rc<RefCell<dyn EventIter>>,
     event_iter_sample_time: f64,
-    sample_offset: SampleOffset,
+    sample_offset: SampleTime,
 }
 
 impl BeatTimeRhythm {
@@ -121,7 +121,7 @@ impl Iterator for BeatTimeRhythm {
             return None;
         }
         // fetch current value
-        let sample_time = (self.event_iter_sample_time as i64 + self.sample_offset).max(0) as u64;
+        let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
         let value = if self.pattern[self.pattern_pos] {
             Some((sample_time, self.event_iter.borrow_mut().next()))
         } else {
@@ -144,10 +144,10 @@ impl Rhythm for BeatTimeRhythm {
         Box::new(self.time_base)
     }
 
-    fn sample_offset(&self) -> SampleOffset {
+    fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }
-    fn set_sample_offset(&mut self, sample_offset: SampleOffset) {
+    fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset
     }
 

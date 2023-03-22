@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use crate::{event::Event, time::SampleTimeDisplay, SampleOffset, SampleTime};
+use crate::{event::Event, time::SampleTimeDisplay, SampleTime};
 
 pub mod beat_time;
 pub mod euclidian;
@@ -25,9 +25,9 @@ pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;
 
     /// Custom sample offset value which is applied to emitted events.
-    fn sample_offset(&self) -> SampleOffset;
+    fn sample_offset(&self) -> SampleTime;
     /// Set a new custom sample offset value.
-    fn set_sample_offset(&mut self, sample_offset: SampleOffset);
+    fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
     /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);

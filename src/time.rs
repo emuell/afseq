@@ -12,7 +12,6 @@ pub use seconds::{SecondTimeBase, SecondTimeStep};
 
 /// Sample time value type emitted by the [Rhythm](`crate::Rhythm`) trait.
 pub type SampleTime = u64;
-pub type SampleOffset = i64;
 
 // -------------------------------------------------------------------------------------------------
 

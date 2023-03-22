@@ -8,8 +8,7 @@ use std::{
 };
 
 use crate::{
-    event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm,
-    SampleOffset, SampleTime,
+    event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm, SampleTime,
 };
 
 #[cfg(doc)]
@@ -66,12 +65,11 @@ impl From<Box<dyn Rhythm>> for RhythmSlot {
 #[derive(Clone, Debug)]
 pub struct Phrase {
     time_base: BeatTimeBase,
-    offset: BeatTimeStep,
-    sample_offset: SampleOffset,
     length: BeatTimeStep,
     rhythm_slots: Rc<RefCell<Vec<RhythmSlot>>>,
     next_events: Vec<Option<RhythmEvent>>,
     held_back_event: Option<RhythmEvent>,
+    sample_offset: SampleTime,
 }
 
 impl Phrase {
@@ -83,36 +81,21 @@ impl Phrase {
         rhythm_slots: Vec<R>,
         length: BeatTimeStep,
     ) -> Self {
-        let offset = BeatTimeStep::Beats(0.0);
-        let sample_offset = 0;
         let next_events = vec![None; rhythm_slots.len()];
         let held_back_event = None;
+        let sample_offset = 0;
         Self {
             time_base,
-            offset,
-            sample_offset,
             length,
             rhythm_slots: Rc::new(RefCell::new(
                 rhythm_slots
-                    .into_iter()
-                    .map(|rhythm| rhythm.into())
-                    .collect::<Vec<_>>(),
+                .into_iter()
+                .map(|rhythm| rhythm.into())
+                .collect::<Vec<_>>(),
             )),
             next_events,
             held_back_event,
-        }
-    }
-
-    /// Apply the given beat-time step offset to all events.
-    pub fn with_offset<O: Into<Option<BeatTimeStep>>>(&self, offset: O) -> Phrase {
-        Self {
-            time_base: self.time_base,
-            offset: offset.into().unwrap_or(BeatTimeStep::Beats(0.0)),
-            sample_offset: self.sample_offset,
-            length: self.length,
-            rhythm_slots: self.rhythm_slots.clone(),
-            next_events: self.next_events.clone(),
-            held_back_event: self.held_back_event.clone(),
+            sample_offset,
         }
     }
 
@@ -154,9 +137,9 @@ impl Phrase {
         }
     }
 
-    /// reset playback status and shift offset to the given sample position.
+    /// reset playback status and shift events to the given sample position.
     /// Further take over rhythms from the passed previously playing phrase for RhythmSlot::Continue slots.   
-    pub fn reset_with_offset(&mut self, sample_offset: SampleOffset, previous_phrase: &Phrase) {
+    pub fn reset_with_offset(&mut self, sample_offset: SampleTime, previous_phrase: &Phrase) {
         // reset rhythm iters, unless they are in continue mode. in contine mode, copy the slot
         // from the previously playing phrase and adjust sample offsets to fit.
         let previous_rhythms = previous_phrase.rhythm_slots.borrow_mut();
@@ -242,10 +225,7 @@ impl Phrase {
             let next = next_due.clone();
             *next_due = None; // consume
             if let Some((rhythm_index, sample_time, event)) = next {
-                let sample_offset = (self.sample_offset
-                    + self.offset.to_samples(&self.time_base) as i64)
-                    .max(0) as u64;
-                Some((rhythm_index, sample_offset + sample_time, event))
+                Some((rhythm_index, self.sample_offset + sample_time, event))
             } else {
                 None
             }
@@ -272,10 +252,10 @@ impl Rhythm for Phrase {
         Box::new(self.time_base)
     }
 
-    fn sample_offset(&self) -> SampleOffset {
+    fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }
-    fn set_sample_offset(&mut self, sample_offset: SampleOffset) {
+    fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset
     }
 
