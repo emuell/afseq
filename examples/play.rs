@@ -173,7 +173,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
         BeatTimeStep::Bar(4.0)
     );
-    let intro_with_bass = Phrase::new(
+    let build_up = Phrase::new(
         beat_time,
         vec![
             RhythmSlot::Continue,
@@ -195,7 +195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             synth_pattern.into(),
             RhythmSlot::Stop,
         ],
-        BeatTimeStep::Bar(32.0)
+        BeatTimeStep::Bar(16.0)
     );
 
     let main_with_fx = Phrase::new(
@@ -208,7 +208,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             RhythmSlot::Continue,
             fx_pattern.into(),
         ],
-        BeatTimeStep::Bar(32.0)
+        BeatTimeStep::Bar(16.0)
     );
 
     // form a sequence from phrases
@@ -216,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         beat_time,
         vec![
             intro,
-            intro_with_bass,
+            build_up,
             main,
             main_with_fx,
         ],
