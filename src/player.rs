@@ -20,6 +20,15 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
+/// Preload time of the player's run_until function. Should be big enough to ensure that events
+/// are scheduled ahead of playback time, but small enough to avoid latency.   
+#[cfg(debug_assertions)] 
+const PLAYBACK_PRELOAD_SECONDS: f64 = 5.0;
+#[cfg(not(debug_assertions))]
+const PLAYBACK_PRELOAD_SECONDS: f64 = 1.0;            
+
+// -------------------------------------------------------------------------------------------------
+
 /// Preloads a set of sample files and stores them as
 /// [`afplay::PreloadedFileSource`](afplay::source::file::preloaded::PreloadedFileSource) for later
 /// use.
@@ -211,14 +220,13 @@ impl SamplePlayer {
         }
         while !stop_fn() {
             // calculate emitted and playback time differences
-            const PRELOAD_SECONDS: f64 = 0.5;
             let seconds_emitted = time_base.samples_to_seconds(self.emitted_sample_time);
             let seconds_played = time_base.samples_to_seconds(
                 self.player.output_sample_frame_position() - self.playback_sample_time,
             );
-            let seconds_to_emit = seconds_played - seconds_emitted + PRELOAD_SECONDS;
+            let seconds_to_emit = seconds_played - seconds_emitted + PLAYBACK_PRELOAD_SECONDS;
             // run sequence ahead of player up to PRELOAD_SECONDS
-            if seconds_to_emit >= PRELOAD_SECONDS || self.emitted_sample_time == 0 {
+            if seconds_to_emit >= PLAYBACK_PRELOAD_SECONDS || self.emitted_sample_time == 0 {
                 let samples_to_emit = time_base.seconds_to_samples(seconds_to_emit);
                 self.run_until_time(
                     sequence,
@@ -227,7 +235,7 @@ impl SamplePlayer {
                 );
                 self.emitted_sample_time += samples_to_emit;
             } else {
-                let sleep_amount = (PRELOAD_SECONDS - seconds_to_emit).max(0.0);
+                let sleep_amount = (PLAYBACK_PRELOAD_SECONDS - seconds_to_emit).max(0.0);
                 std::thread::sleep(std::time::Duration::from_secs_f64(sleep_amount));
             }
         }
@@ -244,7 +252,6 @@ impl SamplePlayer {
             .expect("failed to stop all playing samples");
         // fetch player's actual position and use it as start offset
         self.playback_sample_time = self.player.output_sample_frame_position();
-        // run PRELOAD_SECONDS ahead of the player's time until stop_fn signals us to stop
         self.emitted_sample_time = 0;
         self.emitted_beats = 0;
     }
@@ -262,7 +269,7 @@ impl SamplePlayer {
         sample_time: SampleTime,
     ) {
         let time_display = sequence.time_display();
-        sequence.run_until_time(sample_time, |rhythm_index, sample_time, event| {
+        sequence.run_until_time(sample_time, |rhythm_index, sample_time, event: &Option<Event>| {
             // print
             if self.show_events {
                 const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
