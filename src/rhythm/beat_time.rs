@@ -152,6 +152,9 @@ impl Rhythm for BeatTimeRhythm {
     }
 
     fn reset(&mut self) {
+        // reset sample offset
+        self.sample_offset = 0;
+        // reset iterator state
         self.event_iter.borrow_mut().reset();
         self.event_iter_sample_time = self.offset.to_samples(&self.time_base);
         self.pattern_pos = 0;

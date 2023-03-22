@@ -71,7 +71,7 @@ impl Sequence {
                 self.current_phrase_mut()
                     .run_until_time(sample_position + next_phrase_start, &mut consumer);
                 // select next phrase in the sequence
-                let mut last_phrase = self.current_phrase_mut().clone();
+                let previous_phrase = self.current_phrase_mut().clone();
                 self.phrase_index += 1;
                 if self.phrase_index >= self.phrases().len() {
                     self.phrase_index = 0;
@@ -82,7 +82,7 @@ impl Sequence {
                 if self.phrases().len() > 1 {
                     let sample_offset = self.sample_position;
                     self.current_phrase_mut()
-                        .reset_with_offset(sample_offset as i64, &mut last_phrase);
+                        .reset_with_offset(sample_offset as i64, &previous_phrase);
                 }
             } else {
                 // keep running the current phrase
@@ -139,6 +139,8 @@ impl Rhythm for Sequence {
     }
 
     fn reset(&mut self) {
+        // reset sample offset
+        self.sample_offset = 0;
         // reset our own iter state
         self.sample_position = 0;
         self.sample_position_in_phrase = 0;

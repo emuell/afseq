@@ -25,7 +25,7 @@ pub type RhythmEvent = (RhythmIndex, SampleTime, Option<Event>);
 // -------------------------------------------------------------------------------------------------
 
 /// A single slot in a [`Phrase`] vector.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RhythmSlot {
     /// Stop previous playing rhythm and/or simply play nothing.
     /// This can be useful to create empty placeholder slots in e.g. a [`Sequence`].
@@ -33,7 +33,7 @@ pub enum RhythmSlot {
     /// Continue playing a previously played rhythm in a [`Sequence`].
     Continue,
     /// Play the given boxed rhytm in this slot.
-    Rhythm(Box<dyn Rhythm>),
+    Rhythm(Rc<RefCell<Box<dyn Rhythm>>>),
 }
 
 /// Convert an unboxed rhythm to a RhythmSlot
@@ -42,14 +42,14 @@ where
     R: Rhythm + 'static,
 {
     fn from(r: R) -> RhythmSlot {
-        RhythmSlot::Rhythm(Box::new(r))
+        RhythmSlot::Rhythm(Rc::new(RefCell::new(Box::new(r))))
     }
 }
 
 /// Convert an boxed rhythm to a RhythmSlot
 impl From<Box<dyn Rhythm>> for RhythmSlot {
     fn from(r: Box<dyn Rhythm>) -> RhythmSlot {
-        RhythmSlot::Rhythm(r)
+        RhythmSlot::Rhythm(Rc::new(RefCell::new(r)))
     }
 }
 
@@ -156,16 +156,19 @@ impl Phrase {
 
     /// reset playback status and shift offset to the given sample position.
     /// Further take over rhythms from the passed previously playing phrase for RhythmSlot::Continue slots.   
-    pub fn reset_with_offset(&mut self, sample_offset: SampleOffset, previous_phrase: &mut Phrase) {
+    pub fn reset_with_offset(&mut self, sample_offset: SampleOffset, previous_phrase: &Phrase) {
         // reset rhythm iters, unless they are in continue mode. in contine mode, copy the slot
         // from the previously playing phrase and adjust sample offsets to fit.
-        let mut previous_rhythms = previous_phrase.rhythm_slots.borrow_mut();
+        let previous_rhythms = previous_phrase.rhythm_slots.borrow_mut();
         let mut current_rhythms = self.rhythm_slots.borrow_mut();
         for rhythm_index in 0..current_rhythms.len() {
             match &mut current_rhythms[rhythm_index] {
                 RhythmSlot::Rhythm(rhythm) => {
-                    rhythm.reset();
-                    rhythm.set_sample_offset(sample_offset);
+                    {
+                        let mut rhythm = rhythm.borrow_mut();
+                        rhythm.reset();
+                        rhythm.set_sample_offset(sample_offset);
+                    }
                     self.next_events[rhythm_index] = None;
                     if let Some((index, _, _)) = self.held_back_event {
                         if index == rhythm_index {
@@ -184,18 +187,14 @@ impl Phrase {
                 RhythmSlot::Continue => {
                     // take over pending events
                     self.next_events[rhythm_index] =
-                        std::mem::replace(&mut previous_phrase.next_events[rhythm_index], None);
+                        previous_phrase.next_events[rhythm_index].clone();
                     if let Some((index, _, _)) = previous_phrase.held_back_event {
                         if index == rhythm_index {
-                            self.held_back_event =
-                                std::mem::replace(&mut previous_phrase.held_back_event, None)
+                            self.held_back_event = previous_phrase.held_back_event.clone();
                         }
                     }
                     // take over rhythm
-                    current_rhythms[rhythm_index] = std::mem::replace(
-                        &mut previous_rhythms[rhythm_index],
-                        RhythmSlot::Continue,
-                    );
+                    current_rhythms[rhythm_index] = previous_rhythms[rhythm_index].clone();
                 }
             }
         }
@@ -215,7 +214,7 @@ impl Phrase {
                     // NB: Continue mode is resolved by the Sequence - if not, it should behave like Stop
                     RhythmSlot::Stop | RhythmSlot::Continue => *next_event = None,
                     RhythmSlot::Rhythm(rhythm) => {
-                        if let Some((sample_time, event)) = rhythm.next() {
+                        if let Some((sample_time, event)) = rhythm.borrow_mut().next() {
                             *next_event = Some((rhythm_index, sample_time, event));
                         } else {
                             *next_event = None;
@@ -281,13 +280,15 @@ impl Rhythm for Phrase {
     }
 
     fn reset(&mut self) {
-        // reset our own iter state
+        // reset sample offset
+        self.sample_offset = 0;
+        // reset iterator state
         self.next_events.fill(None);
         self.held_back_event = None;
-        // reset all our rhythm iters
+        // reset all rhythms in our slots as well
         for rhythm_slot in self.rhythm_slots.borrow_mut().iter_mut() {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.reset()
+                rhythm.borrow_mut().reset()
             }
         }
     }
