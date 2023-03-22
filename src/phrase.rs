@@ -16,33 +16,22 @@ use crate::Sequence;
 
 // -------------------------------------------------------------------------------------------------
 
-type RhythmIndex = usize;
+/// Rhythm index in `RhythmEvent`.
+pub type RhythmIndex = usize;
+/// Event as emitted by Phrase, tagged with a sample time and rhythm index.
+pub type RhythmEvent = (RhythmIndex, SampleTime, Option<Event>);
+
+// -------------------------------------------------------------------------------------------------
 
 /// A single slot in a [`Phrase`] vector.
 pub enum RhythmSlot {
-    /// Stop previous playing rhythm and play nothing new.
-    /// This can be useful in [`Sequence`] to create empty placeholder slots.
+    /// Stop previous playing rhythm and/or simply play nothing.
+    /// This can be useful to create empty placeholder slots in e.g. a [`Sequence`].
     Stop,
-    /// TODO: Continue playing previous playing rhythm.
-    /// This is only meaningful in [`Sequence`] rhythms to repeat a rhythm instead
-    /// of restarting it at a new sequence position.
+    /// Continue playing a previously played rhythm in a [`Sequence`].
     Continue,
     /// Play the given boxed rhytm in this slot.
     Rhythm(Box<dyn Rhythm>),
-}
-
-impl RhythmSlot {
-    /// Create a new RhythmSlot from an unboxed [`Rhythm`] instance.
-    pub fn from_rhythm<R>(rhythm: R) -> Self
-    where
-        R: Rhythm + 'static,
-    {
-        Self::Rhythm(Box::new(rhythm))
-    }
-    /// Create a new RhythmSlot from a boxed [`Rhythm`] instance.
-    pub fn from_boxed_rhythm(rhythm: Box<dyn Rhythm>) -> Self {
-        Self::Rhythm(rhythm)
-    }
 }
 
 /// Convert an unboxed rhythm to a RhythmSlot
@@ -79,14 +68,14 @@ pub struct Phrase {
     sample_offset: SampleOffset,
     length: BeatTimeStep,
     rhythm_slots: Rc<RefCell<Vec<RhythmSlot>>>,
-    next_events: Vec<Option<(RhythmIndex, SampleTime, Option<Event>)>>,
-    held_back_event: Option<(RhythmIndex, SampleTime, Option<Event>)>,
+    next_events: Vec<Option<RhythmEvent>>,
+    held_back_event: Option<RhythmEvent>,
 }
 
 impl Phrase {
     /// Create a new phrase from a vector of [`RhythmSlot`] and the given length.
-    /// RhythmSlot has `Into` implementastions, so you can also pass a vector of 
-    /// unboxed rhythm instance here.
+    /// RhythmSlot has `Into` implementastions, so you can also pass a vector of
+    /// boxed or raw rhythm instance here.
     pub fn new<R: Into<RhythmSlot>>(
         time_base: BeatTimeBase,
         rhythm_slots: Vec<R>,
@@ -126,7 +115,7 @@ impl Phrase {
     }
 
     /// Read-only access to our phrase length.
-    /// This is only applied in [`Sequence`].
+    /// This is applied in [`Sequence`] only.
     pub fn length(&self) -> BeatTimeStep {
         self.length
     }
@@ -163,7 +152,54 @@ impl Phrase {
         }
     }
 
-    fn next_event(&mut self) -> Option<(RhythmIndex, SampleTime, Option<Event>)> {
+    /// reset playback status and shift offset to the given sample position.
+    /// Further take over rhythms from the passed previously playing phrase for RhythmSlot::Continue slots.   
+    pub fn reset_with_offset(&mut self, sample_offset: SampleOffset, previous_phrase: &mut Phrase) {
+        // reset rhythm iters, unless they are in continue mode. in contine mode, copy the slot
+        // from the previously playing phrase and adjust sample offsets to fit.
+        let mut previous_rhythms = previous_phrase.rhythm_slots.borrow_mut();
+        let mut current_rhythms = self.rhythm_slots.borrow_mut();
+        for rhythm_index in 0..current_rhythms.len() {
+            match &mut current_rhythms[rhythm_index] {
+                RhythmSlot::Rhythm(rhythm) => {
+                    rhythm.reset();
+                    rhythm.set_sample_offset(sample_offset);
+                    self.next_events[rhythm_index] = None;
+                    if let Some((index, _, _)) = self.held_back_event {
+                        if index == rhythm_index {
+                            self.held_back_event = None
+                        }
+                    }
+                }
+                RhythmSlot::Stop => {
+                    self.next_events[rhythm_index] = None;
+                    if let Some((index, _, _)) = self.held_back_event {
+                        if index == rhythm_index {
+                            self.held_back_event = None
+                        }
+                    }
+                }
+                RhythmSlot::Continue => {
+                    // take over pending events
+                    self.next_events[rhythm_index] =
+                        std::mem::replace(&mut previous_phrase.next_events[rhythm_index], None);
+                    if let Some((index, _, _)) = previous_phrase.held_back_event {
+                        if index == rhythm_index {
+                            self.held_back_event =
+                                std::mem::replace(&mut previous_phrase.held_back_event, None)
+                        }
+                    }
+                    // take over rhythm
+                    current_rhythms[rhythm_index] = std::mem::replace(
+                        &mut previous_rhythms[rhythm_index],
+                        RhythmSlot::Continue,
+                    );
+                }
+            }
+        }
+    }
+
+    fn next_event(&mut self) -> Option<RhythmEvent> {
         // fetch next events in all rhythms
         for (rhythm_index, (rhythm_slot, next_event)) in self
             .rhythm_slots
@@ -174,8 +210,8 @@ impl Phrase {
         {
             if !next_event.is_some() {
                 match rhythm_slot {
-                    RhythmSlot::Stop => *next_event = None,
-                    RhythmSlot::Continue => todo!(),
+                    // NB: Continue mode is resolved by the Sequence - if not, it should behave like Stop
+                    RhythmSlot::Stop | RhythmSlot::Continue => *next_event = None,
                     RhythmSlot::Rhythm(rhythm) => {
                         if let Some((sample_time, event)) = rhythm.next() {
                             *next_event = Some((rhythm_index, sample_time, event));

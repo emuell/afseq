@@ -160,12 +160,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 vec![None, None, Some((FX, "F 4", 0.2))],
             ]));
 
-    // combine 
+    // arrange rhytms into phrases with equal row counts 
     let intro = Phrase::new(
         beat_time,
         vec![
-            kick_pattern.clone().into(),
-            snare_pattern.clone().into(),
+            kick_pattern.into(),
+            snare_pattern.into(),
             RhythmSlot::Stop,
             RhythmSlot::Stop,
             RhythmSlot::Stop,
@@ -176,10 +176,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let intro_with_bass = Phrase::new(
         beat_time,
         vec![
-            kick_pattern.clone().into(),
-            snare_pattern.clone().into(),
-            hihat_rhythm.clone().into(),
-            bass_pattern.clone().into(),
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            hihat_rhythm.into(),
+            bass_pattern.into(),
             RhythmSlot::Stop,
             RhythmSlot::Stop,
         ],
@@ -188,27 +188,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let main = Phrase::new(
         beat_time,
         vec![
-            kick_pattern.clone().into(),
-            snare_pattern.clone().into(),
-            hihat_rhythm.clone().into(),
-            bass_pattern.clone().into(),
-            synth_pattern.clone().into(),
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            synth_pattern.into(),
             RhythmSlot::Stop,
         ],
-        BeatTimeStep::Bar(16.0)
+        BeatTimeStep::Bar(32.0)
     );
 
     let main_with_fx = Phrase::new(
         beat_time,
         vec![
-            kick_pattern.into(),
-            snare_pattern.into(),
-            hihat_rhythm.into(),
-            bass_pattern.into(),
-            synth_pattern.into(),
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
+            RhythmSlot::Continue,
             fx_pattern.into(),
-        ] as Vec<RhythmSlot>,
-        BeatTimeStep::Bar(16.0)
+        ],
+        BeatTimeStep::Bar(32.0)
     );
 
     // form a sequence from phrases
@@ -217,9 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec![
             intro,
             intro_with_bass,
-            main.clone(),
             main,
-            main_with_fx.clone(),
             main_with_fx,
         ],
     );

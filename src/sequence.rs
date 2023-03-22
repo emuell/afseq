@@ -15,10 +15,6 @@ use crate::EventIter;
 
 // -------------------------------------------------------------------------------------------------
 
-type RhythmIndex = usize;
-
-// -------------------------------------------------------------------------------------------------
-
 /// Sequencially arrange [`Phrase`] into a new [`EventIter`] to form simple arrangements.
 ///
 /// The `run_until_time` function can be used to feed the entire sequence into a player engine.
@@ -60,7 +56,10 @@ impl Sequence {
     where
         F: FnMut(RhythmIndex, SampleTime, &Option<Event>),
     {
-        debug_assert!(run_until_time >= self.sample_position, "can not rewind playback here");
+        debug_assert!(
+            run_until_time >= self.sample_position,
+            "can not rewind playback here"
+        );
         while run_until_time - self.sample_position > 0 {
             let phrase_length_in_samples =
                 self.current_phrase().length().to_samples(&self.time_base) as SampleTime;
@@ -72,17 +71,18 @@ impl Sequence {
                 self.current_phrase_mut()
                     .run_until_time(sample_position + next_phrase_start, &mut consumer);
                 // select next phrase in the sequence
+                let mut last_phrase = self.current_phrase_mut().clone();
                 self.phrase_index += 1;
                 if self.phrase_index >= self.phrases().len() {
                     self.phrase_index = 0;
                 }
                 self.sample_position_in_phrase = 0;
                 self.sample_position += next_phrase_start;
-                // reset the new phrase
+                // reset the new phrase or apply continues modes
                 if self.phrases().len() > 1 {
-                    let sample_position = self.sample_position;
-                    self.current_phrase_mut().reset();
-                    self.current_phrase_mut().set_sample_offset(sample_position);
+                    let sample_offset = self.sample_position;
+                    self.current_phrase_mut()
+                        .reset_with_offset(sample_offset as i64, &mut last_phrase);
                 }
             } else {
                 // keep running the current phrase
