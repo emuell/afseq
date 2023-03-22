@@ -214,7 +214,7 @@ impl SamplePlayer {
         } else {
             // match playing notes state to the passed rhythm
             self.playing_notes
-                .resize(sequence.phrases().first().unwrap().rhythms().len(), HashMap::new());
+                .resize(sequence.phrases().first().unwrap().rhythm_slots().len(), HashMap::new());
             // seek new phase to our previously played time
             self.seek_sequence_until_time(sequence, self.emitted_sample_time);
         }
@@ -245,7 +245,7 @@ impl SamplePlayer {
         // rebuild playing notes vec
         self.playing_notes.clear();
         self.playing_notes
-            .resize(sequence.phrases().first().unwrap().rhythms().len(), HashMap::new());
+            .resize(sequence.phrases().first().unwrap().rhythm_slots().len(), HashMap::new());
         // stop whatever is playing in case we're restarting
         self.player
             .stop_all_sources()

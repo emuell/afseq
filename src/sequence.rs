@@ -1,10 +1,5 @@
 //! Combine multiple `Phrase` iterators into a single one to play them sequentially.
 
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
-
 use crate::{
     event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
     SampleTime,
@@ -21,7 +16,7 @@ use crate::EventIter;
 #[derive(Clone, Debug)]
 pub struct Sequence {
     time_base: BeatTimeBase,
-    phrases: Rc<RefCell<Vec<Phrase>>>,
+    phrases: Vec<Phrase>,
     phrase_index: usize,
     sample_position_in_phrase: SampleTime,
     sample_position: SampleTime,
@@ -37,7 +32,7 @@ impl Sequence {
         let sample_offset = 0;
         Self {
             time_base,
-            phrases: Rc::new(RefCell::new(phrases)),
+            phrases,
             phrase_index,
             sample_position_in_phrase,
             sample_position,
@@ -46,8 +41,8 @@ impl Sequence {
     }
 
     /// Read-only borrowed access to our phrases.
-    pub fn phrases(&self) -> Ref<Vec<Phrase>> {
-        self.phrases.borrow()
+    pub fn phrases(&self) -> &Vec<Phrase> {
+        &self.phrases
     }
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
@@ -95,14 +90,12 @@ impl Sequence {
         }
     }
 
-    fn current_phrase(&self) -> Ref<Phrase> {
-        let phrases: Ref<Vec<Phrase>> = self.phrases.borrow();
-        Ref::map(phrases, |t| &t[self.phrase_index])
+    fn current_phrase(&self) -> &Phrase {
+        &self.phrases[self.phrase_index]
     }
 
-    fn current_phrase_mut(&mut self) -> RefMut<Phrase> {
-        let phrases = self.phrases.borrow_mut();
-        RefMut::map(phrases, |t: &mut Vec<Phrase>| &mut t[self.phrase_index])
+    fn current_phrase_mut(&mut self) -> &mut Phrase {
+        &mut self.phrases[self.phrase_index]
     }
 
     fn next_event(&mut self) -> Option<(SampleTime, Option<Event>)> {
@@ -142,8 +135,7 @@ impl Rhythm for Sequence {
         self.sample_position = 0;
         self.sample_position_in_phrase = 0;
         // reset all our phrase iters
-        let mut phrases = (*self.phrases).borrow_mut();
-        for phrase in phrases.iter_mut() {
+        for phrase in self.phrases.iter_mut() {
             phrase.reset()
         }
     }

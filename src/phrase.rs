@@ -1,11 +1,6 @@
 //! Combine multiple `Rythm` iterators into a single one to play them at the same time.
 
-use std::{
-    cell::{Ref, RefCell},
-    cmp::Ordering,
-    fmt::Debug,
-    rc::Rc,
-};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
     event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm, SampleTime,
@@ -35,20 +30,21 @@ pub enum RhythmSlot {
     Rhythm(Rc<RefCell<Box<dyn Rhythm>>>),
 }
 
-/// Convert an unboxed rhythm to a RhythmSlot
+/// Convert an unboxed Rhythm to a RhythmSlot
 impl<R> From<R> for RhythmSlot
 where
     R: Rhythm + 'static,
 {
-    fn from(r: R) -> RhythmSlot {
-        RhythmSlot::Rhythm(Rc::new(RefCell::new(Box::new(r))))
+    fn from(rhythm: R) -> RhythmSlot {
+        RhythmSlot::Rhythm(Rc::new(RefCell::new(Box::new(rhythm))))
     }
 }
 
-/// Convert an boxed rhythm to a RhythmSlot
-impl From<Box<dyn Rhythm>> for RhythmSlot {
-    fn from(r: Box<dyn Rhythm>) -> RhythmSlot {
-        RhythmSlot::Rhythm(Rc::new(RefCell::new(r)))
+/// Convert a boxed Rhythm to a RhythmSlot
+impl From<Box<dyn Rhythm>> for RhythmSlot
+{
+    fn from(rhythm: Box<dyn Rhythm>) -> RhythmSlot {
+        RhythmSlot::Rhythm(Rc::new(RefCell::new(rhythm)))
     }
 }
 
@@ -66,7 +62,7 @@ impl From<Box<dyn Rhythm>> for RhythmSlot {
 pub struct Phrase {
     time_base: BeatTimeBase,
     length: BeatTimeStep,
-    rhythm_slots: Rc<RefCell<Vec<RhythmSlot>>>,
+    rhythm_slots: Vec<RhythmSlot>,
     next_events: Vec<Option<RhythmEvent>>,
     held_back_event: Option<RhythmEvent>,
     sample_offset: SampleTime,
@@ -87,12 +83,10 @@ impl Phrase {
         Self {
             time_base,
             length,
-            rhythm_slots: Rc::new(RefCell::new(
-                rhythm_slots
+            rhythm_slots: rhythm_slots
                 .into_iter()
-                .map(|rhythm| rhythm.into())
+                .map(|rhythm| -> RhythmSlot { rhythm.into() })
                 .collect::<Vec<_>>(),
-            )),
             next_events,
             held_back_event,
             sample_offset,
@@ -106,8 +100,8 @@ impl Phrase {
     }
 
     /// Read-only access to our rhythm slots.
-    pub fn rhythms(&self) -> Ref<Vec<RhythmSlot>> {
-        self.rhythm_slots.borrow()
+    pub fn rhythm_slots(&self) -> &Vec<RhythmSlot> {
+        &self.rhythm_slots
     }
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
@@ -142,10 +136,8 @@ impl Phrase {
     pub fn reset_with_offset(&mut self, sample_offset: SampleTime, previous_phrase: &Phrase) {
         // reset rhythm iters, unless they are in continue mode. in contine mode, copy the slot
         // from the previously playing phrase and adjust sample offsets to fit.
-        let previous_rhythms = previous_phrase.rhythm_slots.borrow_mut();
-        let mut current_rhythms = self.rhythm_slots.borrow_mut();
-        for rhythm_index in 0..current_rhythms.len() {
-            match &mut current_rhythms[rhythm_index] {
+        for rhythm_index in 0..self.rhythm_slots.len() {
+            match &mut self.rhythm_slots[rhythm_index] {
                 RhythmSlot::Rhythm(rhythm) => {
                     {
                         let mut rhythm = rhythm.borrow_mut();
@@ -177,7 +169,8 @@ impl Phrase {
                         }
                     }
                     // take over rhythm
-                    current_rhythms[rhythm_index] = previous_rhythms[rhythm_index].clone();
+                    self.rhythm_slots[rhythm_index] =
+                        previous_phrase.rhythm_slots[rhythm_index].clone();
                 }
             }
         }
@@ -187,7 +180,6 @@ impl Phrase {
         // fetch next events in all rhythms
         for (rhythm_index, (rhythm_slot, next_event)) in self
             .rhythm_slots
-            .borrow_mut()
             .iter_mut()
             .zip(self.next_events.iter_mut())
             .enumerate()
@@ -266,7 +258,7 @@ impl Rhythm for Phrase {
         self.next_events.fill(None);
         self.held_back_event = None;
         // reset all rhythms in our slots as well
-        for rhythm_slot in self.rhythm_slots.borrow_mut().iter_mut() {
+        for rhythm_slot in self.rhythm_slots.iter_mut() {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
                 rhythm.borrow_mut().reset()
             }
