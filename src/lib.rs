@@ -2,7 +2,7 @@
 //! Part of the [afplay](https://github.com/emuell/afplay) crates.
 
 pub mod time;
-pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
+pub use time::{BeatTimeBase, SampleTime, SampleOffset, SecondTimeBase};
 
 pub mod midi;
 pub use midi::Note;

@@ -1,6 +1,6 @@
 //! Periodically emit `Events` via an `EventIter` on a given time base.
 
-use crate::{event::Event, time::SampleTimeDisplay, SampleTime};
+use crate::{event::Event, time::SampleTimeDisplay, SampleTime, SampleOffset};
 
 pub mod beat_time;
 pub mod euclidian;
@@ -21,6 +21,11 @@ pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> {
     /// create a time display printer, which serializes the given sample time to the Rhythm's
     /// time base (seconds or beats)
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;
+
+    /// Custom sample offset value which is applied to emitted events.
+    fn sample_offset(&self) -> SampleOffset;
+    /// Set a new custom sample offset value.
+    fn set_sample_offset(&mut self, sample_offset: SampleOffset);
 
     /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);

@@ -7,7 +7,8 @@ use std::{
 };
 
 use crate::{
-    event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm, SampleTime,
+    event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm,
+    SampleOffset, SampleTime,
 };
 
 #[cfg(doc)]
@@ -75,7 +76,7 @@ impl From<Box<dyn Rhythm>> for RhythmSlot {
 pub struct Phrase {
     time_base: BeatTimeBase,
     offset: BeatTimeStep,
-    sample_offset: SampleTime,
+    sample_offset: SampleOffset,
     length: BeatTimeStep,
     rhythm_slots: Rc<RefCell<Vec<RhythmSlot>>>,
     next_events: Vec<Option<(RhythmIndex, SampleTime, Option<Event>)>>,
@@ -130,15 +131,7 @@ impl Phrase {
         self.length
     }
 
-    ///
-    pub fn sample_offset(&self) -> SampleTime {
-        self.sample_offset
-    }
-    pub fn set_sample_offset(&mut self, sample_offset: SampleTime) {
-        self.sample_offset = sample_offset
-    }
-
-    /// Read-only access to our rhythm slots
+    /// Read-only access to our rhythm slots.
     pub fn rhythms(&self) -> Ref<Vec<RhythmSlot>> {
         self.rhythm_slots.borrow()
     }
@@ -212,8 +205,9 @@ impl Phrase {
             let next = next_due.clone();
             *next_due = None; // consume
             if let Some((rhythm_index, sample_time, event)) = next {
-                let sample_offset =
-                    self.sample_offset + self.offset.to_samples(&self.time_base) as u64;
+                let sample_offset = (self.sample_offset
+                    + self.offset.to_samples(&self.time_base) as i64)
+                    .max(0) as u64;
                 Some((rhythm_index, sample_offset + sample_time, event))
             } else {
                 None
@@ -239,6 +233,13 @@ impl Iterator for Phrase {
 impl Rhythm for Phrase {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
+    }
+
+    fn sample_offset(&self) -> SampleOffset {
+        self.sample_offset
+    }
+    fn set_sample_offset(&mut self, sample_offset: SampleOffset) {
+        self.sample_offset = sample_offset
     }
 
     fn reset(&mut self) {

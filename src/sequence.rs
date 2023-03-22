@@ -6,7 +6,8 @@ use std::{
 };
 
 use crate::{
-    event::Event, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm, SampleTime,
+    event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
+    SampleOffset, SampleTime,
 };
 
 #[cfg(doc)]
@@ -28,6 +29,7 @@ pub struct Sequence {
     phrase_index: usize,
     sample_position_in_phrase: SampleTime,
     sample_position: SampleTime,
+    sample_offset: SampleOffset,
 }
 
 impl Sequence {
@@ -36,12 +38,14 @@ impl Sequence {
         let phrase_index = 0;
         let sample_position_in_phrase = 0;
         let sample_position = 0;
+        let sample_offset = 0;
         Self {
             time_base,
             phrases: Rc::new(RefCell::new(phrases)),
             phrase_index,
             sample_position_in_phrase,
             sample_position,
+            sample_offset,
         }
     }
 
@@ -102,7 +106,15 @@ impl Sequence {
     }
 
     fn next_event(&mut self) -> Option<(SampleTime, Option<Event>)> {
-        self.current_phrase_mut().next()
+        let event = self.current_phrase_mut().next();
+        if let Some((sample_time, event)) = event {
+            Some((
+                (sample_time as i64 + self.sample_offset).max(0) as u64,
+                event,
+            ))
+        } else {
+            None
+        }
     }
 }
 
@@ -117,6 +129,13 @@ impl Iterator for Sequence {
 impl Rhythm for Sequence {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
+    }
+
+    fn sample_offset(&self) -> SampleOffset {
+        self.sample_offset
+    }
+    fn set_sample_offset(&mut self, sample_offset: SampleOffset) {
+        self.sample_offset = sample_offset
     }
 
     fn reset(&mut self) {
