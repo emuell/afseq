@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hihat_rhythm = Phrase::new(
         beat_time,
         vec![hihat_pattern, hihat_pattern2],
-        BeatTimeStep::Bar(4.0)
+        BeatTimeStep::Bar(4.0),
     );
 
     let bass_notes = scale::Scale::from_regex("c aeolian")?.notes();
@@ -160,65 +160,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 vec![None, None, Some((FX, "F 4", 0.2))],
             ]));
 
-    // arrange rhytms into phrases with equal row counts 
-    let intro = Phrase::new(
-        beat_time,
-        vec![
-            kick_pattern.into(),
-            snare_pattern.into(),
-            RhythmSlot::Stop,
-            RhythmSlot::Stop,
-            RhythmSlot::Stop,
-            RhythmSlot::Stop,
-        ],
-        BeatTimeStep::Bar(4.0)
-    );
-    let build_up = Phrase::new(
-        beat_time,
-        vec![
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            hihat_rhythm.into(),
-            bass_pattern.into(),
-            RhythmSlot::Stop,
-            RhythmSlot::Stop,
-        ],
-        BeatTimeStep::Bar(4.0)
-    );
-    let main = Phrase::new(
-        beat_time,
-        vec![
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            synth_pattern.into(),
-            RhythmSlot::Stop,
-        ],
-        BeatTimeStep::Bar(16.0)
-    );
-
-    let main_with_fx = Phrase::new(
-        beat_time,
-        vec![
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            RhythmSlot::Continue,
-            fx_pattern.into(),
-        ],
-        BeatTimeStep::Bar(16.0)
-    );
-
-    // form a sequence from phrases
+    // arrange rhytms into phrases and sequence up these phrases to create a litte arrangement
     let mut sequence = Sequence::new(
         beat_time,
         vec![
-            intro,
-            build_up,
-            main,
-            main_with_fx,
+            Phrase::new(
+                beat_time,
+                vec![
+                    RhythmSlot::from(kick_pattern),
+                    RhythmSlot::from(snare_pattern),
+                    RhythmSlot::Stop, // hihat
+                    RhythmSlot::Stop, // bass
+                    RhythmSlot::Stop, // synth
+                    RhythmSlot::Stop, // fx
+                ],
+                BeatTimeStep::Bar(8.0),
+            ),
+            Phrase::new(
+                beat_time,
+                vec![
+                    RhythmSlot::Continue, // kick
+                    RhythmSlot::Continue, // snare
+                    RhythmSlot::from(hihat_rhythm),
+                    RhythmSlot::from(bass_pattern),
+                    RhythmSlot::Stop, // synth
+                    RhythmSlot::Stop, // fx
+                ],
+                BeatTimeStep::Bar(8.0),
+            ),
+            Phrase::new(
+                beat_time,
+                vec![
+                    RhythmSlot::Continue, // kick
+                    RhythmSlot::Continue, // snare
+                    RhythmSlot::Continue, // hihat
+                    RhythmSlot::Continue, // bass
+                    RhythmSlot::from(synth_pattern),
+                    RhythmSlot::Stop, // fx
+                ],
+                BeatTimeStep::Bar(16.0),
+            ),
+            Phrase::new(
+                beat_time,
+                vec![
+                    RhythmSlot::Continue, // kick
+                    RhythmSlot::Continue, // snare
+                    RhythmSlot::Continue, // hihat
+                    RhythmSlot::Continue, // bass
+                    RhythmSlot::Continue, // synth
+                    RhythmSlot::from(fx_pattern),
+                ],
+                BeatTimeStep::Bar(16.0),
+            ),
         ],
     );
 
