@@ -1,10 +1,12 @@
 //! Rhai script bindings for the entire crate.
 
 use std::{
+    cell::RefCell,
     env::temp_dir,
     fs::{remove_file, File},
     io::Write,
     path::PathBuf,
+    rc::Rc,
 };
 
 use crate::prelude::*;
@@ -155,7 +157,7 @@ pub fn new_rhythm_from_file(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     file_name: &str,
-) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
+) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // create a new engine
     let mut engine = new_engine();
     bindings::register(&mut engine, time_base, Some(instrument));
@@ -166,9 +168,9 @@ pub fn new_rhythm_from_file(
 
     // hande script result
     if let Some(beat_time_rhythm) = result.clone().try_cast::<BeatTimeRhythm>() {
-        Ok(Box::new(beat_time_rhythm))
+        Ok(Rc::new(RefCell::new(beat_time_rhythm)))
     } else if let Some(second_time_rhythm) = result.clone().try_cast::<SecondTimeRhythm>() {
-        Ok(Box::new(second_time_rhythm))
+        Ok(Rc::new(RefCell::new(second_time_rhythm)))
     } else {
         Err(EvalAltResult::ErrorMismatchDataType(
             "Rhythm".to_string(),
@@ -185,10 +187,10 @@ pub fn new_rhythm_from_file_with_fallback(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     file_name: &str,
-) -> Box<dyn Rhythm> {
+) -> Rc<RefCell<dyn Rhythm>> {
     new_rhythm_from_file(instrument, time_base, file_name).unwrap_or_else(|err| {
         log::warn!("Script '{}' failed to compile: {}", file_name, err);
-        Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
+        Rc::new(RefCell::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0))))
     })
 }
 
@@ -197,7 +199,7 @@ pub fn new_rhythm_from_string(
     instrument: InstrumentId,
     time_base: BeatTimeBase,
     script: &str,
-) -> Result<Box<dyn Rhythm>, Box<dyn std::error::Error>> {
+) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // HACK: Need to write the string to a file, so ScriptedEventIter can resolve functions
     let mut temp_file_name = temp_dir();
     temp_file_name.push("afseq/");
@@ -220,14 +222,14 @@ pub fn new_rhythm_from_string_with_fallback(
     time_base: BeatTimeBase,
     expression: &str,
     expression_identifier: &str,
-) -> Box<dyn Rhythm> {
+) -> Rc<RefCell<dyn Rhythm>> {
     new_rhythm_from_string(instrument, time_base, expression).unwrap_or_else(|err| {
         log::warn!(
             "Script '{}' failed to compile: {}",
             expression_identifier,
             err
         );
-        Box::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0)))
+        Rc::new(RefCell::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0))))
     })
 }
 

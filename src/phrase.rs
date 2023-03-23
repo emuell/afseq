@@ -26,8 +26,9 @@ pub enum RhythmSlot {
     Stop,
     /// Continue playing a previously played rhythm in a [`Sequence`].
     Continue,
-    /// Play the given boxed rhytm in this slot.
-    Rhythm(Rc<RefCell<Box<dyn Rhythm>>>),
+    /// Play a shared rhytm in this slot. 
+    /// NB: This is a shared reference, in order to resolve 'Continue' modes in sequences. 
+    Rhythm(Rc<RefCell<dyn Rhythm>>),
 }
 
 /// Convert an unboxed Rhythm to a RhythmSlot
@@ -36,15 +37,14 @@ where
     R: Rhythm + 'static,
 {
     fn from(rhythm: R) -> RhythmSlot {
-        RhythmSlot::Rhythm(Rc::new(RefCell::new(Box::new(rhythm))))
+        RhythmSlot::Rhythm(Rc::new(RefCell::new(rhythm)))
     }
 }
 
-/// Convert a boxed Rhythm to a RhythmSlot
-impl From<Box<dyn Rhythm>> for RhythmSlot
-{
-    fn from(rhythm: Box<dyn Rhythm>) -> RhythmSlot {
-        RhythmSlot::Rhythm(Rc::new(RefCell::new(rhythm)))
+/// Convert a shared Rhythm to a RhythmSlot
+impl From<Rc<RefCell<dyn Rhythm>>> for RhythmSlot {
+    fn from(rhythm: Rc<RefCell<dyn Rhythm>>) -> RhythmSlot {
+        RhythmSlot::Rhythm(rhythm)
     }
 }
 
