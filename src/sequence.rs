@@ -40,6 +40,15 @@ impl Sequence {
         }
     }
 
+    /// returns maximum rhythm count in all phrases. 
+    pub fn rhythm_slot_count(&self) -> usize {
+        let mut count = 0;
+        for phrase in self.phrases.iter() {
+            count = count.max(phrase.rhythm_slots().len());
+        }
+        count
+    }
+
     /// Read-only borrowed access to our phrases.
     pub fn phrases(&self) -> &Vec<Phrase> {
         &self.phrases

@@ -22,10 +22,10 @@ use crate::{
 
 /// Preload time of the player's run_until function. Should be big enough to ensure that events
 /// are scheduled ahead of playback time, but small enough to avoid latency.   
-#[cfg(debug_assertions)] 
+#[cfg(debug_assertions)]
 const PLAYBACK_PRELOAD_SECONDS: f64 = 5.0;
 #[cfg(not(debug_assertions))]
-const PLAYBACK_PRELOAD_SECONDS: f64 = 1.0;            
+const PLAYBACK_PRELOAD_SECONDS: f64 = 1.0;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -194,7 +194,12 @@ impl SamplePlayer {
     }
 
     /// Run/play the given sequence until it stops.
-    pub fn run(&mut self, sequence: &mut Sequence, time_base: &dyn TimeBase, reset_playback_pos: bool) {
+    pub fn run(
+        &mut self,
+        sequence: &mut Sequence,
+        time_base: &dyn TimeBase,
+        reset_playback_pos: bool,
+    ) {
         let dont_stop = || false;
         self.run_until(sequence, time_base, reset_playback_pos, dont_stop);
     }
@@ -214,7 +219,7 @@ impl SamplePlayer {
         } else {
             // match playing notes state to the passed rhythm
             self.playing_notes
-                .resize(sequence.phrases().first().unwrap().rhythm_slots().len(), HashMap::new());
+                .resize(sequence.rhythm_slot_count(), HashMap::new());
             // seek new phase to our previously played time
             self.seek_sequence_until_time(sequence, self.emitted_sample_time);
         }
@@ -245,7 +250,7 @@ impl SamplePlayer {
         // rebuild playing notes vec
         self.playing_notes.clear();
         self.playing_notes
-            .resize(sequence.phrases().first().unwrap().rhythm_slots().len(), HashMap::new());
+            .resize(sequence.rhythm_slot_count(), HashMap::new());
         // stop whatever is playing in case we're restarting
         self.player
             .stop_all_sources()
@@ -269,75 +274,80 @@ impl SamplePlayer {
         sample_time: SampleTime,
     ) {
         let time_display = sequence.time_display();
-        sequence.run_until_time(sample_time, |rhythm_index, sample_time, event: &Option<Event>| {
-            // print
-            if self.show_events {
-                const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
-                println!(
-                    "{}: {}",
-                    time_display.display(sample_time),
-                    match event {
-                        Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
-                        None => "---".to_string(),
-                    }
-                );
-            }
-            // play
-            let playing_notes_in_rhythm = &mut self.playing_notes[rhythm_index];
-            if let Some(Event::NoteEvents(notes)) = event {
-                for (voice_index, note_event) in notes.iter().enumerate() {
-                    if let Some(note_event) = note_event {
-                        // stop playing samples on this voice channel
-                        if let Some((playback_id, _)) = playing_notes_in_rhythm.get(&voice_index) {
-                            if self.new_note_action == NewNoteAction::Stop
-                                || note_event.note.is_note_off()
-                            {
-                                if let Err(_err) = self.player.stop_source_at_sample_time(
-                                    *playback_id,
-                                    start_offset + sample_time,
-                                ) {
-                                    // this is expected when the sample played to end
-                                }
-                                playing_notes_in_rhythm.remove(&voice_index);
-                            }
+        sequence.run_until_time(
+            sample_time,
+            |rhythm_index, sample_time, event: &Option<Event>| {
+                // print
+                if self.show_events {
+                    const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
+                    println!(
+                        "{}: {}",
+                        time_display.display(sample_time),
+                        match event {
+                            Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
+                            None => "---".to_string(),
                         }
-                        // start a new sample - when this is a note off, we already stopped it above
-                        if note_event.note.is_note_on() {
-                            if let Some(instrument) = note_event.instrument {
-                                let playback_options = FilePlaybackOptions::default()
-                                    .speed(speed_from_note(note_event.note as u8))
-                                    .playback_pos_emit_rate(self.playback_pos_emit_rate);
-                                let playback_sample_rate = self.player.output_sample_rate();
-                                let sample_pool = self
-                                    .sample_pool
-                                    .read()
-                                    .expect("Failed to access sample pool");
-                                if let Some(mut sample) = sample_pool.get_sample(
-                                    instrument,
-                                    playback_options,
-                                    playback_sample_rate,
-                                ) {
-                                    sample.set_volume(note_event.velocity);
-                                    let context = Arc::new(SamplePlaybackContext {
-                                        rhythm_index: rhythm_index as isize,
-                                        voice_index: voice_index as isize,
-                                    });
-                                    let playback_id = self
-                                        .player
-                                        .play_file_source_with_context(
-                                            sample,
-                                            Some(start_offset + sample_time),
-                                            Some(context),
-                                        )
-                                        .expect("Failed to play file source");
-                                    playing_notes_in_rhythm
-                                        .insert(voice_index, (playback_id, note_event.note));
+                    );
+                }
+                // play
+                let playing_notes_in_rhythm = &mut self.playing_notes[rhythm_index];
+                if let Some(Event::NoteEvents(notes)) = event {
+                    for (voice_index, note_event) in notes.iter().enumerate() {
+                        if let Some(note_event) = note_event {
+                            // stop playing samples on this voice channel
+                            if let Some((playback_id, _)) =
+                                playing_notes_in_rhythm.get(&voice_index)
+                            {
+                                if self.new_note_action == NewNoteAction::Stop
+                                    || note_event.note.is_note_off()
+                                {
+                                    if let Err(_err) = self.player.stop_source_at_sample_time(
+                                        *playback_id,
+                                        start_offset + sample_time,
+                                    ) {
+                                        // this is expected when the sample played to end
+                                    }
+                                    playing_notes_in_rhythm.remove(&voice_index);
+                                }
+                            }
+                            // start a new sample - when this is a note off, we already stopped it above
+                            if note_event.note.is_note_on() {
+                                if let Some(instrument) = note_event.instrument {
+                                    let playback_options = FilePlaybackOptions::default()
+                                        .speed(speed_from_note(note_event.note as u8))
+                                        .playback_pos_emit_rate(self.playback_pos_emit_rate);
+                                    let playback_sample_rate = self.player.output_sample_rate();
+                                    let sample_pool = self
+                                        .sample_pool
+                                        .read()
+                                        .expect("Failed to access sample pool");
+                                    if let Some(mut sample) = sample_pool.get_sample(
+                                        instrument,
+                                        playback_options,
+                                        playback_sample_rate,
+                                    ) {
+                                        sample.set_volume(note_event.velocity);
+                                        let context = Arc::new(SamplePlaybackContext {
+                                            rhythm_index: rhythm_index as isize,
+                                            voice_index: voice_index as isize,
+                                        });
+                                        let playback_id = self
+                                            .player
+                                            .play_file_source_with_context(
+                                                sample,
+                                                Some(start_offset + sample_time),
+                                                Some(context),
+                                            )
+                                            .expect("Failed to play file source");
+                                        playing_notes_in_rhythm
+                                            .insert(voice_index, (playback_id, note_event.note));
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        });
+            },
+        );
     }
 }
