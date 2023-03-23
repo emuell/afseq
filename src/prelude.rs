@@ -25,4 +25,4 @@ pub use super::{
 pub use super::bindings::{self};
 
 #[cfg(feature = "player")]
-pub use super::player::{NewNoteAction, SamplePlayer, SamplePool};
+pub use super::player::{NewNoteAction, SamplePlayer, SamplePlaybackContext, SamplePool};
