@@ -23,7 +23,7 @@ use crate::{
 /// Preload time of the player's run_until function. Should be big enough to ensure that events
 /// are scheduled ahead of playback time, but small enough to avoid latency.   
 #[cfg(debug_assertions)]
-const PLAYBACK_PRELOAD_SECONDS: f64 = 5.0;
+const PLAYBACK_PRELOAD_SECONDS: f64 = 2.5;
 #[cfg(not(debug_assertions))]
 const PLAYBACK_PRELOAD_SECONDS: f64 = 1.0;
 
