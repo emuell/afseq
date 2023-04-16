@@ -4,7 +4,7 @@ use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, A
 
 use crate::bindings::{
     new_engine,
-    unwrap::{unwrap_note_events, ErrorCallContext},
+    unwrap::{unwrap_note_events_from_dynamic, ErrorCallContext},
 };
 
 use crate::{event::InstrumentId, Event, EventIter};
@@ -65,7 +65,7 @@ impl ScriptedEventIter {
     ) -> Result<Event, Box<EvalAltResult>> {
         let context = ErrorCallContext::new(fn_ptr.fn_name(), Position::new(1, 1));
         let result: Dynamic = fn_ptr.call(engine, ast, {})?;
-        Ok(Event::NoteEvents(unwrap_note_events(
+        Ok(Event::NoteEvents(unwrap_note_events_from_dynamic(
             &context, result, instrument,
         )?))
     }

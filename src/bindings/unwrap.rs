@@ -1,6 +1,8 @@
 //! Helper functions to safely unwrap basic and afseq types from rhai Arrays or Dynamics
 
-use rhai::{Array, Dynamic, EvalAltResult, Map, NativeCallContext, Position, FLOAT, INT, ImmutableString};
+use rhai::{
+    Array, Dynamic, EvalAltResult, ImmutableString, Map, NativeCallContext, Position, FLOAT, INT,
+};
 
 use crate::{
     event::{InstrumentId, NoteEvent},
@@ -126,7 +128,7 @@ pub fn unwrap_note_from_int(
         return Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
-                "Expected a note value in range [0..128] in function '{}', got note '{}'",
+                "Expected a note value in range [0..128] in function '{}', got '{}'",
                 context.fn_name(),
                 note
             )
@@ -172,8 +174,23 @@ pub fn unwrap_note_event_from_string(
             return Err(EvalAltResult::ErrorInModule(
                 "bindings".to_string(),
                 format!(
-                    "Failed to parse voluume in function '{}': Argument is neither a float or int value",
+                    "Failed to parse volume in function '{}': \
+                        Argument is neither a float or int value",
                     context.fn_name(),
+                )
+                .into(),
+                context.position(),
+            )
+            .into());
+        }
+        if volume < 0.0 {
+            return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Failed to parse 'volume' property in function '{}': \
+                            Volume must be >= 0, but is '{}'.",
+                    context.fn_name(),
+                    volume
                 )
                 .into(),
                 context.position(),
@@ -213,7 +230,8 @@ pub fn unwrap_note_event_from_map(
             return Err(EvalAltResult::ErrorInModule(
                 "bindings".to_string(),
                 format!(
-                    "Failed to parse 'key' property in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
+                    "Failed to parse 'key' property in function '{}': \
+                        Argument is neither (), number, or a string, but is a '{}'.",
                     context.fn_name(),
                     key.type_name()
                 )
@@ -231,16 +249,31 @@ pub fn unwrap_note_event_from_map(
                 volume = vol.as_int()? as f32;
             } else {
                 return Err(EvalAltResult::ErrorInModule(
-                "bindings".to_string(),
-                format!(
-                    "Failed to parse 'volume' property in function '{}': Argument is not a number, but is a '{}'.",
-                    context.fn_name(),
-                    vol.type_name()
+                    "bindings".to_string(),
+                    format!(
+                        "Failed to parse 'volume' property in function '{}': \
+                            Argument is not a number, but is a '{}'.",
+                        context.fn_name(),
+                        vol.type_name()
+                    )
+                    .into(),
+                    context.position(),
                 )
-                .into(),
-                context.position(),
-            )
-            .into());
+                .into());
+            }
+            if volume < 0.0 {
+                return Err(EvalAltResult::ErrorInModule(
+                    "bindings".to_string(),
+                    format!(
+                        "Failed to parse 'volume' property in function '{}': \
+                            Volume must be >= 0, but is '{}'.",
+                        context.fn_name(),
+                        volume
+                    )
+                    .into(),
+                    context.position(),
+                )
+                .into());
             }
         } else {
             volume = 1.0;
@@ -254,7 +287,8 @@ pub fn unwrap_note_event_from_map(
         Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
-                "Failed to parse note in function '{}': Missing key property in object map.",
+                "Failed to parse note in function '{}': \
+                    Missing key property in object map.",
                 context.fn_name(),
             )
             .into(),
@@ -264,7 +298,7 @@ pub fn unwrap_note_event_from_map(
     }
 }
 
-pub fn unwrap_note_events(
+pub fn unwrap_note_events_from_dynamic(
     context: &ErrorCallContext,
     d: Dynamic,
     default_instrument: Option<InstrumentId>,
@@ -299,16 +333,17 @@ pub fn unwrap_note_events(
         })])
     } else {
         Err(EvalAltResult::ErrorInModule(
-                "bindings".to_string(),
-                format!(
-                    "Invalid arguments in fn '{}': expecting an array, object map, string or integer as note value, got object of type {}'",
-                    context.fn_name(),
-                    d.type_name()
-                )
-                .into(),
-                context.position(),
-            ).into()
+            "bindings".to_string(),
+            format!(
+                "Invalid arguments in fn '{}': \
+                    expecting an array, object map, string or integer as note value, got '{}'",
+                context.fn_name(),
+                d.type_name()
+            )
+            .into(),
+            context.position(),
         )
+        .into())
     }
 }
 
@@ -346,12 +381,17 @@ pub fn unwrap_note_events_from_array(
                 }));
             } else {
                 return Err(EvalAltResult::ErrorInModule(
-                        "bindings".to_string(),
-                        format!("Invalid arguments in fn '{}': expecting an object map, string or integer as note value, got object of type {}'",
+                    "bindings".to_string(),
+                    format!(
+                        "Invalid arguments in fn '{}': \
+                            expecting an object map, string or integer as note value, got '{}'",
                         context.fn_name(),
-                        item.type_name()).into(),
-                        context.position(),
-                    ).into());
+                        item.type_name()
+                    )
+                    .into(),
+                    context.position(),
+                )
+                .into());
             }
         }
     }

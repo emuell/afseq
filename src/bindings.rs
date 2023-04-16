@@ -431,7 +431,7 @@ mod globals_module {
     }
 
     #[rhai_fn(name = "note", return_raw)]
-    pub fn note_vec(
+    pub fn note_from_array(
         context: NativeCallContext,
         array: Array,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -441,7 +441,7 @@ mod globals_module {
     }
 
     #[rhai_fn(name = "note_seq", return_raw)]
-    pub fn note_vec_seq(
+    pub fn note_seq_from_array(
         context: NativeCallContext,
         array: Array,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
@@ -449,7 +449,11 @@ mod globals_module {
         let instrument = eval_default_instrument(context.engine())?;
         let mut event_sequence = Vec::with_capacity(array.len());
         for item in array {
-            event_sequence.push(unwrap_note_events(&err_context, item, instrument)?);
+            event_sequence.push(unwrap_note_events_from_dynamic(
+                &err_context,
+                item,
+                instrument,
+            )?);
         }
         Ok(event_sequence.to_event_sequence())
     }
@@ -985,6 +989,7 @@ mod test {
         // Note On (string)
         assert!(engine.eval::<Dynamic>(r#"note("X#1")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("0.5")"#).is_err());
+        assert!(engine.eval::<Dynamic>(r#"note("C#1 -0.5")"#).is_err());
         assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#).is_err());
         let eval_result = engine.eval::<Dynamic>(r#"note("C#1 0.5")"#).unwrap();
         let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
@@ -1042,6 +1047,9 @@ mod test {
             .is_err());
         assert!(engine
             .eval::<Dynamic>(r#"note(#{key: "C#1", volume: "abc"})"#)
+            .is_err());
+        assert!(engine
+            .eval::<Dynamic>(r#"note(#{key: "C#1", volume: -1})"#)
             .is_err());
         let eval_result = engine
             .eval::<Dynamic>(r#"note(#{key: "G8", volume: 2})"#)
