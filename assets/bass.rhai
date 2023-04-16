@@ -4,11 +4,11 @@ beat_time()
     .every_eighth()
     .with_pattern([1, 0, 1, 0] + [0, 1, 0, 0] + [1, 0, 1, 0] + [0, 1, 0, 1])
     .trigger(note_seq([
-        [bass_notes[0], 0.5],
-        [bass_notes[2], 0.5],
-        [bass_notes[3], 0.5],
-        [bass_notes[0], 0.5],
-        [bass_notes[2], 0.5],
-        [bass_notes[3], 0.5],
-        [bass_notes[6] - 12, 0.5],
+        #{key: bass_notes[0], volume: 0.5},
+        #{key: bass_notes[2], volume: 0.5},
+        #{key: bass_notes[3], volume: 0.5},
+        #{key: bass_notes[0], volume: 0.5},
+        #{key: bass_notes[2], volume: 0.5},
+        #{key: bass_notes[3], volume: 0.5},
+        #{key: bass_notes[6] - 12, volume: 0.5},
     ]))

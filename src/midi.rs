@@ -171,6 +171,11 @@ impl Note {
 
     /// Try converting the given string to a Note
     pub fn try_from(s: &str) -> Result<Self, String> {
+        Ok(Self::try_from_with_offset(s)?.0)
+    }
+    /// Try converting the given string to a Note.
+    /// returns Self and the number of consumed characters read from the string.
+    pub fn try_from_with_offset(s: &str) -> Result<(Self, usize), String> {
         fn is_note_off(s: &str) -> bool {
             s.to_lowercase() == "off"
         }
@@ -259,14 +264,17 @@ impl Note {
 
         // Note-Off
         if is_note_off(s) {
-            return Ok(Note::OFF);
+            return Ok((Note::OFF, 3));
         }
 
         // Note-On
+        let consumed_chars;
         let note = note_value_at(s, 0)? as i32;
         let octave = if is_sharp_symbol(s, 1) || is_flat_symbol(s, 1) || is_empty_symbol(s, 1) {
+            consumed_chars = 3;
             octave_value_at(s, 2)?
         } else {
+            consumed_chars = 2;
             octave_value_at(s, 1)?
         };
         if !(-1..=9).contains(&octave) {
@@ -275,7 +283,7 @@ impl Note {
                 s, octave
             ));
         }
-        Ok(((octave * 12 + 12 + note) as u8).into())
+        Ok((((octave * 12 + 12 + note) as u8).into(), consumed_chars))
     }
 }
 

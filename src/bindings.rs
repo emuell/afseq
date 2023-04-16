@@ -17,7 +17,7 @@ use crate::{
 
 use rhai::{
     packages::Package, plugin::*, Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString,
-    NativeCallContext, FLOAT, INT,
+    NativeCallContext, INT,
 };
 
 use rhai_rand::RandomPackage;
@@ -190,7 +190,10 @@ pub fn new_rhythm_from_file_with_fallback(
 ) -> Rc<RefCell<dyn Rhythm>> {
     new_rhythm_from_file(instrument, time_base, file_name).unwrap_or_else(|err| {
         log::warn!("Script '{}' failed to compile: {}", file_name, err);
-        Rc::new(RefCell::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0))))
+        Rc::new(RefCell::new(BeatTimeRhythm::new(
+            time_base,
+            BeatTimeStep::Beats(1.0),
+        )))
     })
 }
 
@@ -229,7 +232,10 @@ pub fn new_rhythm_from_string_with_fallback(
             expression_identifier,
             err
         );
-        Rc::new(RefCell::new(BeatTimeRhythm::new(time_base, BeatTimeStep::Beats(1.0))))
+        Rc::new(RefCell::new(BeatTimeRhythm::new(
+            time_base,
+            BeatTimeStep::Beats(1.0),
+        )))
     })
 }
 
@@ -377,46 +383,36 @@ mod globals_module {
     }
 
     #[rhai_fn(name = "note", return_raw)]
-    pub fn note_from_dynamic(
+    pub fn note_from_map(
         context: NativeCallContext,
-        d: Dynamic,
+        map: rhai::Map,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        if d.is::<()>() {
-            Ok(new_empty_note_event())
-        } else if d.is::<ImmutableString>() || d.is::<String>() {
-            Ok(note_from_string(context, d.cast())?)
-        } else if d.is::<INT>() {
-            Ok(note_from_number(context, d.cast())?)
+        let err_context = ErrorCallContext::from(&context);
+        let instrument = eval_default_instrument(context.engine())?;
+        if let Some(note_event) = unwrap_note_event_from_map(&err_context, map, instrument)? {
+            Ok(note_event.to_event())
         } else {
-            Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Failed to parse note in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
-                context.fn_name(),
-                d.type_name()
-            )
-            .into(),
-            context.position(),
-        )
-        .into())
+            Ok(new_empty_note_event())
         }
     }
 
     #[rhai_fn(name = "note", return_raw)]
     pub fn note_from_string(
         context: NativeCallContext,
-        note: ImmutableString,
+        s: ImmutableString,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        let err_context = ErrorCallContext::from(&context);
-        let instrument = eval_default_instrument(context.engine())?;
-        if is_empty_note_string(note.as_str()) {
+        if is_empty_note_string(s.as_str()) {
             Ok(new_empty_note_event())
         } else {
-            Ok(new_note_event(
-                instrument,
-                unwrap_note_from_string(&err_context, note.as_str())?,
-                1.0_f32,
-            ))
+            let err_context = ErrorCallContext::from(&context);
+            let instrument = eval_default_instrument(context.engine())?;
+            if let Some(note_event) =
+                unwrap_note_event_from_string(&err_context, s.as_str(), instrument)?
+            {
+                Ok(note_event.to_event())
+            } else {
+                Ok(new_empty_note_event())
+            }
         }
     }
 
@@ -430,64 +426,7 @@ mod globals_module {
         Ok(new_note_event(
             instrument,
             unwrap_note_from_int(&err_context, note)?,
-            1.0_f32,
-        ))
-    }
-
-    #[rhai_fn(name = "note", return_raw)]
-    pub fn note_from_dynamic_with_velocity(
-        context: NativeCallContext,
-        d: Dynamic,
-        velocity: FLOAT,
-    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        if d.is::<()>() {
-            Ok(new_empty_note_event())
-        } else if d.is::<ImmutableString>() || d.is::<String>() {
-            Ok(note_from_string_with_velocity(context, d.cast(), velocity)?)
-        } else if d.is::<INT>() {
-            Ok(note_from_number_with_velocity(context, d.cast(), velocity)?)
-        } else {
-            Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Failed to parse note in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
-                context.fn_name(),
-                d.type_name()
-            )
-            .into(),
-            context.position(),
-        )
-        .into())
-        }
-    }
-
-    #[rhai_fn(name = "note", return_raw)]
-    pub fn note_from_string_with_velocity(
-        context: NativeCallContext,
-        note: ImmutableString,
-        velocity: FLOAT,
-    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        let err_context = ErrorCallContext::from(&context);
-        let instrument = eval_default_instrument(context.engine())?;
-        Ok(new_note_event(
-            instrument,
-            unwrap_note_from_string(&err_context, note.as_str())?,
-            velocity as f32,
-        ))
-    }
-
-    #[rhai_fn(name = "note", return_raw)]
-    pub fn note_from_number_with_velocity(
-        context: NativeCallContext,
-        note: INT,
-        velocity: FLOAT,
-    ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        let err_context = ErrorCallContext::from(&context);
-        let instrument = eval_default_instrument(context.engine())?;
-        Ok(new_note_event(
-            instrument,
-            unwrap_note_from_int(&err_context, note)?,
-            velocity as f32,
+            1.0,
         ))
     }
 
@@ -496,42 +435,9 @@ mod globals_module {
         context: NativeCallContext,
         array: Array,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        // NB: array arg may be a:
-        // [NOTE, VEL] -> single note
-        // [[NOTE, VEL], ..] -> poly notes
         let err_context = ErrorCallContext::from(&context);
         let instrument = eval_default_instrument(context.engine())?;
-        let mut sequence = Vec::with_capacity(array.len());
-        if array.is_empty() {
-            // []
-            sequence.push(None);
-        } else if array[0].type_name() == "string" || array[0].is::<INT>() || array[0].is::<()>() {
-            // [NOTE, VEL]
-            if is_empty_note_value(&array[0]) {
-                sequence.push(None);
-            } else {
-                sequence.push(Some(unwrap_note_event(&err_context, array, instrument)?));
-            }
-        } else {
-            // [[NOTE, VEL], ..]
-            for item in array {
-                if item.is::<()>() {
-                    sequence.push(None);
-                } else {
-                    let note_item_array = unwrap_array(&err_context, item)?;
-                    if note_item_array.is_empty() || is_empty_note_value(&note_item_array[0]) {
-                        sequence.push(None);
-                    } else {
-                        sequence.push(Some(unwrap_note_event(
-                            &err_context,
-                            note_item_array,
-                            instrument,
-                        )?));
-                    }
-                }
-            }
-        }
-        Ok(new_polyphonic_note_event(sequence))
+        Ok(unwrap_note_events_from_array(&err_context, array, instrument)?.to_event())
     }
 
     #[rhai_fn(name = "note_seq", return_raw)]
@@ -539,55 +445,13 @@ mod globals_module {
         context: NativeCallContext,
         array: Array,
     ) -> Result<FixedEventIter, Box<EvalAltResult>> {
-        // NB: array arg may be a:
-        // [[NOTE, VEL], ..] -> sequence of single notes
-        // [[[NOTE, VEL], ..], [[NOTE, VEL]]] -> sequence of poly notes
         let err_context = ErrorCallContext::from(&context);
         let instrument = eval_default_instrument(context.engine())?;
         let mut event_sequence = Vec::with_capacity(array.len());
-        for item1_dyn in array {
-            if item1_dyn.is::<()>() {
-                event_sequence.push(vec![None]);
-            } else {
-                let item1_arr = unwrap_array(&err_context, item1_dyn)?;
-                let mut note_events = Vec::with_capacity(item1_arr.len());
-                if item1_arr.is_empty() {
-                    // Vec<()>
-                    note_events.push(None);
-                } else if item1_arr[0].type_name() == "string" || item1_arr[0].is::<INT>() {
-                    // Vec<Vec<NOTE, VEL>>
-                    if item1_arr.is_empty() || is_empty_note_value(&item1_arr[0]) {
-                        note_events.push(None);
-                    } else {
-                        note_events.push(Some(unwrap_note_event(
-                            &err_context,
-                            item1_arr,
-                            instrument,
-                        )?));
-                    }
-                } else {
-                    // Vec<Vec<Vec<NOTE, VEL>>>
-                    for item2_dyn in item1_arr {
-                        if item2_dyn.is::<()>() {
-                            note_events.push(None);
-                        } else {
-                            let item2_arr = unwrap_array(&err_context, item2_dyn)?;
-                            if item2_arr.is_empty() || is_empty_note_value(&item2_arr[0]) {
-                                note_events.push(None);
-                            } else {
-                                note_events.push(Some(unwrap_note_event(
-                                    &err_context,
-                                    item2_arr,
-                                    instrument,
-                                )?));
-                            }
-                        }
-                    }
-                }
-                event_sequence.push(note_events)
-            }
+        for item in array {
+            event_sequence.push(unwrap_note_events(&err_context, item, instrument)?);
         }
-        Ok(new_polyphonic_note_sequence_event(event_sequence))
+        Ok(event_sequence.to_event_sequence())
     }
 
     #[rhai_fn(name = "notes_in_scale", return_raw)]
@@ -1118,17 +982,18 @@ mod test {
             Event::NoteEvents(vec![Some(new_note(None, "g#1", 1.0))])
         );
 
-        // Note
-        assert!(engine.eval::<Dynamic>(r#"note("X#1", 0.5)"#).is_err());
-        assert!(engine.eval::<Dynamic>(r#"note("C#1", "0.5")"#).is_err());
-        assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5, 1.0)"#).is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#).unwrap();
+        // Note On (string)
+        assert!(engine.eval::<Dynamic>(r#"note("X#1")"#).is_err());
+        assert!(engine.eval::<Dynamic>(r#"note("0.5")"#).is_err());
+        assert!(engine.eval::<Dynamic>(r#"note("C#1", 0.5)"#).is_err());
+        let eval_result = engine.eval::<Dynamic>(r#"note("C#1 0.5")"#).unwrap();
         let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
         assert_eq!(
             note_event.events()[0],
             Event::NoteEvents(vec![Some(new_note(None, "c#1", 0.5))])
         );
 
+        // Note On (string array)
         assert!(engine.eval::<Dynamic>(r#"note(["X#1"])"#).is_err());
         let eval_result = engine.eval::<Dynamic>(r#"note(["C#1"])"#).unwrap();
         let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
@@ -1137,34 +1002,61 @@ mod test {
             Event::NoteEvents(vec![Some(new_note(None, "c#1", 1.0))])
         );
 
-        assert!(engine.eval::<Dynamic>(r#"note(["X#1", 0.5])"#).is_err());
-        assert!(engine.eval::<Dynamic>(r#"note(["C#1", "0.5"])"#).is_err());
-        assert!(engine
-            .eval::<Dynamic>(r#"note(["C#1", 0.5, 1.0])"#)
-            .is_err());
-        let eval_result = engine.eval::<Dynamic>(r#"note(["C#1", 0.5])"#).unwrap();
+        assert!(engine.eval::<Dynamic>(r#"note(["X#1 0.5"])"#).is_err());
+        assert!(engine.eval::<Dynamic>(r#"note(["C#1 abc"])"#).is_err());
+        let eval_result = engine
+            .eval::<Dynamic>(r#"note(["C#1 0.5", "C5"])"#)
+            .unwrap();
         let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
         assert_eq!(
             note_event.events()[0],
-            Event::NoteEvents(vec![Some(new_note(None, "c#1", 0.5))])
+            Event::NoteEvents(vec![
+                Some(new_note(None, "c#1", 0.5)),
+                Some(new_note(None, "c5", 1.0))
+            ])
         );
 
-        let eval_result = engine.eval::<Dynamic>(r#"note([0x3E, 0.5])"#).unwrap();
+        // Note On (int)
+        let eval_result = engine.eval::<Dynamic>(r#"note(0x3E)"#).unwrap();
         let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
         assert_eq!(
             note_event.events(),
-            vec![Event::NoteEvents(vec![Some(new_note(None, "d4", 0.5))])]
+            vec![Event::NoteEvents(vec![Some(new_note(None, "d4", 1.0))])]
         );
 
+        // Note On (int array)
+        let eval_result = engine.eval::<Dynamic>(r#"note([0x3E, 60])"#).unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events(),
+            vec![Event::NoteEvents(vec![
+                Some(new_note(None, "d4", 1.0)),
+                Some(new_note(None, "c4", 1.0))
+            ])]
+        );
+
+        // Note On (object map)
+        assert!(engine.eval::<Dynamic>(r#"note(#{volume: 0.5})"#).is_err());
         assert!(engine
-            .eval::<Dynamic>(r#"note([["Note", 0.5, 1.0]])"#)
+            .eval::<Dynamic>(r#"note(#{key: "xxx", volume: 0.5})"#)
             .is_err());
         assert!(engine
-            .eval::<Dynamic>(r#"note([["C#1", 0.5, 1.0]])"#)
+            .eval::<Dynamic>(r#"note(#{key: "C#1", volume: "abc"})"#)
             .is_err());
-        assert!(engine.eval::<Dynamic>(r#"note([["C#1", "0.5"]])"#).is_err());
         let eval_result = engine
-            .eval::<Dynamic>(r#"note([["C#1", 0.5], ["G2", 0.75], []])"#)
+            .eval::<Dynamic>(r#"note(#{key: "G8", volume: 2})"#)
+            .unwrap();
+        let note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
+        assert_eq!(
+            note_event.events()[0],
+            Event::NoteEvents(vec![Some(new_note(None, "g8", 2.0)),])
+        );
+
+        // Note On (object map array)
+        let eval_result = engine
+            .eval::<Dynamic>(
+                r#"note([#{key: "C#1", volume: 0.5}, #{key: "G2", volume: 0.75}, #{}])"#,
+            )
             .unwrap();
         let poly_note_event = eval_result.try_cast::<FixedEventIter>().unwrap();
         assert_eq!(
@@ -1176,9 +1068,9 @@ mod test {
             ])
         );
 
-        // NoteSequence
+        // Note Sequence
         let eval_result = engine
-            .eval::<Dynamic>(r#"note_seq([["C#1", 0.5], ["---"], ["G_2"]])"#)
+            .eval::<Dynamic>(r#"note_seq(["C#1 0.5", "---", "G_2"])"#)
             .unwrap();
         let note_sequence_event = eval_result.try_cast::<FixedEventIter>().unwrap();
         assert_eq!(
@@ -1193,8 +1085,8 @@ mod test {
         let eval_result = engine
             .eval::<Dynamic>(
                 r#"note_seq([
-                     [["C#1"], (), ["G_2", 0.75]], 
-                     [["A#5", 0.2], ["---"], ["B_1", 0.1]]
+                     ["C#1", (), "G_2 0.75"], 
+                     ["A#5 0.2", "---", #{key: "B_1", volume: 0.1}],
                    ])"#,
             )
             .unwrap();

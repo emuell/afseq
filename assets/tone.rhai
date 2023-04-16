@@ -21,15 +21,15 @@ beat_time()
     const SCALE_STEP_COUNT = 8;
     scale_index = ((note_step / notes.len()) / SCALE_STEP_COUNT) % scales.len();
     
-    const VEL_STEP_COUNT = 32;
-    let vel = 0.3 * volume_step / VEL_STEP_COUNT + 0.2;
+    const VOLUME_STEP_COUNT = 32;
+    let volume = 0.3 * volume_step / VOLUME_STEP_COUNT + 0.2;
     if note_step % 2 == 0 {
-      vel = 0.3 * (1.0 - volume_step / VEL_STEP_COUNT) + 0.2;
+      volume = 0.3 * (1.0 - volume_step / VOLUME_STEP_COUNT) + 0.2;
     }
     volume_step += volume_direction;
-    if volume_step >= VEL_STEP_COUNT || volume_step == 0 {
+    if volume_step >= VOLUME_STEP_COUNT || volume_step == 0 {
       volume_direction = -volume_direction;
     }
 
-    [note, vel * 0.12] 
+    #{key: note, volume: volume * 0.12} 
   })

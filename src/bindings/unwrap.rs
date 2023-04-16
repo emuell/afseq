@@ -1,8 +1,11 @@
 //! Helper functions to safely unwrap basic and afseq types from rhai Arrays or Dynamics
 
-use rhai::{Array, Dynamic, EvalAltResult, NativeCallContext, Position, FLOAT, INT};
+use rhai::{Array, Dynamic, EvalAltResult, Map, NativeCallContext, Position, FLOAT, INT, ImmutableString};
 
-use crate::{event::InstrumentId, Note};
+use crate::{
+    event::{InstrumentId, NoteEvent},
+    Note,
+};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -87,49 +90,6 @@ pub fn unwrap_integer(
     }
 }
 
-pub fn unwrap_array(context: &ErrorCallContext, d: Dynamic) -> Result<Array, Box<EvalAltResult>> {
-    let array_result = d.into_array();
-    if let Err(other_type) = array_result {
-        return Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Expected 'array' arg in function '{}', got '{}'",
-                context.fn_name(),
-                other_type
-            )
-            .into(),
-            context.position(),
-        )
-        .into());
-    }
-    Ok(array_result.unwrap())
-}
-
-pub fn unwrap_note(context: &ErrorCallContext, d: Dynamic) -> Result<Note, Box<EvalAltResult>> {
-    if let Ok(integer) = d.as_int() {
-        unwrap_note_from_int(context, integer)
-    } else if let Ok(string) = d.clone().into_string() {
-        unwrap_note_from_string(context, string.as_str())
-    } else {
-        Err(EvalAltResult::ErrorInModule(
-            "bindings".to_string(),
-            format!(
-                "Failed to parse note in function '{}': Argument is not a string, but a '{}'.",
-                context.fn_name(),
-                d.type_name()
-            )
-            .into(),
-            context.position(),
-        )
-        .into())
-    }
-}
-
-pub fn is_empty_note_value(d: &Dynamic) -> bool {
-    d.is::<()>()
-        || (d.type_name() == "string" && is_empty_note_string(d.clone().cast::<String>().as_str()))
-}
-
 pub fn is_empty_note_string(s: &str) -> bool {
     matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
 }
@@ -177,30 +137,223 @@ pub fn unwrap_note_from_int(
     }
 }
 
-pub fn unwrap_note_event(
+pub fn unwrap_note_event_from_string(
     context: &ErrorCallContext,
-    array: Array,
+    s: &str,
     default_instrument: Option<InstrumentId>,
-) -> Result<(Option<InstrumentId>, Note, f32), Box<EvalAltResult>> {
-    if !(1..=2).contains(&array.len()) {
-        return Err(EvalAltResult::ErrorInModule(
+) -> Result<Option<NoteEvent>, Box<EvalAltResult>> {
+    if is_empty_note_string(s) {
+        return Ok(None);
+    }
+    let (note, offset) = match Note::try_from_with_offset(s) {
+        Ok(result) => result,
+        Err(err) => {
+            return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Failed to parse note in function '{}': {}",
+                    context.fn_name(),
+                    err
+                )
+                .into(),
+                context.position(),
+            )
+            .into())
+        }
+    };
+    let mut volume = 1.0;
+    let remaining_s = &s[offset..].trim();
+    if !remaining_s.is_empty() {
+        if let Ok(int) = remaining_s.parse::<i32>() {
+            volume = int as f32;
+        } else if let Ok(float) = remaining_s.parse::<f32>() {
+            volume = float;
+        } else {
+            return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Failed to parse voluume in function '{}': Argument is neither a float or int value",
+                    context.fn_name(),
+                )
+                .into(),
+                context.position(),
+            )
+            .into());
+        }
+    }
+    Ok(Some(NoteEvent {
+        instrument: default_instrument,
+        note,
+        volume,
+    }))
+}
+
+pub fn unwrap_note_event_from_map(
+    context: &ErrorCallContext,
+    map: Map,
+    default_instrument: Option<InstrumentId>,
+) -> Result<Option<NoteEvent>, Box<EvalAltResult>> {
+    if map.is_empty() {
+        return Ok(None);
+    }
+    if let Some(key) = map.get("key") {
+        // key
+        let note;
+        if key.is::<()>() {
+            return Ok(None);
+        } else if key.is_string() {
+            let note_string = key.clone().into_immutable_string()?;
+            if is_empty_note_string(note_string.as_str()) {
+                return Ok(None);
+            }
+            note = unwrap_note_from_string(context, note_string.as_str())?;
+        } else if key.is_int() {
+            note = unwrap_note_from_int(context, key.as_int()?)?;
+        } else {
+            return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Failed to parse 'key' property in function '{}': Argument is neither (), number, or a string, but is a '{}'.",
+                    context.fn_name(),
+                    key.type_name()
+                )
+                .into(),
+                context.position(),
+            )
+            .into());
+        }
+        // volume
+        let volume;
+        if let Some(vol) = map.get("volume") {
+            if vol.is_float() {
+                volume = vol.as_float()? as f32;
+            } else if vol.is_int() {
+                volume = vol.as_int()? as f32;
+            } else {
+                return Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Failed to parse 'volume' property in function '{}': Argument is not a number, but is a '{}'.",
+                    context.fn_name(),
+                    vol.type_name()
+                )
+                .into(),
+                context.position(),
+            )
+            .into());
+            }
+        } else {
+            volume = 1.0;
+        }
+        Ok(Some(NoteEvent {
+            instrument: default_instrument,
+            note,
+            volume,
+        }))
+    } else {
+        Err(EvalAltResult::ErrorInModule(
             "bindings".to_string(),
             format!(
-                "Expected 1 or 2 items in note array in function '{}', got '{}' items",
+                "Failed to parse note in function '{}': Missing key property in object map.",
                 context.fn_name(),
-                array.len()
             )
             .into(),
             context.position(),
         )
-        .into());
+        .into())
     }
-    if array.len() == 2 {
-        let note = unwrap_note(context, array[0].clone())?;
-        let velocity = unwrap_float(context, array[1].clone(), "velocity")? as f32;
-        Ok((default_instrument, note, velocity))
+}
+
+pub fn unwrap_note_events(
+    context: &ErrorCallContext,
+    d: Dynamic,
+    default_instrument: Option<InstrumentId>,
+) -> Result<Vec<Option<NoteEvent>>, Box<EvalAltResult>> {
+    if d.is::<()>() {
+        Ok(vec![None])
+    } else if d.is_array() {
+        Ok(unwrap_note_events_from_array(
+            context,
+            d.cast::<Array>(),
+            default_instrument,
+        )?)
+    } else if d.is_map() {
+        Ok(vec![unwrap_note_event_from_map(
+            context,
+            d.cast::<Map>(),
+            default_instrument,
+        )?])
+    } else if d.is_string() {
+        Ok(vec![unwrap_note_event_from_string(
+            context,
+            d.cast::<ImmutableString>().as_str(),
+            default_instrument,
+        )?])
+    } else if d.is_int() {
+        let note = unwrap_note_from_int(context, d.cast::<INT>())?;
+        let volume = 1.0;
+        Ok(vec![Some(NoteEvent {
+            instrument: default_instrument,
+            note,
+            volume,
+        })])
     } else {
-        let note = unwrap_note(context, array[0].clone())?;
-        Ok((default_instrument, note, 1.0))
+        Err(EvalAltResult::ErrorInModule(
+                "bindings".to_string(),
+                format!(
+                    "Invalid arguments in fn '{}': expecting an array, object map, string or integer as note value, got object of type {}'",
+                    context.fn_name(),
+                    d.type_name()
+                )
+                .into(),
+                context.position(),
+            ).into()
+        )
     }
+}
+
+pub fn unwrap_note_events_from_array(
+    context: &ErrorCallContext,
+    array: Array,
+    default_instrument: Option<InstrumentId>,
+) -> Result<Vec<Option<NoteEvent>>, Box<EvalAltResult>> {
+    let mut sequence = Vec::with_capacity(array.len());
+    if array.is_empty() {
+        sequence.push(None);
+    } else {
+        for item in array {
+            if item.is::<()>() {
+                sequence.push(None);
+            } else if item.is::<Map>() {
+                sequence.push(unwrap_note_event_from_map(
+                    context,
+                    item.cast::<Map>(),
+                    default_instrument,
+                )?);
+            } else if item.is_string() {
+                sequence.push(unwrap_note_event_from_string(
+                    context,
+                    item.cast::<ImmutableString>().as_str(),
+                    default_instrument,
+                )?);
+            } else if item.is_int() {
+                let note = unwrap_note_from_int(context, item.cast::<INT>())?;
+                let volume = 1.0;
+                sequence.push(Some(NoteEvent {
+                    instrument: default_instrument,
+                    note,
+                    volume,
+                }));
+            } else {
+                return Err(EvalAltResult::ErrorInModule(
+                        "bindings".to_string(),
+                        format!("Invalid arguments in fn '{}': expecting an object map, string or integer as note value, got object of type {}'",
+                        context.fn_name(),
+                        item.type_name()).into(),
+                        context.position(),
+                    ).into());
+            }
+        }
+    }
+    Ok(sequence)
 }

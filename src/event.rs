@@ -38,7 +38,7 @@ pub fn unique_instrument_id() -> InstrumentId {
 pub struct NoteEvent {
     pub instrument: Option<InstrumentId>,
     pub note: Note,
-    pub velocity: f32,
+    pub volume: f32,
 }
 
 impl NoteEvent {
@@ -52,10 +52,10 @@ impl NoteEvent {
                     "NA".to_string()
                 },
                 self.note,
-                self.velocity
+                self.volume
             )
         } else {
-            format!("{} {:.3}", self.note, self.velocity)
+            format!("{} {:.3}", self.note, self.volume)
         }
     }
 }
@@ -76,14 +76,14 @@ pub fn new_empty_note() -> Option<NoteEvent> {
 pub fn new_note<I: Into<Option<InstrumentId>>, N: Into<Note>>(
     instrument: I,
     note: N,
-    velocity: f32,
+    volume: f32,
 ) -> NoteEvent {
     let instrument: Option<InstrumentId> = instrument.into();
     let note: Note = note.into();
     NoteEvent {
         instrument,
         note,
-        velocity,
+        volume,
     }
 }
 
@@ -98,13 +98,13 @@ pub fn new_note_vector<
 ) -> Vec<Option<NoteEvent>> {
     let mut event_sequence = Vec::with_capacity(sequence.len());
     for event in sequence {
-        if let Some((instrument, note, velocity)) = event.into() {
+        if let Some((instrument, note, volume)) = event.into() {
             let instrument = instrument.into();
             let note = note.into();
             event_sequence.push(Some(NoteEvent {
                 instrument,
                 note,
-                velocity,
+                volume,
             }));
         } else {
             event_sequence.push(None);
@@ -126,13 +126,13 @@ pub fn new_polyphonic_note_sequence<
     for sequence in polyphonic_sequence {
         let mut event_sequence = Vec::with_capacity(sequence.len());
         for event in sequence {
-            if let Some((instrument, note, velocity)) = event.into() {
+            if let Some((instrument, note, volume)) = event.into() {
                 let instrument = instrument.into();
                 let note = note.into();
                 event_sequence.push(Some(NoteEvent {
                     instrument,
                     note,
-                    velocity,
+                    volume,
                 }));
             } else {
                 event_sequence.push(None)

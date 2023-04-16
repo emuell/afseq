@@ -1,16 +1,13 @@
 use std::path::PathBuf;
 
-use rhai::{Array, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, AST, INT};
+use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, AST};
 
 use crate::bindings::{
     new_engine,
-    unwrap::{is_empty_note_value, unwrap_array, unwrap_note_event, ErrorCallContext},
+    unwrap::{unwrap_note_events, ErrorCallContext},
 };
 
-use crate::{
-    event::{new_note_vector, InstrumentId},
-    Event, EventIter,
-};
+use crate::{event::InstrumentId, Event, EventIter};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -67,41 +64,10 @@ impl ScriptedEventIter {
         instrument: Option<InstrumentId>,
     ) -> Result<Event, Box<EvalAltResult>> {
         let context = ErrorCallContext::new(fn_ptr.fn_name(), Position::new(1, 1));
-        let array: Array = fn_ptr.call(engine, ast, {})?;
-        // Supported array args:
-        // [NOTE, VEL] -> single note
-        // [[NOTE, VEL], ..] -> poly notes
-        let mut sequence = Vec::with_capacity(array.len());
-        if array.is_empty() {
-            // []
-            sequence.push(None);
-        } else if array[0].type_name() == "string" || array[0].is::<INT>() || array[0].is::<()>() {
-            // [NOTE, VEL]
-            if is_empty_note_value(&array[0]) {
-                sequence.push(None);
-            } else {
-                sequence.push(Some(unwrap_note_event(&context, array, instrument)?));
-            }
-        } else {
-            // [[NOTE, VEL], ..]
-            for item in array {
-                if item.is::<()>() {
-                    sequence.push(None);
-                } else {
-                    let note_item_array = unwrap_array(&context, item)?;
-                    if note_item_array.is_empty() || is_empty_note_value(&note_item_array[0]) {
-                        sequence.push(None);
-                    } else {
-                        sequence.push(Some(unwrap_note_event(
-                            &context,
-                            note_item_array,
-                            instrument,
-                        )?));
-                    }
-                }
-            }
-        }
-        Ok(Event::NoteEvents(new_note_vector(sequence)))
+        let result: Dynamic = fn_ptr.call(engine, ast, {})?;
+        Ok(Event::NoteEvents(unwrap_note_events(
+            &context, result, instrument,
+        )?))
     }
 }
 

@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Event::NoteEvents(notes) = &mut event {
                         for (_index, note) in notes.iter_mut().enumerate() {
                             if let Some(note) = note {
-                                note.velocity = 1.0 / (step + 1) as f32;
+                                note.volume = 1.0 / (step + 1) as f32;
                                 step += 1;
                                 if step >= 3 {
                                     step = 0;
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Event::NoteEvents(notes) = &mut event {
                     for (_index, note) in notes.iter_mut().enumerate() {
                         if let Some(note) = note {
-                            note.velocity = 1.0 / (vel_step + 1) as f32 * 0.5;
+                            note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
                             vel_step += 1;
                             if vel_step >= 3 {
                                 vel_step = 0;

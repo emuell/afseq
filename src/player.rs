@@ -326,7 +326,7 @@ impl SamplePlayer {
                                         playback_options,
                                         playback_sample_rate,
                                     ) {
-                                        sample.set_volume(note_event.velocity);
+                                        sample.set_volume(note_event.volume);
                                         let context = Arc::new(SamplePlaybackContext {
                                             rhythm_index: rhythm_index as isize,
                                             voice_index: voice_index as isize,
