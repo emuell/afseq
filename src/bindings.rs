@@ -382,6 +382,16 @@ mod globals_module {
         })
     }
 
+    /// Create a note iterator, which endlessly emits a single fixed note.
+    /// Note argument is a rhai object map with required "key" property and an 
+    /// optional "volume" property.
+    /// 
+    /// # Example
+    ///
+    /// ```rhai
+    /// note(#{key: 48, volume: 0.25})
+    /// note(#{key: "C4"})
+    /// ```
     #[rhai_fn(name = "note", return_raw)]
     pub fn note_from_map(
         context: NativeCallContext,
@@ -396,6 +406,16 @@ mod globals_module {
         }
     }
 
+    /// Create a note iterator, which endlessly emits a single fixed note.
+    /// Note argument is a string with a required "key" and optional "volume".
+    /// 
+    /// # Example
+    ///
+    /// ```rhai
+    /// note("60 0.25")
+    /// note("C4")
+    /// note("---")
+    /// ```
     #[rhai_fn(name = "note", return_raw)]
     pub fn note_from_string(
         context: NativeCallContext,
@@ -416,6 +436,14 @@ mod globals_module {
         }
     }
 
+    /// Create a note iterator, which endlessly emits a single fixed note.
+    /// Note argument is an integer midi key value in range [0..128].
+    /// 
+    /// # Example
+    ///
+    /// ```rhai
+    /// note(60)
+    /// ```
     #[rhai_fn(name = "note", return_raw)]
     pub fn note_from_number(
         context: NativeCallContext,
@@ -430,6 +458,18 @@ mod globals_module {
         ))
     }
 
+    /// Create a note iterator, which endlessly emits a single fixed polyphonic note.
+    /// Array items can be strings, integers, object maps or ().
+    /// 
+    /// # Example
+    ///
+    /// ```rhai
+    /// note([60, 62, 65]) // C Major Chord
+    /// note(["C4", "E4", "G4"]  
+    ///   .map(|n, i| #{key: n, volume: 0.3}))  // add volume 0.3 to all notes
+    /// )
+    /// note(["---",    "OFF",    "OFF"   ])
+    /// ```
     #[rhai_fn(name = "note", return_raw)]
     pub fn note_from_array(
         context: NativeCallContext,
@@ -440,6 +480,22 @@ mod globals_module {
         Ok(unwrap_note_events_from_array(&err_context, array, instrument)?.to_event())
     }
 
+    /// Create a note iterator, which endlessly emits a sequence of monophonic or 
+    /// polyphonic notes.
+    /// The sequence repeats from the beginning after the last note was emitted.
+    /// Array items can be arrays, strings, integers, object maps or ().
+    /// 
+    /// # Example
+    ///
+    /// ```rhai
+    /// note_seq(["C4", "E4", "G4"]) // C Major Chord !arpeggio!
+    /// note_seq([
+    ///     ["A 3", "D 3", "F 3"], // Dm
+    ///     ["B 3", "D 3", "G 3"], // G
+    ///     ["C 3", "E 3", "A 3"], // C
+    ///     ["---", "---", "---"], // continue last
+    /// ])
+    /// ```
     #[rhai_fn(name = "note_seq", return_raw)]
     pub fn note_seq_from_array(
         context: NativeCallContext,
