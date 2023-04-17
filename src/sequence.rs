@@ -40,7 +40,7 @@ impl Sequence {
         }
     }
 
-    /// returns maximum rhythm count in all phrases. 
+    /// returns maximum rhythm count in all phrases.
     pub fn rhythm_slot_count(&self) -> usize {
         let mut count = 0;
         for phrase in self.phrases.iter() {
@@ -149,3 +149,9 @@ impl Rhythm for Sequence {
         }
     }
 }
+
+/// Allow sending sequences accross threads: We only do so, to allow building sequences outside
+/// the thread they are played in, and never reuse phrases from other already running sequences.
+/// 
+/// So this is **safe as long as new sequences only reference phrases within itself**.
+unsafe impl Send for Sequence {}
