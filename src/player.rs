@@ -240,8 +240,15 @@ impl SamplePlayer {
                 );
                 self.emitted_sample_time += samples_to_emit;
             } else {
-                let sleep_amount = (PLAYBACK_PRELOAD_SECONDS - seconds_to_emit).max(0.0);
-                std::thread::sleep(std::time::Duration::from_secs_f64(sleep_amount));
+                // wait until next events are due, but check stop_fn at least every...
+                const MAX_SLEEP_TIME: f64 = 0.1; 
+                let time_until_next_emit_batch = (PLAYBACK_PRELOAD_SECONDS - seconds_to_emit).max(0.0);
+                let mut time_slept = 0.0;
+                while time_slept < time_until_next_emit_batch && !stop_fn() {
+                    let sleep_amount = time_until_next_emit_batch.min(MAX_SLEEP_TIME).min(MAX_SLEEP_TIME);
+                    std::thread::sleep(std::time::Duration::from_secs_f64(sleep_amount));
+                    time_slept += sleep_amount;
+                }
             }
         }
     }
