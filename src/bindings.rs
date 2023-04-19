@@ -39,8 +39,7 @@ pub fn new_engine() -> Engine {
     engine.set_max_expr_depths(1000, 1000);
 
     // load default packages
-    let rand = RandomPackage::new();
-    rand.register_into_engine(&mut engine);
+    engine.register_global_module(RandomPackage::new().as_shared_module());
 
     engine
 }
