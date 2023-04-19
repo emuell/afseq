@@ -95,6 +95,6 @@ impl Iterator for ScriptedEventIter {
 impl EventIter for ScriptedEventIter {
     fn reset(&mut self) {
         // recreate our engine: this will recreate the function's scope as well.
-        self.engine = Engine::new();
+        self.engine = new_engine();
     }
 }
