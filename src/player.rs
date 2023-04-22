@@ -21,11 +21,12 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 /// Preload time of the player's run_until function. Should be big enough to ensure that events
-/// are scheduled ahead of playback time, but small enough to avoid latency.   
+/// are scheduled ahead of playback time, but small enough to avoid latency.
+/// NB: real audio/event latency is twice the amount of the preload!
 #[cfg(debug_assertions)]
-const PLAYBACK_PRELOAD_SECONDS: f64 = 2.5;
-#[cfg(not(debug_assertions))]
 const PLAYBACK_PRELOAD_SECONDS: f64 = 1.0;
+#[cfg(not(debug_assertions))]
+const PLAYBACK_PRELOAD_SECONDS: f64 = 0.5;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -216,12 +217,17 @@ impl SamplePlayer {
         // playing from our previous time to avoid interrupting playback streams
         if reset_playback_pos || self.emitted_sample_time == 0 {
             self.reset_playback_position(sequence);
+            log::debug!(target: "Player", "Resetting playback pos");
         } else {
             // match playing notes state to the passed rhythm
             self.playing_notes
                 .resize(sequence.rhythm_slot_count(), HashMap::new());
             // seek new phase to our previously played time
             self.seek_sequence_until_time(sequence, self.emitted_sample_time);
+            log::debug!(target: "Player",
+                "Seek sequence to time {:.2}",
+                time_base.samples_to_seconds(self.emitted_sample_time)
+            );
         }
         while !stop_fn() {
             // calculate emitted and playback time differences
@@ -229,9 +235,15 @@ impl SamplePlayer {
             let seconds_played = time_base.samples_to_seconds(
                 self.player.output_sample_frame_position() - self.playback_sample_time,
             );
-            let seconds_to_emit = seconds_played - seconds_emitted + PLAYBACK_PRELOAD_SECONDS;
+            let seconds_to_emit = seconds_played - seconds_emitted + PLAYBACK_PRELOAD_SECONDS * 2.0;
             // run sequence ahead of player up to PRELOAD_SECONDS
             if seconds_to_emit >= PLAYBACK_PRELOAD_SECONDS || self.emitted_sample_time == 0 {
+                log::debug!(target: "Player",
+                    "Seconds emitted {:.2}s - Seconds played {:.2}s: Emitting {:.2}s",
+                    seconds_emitted,
+                    seconds_played,
+                    seconds_to_emit
+                );
                 let samples_to_emit = time_base.seconds_to_samples(seconds_to_emit);
                 self.run_until_time(
                     sequence,
@@ -241,12 +253,14 @@ impl SamplePlayer {
                 self.emitted_sample_time += samples_to_emit;
             } else {
                 // wait until next events are due, but check stop_fn at least every...
-                const MAX_SLEEP_TIME: f64 = 0.1; 
-                let time_until_next_emit_batch = (PLAYBACK_PRELOAD_SECONDS - seconds_to_emit).max(0.0);
+                const MAX_SLEEP_TIME: f64 = 0.1;
+                let time_until_next_emit_batch =
+                    (PLAYBACK_PRELOAD_SECONDS - seconds_to_emit).max(0.0);
                 let mut time_slept = 0.0;
                 while time_slept < time_until_next_emit_batch && !stop_fn() {
-                    let sleep_amount = time_until_next_emit_batch.min(MAX_SLEEP_TIME).min(MAX_SLEEP_TIME);
+                    let sleep_amount = time_until_next_emit_batch.min(MAX_SLEEP_TIME);
                     std::thread::sleep(std::time::Duration::from_secs_f64(sleep_amount));
+                    // log::debug!(target: "Player", "Slept {} seconds", sleep_amount);
                     time_slept += sleep_amount;
                 }
             }
