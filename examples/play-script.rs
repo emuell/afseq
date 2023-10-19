@@ -63,9 +63,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // (re)run all scripts
     loop {
+        if script_files_changed.load(Ordering::Relaxed) {
+            script_files_changed.store(false, Ordering::Relaxed);
+            log::info!("Rebuilding all rhythms...");
+        }
+
         // build final phrase
         let load = |id: InstrumentId, file_name: &str| {
-            bindings::new_rhythm_from_file_with_fallback(
+            bindings::rhai::new_rhythm_from_file_with_fallback(
                 id,
                 beat_time,
                 format!("./assets/{file_name}").as_str(),
@@ -89,17 +94,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut sequence = Sequence::new(beat_time, vec![phrase]);
 
         let reset_playback_pos = false;
-        player.run_until(&mut sequence, &beat_time, reset_playback_pos, {
-            let script_files_changed = script_files_changed.clone();
-            move || {
-                if script_files_changed.load(Ordering::Relaxed) {
-                    script_files_changed.store(false, Ordering::Relaxed);
-                    log::info!("Rebuilding all rhythms...");
-                    true
-                } else {
-                    false
-                }
-            }
+        player.run_until(&mut sequence, &beat_time, reset_playback_pos, || {
+            script_files_changed.load(Ordering::Relaxed)
         });
     }
 }

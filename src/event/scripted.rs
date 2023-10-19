@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, AST};
 
 use crate::bindings::{
-    new_engine,
-    unwrap::{unwrap_note_events_from_dynamic, ErrorCallContext},
+    new_rhai_engine,
+    rhai_unwrap::{unwrap_note_events_from_dynamic, ErrorCallContext},
 };
 
 use crate::{event::InstrumentId, Event, EventIter};
@@ -30,7 +30,7 @@ impl ScriptedEventIter {
         instrument: Option<InstrumentId>,
     ) -> Result<Self, Box<EvalAltResult>> {
         // create a new engine
-        let engine = new_engine();
+        let engine = new_rhai_engine();
         // compile AST from the callback context's source
         let source_file = context.global_runtime_state().source();
         if let Some(source_file) = source_file {
@@ -95,6 +95,6 @@ impl Iterator for ScriptedEventIter {
 impl EventIter for ScriptedEventIter {
     fn reset(&mut self) {
         // recreate our engine: this will recreate the function's scope as well.
-        self.engine = new_engine();
+        self.engine = new_rhai_engine();
     }
 }
