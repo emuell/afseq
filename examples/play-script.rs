@@ -70,16 +70,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // build final phrase
         let load = |id: InstrumentId, file_name: &str| {
-            bindings::rhai::new_rhythm_from_file_with_fallback(
-                id,
-                beat_time,
-                format!("./assets/{file_name}").as_str(),
-            )
+            if file_name.ends_with(".lua") {
+                bindings::lua::new_rhythm_from_file_with_fallback(
+                    id,
+                    beat_time,
+                    format!("./assets/{file_name}").as_str(),
+                )
+            } else {
+                bindings::rhai::new_rhythm_from_file_with_fallback(
+                    id,
+                    beat_time,
+                    format!("./assets/{file_name}").as_str(),
+                )
+            }
         };
         let phrase = Phrase::new(
             beat_time,
             vec![
-                load(KICK, "kick.rhai"),
+                load(KICK, "kick.lua"),
                 load(SNARE, "snare.rhai"),
                 load(HIHAT, "hihat.rhai"),
                 load(BASS, "bass.rhai"),

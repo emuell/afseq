@@ -20,17 +20,18 @@ uuid = {version = "^1.3", features = [ "v4", "fast-rng" ]}
 rust-music-theory = { version = "^0.2" }
 rhai = { version = "^1.13", optional = true, features = ["metadata", "internals", "serde"] }
 rhai-rand = { version = "^0.1", optional = true }
+mlua = { version = "0.9.1", features = ["lua54", "vendored", "serialize", "macros"], optional = true }
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"], optional = true }
 
 [dev-dependencies]
-notify = { version = "^5.1" }
+notify = { version = "^6.1" }
 lazy_static = { version = "^1.4" }
 
 [profile.release]
 debug = 1
 
 [features]
-scripting = ["rhai", "rhai-rand"]
+scripting = ["rhai", "rhai-rand", "mlua"]
 player = ["afplay"]
 default = ["scripting", "player"]
 
