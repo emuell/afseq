@@ -258,7 +258,7 @@ impl Note {
                     Ok(note)
                 }
             } else {
-                return Err(format!("Invalid note str '{}' - string is too short.", s));
+                Err(format!("Invalid note str '{}' - string is too short.", s))
             }
         }
 
