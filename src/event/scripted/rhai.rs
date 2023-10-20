@@ -4,7 +4,7 @@ use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, NativeCallContext, Position, A
 
 use crate::bindings::{
     new_rhai_engine,
-    rhai_unwrap::{unwrap_note_events_from_dynamic, ErrorCallContext},
+    rhai::unwrap::{unwrap_note_events_from_dynamic, ErrorCallContext},
 };
 
 use crate::{event::InstrumentId, Event, EventIter};

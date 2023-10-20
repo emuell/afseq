@@ -1,9 +1,7 @@
 use ::mlua::Lua;
 use ::rhai::Engine as RhaiEngine;
 
-pub(crate) mod rhai_unwrap;
 pub mod rhai;
-
 pub mod lua;
 
 // ---------------------------------------------------------------------------------------------

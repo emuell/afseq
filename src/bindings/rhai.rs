@@ -11,7 +11,6 @@ use std::{
 
 use crate::prelude::*;
 use crate::{
-    bindings::rhai_unwrap::*,
     event::{fixed::FixedEventIter, scripted::rhai::ScriptedEventIter},
     rhythm::{beat_time::BeatTimeRhythm, euclidian::euclidean},
 };
@@ -19,6 +18,11 @@ use crate::{
 use rhai::{packages::Package, plugin::*, Dynamic, Engine, EvalAltResult};
 use rhai_rand::RandomPackage;
 use rust_music_theory::{note::Notes, scale};
+
+// ---------------------------------------------------------------------------------------------
+
+pub(crate) mod unwrap;
+use unwrap::*;
 
 // ---------------------------------------------------------------------------------------------
 
