@@ -1,0 +1,9 @@
+{
+    "Lua.diagnostics.globals": [
+        "sequence",
+        "chord",
+        "note",
+        "notes_in_scale",
+        "Emitter"
+    ]
+}

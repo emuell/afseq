@@ -1,9 +1,11 @@
 //! Lua script bindings for the entire crate.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
+
+use mlua::prelude::*;
+use rust_music_theory::{note::Notes, scale};
 
 use crate::prelude::*;
-use mlua::prelude::*;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -183,6 +185,29 @@ fn note_event_from_table(
     }
 }
 
+fn notes_in_scale(lua: &Lua, string: String) -> mlua::Result<LuaTable> {
+    match scale::Scale::from_regex(string.as_str()) {
+        Ok(scale) => {
+            let note_values = scale
+                .notes()
+                .into_iter()
+                .map(|n| LuaValue::Integer(Note::from(&n) as u8 as i64)).enumerate();
+            Ok(lua.create_table_from(note_values)?)
+        }
+        Err(_) => Err(mlua::Error::BadArgument {
+            to: Some("Scale".to_string()),
+            pos: 1,
+            name: Some("scale".to_string()),
+            cause: Arc::new(mlua::Error::RuntimeError(format!(
+                "Invalid scale arg: '{}'. Valid scale args are e.g. 'c major'",
+                string,
+            ))),
+        }),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 pub fn register_bindings(
     lua: &mut Lua,
     default_time_base: BeatTimeBase,
@@ -203,6 +228,14 @@ pub fn register_bindings(
         notes: Vec<Vec<Option<NoteEvent>>>,
     }
     impl LuaUserData for Sequence {}
+
+    // function notes_in_scale(args...)
+    globals.set(
+        "notes_in_scale",
+        lua.create_function(|lua, string: String| -> mlua::Result<LuaTable> {
+            notes_in_scale(lua, string)
+        })?,
+    )?;
 
     // function chord(args...)
     globals.set(
