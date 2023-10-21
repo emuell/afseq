@@ -1,1 +1,2 @@
-pub(crate) mod rhai;
+pub mod rhai;
+pub mod lua;

@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             vec![
                 load(KICK, "kick.lua"),
                 load(SNARE, "snare.rhai"),
-                load(HIHAT, "hihat.rhai"),
+                load(HIHAT, "hihat.lua"),
                 load(BASS, "bass.lua"),
                 load(SYNTH, "synth.rhai"),
                 load(TONE, "tone.rhai"),
