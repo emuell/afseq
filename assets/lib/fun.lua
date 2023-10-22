@@ -6,6 +6,8 @@
 --- Distributed under the MIT/X11 License. See COPYING.md for more details.
 ---
 
+---@diagnostic disable: deprecated, unused-local, unbalanced-assignments, assign-type-mismatch
+
 local exports = {}
 local methods = {}
 

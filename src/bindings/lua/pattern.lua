@@ -1,4 +1,5 @@
 -- table wrapper with array alike helper functions which are useful to create rhythmical patterns
+---@diagnostic disable-next-line: lowercase-global
 pattern = {}
 
 pattern.mt = {
