@@ -1,8 +1,9 @@
 //! Lua script bindings for the entire crate.
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, env, rc::Rc, sync::Arc};
 
-use mlua::prelude::*;
+use log::warn;
+use mlua::{chunk, prelude::*};
 use rust_music_theory::{note::Notes, scale};
 
 use crate::{event::scripted::lua::ScriptedEventIter, prelude::*};
@@ -11,7 +12,16 @@ use crate::{event::scripted::lua::ScriptedEventIter, prelude::*};
 
 /// Create a new rhai engine with preloaded packages and our default configuation
 pub fn new_engine() -> Lua {
-    Lua::new()
+    let lua = Lua::new();
+    // add cwd/lib to package path
+    let cwd = env::current_dir()
+        .unwrap_or(".".into())
+        .to_string_lossy()
+        .to_string();
+    lua.load(chunk!(package.path = $cwd.."/assets/lib/?.lua;"..package.path))
+        .exec()
+        .unwrap_or_else(|err| warn!("Failed to initialize lua engine: {}", err));
+    lua
 }
 
 // -------------------------------------------------------------------------------------------------
