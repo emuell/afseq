@@ -15,6 +15,7 @@ use crate::{
     rhythm::{beat_time::BeatTimeRhythm, euclidian::euclidean},
 };
 
+use anyhow::anyhow;
 use rhai::{packages::Package, plugin::*, Dynamic, Engine, EvalAltResult};
 use rhai_rand::RandomPackage;
 use rust_music_theory::{note::Notes, scale};
@@ -96,11 +97,11 @@ pub fn registered_functions(
                     let mut result: Vec<FnMetaDataParam> = Vec::new();
                     let array = value
                         .as_array()
-                        .ok_or_else(|| string_error::new_err("Unexpected params array object"))?;
+                        .ok_or_else(|| anyhow!("Unexpected params array object"))?;
                     for item in array {
                         let object = item
                             .as_object()
-                            .ok_or_else(|| string_error::new_err("Unexpected params array item"))?;
+                            .ok_or_else(|| anyhow!("Unexpected params array item"))?;
                         let mut param_name = None;
                         if let Some(name) = object.get("name") {
                             param_name = Some(name.as_str().unwrap_or("").to_string());
@@ -140,7 +141,7 @@ pub fn registered_functions(
         }
         Ok(metadata)
     } else {
-        Err(string_error::static_err("Unexpected meta data JSON"))
+        Err(anyhow!("Unexpected meta data JSON").into())
     }
 }
 

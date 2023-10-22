@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, env, rc::Rc, sync::Arc};
 
-use log::warn;
+use anyhow::anyhow;
 use mlua::{chunk, prelude::*};
 use rust_music_theory::{note::Notes, scale};
 
@@ -20,7 +20,7 @@ pub fn new_engine() -> Lua {
         .to_string();
     lua.load(chunk!(package.path = $cwd.."/assets/lib/?.lua;"..package.path))
         .exec()
-        .unwrap_or_else(|err| warn!("Failed to initialize lua engine: {}", err));
+        .unwrap_or_else(|err| log::warn!("Failed to initialize lua engine: {}", err));
     lua
 }
 
@@ -286,37 +286,23 @@ fn rhytm_from_value(
         } else if let Ok(second_time_rhythm) = user_data.take::<SecondTimeRhythm>() {
             Ok(Rc::new(RefCell::new(second_time_rhythm)))
         } else {
-            Err(string_error::new_err(
-                "Expected script to return a Rhythm, got some other custom type",
-            ))
+            Err(anyhow!("Expected script to return a Rhythm, got some other custom type",).into())
         }
     } else {
-        Err(string_error::new_err(&format!(
+        Err(anyhow!(
             "Expected script to return a Rhythm, got {}",
             result.type_name()
-        )))
+        )
+        .into())
     }
 }
 
-fn notes_in_scale(lua: &Lua, string: String) -> mlua::Result<LuaTable> {
-    match scale::Scale::from_regex(string.as_str()) {
-        Ok(scale) => {
-            let note_values = scale
-                .notes()
-                .into_iter()
-                .map(|n| LuaValue::Integer(Note::from(&n) as u8 as i64))
-                .enumerate();
-            Ok(lua.create_table_from(note_values)?)
-        }
-        Err(_) => Err(mlua::Error::BadArgument {
-            to: Some("Scale".to_string()),
-            pos: 1,
-            name: Some("scale".to_string()),
-            cause: Arc::new(mlua::Error::RuntimeError(format!(
-                "Invalid scale arg: '{}'. Valid scale args are e.g. 'c major'",
-                string,
-            ))),
-        }),
+fn bad_argument_error(func: &str, arg: &str, pos: usize, message: &str) -> mlua::Error {
+    mlua::Error::BadArgument {
+        to: Some(func.to_string()),
+        name: Some(arg.to_string()),
+        pos,
+        cause: mlua::Error::RuntimeError(message.to_string()).into(),
     }
 }
 
@@ -343,7 +329,25 @@ fn register_global_bindings(
     globals.set(
         "notes_in_scale",
         lua.create_function(|lua, string: String| -> mlua::Result<LuaTable> {
-            notes_in_scale(lua, string)
+            match scale::Scale::from_regex(string.as_str()) {
+                Ok(scale) => {
+                    let note_values = scale
+                        .notes()
+                        .into_iter()
+                        .map(|n| LuaValue::Integer(Note::from(&n) as u8 as i64))
+                        .enumerate();
+                    Ok(lua.create_table_from(note_values)?)
+                }
+                Err(_) => Err(mlua::Error::BadArgument {
+                    to: Some("Scale".to_string()),
+                    pos: 1,
+                    name: Some("scale".to_string()),
+                    cause: Arc::new(mlua::Error::RuntimeError(format!(
+                        "Invalid scale arg: '{}'. Valid scale args are e.g. 'c major'",
+                        string,
+                    ))),
+                }),
+            }
         })?,
     )?;
 
@@ -354,31 +358,35 @@ fn register_global_bindings(
             |lua, (pulses, steps, offset): (i32, i32, Option<i32>)| -> mlua::Result<LuaTable> {
                 let offset = offset.unwrap_or(0);
                 if pulses <= 0 {
-                    Err(mlua::Error::BadArgument {
-                        to: Some("euclidian".to_string()),
-                        name: Some("pulses".to_string()),
-                        pos: 1,
-                        cause: mlua::Error::RuntimeError("pulses must be > 0".to_string()).into(),
-                    })
-                } else if steps <= 0 {
-                    Err(mlua::Error::BadArgument {
-                        to: Some("euclidian".to_string()),
-                        name: Some("steps".to_string()),
-                        pos: 2,
-                        cause: mlua::Error::RuntimeError("steps must be > 0".to_string()).into(),
-                    })
-                } else if pulses > steps {
-                    Err(mlua::Error::BadArgument {
-                        to: Some("euclidian".to_string()),
-                        name: Some("steps".to_string()),
-                        pos: 1,
-                        cause: mlua::Error::RuntimeError("pulse must be <= step".to_string())
-                            .into(),
-                    })
-                } else {
-                    let pattern = euclidean(pulses as u32, steps as u32, offset);
-                    Ok(lua.create_table_from(pattern.into_iter().map(|v| v as i32).enumerate())?)
+                    return Err(bad_argument_error(
+                        "euclidian",
+                        "pulses",
+                        1,
+                        "pulses must be > 0",
+                    ));
                 }
+                if steps <= 0 {
+                    return Err(bad_argument_error(
+                        "euclidian",
+                        "steps",
+                        2,
+                        "steps must be > 0",
+                    ));
+                }
+                if pulses > steps {
+                    return Err(bad_argument_error(
+                        "euclidian",
+                        "steps",
+                        1,
+                        "pulse must be <= step",
+                    ));
+                }
+                lua.create_table_from(
+                    euclidean(pulses as u32, steps as u32, offset)
+                        .into_iter()
+                        .map(|v| v as i32)
+                        .enumerate(),
+                )
             },
         )?,
     )?;
@@ -490,7 +498,6 @@ fn register_global_bindings(
 
 fn register_pattern_bindings(lua: &mut Lua) -> mlua::Result<()> {
     // implemented in lua: load and evaluate chunk
-    let pattern = include_str!("./lua/pattern.lua");
-    let chunk = lua.load(pattern);
+    let chunk = lua.load(include_str!("./lua/pattern.lua"));
     chunk.exec()
 }

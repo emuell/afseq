@@ -8,19 +8,22 @@ exclude = ["assets", "examples"]
 categories = ["audio", "player", "sequencer"]
 
 [dependencies]
+# required
+anyhow = { version = "^1.0" }
 paste = { version = "^1.0"}
 derive_more = { version = "^0.99" }
 crossbeam-channel = { version = "^0.5" }
 log = { version = "^0.4" }
 simplelog = { version = "^0.12" }
-string-error = { version = "^0.1" }
 serde = { version = "^1.0" }
 serde_json = { version = "^1.0" }
 uuid = {version = "^1.3", features = [ "v4", "fast-rng" ]}
 rust-music-theory = { version = "^0.2" }
-rhai = { version = "^1.13", optional = true, features = ["metadata", "internals", "serde"] }
+# optional -> scripting
+rhai = { version = "^1.13", features = ["metadata", "internals", "serde"], optional = true }
 rhai-rand = { version = "^0.1", optional = true }
 mlua = { version = "0.9.1", features = ["luajit52", "vendored", "macros", "unstable"], optional = true }
+# optional -> player
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"], optional = true }
 
 [dev-dependencies]
@@ -38,6 +41,7 @@ default = ["scripting", "player"]
 [[example]]
 name = "play"
 required-features = ["player"]
+
 [[example]]
 name = "play-script"
 required-features = ["scripting", "player"]
