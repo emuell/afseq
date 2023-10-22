@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 load(SNARE, "snare.lua"),
                 load(HIHAT, "hihat.lua"),
                 load(BASS, "bass.lua"),
-                load(SYNTH, "synth.rhai"),
+                load(SYNTH, "synth.lua"),
                 load(TONE, "tone.rhai"),
                 load(FX, "fx.rhai"),
             ],

@@ -1,6 +1,6 @@
 //! Lua script bindings for the entire crate.
 
-use std::{cell::RefCell, env, rc::Rc, sync::Arc};
+use std::{cell::RefCell, env, rc::Rc};
 
 use anyhow::anyhow;
 use mlua::{chunk, prelude::*};
@@ -103,14 +103,52 @@ struct Chord {
     notes: Vec<Option<NoteEvent>>,
 }
 
+impl LuaUserData for Chord {
+    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_function("set_volume", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
+            let mut this = ud.borrow::<Self>()?.clone();
+            for note in this.notes.iter_mut().flatten() {
+                note.volume = volume;
+            }
+            Ok(this)
+        });
+
+        methods.add_function("amplify", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
+            let mut this = ud.borrow::<Self>()?.clone();
+            for note in this.notes.iter_mut().flatten() {
+                note.volume *= volume;
+            }
+            Ok(this)
+        });
+    }
+}
+
 // Sequence
 #[derive(Clone, Debug)]
 struct Sequence {
     notes: Vec<Vec<Option<NoteEvent>>>,
 }
 
-impl LuaUserData for Chord {}
-impl LuaUserData for Sequence {}
+impl LuaUserData for Sequence {
+    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_function("set_volume", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
+            let mut this = ud.borrow::<Self>()?.clone();
+            for note in this.notes.iter_mut().flatten().flatten() {
+                note.volume = volume;
+            }
+            Ok(this)
+        });
+
+        methods.add_function("amplify", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
+            let mut this = ud.borrow::<Self>()?.clone();
+            for note in this.notes.iter_mut().flatten().flatten() {
+                note.volume *= volume;
+            }
+            Ok(this)
+        });
+    }
+}
+
 impl LuaUserData for BeatTimeRhythm {
     // BeatTimeRhythm is only passed through ATM
 }
@@ -325,7 +363,7 @@ fn register_global_bindings(
 ) -> mlua::Result<()> {
     let globals = lua.globals();
 
-    // function notes_in_scale(args...)
+    // function notes_in_scale(expression)
     globals.set(
         "notes_in_scale",
         lua.create_function(|lua, string: String| -> mlua::Result<LuaTable> {
@@ -338,20 +376,17 @@ fn register_global_bindings(
                         .enumerate();
                     Ok(lua.create_table_from(note_values)?)
                 }
-                Err(_) => Err(mlua::Error::BadArgument {
-                    to: Some("Scale".to_string()),
-                    pos: 1,
-                    name: Some("scale".to_string()),
-                    cause: Arc::new(mlua::Error::RuntimeError(format!(
-                        "Invalid scale arg: '{}'. Valid scale args are e.g. 'c major'",
-                        string,
-                    ))),
-                }),
+                Err(err) => Err(bad_argument_error(
+                    "notes_in_scale",
+                    "scale",
+                    1,
+                    format!("{}. Valid modes are e.g. 'c major'", err).as_str(),
+                )),
             }
         })?,
     )?;
 
-    // function euclidian(pulses, steps, offset or nil)
+    // function euclidian(pulses, steps, [offset])
     globals.set(
         "euclidian",
         lua.create_function(
@@ -434,6 +469,10 @@ fn register_global_bindings(
                 let resolution = table.get::<&str, f32>("resolution")?;
                 let mut rhythm =
                     BeatTimeRhythm::new(default_time_base, BeatTimeStep::Beats(resolution));
+                if table.contains_key("offset")? {
+                    let offset = table.get::<&str, f32>("offset")?;
+                    rhythm = rhythm.with_offset_in_step(offset);
+                }
                 if table.contains_key("pattern")? {
                     let pattern = table.get::<&str, Vec<i32>>("pattern")?;
                     rhythm = rhythm.with_pattern_vector(pattern);
