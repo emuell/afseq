@@ -347,6 +347,42 @@ fn register_global_bindings(
         })?,
     )?;
 
+    // function euclidian(pulses, steps, offset or nil)
+    globals.set(
+        "euclidian",
+        lua.create_function(
+            |lua, (pulses, steps, offset): (i32, i32, Option<i32>)| -> mlua::Result<LuaTable> {
+                let offset = offset.unwrap_or(0);
+                if pulses <= 0 {
+                    Err(mlua::Error::BadArgument {
+                        to: Some("euclidian".to_string()),
+                        name: Some("pulses".to_string()),
+                        pos: 1,
+                        cause: mlua::Error::RuntimeError("pulses must be > 0".to_string()).into(),
+                    })
+                } else if steps <= 0 {
+                    Err(mlua::Error::BadArgument {
+                        to: Some("euclidian".to_string()),
+                        name: Some("steps".to_string()),
+                        pos: 2,
+                        cause: mlua::Error::RuntimeError("steps must be > 0".to_string()).into(),
+                    })
+                } else if pulses > steps {
+                    Err(mlua::Error::BadArgument {
+                        to: Some("euclidian".to_string()),
+                        name: Some("steps".to_string()),
+                        pos: 1,
+                        cause: mlua::Error::RuntimeError("pulse must be <= step".to_string())
+                            .into(),
+                    })
+                } else {
+                    let pattern = euclidean(pulses as u32, steps as u32, offset);
+                    Ok(lua.create_table_from(pattern.into_iter().map(|v| v as i32).enumerate())?)
+                }
+            },
+        )?,
+    )?;
+
     // function chord(args...)
     globals.set(
         "chord",

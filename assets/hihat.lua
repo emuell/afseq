@@ -3,8 +3,7 @@ return Emitter {
   resolution = 1 / 4,
   offset = 8,
   -- duration = nil,
-  -- euclidian(14, 16).rotate(6))
-  pattern = { 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1 },
+  pattern = euclidian(14, 16, 6),
   emit = function()
     local note_step = 0;
     return function()
