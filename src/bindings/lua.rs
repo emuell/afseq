@@ -368,14 +368,12 @@ fn register_global_bindings(
         "notes_in_scale",
         lua.create_function(|lua, string: String| -> mlua::Result<LuaTable> {
             match scale::Scale::from_regex(string.as_str()) {
-                Ok(scale) => {
-                    let note_values = scale
+                Ok(scale) => Ok(lua.create_sequence_from(
+                    scale
                         .notes()
-                        .into_iter()
-                        .map(|n| LuaValue::Integer(Note::from(&n) as u8 as i64))
-                        .enumerate();
-                    Ok(lua.create_table_from(note_values)?)
-                }
+                        .iter()
+                        .map(|n| LuaValue::Integer(Note::from(n) as u8 as i64)),
+                )?),
                 Err(err) => Err(bad_argument_error(
                     "notes_in_scale",
                     "scale",
@@ -416,11 +414,10 @@ fn register_global_bindings(
                         "pulse must be <= step",
                     ));
                 }
-                lua.create_table_from(
+                lua.create_sequence_from(
                     euclidean(pulses as u32, steps as u32, offset)
-                        .into_iter()
-                        .map(|v| v as i32)
-                        .enumerate(),
+                        .iter()
+                        .map(|v| *v as i32),
                 )
             },
         )?,
