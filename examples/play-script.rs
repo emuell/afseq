@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             beat_time,
             vec![
                 load(KICK, "kick.lua"),
-                load(SNARE, "snare.rhai"),
+                load(SNARE, "snare.lua"),
                 load(HIHAT, "hihat.lua"),
                 load(BASS, "bass.lua"),
                 load(SYNTH, "synth.rhai"),

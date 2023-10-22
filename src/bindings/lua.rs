@@ -6,7 +6,7 @@ use log::warn;
 use mlua::{chunk, prelude::*};
 use rust_music_theory::{note::Notes, scale};
 
-use crate::{event::scripted::lua::ScriptedEventIter, prelude::*};
+use crate::{event::scripted::lua::ScriptedEventIter, prelude::*, rhythm::euclidian::euclidean};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -327,6 +327,16 @@ pub fn register_bindings(
     default_time_base: BeatTimeBase,
     default_instrument: Option<InstrumentId>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    register_global_bindings(lua, default_time_base, default_instrument)?;
+    register_pattern_bindings(lua)?;
+    Ok(())
+}
+
+fn register_global_bindings(
+    lua: &mut Lua,
+    default_time_base: BeatTimeBase,
+    default_instrument: Option<InstrumentId>,
+) -> mlua::Result<()> {
     let globals = lua.globals();
 
     // function notes_in_scale(args...)
@@ -440,4 +450,11 @@ pub fn register_bindings(
     )?;
 
     Ok(())
+}
+
+fn register_pattern_bindings(lua: &mut Lua) -> mlua::Result<()> {
+    // implemented in lua: load and evaluate chunk
+    let pattern = include_str!("./lua/pattern.lua");
+    let chunk = lua.load(pattern);
+    chunk.exec()
 }
