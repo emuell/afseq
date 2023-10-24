@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-use crate::bindings::lua::note_events_from_value;
+use crate::bindings::lua::unwrap::note_events_from_value;
 use crate::{event::InstrumentId, Event, EventIter};
 
 // -------------------------------------------------------------------------------------------------
