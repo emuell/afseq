@@ -1039,22 +1039,25 @@ methods.op = operator
 --------------------------------------------------------------------------------
 
 -- a special syntax sugar to export all functions to the global table
-setmetatable(exports, {
-    __call = function(t, override)
-        for k, v in pairs(t) do
-            if rawget(_G, k) ~= nil then
-                local msg = 'function ' .. k .. ' already exists in global scope.'
-                if override then
-                    rawset(_G, k, v)
-                    print('WARNING: ' .. msg .. ' Overwritten.')
-                else
-                    print('NOTICE: ' .. msg .. ' Skipped.')
-                end
-            else
+---@diagnostic disable-next-line: lowercase-global
+globalfun = function(override)
+    for k, v in pairs(fun) do
+        if rawget(_G, k) ~= nil then
+            local msg = 'function ' .. k .. ' already exists in global scope.'
+            if override then
                 rawset(_G, k, v)
+                print('WARNING: ' .. msg .. ' Overwritten.')
+            else
+                print('NOTICE: ' .. msg .. ' Skipped.')
             end
+        else
+            rawset(_G, k, v)
         end
-    end,
-})
+    end
+end
 
-return exports
+-- [taktik]: added
+---@diagnostic disable-next-line: lowercase-global
+fun = exports
+
+return fun

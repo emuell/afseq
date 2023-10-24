@@ -1,5 +1,3 @@
-require "fun" ()
-
 local scales = {
   notes_in_scale("f major"),
   notes_in_scale("c mixolydian"),
@@ -21,7 +19,7 @@ return Emitter {
 
     return function()
       -- get current note set
-      local notes = totable(map(function(v)
+      local notes = fun.totable(fun.map(function(v)
         return scales[scale_index][v] - 12
       end, { 1, 6, 3, 4, 8, 3 }))
       -- move note step

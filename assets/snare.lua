@@ -1,4 +1,4 @@
-require "fun"()
+globalfun() -- move fun.* into globals
 
 return Emitter {
   resolution = 1 / 4,

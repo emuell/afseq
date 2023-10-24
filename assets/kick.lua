@@ -1,5 +1,3 @@
-require "fun" ()
-
 return Emitter {
   unit = "beats",
   resolution = 1 / 4,

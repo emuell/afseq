@@ -353,6 +353,7 @@ pub fn register_bindings(
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_global_bindings(lua, default_time_base, default_instrument)?;
     register_pattern_bindings(lua)?;
+    register_fun_bindings(lua)?;
     Ok(())
 }
 
@@ -535,5 +536,11 @@ fn register_global_bindings(
 fn register_pattern_bindings(lua: &mut Lua) -> mlua::Result<()> {
     // implemented in lua: load and evaluate chunk
     let chunk = lua.load(include_str!("./lua/pattern.lua"));
+    chunk.exec()
+}
+
+fn register_fun_bindings(lua: &mut Lua) -> mlua::Result<()> {
+    // implemented in lua: load and evaluate chunk
+    let chunk = lua.load(include_str!("./lua/fun.lua"));
     chunk.exec()
 }

@@ -1,4 +1,11 @@
--- table wrapper with array alike helper functions which are useful to create rhythmical patterns
+---
+--- Part of the afseq trait:
+--- exports Pattern, a table wrapper with array alike helper functions which are useful to 
+--- ease creating rhythmical patterns. inspired from https://github.com/rick4stley/array  
+--- 
+--- Copyright (c) 2023 Eduard Müller <mail@emuell.net>
+---
+
 ---@diagnostic disable-next-line: lowercase-global
 pattern = {}
 
