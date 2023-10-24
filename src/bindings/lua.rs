@@ -6,7 +6,9 @@ use anyhow::anyhow;
 use mlua::{chunk, prelude::*};
 use rust_music_theory::{note::Notes, scale};
 
-use crate::{event::scripted::lua::ScriptedEventIter, prelude::*, rhythm::euclidian::euclidean};
+use crate::{prelude::*, rhythm::euclidian::euclidean};
+
+// ---------------------------------------------------------------------------------------------
 
 pub(crate) mod unwrap;
 use unwrap::*;
@@ -42,7 +44,7 @@ pub fn new_rhythm_from_file(
     let chunk = lua.load(std::path::PathBuf::from(file_name));
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhytm_from_value(result)
+    rhthm_from_userdata(result)
 }
 
 // evaluate a script which creates and returns a rhythm,
@@ -74,7 +76,7 @@ pub fn new_rhythm_from_string(
     let chunk = lua.load(script);
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhytm_from_value(result)
+    rhthm_from_userdata(result)
 }
 
 // evaluate an expression which creates and returns a rhythm,
@@ -98,10 +100,11 @@ pub fn new_rhythm_from_string_with_fallback(
     })
 }
 
-fn rhytm_from_value(
+// unwrap a BeatTimeRhythm or SecondTimeRhythm from the given LuaValue,
+// which is expected to be a user data
+fn rhthm_from_userdata(
     result: LuaValue,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
-    // hande script result
     if let Some(user_data) = result.as_userdata() {
         if let Ok(beat_time_rhythm) = user_data.take::<BeatTimeRhythm>() {
             Ok(Rc::new(RefCell::new(beat_time_rhythm)))
@@ -116,6 +119,90 @@ fn rhytm_from_value(
             result.type_name()
         )
         .into())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl LuaUserData for BeatTimeRhythm {
+    // BeatTimeRhythm is only passed through ATM
+}
+
+impl BeatTimeRhythm {
+    // create a BeatTimeRhythm from the given Lua table value
+    fn from_table(
+        table: LuaTable,
+        default_time_base: BeatTimeBase,
+        default_instrument: Option<InstrumentId>,
+    ) -> mlua::Result<BeatTimeRhythm> {
+        let resolution = table.get::<&str, f32>("resolution").unwrap_or(1.0);
+        let mut step = BeatTimeStep::Beats(resolution);
+        if table.contains_key("unit")? {
+            let unit = table.get::<&str, String>("unit")?;
+            match unit.as_str() {
+                "bars" => step = BeatTimeStep::Bar(resolution),
+                "beats"|"quarter"|"1/4" => step = BeatTimeStep::Beats(resolution),
+                "eighth"|"1/8" => step = BeatTimeStep::Eighth(resolution),
+                "sixteenth"|"1/16" => step = BeatTimeStep::Sixteenth(resolution),
+                _ => return Err(bad_argument_error("emit", "unit", 1, 
+                "Invalid unit parameter. Expected 'seconds', 'bars', 'beats', 'eighth', 'sixteenth'"))
+            }
+        }
+        let mut rhythm = BeatTimeRhythm::new(default_time_base, step);
+        if table.contains_key("offset")? {
+            let offset = table.get::<&str, f32>("offset")?;
+            rhythm = rhythm.with_offset_in_step(offset);
+        }
+        if table.contains_key("pattern")? {
+            let pattern = table.get::<&str, Vec<i32>>("pattern")?;
+            rhythm = rhythm.with_pattern_vector(pattern);
+        }
+        if table.contains_key("emit")? {
+            let iter =
+                event_iter_from_value(table.get::<&str, LuaValue>("emit")?, default_instrument)?;
+            rhythm = rhythm.trigger_dyn(iter);
+        }
+        Ok(rhythm)
+    }
+}
+
+impl LuaUserData for SecondTimeRhythm {
+    // SecondTimeRhythm is only passed through ATM
+}
+
+impl SecondTimeRhythm {
+    // create a SecondtimeRhythm from the given Lua table value
+    fn from_table(
+        table: LuaTable,
+        default_time_base: SecondTimeBase,
+        default_instrument: Option<InstrumentId>,
+    ) -> mlua::Result<SecondTimeRhythm> {
+        let mut resolution = table.get::<&str, f64>("resolution").unwrap_or(1.0);
+        if table.contains_key("unit")? {
+            let unit = table.get::<&str, String>("unit")?;
+            match unit.as_str() {
+                "seconds" => (),
+                "ms" => resolution /= 1000.0,
+                _ => return Err(bad_argument_error("emit", "unit", 1, 
+                "Invalid unit parameter. Expected 'seconds', 'bars', 'beats', 'eighth', 'sixteenth'")),
+            }
+        }
+        let mut rhythm = SecondTimeRhythm::new(default_time_base, resolution);
+
+        if table.contains_key("offset")? {
+            let offset = table.get::<&str, f32>("offset")? as SecondTimeStep;
+            rhythm = rhythm.with_offset(offset);
+        }
+        if table.contains_key("pattern")? {
+            let pattern = table.get::<&str, Vec<i32>>("pattern")?;
+            rhythm = rhythm.with_pattern_vector(pattern);
+        }
+        if table.contains_key("emit")? {
+            let iter =
+                event_iter_from_value(table.get::<&str, LuaValue>("emit")?, default_instrument)?;
+            rhythm = rhythm.trigger_dyn(iter);
+        }
+        Ok(rhythm)
     }
 }
 
@@ -226,69 +313,22 @@ fn register_global_bindings(
         "Emitter",
         lua.create_function({
             let default_time_base = default_time_base;
-            move |_lua, table: LuaTable| -> mlua::Result<BeatTimeRhythm> {
-                let resolution = table.get::<&str, f32>("resolution")?;
-                let mut rhythm =
-                    BeatTimeRhythm::new(default_time_base, BeatTimeStep::Beats(resolution));
-                if table.contains_key("offset")? {
-                    let offset = table.get::<&str, f32>("offset")?;
-                    rhythm = rhythm.with_offset_in_step(offset);
+            move |lua, table: LuaTable| -> mlua::Result<LuaValue> {
+                let second_time_unit = match table.get::<&str, String>("unit") {
+                    Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
+                    Err(_) => false,
+                };
+                if second_time_unit {
+                    let time_base = SecondTimeBase {
+                        samples_per_sec: default_time_base.samples_per_sec,
+                    };
+                    let instrument = default_instrument;
+                    SecondTimeRhythm::from_table(table, time_base, instrument)?.into_lua(lua)
+                } else {
+                    let time_base = default_time_base;
+                    let instrument = default_instrument;
+                    BeatTimeRhythm::from_table(table, time_base, instrument)?.into_lua(lua)
                 }
-                if table.contains_key("pattern")? {
-                    let pattern = table.get::<&str, Vec<i32>>("pattern")?;
-                    rhythm = rhythm.with_pattern_vector(pattern);
-                }
-                if table.contains_key("emit")? {
-                    match table.get::<&str, LuaValue>("emit").unwrap() {
-                        LuaValue::String(note_str) => {
-                            let event = note_event_from_string(
-                                &note_str.to_string_lossy(),
-                                default_instrument,
-                            )?;
-                            rhythm = rhythm.trigger(event.to_event());
-                        }
-                        LuaValue::Table(table) => {
-                            // { key = "C4", volume = 1.0 }
-                            if table.contains_key("key")? {
-                                let event = note_event_from_table(table, default_instrument)?;
-                                rhythm = rhythm.trigger(event.to_event());
-                            } else {
-                                return Err(mlua::Error::FromLuaConversionError {
-                                    from: "table",
-                                    to: "Note",
-                                    message: Some("Invalid event table argument".to_string()),
-                                });
-                            }
-                        }
-                        LuaValue::UserData(userdata) => {
-                            if userdata.is::<ChordUserData>() {
-                                let chord = userdata.take::<ChordUserData>().unwrap();
-                                rhythm = rhythm.trigger(chord.notes.to_event());
-                            } else if userdata.is::<SequenceUserData>() {
-                                let sequence = userdata.take::<SequenceUserData>().unwrap();
-                                rhythm = rhythm.trigger(sequence.notes.to_event_sequence());
-                            } else {
-                                return Err(mlua::Error::FromLuaConversionError {
-                                    from: "table",
-                                    to: "Note",
-                                    message: Some("Invalid note table argument".to_string()),
-                                });
-                            }
-                        }
-                        LuaValue::Function(function) => {
-                            rhythm = rhythm
-                                .trigger(ScriptedEventIter::new(function, default_instrument)?);
-                        }
-                        _ => {
-                            return Err(mlua::Error::FromLuaConversionError {
-                                from: "table",
-                                to: "Note",
-                                message: Some("Invalid note table argument".to_string()),
-                            });
-                        }
-                    }
-                }
-                Ok(rhythm)
             }
         })?,
     )?;

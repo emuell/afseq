@@ -1,7 +1,7 @@
 globalfun() -- move fun.* into globals
 
 return Emitter {
-  resolution = 1 / 4,
+  unit = "sixteenth",
   pattern_fun = totable(chain(
     take(7 * 8, cycle { 0, 0, 0, 0, 1, 0, 0, 0 }),
     { 0, 0, 0, 1, 0, 0, 1, 0 }

@@ -105,9 +105,14 @@ impl BeatTimeRhythm {
 
     /// Use the given [`EventIter`] to trigger events.
     pub fn trigger<Iter: EventIter + 'static>(&self, iter: Iter) -> Self {
+        self.trigger_dyn(Rc::new(RefCell::new(iter)))
+    }
+
+    /// Use the given dyn [`EventIter`] to trigger events.
+    pub fn trigger_dyn(&self, event_iter: Rc<RefCell<dyn EventIter>>) -> Self {
         Self {
             pattern: self.pattern.clone(),
-            event_iter: Rc::new(RefCell::new(iter)),
+            event_iter,
             ..*self
         }
     }

@@ -1,7 +1,6 @@
 return Emitter {
-  -- unit = "beats",
-  resolution = 1 / 4,
-  offset = 8 * 4,
+  unit = "sixteenth",
+  offset = 16 * 8,
   pattern = euclidian(14, 16, 6),
   emit = function()
     local note_step = 0;

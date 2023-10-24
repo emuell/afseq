@@ -1,6 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use mlua::prelude::*;
 
-use crate::prelude::*;
+use crate::{prelude::*, event::scripted::lua::ScriptedEventIter};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -81,10 +83,6 @@ impl LuaUserData for SequenceUserData {
             Ok(this)
         });
     }
-}
-
-impl LuaUserData for BeatTimeRhythm {
-    // BeatTimeRhythm is only passed through ATM
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -256,5 +254,58 @@ pub fn note_events_from_value(
             arg_index,
             default_instrument,
         )?]),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub fn event_iter_from_value(
+    value: LuaValue,
+    default_instrument: Option<InstrumentId>,
+) -> mlua::Result<Rc<RefCell<dyn EventIter>>> {
+    match value {
+        LuaValue::String(note_str) => {
+            let event = note_event_from_string(&note_str.to_string_lossy(), default_instrument)?;
+            Ok(Rc::new(RefCell::new(event.to_event())))
+        }
+        LuaValue::Table(table) => {
+            // { key = "C4", volume = 1.0 }
+            if table.contains_key("key")? {
+                let event = note_event_from_table(table, default_instrument)?;
+                Ok(Rc::new(RefCell::new(event.to_event())))
+            } else {
+                Err(mlua::Error::FromLuaConversionError {
+                    from: "table",
+                    to: "Note",
+                    message: Some("Invalid event table argument".to_string()),
+                })
+            }
+        }
+        LuaValue::UserData(userdata) => {
+            if userdata.is::<ChordUserData>() {
+                let chord = userdata.take::<ChordUserData>().unwrap();
+                Ok(Rc::new(RefCell::new(chord.notes.to_event())))
+            } else if userdata.is::<SequenceUserData>() {
+                let sequence = userdata.take::<SequenceUserData>().unwrap();
+                Ok(Rc::new(RefCell::new(sequence.notes.to_event_sequence())))
+            } else {
+                Err(mlua::Error::FromLuaConversionError {
+                    from: "table",
+                    to: "Note",
+                    message: Some("Invalid note table argument".to_string()),
+                })
+            }
+        }
+        LuaValue::Function(function) => {
+            let iter = ScriptedEventIter::new(function, default_instrument)?;
+            Ok(Rc::new(RefCell::new(iter)))
+        }
+        _ => {
+            Err(mlua::Error::FromLuaConversionError {
+                from: "table",
+                to: "Note",
+                message: Some("Invalid note table argument".to_string()),
+            })
+        }
     }
 }

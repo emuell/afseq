@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 load(BASS, "bass.lua"),
                 load(SYNTH, "synth.lua"),
                 load(TONE, "tone.lua"),
-                load(FX, "fx.rhai"),
+                load(FX, "fx.lua"),
             ],
             BeatTimeStep::Bar(4.0),
         );
