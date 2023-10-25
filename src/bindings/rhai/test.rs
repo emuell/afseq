@@ -1,10 +1,4 @@
-use crate::{
-    bindings::rhai::*,
-    event::{fixed::FixedEventIter, new_note, Event, InstrumentId},
-    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
-    time::BeatTimeStep,
-    BeatTimeBase, SecondTimeBase,
-};
+use crate::{bindings::rhai::*, prelude::*};
 
 use ::rhai::{Dynamic, Engine, INT};
 
@@ -142,6 +136,35 @@ fn extensions() {
 }
 
 #[test]
+fn globals() {
+    // create a new engine and register bindings
+    let mut engine = new_engine();
+    register_bindings(
+        &mut engine,
+        BeatTimeBase {
+            beats_per_min: 120.0,
+            beats_per_bar: 4,
+            samples_per_sec: 44100,
+        },
+        None,
+    );
+
+    // Notes in Scale
+    assert!(engine
+        .eval::<Dynamic>(r#"notes_in_scale("c wurst")"#)
+        .is_err());
+    assert_eq!(
+        engine
+            .eval::<Vec<rhai::Dynamic>>(r#"notes_in_scale("c major")"#)
+            .unwrap()
+            .iter()
+            .map(|v| v.clone().cast::<INT>())
+            .collect::<Vec<INT>>(),
+        vec![60, 62, 64, 65, 67, 69, 71, 72]
+    );
+}
+
+#[test]
 fn note() {
     // create a new engine and register bindings
     let mut engine = new_engine();
@@ -257,18 +280,34 @@ fn note() {
             None
         ])
     );
+}
+
+#[test]
+fn note_sequence() {
+    // create a new engine and register bindings
+    let mut engine = Engine::new();
+    let instrument = Some(InstrumentId::from(76));
+    register_bindings(
+        &mut engine,
+        BeatTimeBase {
+            beats_per_min: 160.0,
+            beats_per_bar: 6,
+            samples_per_sec: 96000,
+        },
+        instrument,
+    );
 
     // Note Sequence
     let eval_result = engine
-        .eval::<Dynamic>(r#"note_seq(["C#1 0.5", "---", "G_2"])"#)
+        .eval::<Dynamic>(r#"note_seq([["C#1 0.5"], ["---"], ["G_2"]])"#)
         .unwrap();
     let note_sequence_event = eval_result.try_cast::<FixedEventIter>().unwrap();
     assert_eq!(
         note_sequence_event.events(),
         vec![
-            Event::NoteEvents(vec![Some(new_note(None, "c#1", 0.5))]),
+            Event::NoteEvents(vec![Some(new_note(instrument, "c#1", 0.5))]),
             Event::NoteEvents(vec![None]),
-            Event::NoteEvents(vec![Some(new_note(None, "g2", 1.0))])
+            Event::NoteEvents(vec![Some(new_note(instrument, "g2", 1.0))])
         ]
     );
 
@@ -285,30 +324,16 @@ fn note() {
         poly_note_sequence_event.events(),
         vec![
             Event::NoteEvents(vec![
-                Some(new_note(None, "c#1", 1.0)),
+                Some(new_note(instrument, "c#1", 1.0)),
                 None,
-                Some(new_note(None, "g2", 0.75)),
+                Some(new_note(instrument, "g2", 0.75)),
             ]),
             Event::NoteEvents(vec![
-                Some(new_note(None, "a#5", 0.2)),
+                Some(new_note(instrument, "a#5", 0.2)),
                 None,
-                Some(new_note(None, "b1", 0.1))
+                Some(new_note(instrument, "b1", 0.1))
             ])
         ]
-    );
-
-    // Notes in Scale
-    assert!(engine
-        .eval::<Dynamic>(r#"notes_in_scale("c wurst")"#)
-        .is_err());
-    assert_eq!(
-        engine
-            .eval::<Vec<rhai::Dynamic>>(r#"notes_in_scale("c major")"#)
-            .unwrap()
-            .iter()
-            .map(|v| v.clone().cast::<INT>())
-            .collect::<Vec<INT>>(),
-        vec![60, 62, 64, 65, 67, 69, 71, 72]
     );
 }
 

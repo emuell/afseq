@@ -13,6 +13,9 @@ use crate::{prelude::*, rhythm::euclidean::euclidean};
 pub(crate) mod unwrap;
 use unwrap::*;
 
+#[cfg(test)]
+mod test;
+
 // ---------------------------------------------------------------------------------------------
 
 /// Create a new rhai engine with preloaded packages and our default configuation
