@@ -486,15 +486,15 @@ mod globals_module {
     /// # Example
     ///
     /// ```rhai
-    /// note_seq(["C4", "E4", "G4"]) // C Major Chord !arpeggio!
-    /// note_seq([
+    /// sequence(["C4", "E4", "G4"]) // C Major Chord !arpeggio!
+    /// sequence([
     ///     ["A 3", "D 3", "F 3"], // Dm
     ///     ["B 3", "D 3", "G 3"], // G
     ///     ["C 3", "E 3", "A 3"], // C
     ///     ["---", "---", "---"], // continue last
     /// ])
     /// ```
-    #[rhai_fn(name = "note_seq", return_raw)]
+    #[rhai_fn(name = "sequence", return_raw)]
     pub fn note_seq_from_array(
         context: NativeCallContext,
         array: Array,

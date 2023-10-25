@@ -299,7 +299,7 @@ fn note_sequence() {
 
     // Note Sequence
     let eval_result = engine
-        .eval::<Dynamic>(r#"note_seq([["C#1 0.5"], ["---"], ["G_2"]])"#)
+        .eval::<Dynamic>(r#"sequence([["C#1 0.5"], ["---"], ["G_2"]])"#)
         .unwrap();
     let note_sequence_event = eval_result.try_cast::<FixedEventIter>().unwrap();
     assert_eq!(
@@ -313,7 +313,7 @@ fn note_sequence() {
 
     let eval_result = engine
         .eval::<Dynamic>(
-            r#"note_seq([
+            r#"sequence([
                     ["C#1", (), "G_2 0.75"], 
                     ["A#5 0.2", "---", #{key: "B_1", volume: 0.1}],
                 ])"#,
