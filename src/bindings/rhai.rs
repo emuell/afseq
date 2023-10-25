@@ -12,7 +12,7 @@ use std::{
 use crate::prelude::*;
 use crate::{
     event::{fixed::FixedEventIter, scripted::rhai::ScriptedEventIter},
-    rhythm::{beat_time::BeatTimeRhythm, euclidian::euclidean},
+    rhythm::{beat_time::BeatTimeRhythm, euclidean::euclidean},
 };
 
 use anyhow::anyhow;
@@ -535,17 +535,17 @@ mod globals_module {
         }
     }
 
-    #[rhai_fn(name = "euclidian", return_raw)]
-    pub fn euclidian_rhythm(
+    #[rhai_fn(name = "euclidean", return_raw)]
+    pub fn euclidean_rhythm(
         context: NativeCallContext,
         pulses: INT,
         steps: INT,
     ) -> Result<Array, Box<EvalAltResult>> {
-        euclidian_rhythm_with_offset(context, pulses, steps, 0)
+        euclidean_rhythm_with_offset(context, pulses, steps, 0)
     }
 
-    #[rhai_fn(name = "euclidian", return_raw)]
-    pub fn euclidian_rhythm_with_offset(
+    #[rhai_fn(name = "euclidean", return_raw)]
+    pub fn euclidean_rhythm_with_offset(
         context: NativeCallContext,
         pulses: INT,
         steps: INT,

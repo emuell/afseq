@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use crate::{event::Event, time::SampleTimeDisplay, SampleTime};
 
 pub mod beat_time;
-pub mod euclidian;
+pub mod euclidean;
 pub mod second_time;
 
 // -------------------------------------------------------------------------------------------------

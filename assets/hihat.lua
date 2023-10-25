@@ -1,7 +1,7 @@
 return Emitter {
   unit = "sixteenth",
   offset = 16 * 8,
-  pattern = euclidian(14, 16, 6),
+  pattern = pattern.euclidean(14, 16, 6),
   emit = function()
     local note_step = 0;
     return function()

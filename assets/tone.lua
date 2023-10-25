@@ -5,7 +5,7 @@ local scales = {
 
 return Emitter {
   unit = "sixteenth",
-  pattern = euclidian(6, 8, -5),
+  pattern = pattern.euclidean(6, 8, -5),
   offset = 16 * 64,
   emit = function()
     local SCALE_STEP_COUNT = 8

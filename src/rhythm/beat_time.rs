@@ -6,7 +6,7 @@ use crate::{
     Rhythm, SampleTime,
 };
 
-use super::euclidian::euclidean;
+use super::euclidean::euclidean;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ impl BeatTimeRhythm {
         self.with_pattern_vector(pattern.to_vec())
     }
 
-    pub fn with_euclidian_pattern(&self, pulses: u32, steps: u32, offset: i32) -> Self {
+    pub fn with_euclidean_pattern(&self, pulses: u32, steps: u32, offset: i32) -> Self {
         let pattern = euclidean(pulses, steps, offset);
         self.with_pattern_vector(pattern)
     }

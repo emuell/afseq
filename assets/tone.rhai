@@ -11,7 +11,7 @@ let volume_direction = 1.0;
 
 beat_time()
   .every_sixteenth()
-  .with_pattern(euclidian(6, 8).rotate(-5))
+  .with_pattern(euclidean(6, 8).rotate(-5))
   .with_offset(16 * 64)
   .trigger(|| {
     let notes = [0, 5, 2, 3, 7, 2].map(|i| scales[scale_index][i] - 12);

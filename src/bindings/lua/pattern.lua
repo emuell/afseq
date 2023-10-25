@@ -45,7 +45,7 @@ function pattern.copy(self)
 end
 
 -- create an new pattern which spreads a pulses evenly within the given length,
--- using Bresenham’s line algorithm, similar, but not exactly like "euclidian".
+-- using Bresenham’s line algorithm, similar, but not exactly like "euclidean".
 -- shortcut for pattern.new():init(1, steps):spread(length):rotate(offset)
 function pattern.distributed(steps, length, offset)
   assert(type(steps) == "number" and steps > 0, "Invalid step argument")

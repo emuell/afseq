@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use mlua::{chunk, prelude::*};
 use rust_music_theory::{note::Notes, scale};
 
-use crate::{prelude::*, rhythm::euclidian::euclidean};
+use crate::{prelude::*, rhythm::euclidean::euclidean};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -247,15 +247,15 @@ fn register_global_bindings(
         })?,
     )?;
 
-    // function euclidian(pulses, steps, [offset])
+    // function euclidean(pulses, steps, [offset])
     globals.set(
-        "euclidian",
+        "euclidean",
         lua.create_function(
             |lua, (pulses, steps, offset): (i32, i32, Option<i32>)| -> mlua::Result<LuaTable> {
                 let offset = offset.unwrap_or(0);
                 if pulses <= 0 {
                     return Err(bad_argument_error(
-                        "euclidian",
+                        "euclidean",
                         "pulses",
                         1,
                         "pulses must be > 0",
@@ -263,7 +263,7 @@ fn register_global_bindings(
                 }
                 if steps <= 0 {
                     return Err(bad_argument_error(
-                        "euclidian",
+                        "euclidean",
                         "steps",
                         2,
                         "steps must be > 0",
@@ -271,7 +271,7 @@ fn register_global_bindings(
                 }
                 if pulses > steps {
                     return Err(bad_argument_error(
-                        "euclidian",
+                        "euclidean",
                         "steps",
                         1,
                         "pulse must be <= step",
