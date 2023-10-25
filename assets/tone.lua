@@ -19,7 +19,7 @@ return Emitter {
 
     return function()
       -- get current note set
-      local notes = fun.totable(fun.map(function(v)
+      local notes = fun.to_table(fun.map(function(v)
         return scales[scale_index][v] - 12
       end, { 1, 6, 3, 4, 8, 3 }))
       -- move note step
