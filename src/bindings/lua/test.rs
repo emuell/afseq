@@ -70,42 +70,42 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // unwrap helper
-    fn evaluate_chord_userdata(engine: &Lua, expression: &str) -> mlua::Result<ChordUserData> {
+    fn evaluate_chord_userdata(engine: &Lua, expression: &str) -> mlua::Result<NoteUserData> {
         Ok(engine
             .load(expression)
             .eval::<LuaValue>()?
             .as_userdata()
             .ok_or(mlua::Error::RuntimeError("No user data".to_string()))?
-            .borrow::<ChordUserData>()?
+            .borrow::<NoteUserData>()?
             .clone())
     }
 
     // Empty Note
-    let note_event = evaluate_chord_userdata(&engine, r#"chord("---")"#)?;
+    let note_event = evaluate_chord_userdata(&engine, r#"note("---")"#)?;
     assert_eq!(note_event.notes, vec![None]);
 
     // Note Off
-    assert!(evaluate_chord_userdata(&engine, r#"chord("X#1")"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord("C#-2"#).is_err());
-    let note_event = evaluate_chord_userdata(&engine, r#"chord("g#1")"#)?;
+    assert!(evaluate_chord_userdata(&engine, r#"note("X#1")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("C#-2"#).is_err());
+    let note_event = evaluate_chord_userdata(&engine, r#"note("g#1")"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "g#1", 1.0))]);
 
     // Note On (string)
-    assert!(evaluate_chord_userdata(&engine, r#"chord("X#1")"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord("0.5")"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord("C#1 -0.5")"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord("C#1", 0.5)"#).is_err());
-    let note_event = evaluate_chord_userdata(&engine, r#"chord("C#1 0.5")"#)?;
+    assert!(evaluate_chord_userdata(&engine, r#"note("X#1")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("0.5")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("C#1 -0.5")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("C#1", 0.5)"#).is_err());
+    let note_event = evaluate_chord_userdata(&engine, r#"note("C#1 0.5")"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "c#1", 0.5))]);
 
     // Note On (string array)
-    assert!(evaluate_chord_userdata(&engine, r#"chord({"X#1"})"#).is_err());
-    let note_event = evaluate_chord_userdata(&engine, r#"chord({"C#1"})"#)?;
+    assert!(evaluate_chord_userdata(&engine, r#"note({"X#1"})"#).is_err());
+    let note_event = evaluate_chord_userdata(&engine, r#"note({"C#1"})"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "c#1", 1.0))]);
 
-    assert!(evaluate_chord_userdata(&engine, r#"chord("X#1")"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord("C#1 abc")"#).is_err());
-    let note_event = evaluate_chord_userdata(&engine, r#"chord({"C#1 0.5", "C5"})"#)?;
+    assert!(evaluate_chord_userdata(&engine, r#"note("X#1")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("C#1 abc")"#).is_err());
+    let note_event = evaluate_chord_userdata(&engine, r#"note({"C#1 0.5", "C5"})"#)?;
     assert_eq!(
         note_event.notes,
         vec![
@@ -115,11 +115,11 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Note On (int)
-    let note_event = evaluate_chord_userdata(&engine, r#"chord(0x3E)"#)?;
+    let note_event = evaluate_chord_userdata(&engine, r#"note(0x3E)"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "d4", 1.0))]);
 
     // Note On (int array)
-    let note_event = evaluate_chord_userdata(&engine, r#"chord({0x3E, 60})"#)?;
+    let note_event = evaluate_chord_userdata(&engine, r#"note({0x3E, 60})"#)?;
     assert_eq!(
         note_event.notes,
         vec![
@@ -129,19 +129,19 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Note On (table)
-    assert!(evaluate_chord_userdata(&engine, r#"chord({volume = 0.5})"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord({key = "xxx", volume = 0.5})"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord({key = "C#1", volume = "abc"})"#).is_err());
-    assert!(evaluate_chord_userdata(&engine, r#"chord({key = "C#1", volume = -1})"#).is_err());
-    let note_event = evaluate_chord_userdata(&engine, r#"chord({key = "c8"})"#)?;
+    assert!(evaluate_chord_userdata(&engine, r#"note({volume = 0.5})"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note({key = "xxx", volume = 0.5})"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note({key = "C#1", volume = "abc"})"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note({key = "C#1", volume = -1})"#).is_err());
+    let note_event = evaluate_chord_userdata(&engine, r#"note({key = "c8"})"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "c8", 1.0))]);
-    let note_event = evaluate_chord_userdata(&engine, r#"chord({key = "G8", volume = 2})"#)?;
+    let note_event = evaluate_chord_userdata(&engine, r#"note({key = "G8", volume = 2})"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "g8", 2.0))]);
 
     // Note On (object map array)
     let poly_note_event = evaluate_chord_userdata(
         &engine,
-        r#"chord({{key = "C#1", volume = 0.5}, {key = "G2", volume = 0.75}, {}})"#,
+        r#"note({{key = "C#1", volume = 0.5}, {key = "G2", volume = 0.75}, {}})"#,
     )?;
     assert_eq!(
         poly_note_event.notes,

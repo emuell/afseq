@@ -6,21 +6,27 @@ use crate::{event::scripted::lua::ScriptedEventIter, prelude::*};
 
 // ---------------------------------------------------------------------------------------------
 
-// Chord Userdata in bindings
+// Note Userdata in bindings
 #[derive(Clone, Debug)]
-pub struct ChordUserData {
+pub struct NoteUserData {
     pub notes: Vec<Option<NoteEvent>>,
 }
 
-impl ChordUserData {
+impl NoteUserData {
     pub fn from(
         args: LuaMultiValue,
         default_instrument: Option<InstrumentId>,
     ) -> mlua::Result<Self> {
         // single value, probably a table?
         if args.len() == 1 {
-            let arg = args.iter().next().unwrap().clone();
-            Ok(ChordUserData {
+            let arg = args
+                .iter()
+                .next()
+                .ok_or(mlua::Error::RuntimeError(
+                    "Failed to access table content".to_string(),
+                ))?
+                .clone();
+            Ok(NoteUserData {
                 notes: note_events_from_value(arg, None, default_instrument)?,
             })
         // multiple values, maybe of different type
@@ -29,12 +35,12 @@ impl ChordUserData {
             for (index, arg) in args.into_iter().enumerate() {
                 notes.push(note_event_from_value(arg, Some(index), default_instrument)?);
             }
-            Ok(ChordUserData { notes })
+            Ok(NoteUserData { notes })
         }
     }
 }
 
-impl LuaUserData for ChordUserData {
+impl LuaUserData for NoteUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_function(
             "with_volume",
@@ -70,7 +76,13 @@ impl SequenceUserData {
     ) -> mlua::Result<Self> {
         // single value, probably a table?
         if args.len() == 1 {
-            let arg = args.iter().next().unwrap().clone();
+            let arg = args
+                .iter()
+                .next()
+                .ok_or(mlua::Error::RuntimeError(
+                    "Failed to access table content".to_string(),
+                ))?
+                .clone();
             Ok(SequenceUserData {
                 notes: note_events_from_value(arg, None, default_instrument)?
                     .into_iter()
@@ -295,11 +307,8 @@ pub fn note_event_from_value(
                 to: "Note",
                 message: if let Some(index) = arg_index {
                     Some(
-                        format!(
-                            "Chord arg #{} does not contain a valid note property",
-                            index
-                        )
-                        .to_string(),
+                        format!("Note arg #{} does not contain a valid note property", index)
+                            .to_string(),
                     )
                 } else {
                     Some("Argument does not contain a valid note property".to_string())
@@ -322,7 +331,7 @@ pub fn note_events_from_value(
                     to: "Note",
                     message: Some("Can not nest sequences into sequences".to_string()),
                 })
-            } else if let Ok(chord) = userdata.take::<ChordUserData>() {
+            } else if let Ok(chord) = userdata.take::<NoteUserData>() {
                 Ok(chord.notes)
             } else {
                 Err(mlua::Error::FromLuaConversionError {
@@ -397,11 +406,11 @@ pub fn event_iter_from_value(
             }
         }
         LuaValue::UserData(userdata) => {
-            if userdata.is::<ChordUserData>() {
-                let chord = userdata.take::<ChordUserData>().unwrap();
-                Ok(Rc::new(RefCell::new(chord.notes.to_event())))
+            if userdata.is::<NoteUserData>() {
+                let note = userdata.take::<NoteUserData>()?;
+                Ok(Rc::new(RefCell::new(note.notes.to_event())))
             } else if userdata.is::<SequenceUserData>() {
-                let sequence = userdata.take::<SequenceUserData>().unwrap();
+                let sequence = userdata.take::<SequenceUserData>()?;
                 Ok(Rc::new(RefCell::new(sequence.notes.to_event_sequence())))
             } else {
                 Err(mlua::Error::FromLuaConversionError {

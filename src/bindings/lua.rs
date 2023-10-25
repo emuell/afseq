@@ -289,13 +289,13 @@ fn register_global_bindings(
         )?,
     )?;
 
-    // function chord(args...)
+    // function note(args...)
     globals.set(
-        "chord",
+        "note",
         lua.create_function({
             let default_instrument = default_instrument;
-            move |_lua, args: LuaMultiValue| -> mlua::Result<ChordUserData> {
-                ChordUserData::from(args, default_instrument)
+            move |_lua, args: LuaMultiValue| -> mlua::Result<NoteUserData> {
+                NoteUserData::from(args, default_instrument)
             }
         })?,
     )?;
