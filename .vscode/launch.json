@@ -42,5 +42,13 @@
       "args": [],
       "cwd": "${workspaceFolder}"
     },
+    {
+      "arg": [],
+      "name": "Debug current Lua File",
+      "program": "${file}",
+      "request": "launch",
+      "stopOnEntry": true,
+      "type": "lua"
+    },
   ]
 }

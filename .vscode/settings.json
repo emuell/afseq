@@ -4,12 +4,12 @@
         "chord",
         "note",
         "notes_in_scale",
-        "euclidian",
         "Emitter",
         "totable",
         "chain",
         "cycle",
         "map",
         "take",
+        "to_table"
     ],
 }
