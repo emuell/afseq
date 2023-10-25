@@ -10,6 +10,6 @@ end, { 1, 3, 4, 7, 5, 4, 7, 1, 3, 4, 1, 5, 1, 7 }))
 
 return Emitter {
     unit = "eighth",
-    pattern = pattern.euclidian(7, 16, -6),
-    emit = sequence(table.unpack(bass_line)):set_volume(0.0)
+    pattern = pattern.euclidean(7, 16, -6),
+    emit = sequence(table.unpack(bass_line)):with_volume(0.0)
 }

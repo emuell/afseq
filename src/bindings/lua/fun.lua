@@ -788,6 +788,9 @@ end
 methods.totable = method0(totable)
 exports.totable = export0(totable)
 
+methods.to_table = method0(totable)
+exports.to_table = export0(totable)
+
 local tomap = function(gen_x, param_x, state_x)
     local tab, key, val = {}
     while true do
@@ -801,6 +804,9 @@ local tomap = function(gen_x, param_x, state_x)
 end
 methods.tomap = method0(tomap)
 exports.tomap = export0(tomap)
+
+methods.to_map = method0(tomap)
+exports.to_map = export0(tomap)
 
 --------------------------------------------------------------------------------
 -- Transformations

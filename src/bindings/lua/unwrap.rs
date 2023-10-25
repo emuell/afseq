@@ -27,7 +27,7 @@ impl ChordUserData {
 
 impl LuaUserData for ChordUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_function("set_volume", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
+        methods.add_function("with_volume", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
             let mut this = ud.borrow::<Self>()?.clone();
             for note in this.notes.iter_mut().flatten() {
                 note.volume = volume;
@@ -67,7 +67,7 @@ impl SequenceUserData {
 
 impl LuaUserData for SequenceUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_function("set_volume", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
+        methods.add_function("with_volume", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
             let mut this = ud.borrow::<Self>()?.clone();
             for note in this.notes.iter_mut().flatten().flatten() {
                 note.volume = volume;
