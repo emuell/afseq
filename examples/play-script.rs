@@ -1,5 +1,7 @@
 use std::{
-    path::Path,
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, RwLock,
@@ -10,6 +12,12 @@ use notify::{RecursiveMode, Watcher};
 use simplelog::*;
 
 use afseq::prelude::*;
+
+// -------------------------------------------------------------------------------------------------
+
+// TODO: make this configurable with an cmd line arg
+const DEMO_PATH: &str = "./assets/examples/demo-lua";
+// OR const DEMO_PATH: &str = "./assets/examples/demo-rhai";
 
 // -------------------------------------------------------------------------------------------------
 
@@ -26,15 +34,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         log::error!("init_logger error: {:?}", err);
     });
 
-    // preload samples
+    // fetch contents from demo dir
+    log::info!("Searching for wav/script files in path '{}'...", DEMO_PATH);
+    let mut entry_stems = HashSet::<String>::new();
+    let paths = fs::read_dir(DEMO_PATH).expect("Failed to access demo content directory");
+    for path in paths {
+        let path = path?.path();
+        if let Some(extension) = path.extension() {
+            let extension = extension.to_string_lossy().to_string();
+            if matches!(extension.as_str(), "lua" | "rhai" | "wav") {
+                if let Some(stem) = path.file_stem() {
+                    entry_stems.insert(stem.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+
+    // load samples and get paths to the rhythm scripts
     let sample_pool = SamplePool::new();
-    let KICK = sample_pool.load_sample("assets/kick.wav")?;
-    let SNARE = sample_pool.load_sample("assets/snare.wav")?;
-    let HIHAT = sample_pool.load_sample("assets/hihat.wav")?;
-    let BASS = sample_pool.load_sample("assets/bass.wav")?;
-    let SYNTH = sample_pool.load_sample("assets/synth.wav")?;
-    let TONE = sample_pool.load_sample("assets/tone.wav")?;
-    let FX = sample_pool.load_sample("assets/fx.wav")?;
+    struct RhythmEntry {
+        instrument_id: InstrumentId,
+        script_path: String,
+    }
+    let mut entries = vec![];
+    for stem in entry_stems.iter() {
+        let base_path = PathBuf::new().join(DEMO_PATH).join(stem);
+        let wave_file = base_path.with_extension("wav");
+        let lua_file = base_path.with_extension("lua");
+        let rhai_file = base_path.with_extension("rhai");
+        if wave_file.exists() && (lua_file.exists() || rhai_file.exists()) {
+            log::info!("Found file/script: '{}'...", stem);
+            let instrument_id = sample_pool.load_sample(&wave_file.to_string_lossy())?;
+            let script_path = if lua_file.exists() {
+                lua_file
+            } else {
+                rhai_file
+            }
+            .to_string_lossy()
+            .to_string();
+            entries.push(RhythmEntry {
+                instrument_id,
+                script_path,
+            });
+        } else if rhai_file.exists() || lua_file.exists() || wave_file.exists() {
+            log::warn!("Ignoring file/script: '{}'...", stem);
+        }
+    }
 
     // create event player
     let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
@@ -59,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(err) => log::error!("File watch error: {}", err),
         }
     })?;
-    watcher.watch(Path::new("./assets"), RecursiveMode::Recursive)?;
+    watcher.watch(Path::new(DEMO_PATH), RecursiveMode::Recursive)?;
 
     // (re)run all scripts
     loop {
@@ -71,30 +116,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // build final phrase
         let load = |id: InstrumentId, file_name: &str| {
             if file_name.ends_with(".lua") {
-                bindings::lua::new_rhythm_from_file_with_fallback(
-                    id,
-                    beat_time,
-                    format!("./assets/{file_name}").as_str(),
-                )
+                bindings::lua::new_rhythm_from_file_with_fallback(id, beat_time, file_name)
             } else {
-                bindings::rhai::new_rhythm_from_file_with_fallback(
-                    id,
-                    beat_time,
-                    format!("./assets/{file_name}").as_str(),
-                )
+                bindings::rhai::new_rhythm_from_file_with_fallback(id, beat_time, file_name)
             }
         };
         let phrase = Phrase::new(
             beat_time,
-            vec![
-                load(KICK, "kick.lua"),
-                load(SNARE, "snare.lua"),
-                load(HIHAT, "hihat.lua"),
-                load(BASS, "bass.lua"),
-                load(SYNTH, "synth.lua"),
-                load(TONE, "tone.lua"),
-                load(FX, "fx.lua"),
-            ],
+            entries
+                .iter()
+                .map(|e| load(e.instrument_id, &e.script_path))
+                .collect(),
             BeatTimeStep::Bar(4.0),
         );
 
