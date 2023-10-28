@@ -56,9 +56,9 @@ impl Sequence {
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
     /// function for all emitted events to consume them.
-    pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, mut consumer: F)
+    pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, SampleTime, &Option<Event>),
+        F: FnMut(RhythmIndex, SampleTime, Option<Event>),
     {
         debug_assert!(
             run_until_time >= self.sample_position,
@@ -73,7 +73,7 @@ impl Sequence {
                 // run current phrase until it ends
                 let sample_position = self.sample_position;
                 self.current_phrase_mut()
-                    .run_until_time(sample_position + next_phrase_start, &mut consumer);
+                    .run_until_time(sample_position + next_phrase_start, consumer);
                 // select next phrase in the sequence
                 let previous_phrase = self.current_phrase_mut().clone();
                 self.phrase_index += 1;
@@ -92,7 +92,7 @@ impl Sequence {
                 // keep running the current phrase
                 let sample_position = self.sample_position;
                 self.current_phrase_mut()
-                    .run_until_time(sample_position + samples_to_run, &mut consumer);
+                    .run_until_time(sample_position + samples_to_run, consumer);
                 self.sample_position_in_phrase += samples_to_run;
                 self.sample_position += samples_to_run;
             }

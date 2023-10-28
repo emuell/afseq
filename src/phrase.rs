@@ -108,15 +108,15 @@ impl Phrase {
     /// function for all emitted events to consume them.
     pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, SampleTime, &Option<Event>),
+        F: FnMut(RhythmIndex, SampleTime, Option<Event>),
     {
         // emit last held back event first
-        if let Some((rhythm_index, sample_time, event)) = &self.held_back_event {
-            if *sample_time < run_until_time {
-                consumer(*rhythm_index, *sample_time, event);
-                self.held_back_event = None;
+        if let Some((rhythm_index, sample_time, event)) = self.held_back_event.take() {
+            if sample_time < run_until_time {
+                consumer(rhythm_index, sample_time, event);
             } else {
-                // held back event is not yet due
+                // held back event is not yet due. put it back...
+                self.held_back_event = Some((rhythm_index, sample_time, event));
                 return;
             }
         }
@@ -127,7 +127,7 @@ impl Phrase {
                 self.held_back_event = Some((rhythm_index, sample_time, event));
                 break;
             }
-            consumer(rhythm_index, sample_time, &event);
+            consumer(rhythm_index, sample_time, event);
         }
     }
 

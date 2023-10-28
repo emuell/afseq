@@ -283,7 +283,7 @@ impl SamplePlayer {
     }
 
     fn seek_sequence_until_time(&mut self, sequence: &mut Sequence, sample_time: SampleTime) {
-        sequence.run_until_time(sample_time, |_, _, _| {
+        sequence.run_until_time(sample_time, &mut |_, _, _| {
             // ignore all events
         });
     }
@@ -297,14 +297,14 @@ impl SamplePlayer {
         let time_display = sequence.time_display();
         sequence.run_until_time(
             sample_time,
-            |rhythm_index, sample_time, event: &Option<Event>| {
+            &mut |rhythm_index, sample_time, event: Option<Event>| {
                 // print
                 if self.show_events {
                     const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
                     println!(
                         "{}: {}",
                         time_display.display(sample_time),
-                        match event {
+                        match &event {
                             Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
                             None => "---".to_string(),
                         }
