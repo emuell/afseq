@@ -139,6 +139,14 @@ impl BeatTimeRhythm {
         default_instrument: Option<InstrumentId>,
     ) -> mlua::Result<BeatTimeRhythm> {
         let resolution = table.get::<&str, f32>("resolution").unwrap_or(1.0);
+        if resolution <= 0.0 {
+            return Err(bad_argument_error(
+                "emit",
+                "resolution",
+                1,
+                "resolution must be > 0",
+            ));
+        }
         let mut step = BeatTimeStep::Beats(resolution);
         if table.contains_key("unit")? {
             let unit = table.get::<&str, String>("unit")?;
@@ -181,6 +189,14 @@ impl SecondTimeRhythm {
         default_instrument: Option<InstrumentId>,
     ) -> mlua::Result<SecondTimeRhythm> {
         let mut resolution = table.get::<&str, f64>("resolution").unwrap_or(1.0);
+        if resolution <= 0.0 {
+            return Err(bad_argument_error(
+                "emit",
+                "resolution",
+                1,
+                "resolution must be > 0",
+            )); 
+        }
         if table.contains_key("unit")? {
             let unit = table.get::<&str, String>("unit")?;
             match unit.as_str() {
