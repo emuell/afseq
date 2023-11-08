@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use mlua::prelude::*;
 
-use crate::{event::scripted::lua::ScriptedEventIter, prelude::*};
+use crate::{event::scripted::ScriptedEventIter, prelude::*};
 
 // ---------------------------------------------------------------------------------------------
 

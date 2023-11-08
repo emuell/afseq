@@ -16,8 +16,7 @@ use afseq::prelude::*;
 // -------------------------------------------------------------------------------------------------
 
 // TODO: make this configurable with an cmd line arg
-const DEMO_PATH: &str = "./assets/examples/demo-lua";
-// OR const DEMO_PATH: &str = "./assets/examples/demo-rhai";
+const DEMO_PATH: &str = "./assets/examples/demo";
 
 // -------------------------------------------------------------------------------------------------
 
@@ -42,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let path = path?.path();
         if let Some(extension) = path.extension() {
             let extension = extension.to_string_lossy().to_string();
-            if matches!(extension.as_str(), "lua" | "rhai" | "wav") {
+            if matches!(extension.as_str(), "lua" | "wav") {
                 if let Some(stem) = path.file_stem() {
                     entry_stems.insert(stem.to_string_lossy().to_string());
                 }
@@ -61,22 +60,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let base_path = PathBuf::new().join(DEMO_PATH).join(stem);
         let wave_file = base_path.with_extension("wav");
         let lua_file = base_path.with_extension("lua");
-        let rhai_file = base_path.with_extension("rhai");
-        if wave_file.exists() && (lua_file.exists() || rhai_file.exists()) {
+        if wave_file.exists() && lua_file.exists() {
             log::info!("Found file/script: '{}'...", stem);
             let instrument_id = sample_pool.load_sample(&wave_file.to_string_lossy())?;
-            let script_path = if lua_file.exists() {
-                lua_file
-            } else {
-                rhai_file
-            }
-            .to_string_lossy()
-            .to_string();
+            let script_path = lua_file.to_string_lossy().to_string();
             entries.push(RhythmEntry {
                 instrument_id,
                 script_path,
             });
-        } else if rhai_file.exists() || lua_file.exists() || wave_file.exists() {
+        } else if lua_file.exists() || wave_file.exists() {
             log::warn!("Ignoring file/script: '{}'...", stem);
         }
     }
@@ -115,11 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // build final phrase
         let load = |id: InstrumentId, file_name: &str| {
-            if file_name.ends_with(".lua") {
-                bindings::lua::new_rhythm_from_file_with_fallback(id, beat_time, file_name)
-            } else {
-                bindings::rhai::new_rhythm_from_file_with_fallback(id, beat_time, file_name)
-            }
+            bindings::new_rhythm_from_file_with_fallback(id, beat_time, file_name)
         };
         let phrase = Phrase::new(
             beat_time,

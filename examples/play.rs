@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // preload samples
     fn sample_path(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(path::PathBuf::from(format!("./assets/examples/demo-rhai/{file_name}"))
+        Ok(path::PathBuf::from(format!("./assets/examples/demo/{file_name}"))
             .to_str()
             .ok_or(anyhow!(
                 "Failed to create asset path for file '{}'",

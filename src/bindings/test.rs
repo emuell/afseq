@@ -1,4 +1,4 @@
-use crate::bindings::lua::*;
+use crate::bindings::*;
 
 #[test]
 fn extensions() {
