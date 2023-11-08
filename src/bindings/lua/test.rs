@@ -245,28 +245,42 @@ fn beat_time() {
                     unit = "beats",
                     resolution = 0.5,
                     offset = "2",
-                    pattern = {1,0,1,0}
+                    pattern = {1,0,1,0},
+                    emit = "c6"
                 }
             "#,
         )
         .eval::<LuaValue>()
         .unwrap();
-    let beat_time_rhythm = beat_time_rhythm
+    let mut beat_time_rhythm = beat_time_rhythm
         .as_userdata()
         .unwrap()
         .borrow::<BeatTimeRhythm>();
     assert!(beat_time_rhythm.is_ok());
+    let mut beat_time_rhythm = beat_time_rhythm.as_mut().unwrap().clone();
     assert_eq!(
-        beat_time_rhythm.as_ref().unwrap().step(),
+        beat_time_rhythm.step(),
         BeatTimeStep::Beats(0.5)
     );
     assert_eq!(
-        beat_time_rhythm.as_ref().unwrap().offset(),
+        beat_time_rhythm.offset(),
         BeatTimeStep::Beats(2.0)
     );
     assert_eq!(
-        beat_time_rhythm.unwrap().pattern(),
+        beat_time_rhythm.pattern(),
         vec![true, false, true, false]
+    );
+    let event = beat_time_rhythm.next();
+    assert_eq!(
+        event,
+        Some((
+            44100,
+            Some(Event::NoteEvents(vec![Some(NoteEvent {
+                instrument: None,
+                note: Note::C6,
+                volume: 1.0
+            })]))
+        ))
     );
 }
 

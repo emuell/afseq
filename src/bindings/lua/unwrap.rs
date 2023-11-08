@@ -388,23 +388,6 @@ pub fn event_iter_from_value(
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Rc<RefCell<dyn EventIter>>> {
     match value {
-        LuaValue::String(note_str) => {
-            let event = note_event_from_string(&note_str.to_string_lossy(), default_instrument)?;
-            Ok(Rc::new(RefCell::new(event.to_event())))
-        }
-        LuaValue::Table(table) => {
-            // { key = "C4", volume = 1.0 }
-            if table.contains_key("key")? {
-                let event = note_event_from_table(table, default_instrument)?;
-                Ok(Rc::new(RefCell::new(event.to_event())))
-            } else {
-                Err(mlua::Error::FromLuaConversionError {
-                    from: "table",
-                    to: "Note",
-                    message: Some("Invalid event table argument".to_string()),
-                })
-            }
-        }
         LuaValue::UserData(userdata) => {
             if userdata.is::<NoteUserData>() {
                 let note = userdata.take::<NoteUserData>()?;
@@ -424,10 +407,9 @@ pub fn event_iter_from_value(
             let iter = ScriptedEventIter::new(function, default_instrument)?;
             Ok(Rc::new(RefCell::new(iter)))
         }
-        _ => Err(mlua::Error::FromLuaConversionError {
-            from: "table",
-            to: "Note",
-            message: Some("Invalid note table argument".to_string()),
-        }),
+        _ => {
+            let iter = note_event_from_value(value, None, default_instrument)?.to_event();
+            Ok(Rc::new(RefCell::new(iter)))
+        }
     }
 }
