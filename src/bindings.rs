@@ -92,11 +92,7 @@ pub fn new_rhythm_from_string_with_fallback(
     script_name: &str,
 ) -> Rc<RefCell<dyn Rhythm>> {
     new_rhythm_from_string(instrument, time_base, script, script_name).unwrap_or_else(|err| {
-        log::warn!(
-            "Script '{}' failed to compile: {}",
-            script_name,
-            err
-        );
+        log::warn!("Script '{}' failed to compile: {}", script_name, err);
         Rc::new(RefCell::new(BeatTimeRhythm::new(
             time_base,
             BeatTimeStep::Beats(1.0),
@@ -196,7 +192,7 @@ impl SecondTimeRhythm {
                 "resolution",
                 1,
                 "resolution must be > 0",
-            )); 
+            ));
         }
         if table.contains_key("unit")? {
             let unit = table.get::<&str, String>("unit")?;
@@ -358,12 +354,16 @@ fn register_global_bindings(
 
 fn register_pattern_bindings(lua: &mut Lua) -> mlua::Result<()> {
     // implemented in lua: load and evaluate chunk
-    let chunk = lua.load(include_str!("./bindings/lua/pattern.lua"));
+    let chunk = lua
+        .load(include_str!("./bindings/lua/pattern.lua"))
+        .set_name("[inbuilt:pattern.lua]");
     chunk.exec()
 }
 
 fn register_fun_bindings(lua: &mut Lua) -> mlua::Result<()> {
     // implemented in lua: load and evaluate chunk
-    let chunk = lua.load(include_str!("./bindings/lua/fun.lua"));
+    let chunk = lua
+        .load(include_str!("./bindings/lua/fun.lua"))
+        .set_name("[inbuilt:fun.lua]");
     chunk.exec()
 }

@@ -44,7 +44,7 @@ function pattern.copy(self)
   return pattern.from(self)
 end
 
--- create an new pattern which spreads a pulses evenly within the given length,
+-- create an new pattern which spreads pulses evenly within the given length,
 -- using Bresenham’s line algorithm, similar, but not exactly like "euclidean".
 -- shortcut for pattern.new():init(1, steps):spread(length):rotate(offset)
 function pattern.distributed(steps, length, offset)
@@ -100,7 +100,9 @@ function pattern.euclidean(pulses, length, offset)
     result:push_back(g);
   end
   -- rotate
-  result:rotate(offset)
+  if offset then
+    result:rotate(offset)
+  end
   return result
 end
 
@@ -190,20 +192,19 @@ end
 ----------------------------------------------------------------------------------------------------
 
 -- push any number of items or other pattern contents to the end of the pattern
--- when passing tables, patterns, those will be flattened.
-function pattern.push_back(self, other, ...)
+-- when passing tables or patterns, they will be added unpacked.
+function pattern.push_back(self, ...)
   local function add_unpacked(v)
     if type(v) == 'table' then
       for i = 1, #v do
         if v[i] ~= nil then
-          table.insert(self, v[i])
+          add_unpacked(v[i])
         end
       end
     else
       table.insert(self, v)
     end
   end
-  add_unpacked(other)
   for i = 1, select("#", ...) do
     local v = select(i, ...)
     add_unpacked(v)
@@ -213,7 +214,7 @@ end
 -- alias for pattern.push_back
 pattern.add = pattern.push_back
 
--- remove an entry from the back of the pattern
+-- remove an entry from the back of the pattern and returns the popped item.
 function pattern.pop_back(self)
   return table.remove(self)
 end
