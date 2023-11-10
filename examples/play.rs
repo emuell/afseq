@@ -64,17 +64,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
         ])
-        .trigger(new_note_event(KICK, "C_4", 1.0));
+        .trigger(new_note_event(KICK, "C_5", 1.0));
 
     let snare_pattern = beat_time
         .every_nth_beat(2.0)
         .with_offset(BeatTimeStep::Beats(1.0))
-        .trigger(new_note_event(SNARE, "C_4", 1.0));
+        .trigger(new_note_event(SNARE, "C_5", 1.0));
 
     let hihat_pattern =
         beat_time
             .every_nth_sixteenth(2.0)
-            .trigger(new_note_event(HIHAT, "C_4", 1.0).mutate({
+            .trigger(new_note_event(HIHAT, "C_5", 1.0).mutate({
                 let mut step = 0;
                 move |mut event| {
                     if let Event::NoteEvents(notes) = &mut event {
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hihat_pattern2 = beat_time
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
-        .trigger(new_note_event(HIHAT, "C_4", 1.0).mutate({
+        .trigger(new_note_event(HIHAT, "C_5", 1.0).mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |mut event| {
@@ -143,24 +143,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .every_nth_bar(4.0)
         .trigger(new_polyphonic_note_sequence_event(vec![
             vec![
-                (SYNTH, "C 3", 0.3),
-                (SYNTH, "D#3", 0.3),
-                (SYNTH, "G 3", 0.3),
+                (SYNTH, "C 4", 0.3),
+                (SYNTH, "D#4", 0.3),
+                (SYNTH, "G 4", 0.3),
             ],
             vec![
-                (SYNTH, "C 3", 0.3),
-                (SYNTH, "D#3", 0.3),
-                (SYNTH, "F 3", 0.3),
+                (SYNTH, "C 4", 0.3),
+                (SYNTH, "D#4", 0.3),
+                (SYNTH, "F 4", 0.3),
             ],
             vec![
-                (SYNTH, "C 3", 0.3),
-                (SYNTH, "D#3", 0.3),
-                (SYNTH, "G 3", 0.3),
+                (SYNTH, "C 4", 0.3),
+                (SYNTH, "D#4", 0.3),
+                (SYNTH, "G 4", 0.3),
             ],
             vec![
-                (SYNTH, "C 3", 0.3),
-                (SYNTH, "D#3", 0.3),
-                (SYNTH, "A#3", 0.3),
+                (SYNTH, "C 4", 0.3),
+                (SYNTH, "D#4", 0.3),
+                (SYNTH, "A#4", 0.3),
             ],
         ]));
 
@@ -168,7 +168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         second_time
             .every_nth_seconds(8.0)
             .trigger(new_polyphonic_note_sequence_event(vec![
-                vec![Some((FX, "C 3", 0.2)), None, None],
+                vec![Some((FX, "C 4", 0.2)), None, None],
                 vec![None, Some((FX, "C 4", 0.2)), None],
                 vec![None, None, Some((FX, "F 4", 0.2))],
             ]));

@@ -115,11 +115,11 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Note On (int)
-    let note_event = evaluate_chord_userdata(&engine, r#"note(0x3E)"#)?;
+    let note_event = evaluate_chord_userdata(&engine, r#"note(0x32)"#)?;
     assert_eq!(note_event.notes, vec![Some(new_note(None, "d4", 1.0))]);
 
     // Note On (int array)
-    let note_event = evaluate_chord_userdata(&engine, r#"note({0x3E, 60})"#)?;
+    let note_event = evaluate_chord_userdata(&engine, r#"note({0x32, 48})"#)?;
     assert_eq!(
         note_event.notes,
         vec![

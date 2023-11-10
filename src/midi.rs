@@ -15,7 +15,7 @@ use rust_music_theory::note as rmt_note;
 /// Because it only uses the least significant 7 bits, any value can be interpreted as either an i8
 /// or a u8 for free (as the representation is the same in both)
 ///
-/// Note implements From\<u8\>, Into\<u8\> as well as From\<i8\>, Into\<i8\> and From\<&str\> so the 
+/// Note implements From\<u8\>, Into\<u8\> as well as From\<i8\>, Into\<i8\> and From\<&str\> so the
 /// enum names usually should be completely ignored.
 ///
 /// For From<&str> conversions, the following notation is supported:
@@ -27,136 +27,137 @@ use rust_music_theory::note as rmt_note;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 #[allow(non_camel_case_types)]
 pub enum Note {
-    Cm1 = 0x00,
-    Csm1 = 0x01,
-    Dm1 = 0x02,
-    Dsm1 = 0x03,
-    Em1 = 0x04,
-    Fm1 = 0x05,
-    Fsm1 = 0x06,
-    Gm1 = 0x07,
-    Gsm1 = 0x08,
-    Am1 = 0x09,
-    Asm1 = 0x0A,
-    Bm1 = 0x0B,
-    C0 = 0x0C,
-    Cs0 = 0x0D,
-    D0 = 0x0E,
-    Ds0 = 0x0F,
-    E0 = 0x10,
-    F0 = 0x11,
-    Fs0 = 0x12,
-    G0 = 0x13,
-    Gs0 = 0x14,
-    A0 = 0x15,
-    As0 = 0x16,
-    B0 = 0x17,
-    C1 = 0x18,
-    Cs1 = 0x19,
-    D1 = 0x1A,
-    Ds1 = 0x1B,
-    E1 = 0x1C,
-    F1 = 0x1D,
-    Fs1 = 0x1E,
-    G1 = 0x1F,
-    Gs1 = 0x20,
-    A1 = 0x21,
-    As1 = 0x22,
-    B1 = 0x23,
-    C2 = 0x24,
-    Cs2 = 0x25,
-    D2 = 0x26,
-    Ds2 = 0x27,
-    E2 = 0x28,
-    F2 = 0x29,
-    Fs2 = 0x2A,
-    G2 = 0x2B,
-    Gs2 = 0x2C,
-    A2 = 0x2D,
-    As2 = 0x2E,
-    B2 = 0x2F,
-    C3 = 0x30,
-    Cs3 = 0x31,
-    D3 = 0x32,
-    Ds3 = 0x33,
-    E3 = 0x34,
-    F3 = 0x35,
-    Fs3 = 0x36,
-    G3 = 0x37,
-    Gs3 = 0x38,
-    A3 = 0x39,
-    As3 = 0x3A,
-    B3 = 0x3B,
-    C4 = 0x3C,
-    Cs4 = 0x3D,
-    D4 = 0x3E,
-    Ds4 = 0x3F,
-    E4 = 0x40,
-    F4 = 0x41,
-    Fs4 = 0x42,
-    G4 = 0x43,
-    Gs4 = 0x44,
-    A4 = 0x45,
-    As4 = 0x46,
-    B4 = 0x47,
-    C5 = 0x48,
-    Cs5 = 0x49,
-    D5 = 0x4A,
-    Ds5 = 0x4B,
-    E5 = 0x4C,
-    F5 = 0x4D,
-    Fs5 = 0x4E,
-    G5 = 0x4F,
-    Gs5 = 0x50,
-    A5 = 0x51,
-    As5 = 0x52,
-    B5 = 0x53,
-    C6 = 0x54,
-    Cs6 = 0x55,
-    D6 = 0x56,
-    Ds6 = 0x57,
-    E6 = 0x58,
-    F6 = 0x59,
-    Fs6 = 0x5A,
-    G6 = 0x5B,
-    Gs6 = 0x5C,
-    A6 = 0x5D,
-    As6 = 0x5E,
-    B6 = 0x5F,
-    C7 = 0x60,
-    Cs7 = 0x61,
-    D7 = 0x62,
-    Ds7 = 0x63,
-    E7 = 0x64,
-    F7 = 0x65,
-    Fs7 = 0x66,
-    G7 = 0x67,
-    Gs7 = 0x68,
-    A7 = 0x69,
-    As7 = 0x6A,
-    B7 = 0x6B,
-    C8 = 0x6C,
-    Cs8 = 0x6D,
-    D8 = 0x6E,
-    Ds8 = 0x6F,
-    E8 = 0x70,
-    F8 = 0x71,
-    Fs8 = 0x72,
-    G8 = 0x73,
-    Gs8 = 0x74,
-    A8 = 0x75,
-    As8 = 0x76,
-    B8 = 0x77,
-    C9 = 0x78,
-    Cs9 = 0x79,
-    D9 = 0x7A,
-    Ds9 = 0x7B,
-    E9 = 0x7C,
-    F9 = 0x7D,
-    Fs9 = 0x7E,
-    G9 = 0x7F,
-    // This is NOT a MIDI note, but only internally used
-    OFF = 0xFF,
+    C0 = 0x00,
+    Cs0 = 0x01,
+    D0 = 0x02,
+    Ds0 = 0x03,
+    E0 = 0x04,
+    F0 = 0x05,
+    Fs0 = 0x06,
+    G0 = 0x07,
+    Gs0 = 0x08,
+    A0 = 0x09,
+    As0 = 0x0A,
+    B0 = 0x0B,
+    C1 = 0x0C,
+    Cs1 = 0x0D,
+    D1 = 0x0E,
+    Ds1 = 0x0F,
+    E1 = 0x10,
+    F1 = 0x11,
+    Fs1 = 0x12,
+    G1 = 0x13,
+    Gs1 = 0x14,
+    A1 = 0x15,
+    As1 = 0x16,
+    B1 = 0x17,
+    C2 = 0x18,
+    Cs2 = 0x19,
+    D2 = 0x1A,
+    Ds2 = 0x1B,
+    E2 = 0x1C,
+    F2 = 0x1D,
+    Fs2 = 0x1E,
+    G2 = 0x1F,
+    Gs2 = 0x20,
+    A2 = 0x21,
+    As2 = 0x22,
+    B2 = 0x23,
+    C3 = 0x24,
+    Cs3 = 0x25,
+    D3 = 0x26,
+    Ds3 = 0x27,
+    E3 = 0x28,
+    F3 = 0x29,
+    Fs3 = 0x2A,
+    G3 = 0x2B,
+    Gs3 = 0x2C,
+    A3 = 0x2D,
+    As3 = 0x2E,
+    B3 = 0x2F,
+    C4 = 0x30,
+    Cs4 = 0x31,
+    D4 = 0x32,
+    Ds4 = 0x33,
+    E4 = 0x34,
+    F4 = 0x35,
+    Fs4 = 0x36,
+    G4 = 0x37,
+    Gs4 = 0x38,
+    A4 = 0x39,
+    As4 = 0x3A,
+    B4 = 0x3B,
+    C5 = 0x3C,
+    Cs5 = 0x3D,
+    D5 = 0x3E,
+    Ds5 = 0x3F,
+    E5 = 0x40,
+    F5 = 0x41,
+    Fs5 = 0x42,
+    G5 = 0x43,
+    Gs5 = 0x44,
+    A5 = 0x45,
+    As5 = 0x46,
+    B5 = 0x47,
+    C6 = 0x48,
+    Cs6 = 0x49,
+    D6 = 0x4A,
+    Ds6 = 0x4B,
+    E6 = 0x4C,
+    F6 = 0x4D,
+    Fs6 = 0x4E,
+    G6 = 0x4F,
+    Gs6 = 0x50,
+    A6 = 0x51,
+    As6 = 0x52,
+    B6 = 0x53,
+    C7 = 0x54,
+    Cs7 = 0x55,
+    D7 = 0x56,
+    Ds7 = 0x57,
+    E7 = 0x58,
+    F7 = 0x59,
+    Fs7 = 0x5A,
+    G7 = 0x5B,
+    Gs7 = 0x5C,
+    A7 = 0x5D,
+    As7 = 0x5E,
+    B7 = 0x5F,
+    C8 = 0x60,
+    Cs8 = 0x61,
+    D8 = 0x62,
+    Ds8 = 0x63,
+    E8 = 0x64,
+    F8 = 0x65,
+    Fs8 = 0x66,
+    G8 = 0x67,
+    Gs8 = 0x68,
+    A8 = 0x69,
+    As8 = 0x6A,
+    B8 = 0x6B,
+    C9 = 0x6C,
+    Cs9 = 0x6D,
+    D9 = 0x6E,
+    Ds9 = 0x6F,
+    E9 = 0x70,
+    F9 = 0x71,
+    Fs9 = 0x72,
+    G9 = 0x73,
+    Gs9 = 0x74,
+    A9 = 0x75,
+    As9 = 0x76,
+    B9 = 0x77,
+    C10 = 0x78,
+    Cs10 = 0x79,
+    D10 = 0x7A,
+    Ds10 = 0x7B,
+    E10 = 0x7C,
+    F10 = 0x7D,
+    Fs10 = 0x7E,
+    G10 = 0x7F,
+    // Following notes are NOT valid MIDI notes, but only internally used
+    OFF = 0xFE,
+    EMPTY = 0xFF,
 }
 
 impl Note {
@@ -197,8 +198,7 @@ impl Note {
         }
         fn is_empty_symbol(s: &str, index: usize) -> bool {
             if let Some(c) = s.chars().nth(index) {
-                // NB: don't allow '-': it's used for negative octaves
-                if c == ' ' || c == '_' {
+                if c == ' ' || c == '_' || c == '-' {
                     return true;
                 }
             }
@@ -207,20 +207,16 @@ impl Note {
         fn octave_value_at(s: &str, index: usize) -> Result<i32, String> {
             if let Some(c) = s.chars().nth(index) {
                 let octave = match c {
-                    '-' => match octave_value_at(s, index + 1) {
-                        Ok(octave) => -octave,
-                        Err(err) => return Err(err),
+                    '0' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => c as i32 - '0' as i32,
+                    '1' => match s.chars().nth(index + 1) {
+                        Some(next_char) => match next_char {
+                            '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+                                10 + (next_char as i32 - '0' as i32)
+                            }
+                            _ => 1,
+                        },
+                        None => 1,
                     },
-                    '0' => 0,
-                    '1' => 1,
-                    '2' => 2,
-                    '3' => 3,
-                    '4' => 4,
-                    '5' => 5,
-                    '6' => 6,
-                    '7' => 7,
-                    '8' => 8,
-                    '9' => 9,
                     _ => {
                         return Err(format!(
                             "Invalid note str '{}' - octave character '{}' is invalid.",
@@ -271,19 +267,21 @@ impl Note {
         let consumed_chars;
         let note = note_value_at(s, 0)? as i32;
         let octave = if is_sharp_symbol(s, 1) || is_flat_symbol(s, 1) || is_empty_symbol(s, 1) {
-            consumed_chars = 3;
-            octave_value_at(s, 2)?
+            let value = octave_value_at(s, 2)?;
+            consumed_chars = if value >= 10 { 4 } else { 3 };
+            value
         } else {
-            consumed_chars = 2;
-            octave_value_at(s, 1)?
+            let value = octave_value_at(s, 1)?;
+            consumed_chars = if value >= 10 { 3 } else { 2 };
+            value
         };
-        if !(-1..=9).contains(&octave) {
+        if !(0..=10).contains(&octave) {
             return Err(format!(
                 "Invalid note str '{}' - octave '{}' is out of range.",
                 s, octave
             ));
         }
-        Ok((((octave * 12 + 12 + note) as u8).into(), consumed_chars))
+        Ok((((octave * 12 + note) as u8).into(), consumed_chars))
     }
 }
 
@@ -350,7 +348,7 @@ impl Display for Note {
             "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
         ];
 
-        let octave = (*self as u8 / 12) as i32 - 1;
+        let octave = (*self as u8 / 12) as i32;
         let note = (*self as u8 % 12) as usize;
         write!(f, "{}{}", NOTE_NAMES[note], octave)
     }
@@ -364,32 +362,33 @@ mod test {
 
     #[test]
     fn note_number_conversion() {
-        assert_eq!(Note::from(0x0_u8), Note::Cm1);
-        assert_eq!(Note::from(0x30_u8), Note::C3);
-        assert_eq!(Note::from(0x80_u8), Note::Cm1); // wraps, probably should not be allowed
-        assert_eq!(i8::from(Note::C4), 60);
-        assert_eq!(u8::from(Note::C3), 0x30_u8);
+        assert_eq!(Note::from(0x0_u8), Note::C0);
+        assert_eq!(Note::from(0x24_u8), Note::C3);
+        assert_eq!(Note::from(0x80_u8), Note::C0); // wraps, probably should not be allowed
+        assert_eq!(i8::from(Note::C4), 48);
+        assert_eq!(u8::from(Note::C3), 0x24);
     }
 
     #[test]
     fn note_serialization() {
         assert_eq!(Note::C4.to_string(), "C4");
-        assert_eq!(Note::Csm1.to_string(), "C#-1");
+        assert_eq!(Note::Cs0.to_string(), "C#0");
         assert_eq!(Note::G9.to_string(), "G9");
+        assert_eq!(Note::Fs10.to_string(), "F#10");
     }
 
     #[test]
     fn note_deserialization() {
         assert!(Note::try_from("").is_err());
         assert!(Note::try_from("x4").is_err());
-        assert!(Note::try_from("c-2").is_err());
+        assert!(Note::try_from("c.2").is_err());
         assert!(Note::try_from("cc2").is_err());
         assert!(Note::try_from("cbb2").is_err());
         assert!(Note::try_from("c##2").is_err());
         assert_eq!(Note::from("C4"), Note::C4);
         assert_eq!(Note::from("Cb4"), Note::B3);
         assert_eq!(Note::from("C#3"), Note::Cs3);
-        assert_eq!(Note::from("D#-1"), Note::Dsm1);
+        assert_eq!(Note::from("D#10"), Note::Ds10);
         assert_eq!(Note::from("E_7"), Note::E7);
         assert_eq!(Note::from("f5"), Note::F5);
         assert_eq!(Note::from("g 9"), Note::G9);
