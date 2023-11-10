@@ -149,11 +149,11 @@ impl BeatTimeRhythm {
             let unit = table.get::<&str, String>("unit")?;
             match unit.as_str() {
                 "bars" => step = BeatTimeStep::Bar(resolution),
-                "beats"|"quarter"|"1/4" => step = BeatTimeStep::Beats(resolution),
-                "eighth"|"1/8" => step = BeatTimeStep::Eighth(resolution),
-                "sixteenth"|"1/16" => step = BeatTimeStep::Sixteenth(resolution),
+                "beats" | "1/4" | "4th" => step = BeatTimeStep::Beats(resolution),
+                "eighth" | "1/8" | "8th" => step = BeatTimeStep::Eighth(resolution),
+                "sixteenth"|"1/16" | "16th" => step = BeatTimeStep::Sixteenth(resolution),
                 _ => return Err(bad_argument_error("emit", "unit", 1, 
-                "Invalid unit parameter. Expected 'seconds', 'bars', 'beats', 'eighth', 'sixteenth'"))
+                "Invalid unit parameter. Expected one of 'seconds', 'bars', 'beats|4th', 'eighth|8th', 'sixteenth|8th'"))
             }
         }
         let mut rhythm = BeatTimeRhythm::new(default_time_base, step);
@@ -200,7 +200,7 @@ impl SecondTimeRhythm {
                 "seconds" => (),
                 "ms" => resolution /= 1000.0,
                 _ => return Err(bad_argument_error("emit", "unit", 1, 
-                "Invalid unit parameter. Expected 'seconds', 'bars', 'beats', 'eighth', 'sixteenth'")),
+                "Invalid unit parameter. Expected one of 'seconds', 'bars', 'beats|4th', 'eighth|8th', 'sixteenth|8th'"))
             }
         }
         let mut rhythm = SecondTimeRhythm::new(default_time_base, resolution);

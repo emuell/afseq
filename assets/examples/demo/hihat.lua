@@ -1,5 +1,5 @@
 return Emitter {
-  unit = "sixteenth",
+  unit = "16th",
   offset = 16 * 8,
   pattern = pattern.euclidean(14, 16, 6),
   emit = function()

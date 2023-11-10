@@ -9,7 +9,7 @@ local bass_line = fun.to_table(fun.map(function(x)
 end, { 1, 3, 4, 1, 3, 4, 7 }))
 
 return Emitter {
-    unit = "eighth",
+    unit = "8th",
     pattern = pattern.from({1, 0, 1, 0}, {0, 1, 0, 0}, {1, 0, 1, 0}, {0, 1, 0, 1}),
     emit = sequence(table.unpack(bass_line)):with_volume(0.7)
 }
