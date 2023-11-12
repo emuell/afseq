@@ -1,7 +1,7 @@
 [package]
 name = "afseq"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 description = "afplay sequencer"
 authors = ["Eduard Müller <mail@emuell.net>"]
 exclude = ["assets", "examples"]
@@ -9,6 +9,7 @@ categories = ["audio", "player", "sequencer"]
 
 [dependencies]
 # required
+lazy_static = { version = "^1.4" }
 anyhow = { version = "^1.0" }
 paste = { version = "^1.0"}
 derive_more = { version = "^0.99" }

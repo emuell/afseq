@@ -10,8 +10,7 @@ use rust_music_theory::note as rmt_note;
 
 // -------------------------------------------------------------------------------------------------
 
-/// A note representable in a 7 bit unsigned int. The subscript 'S' to a note means sharp. The
-/// subscript 'm' to an octave means negate, so `CSm2` = C# in octave -2.
+/// A note representable in a 7 bit unsigned int. The subscript 'S' to a note means sharp.
 /// Because it only uses the least significant 7 bits, any value can be interpreted as either an i8
 /// or a u8 for free (as the representation is the same in both)
 ///
@@ -19,10 +18,8 @@ use rust_music_theory::note as rmt_note;
 /// enum names usually should be completely ignored.
 ///
 /// For From<&str> conversions, the following notation is supported:
-/// `C4` (plain), `C-1` (minus 1 octave), `C#1` (sharps), `Db1` (flats),
-/// `D_2` (using _ as optional separator), `G 5` (using space as optional separator)
-///
-/// Beware: From<&str> wil panic when string to note parsing failed! Use Note::try_from then instead.
+/// `C4` (plain), `C#1` (sharps), `Db1` (flats),
+/// `D_2` (using _ as separator), `G 5` (using space as separator)
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 #[allow(non_camel_case_types)]
@@ -163,17 +160,13 @@ pub enum Note {
 impl Note {
     /// Test if this note value is a note-on.
     pub fn is_note_on(&self) -> bool {
-        *self != Note::OFF
+        *self != Note::OFF && *self != Note::EMPTY
     }
     /// Test if this note value is a note-off.
     pub fn is_note_off(&self) -> bool {
-        *self == Note::OFF
+        *self == Note::OFF && *self != Note::EMPTY
     }
 
-    /// Try converting the given string to a Note
-    pub fn try_from(s: &str) -> Result<Self, String> {
-        Ok(Self::try_from_with_offset(s)?.0)
-    }
     /// Try converting the given string to a Note.
     /// returns Self and the number of consumed characters read from the string.
     pub fn try_from_with_offset(s: &str) -> Result<(Self, usize), String> {
@@ -285,6 +278,15 @@ impl Note {
     }
 }
 
+impl TryFrom<&str> for Note {
+    type Error = String;
+
+    /// Try converting the given string to a Note
+    fn try_from(s: &str) -> Result<Self, String> {
+        Ok(Self::try_from_with_offset(s)?.0)
+    }
+}
+
 impl From<u8> for Note {
     #[inline(always)]
     fn from(n: u8) -> Note {
@@ -310,15 +312,6 @@ impl From<Note> for i8 {
     #[inline(always)]
     fn from(note: Note) -> Self {
         note as i8
-    }
-}
-
-impl From<&str> for Note {
-    fn from(s: &str) -> Self {
-        match Self::try_from(s) {
-            Ok(n) => n,
-            Err(err) => panic!("{}", err),
-        }
     }
 }
 
@@ -378,21 +371,22 @@ mod test {
     }
 
     #[test]
-    fn note_deserialization() {
+    fn note_deserialization() -> Result<(), String> {
         assert!(Note::try_from("").is_err());
         assert!(Note::try_from("x4").is_err());
         assert!(Note::try_from("c.2").is_err());
         assert!(Note::try_from("cc2").is_err());
         assert!(Note::try_from("cbb2").is_err());
         assert!(Note::try_from("c##2").is_err());
-        assert_eq!(Note::from("C4"), Note::C4);
-        assert_eq!(Note::from("Cb4"), Note::B3);
-        assert_eq!(Note::from("C#3"), Note::Cs3);
-        assert_eq!(Note::from("D#10"), Note::Ds10);
-        assert_eq!(Note::from("E_7"), Note::E7);
-        assert_eq!(Note::from("f5"), Note::F5);
-        assert_eq!(Note::from("g 9"), Note::G9);
-        assert_eq!(Note::from("A 8"), Note::A8);
-        assert_eq!(Note::from("bb2"), Note::As2);
+        assert_eq!(Note::try_from("C4")?, Note::C4);
+        assert_eq!(Note::try_from("Cb4")?, Note::B3);
+        assert_eq!(Note::try_from("C#3")?, Note::Cs3);
+        assert_eq!(Note::try_from("D#10")?, Note::Ds10);
+        assert_eq!(Note::try_from("E_7")?, Note::E7);
+        assert_eq!(Note::try_from("f5")?, Note::F5);
+        assert_eq!(Note::try_from("g 9")?, Note::G9);
+        assert_eq!(Note::try_from("A 8")?, Note::A8);
+        assert_eq!(Note::try_from("bb2")?, Note::As2);
+        Ok(())
     }
 }
