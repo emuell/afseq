@@ -140,41 +140,12 @@ pub fn bad_argument_error(func: &str, arg: &str, pos: usize, message: &str) -> m
 
 // ---------------------------------------------------------------------------------------------
 
-fn is_empty_note_string(s: &str) -> bool {
-    matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
-}
-
-pub fn note_event_from_number(
-    note_value: i64,
-    default_instrument: Option<InstrumentId>,
-) -> mlua::Result<NoteEvent> {
-    Ok(NoteEvent {
-        note: crate::midi::Note::from(note_value as u8),
-        volume: 1.0,
-        instrument: default_instrument,
-    })
-}
-
-pub fn note_event_from_string(
-    note_str: &str,
-    default_instrument: Option<InstrumentId>,
-) -> mlua::Result<NoteEvent> {
-    let (note, offset) = match Note::try_from_with_offset(note_str) {
-        Ok(result) => result,
-        Err(err) => {
-            return Err(mlua::Error::FromLuaConversionError {
-                from: "string",
-                to: "Note",
-                message: Some(format!("Invalid note value '{}': {}", note_str, err)),
-            })
-        }
-    };
+fn volume_from_string(str: &str) -> mlua::Result<f32> {
     let mut volume = 1.0;
-    let remaining_s = &note_str[offset..].trim();
-    if !remaining_s.is_empty() {
-        if let Ok(int) = remaining_s.parse::<i32>() {
+    if !str.is_empty() {
+        if let Ok(int) = str.parse::<i32>() {
             volume = int as f32;
-        } else if let Ok(float) = remaining_s.parse::<f32>() {
+        } else if let Ok(float) = str.parse::<f32>() {
             volume = float;
         } else {
             return Err(mlua::Error::FromLuaConversionError {
@@ -183,7 +154,7 @@ pub fn note_event_from_string(
                 message: Some(format!(
                     "Failed to parse volume: \
                         Argument '{}' is neither a float or int value",
-                    note_str
+                    str
                 )),
             });
         }
@@ -199,17 +170,92 @@ pub fn note_event_from_string(
             });
         }
     }
-    Ok(NoteEvent {
+    Ok(volume)
+}
+
+fn is_empty_note_string(s: &str) -> bool {
+    matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
+}
+
+pub fn note_event_from_number(
+    note_value: i64,
+    default_instrument: Option<InstrumentId>,
+) -> mlua::Result<Option<NoteEvent>> {
+    Ok(Some(NoteEvent {
+        note: crate::midi::Note::from(note_value as u8),
+        volume: 1.0,
         instrument: default_instrument,
-        note,
-        volume,
-    })
+    }))
+}
+
+pub fn note_event_from_string(
+    str: &str,
+    default_instrument: Option<InstrumentId>,
+) -> mlua::Result<Option<NoteEvent>> {
+    let mut white_space_splits = str.split(' ').filter(|v| !v.is_empty());
+    let note_part = white_space_splits.next().unwrap_or("");
+    if is_empty_note_string(note_part) {
+        Ok(None)
+    } else {
+        let note =
+            Note::try_from(note_part).map_err(|err| mlua::Error::FromLuaConversionError {
+                from: "string",
+                to: "Note",
+                message: Some(format!("Invalid note value '{}': {}", note_part, err)),
+            })?;
+        let volume = {
+            if let Some(volume_part) = white_space_splits.next() {
+                volume_from_string(volume_part)?
+            } else {
+                1.0
+            }
+        };
+        Ok(Some(NoteEvent {
+            instrument: default_instrument,
+            note,
+            volume,
+        }))
+    }
+}
+
+pub fn chord_events_from_string(
+    str: &str,
+    default_instrument: Option<InstrumentId>,
+) -> mlua::Result<Vec<Option<NoteEvent>>> {
+    let mut white_space_splits = str.split(' ').filter(|v| !v.is_empty());
+    let chord_part = white_space_splits.next().unwrap_or("");
+    let chord = Chord::try_from(chord_part).map_err(|err| mlua::Error::FromLuaConversionError {
+        from: "string",
+        to: "Note",
+        message: Some(format!("Invalid chord value '{}': {}", chord_part, err)),
+    })?;
+    let volume = {
+        if let Some(volume_part) = white_space_splits.next() {
+            volume_from_string(volume_part)?
+        } else {
+            1.0
+        }
+    };
+    Ok(chord
+        .intervals
+        .iter()
+        .map(|i| {
+            Some(NoteEvent {
+                instrument: default_instrument,
+                note: Note::from(chord.note as u8 + i),
+                volume,
+            })
+        })
+        .collect::<Vec<_>>())
 }
 
 pub fn note_event_from_table(
     table: LuaTable,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<NoteEvent> {
+) -> mlua::Result<Option<NoteEvent>> {
+    if table.is_empty() {
+        return Ok(None);
+    }
     if table.contains_key("key")? {
         // get optional volume value
         let volume = if table.contains_key::<&str>("volume")? {
@@ -236,20 +282,20 @@ pub fn note_event_from_table(
         // { key = 60, [volume = 1.0] }
         if let Ok(note_value) = table.get::<&str, u8>("key") {
             let note = crate::midi::Note::from(note_value);
-            Ok(NoteEvent {
+            Ok(Some(NoteEvent {
                 note,
                 volume,
                 instrument: default_instrument,
-            })
+            }))
         }
         // { key = "C4", [volume = 1.0] }
         else if let Ok(note_str) = table.get::<&str, String>("key") {
             if let Ok(note) = crate::midi::Note::try_from(note_str.as_str()) {
-                Ok(NoteEvent {
+                Ok(Some(NoteEvent {
                     note,
                     volume,
                     instrument: default_instrument,
-                })
+                }))
             } else {
                 Err(mlua::Error::FromLuaConversionError {
                     from: "string",
@@ -280,27 +326,11 @@ pub fn note_event_from_value(
 ) -> mlua::Result<Option<NoteEvent>> {
     match arg {
         LuaValue::Nil => Ok(None),
-        LuaValue::Integer(note_value) => Ok(Some(note_event_from_number(
-            note_value,
-            default_instrument,
-        )?)),
-        LuaValue::String(note_str) => {
-            if is_empty_note_string(&note_str.to_string_lossy()) {
-                Ok(None)
-            } else {
-                Ok(Some(note_event_from_string(
-                    &note_str.to_string_lossy(),
-                    default_instrument,
-                )?))
-            }
+        LuaValue::Integer(note_value) => note_event_from_number(note_value, default_instrument),
+        LuaValue::String(str) => {
+            note_event_from_string(&str.to_string_lossy(), default_instrument)
         }
-        LuaValue::Table(table) => {
-            if table.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(note_event_from_table(table, default_instrument)?))
-            }
-        }
+        LuaValue::Table(table) => note_event_from_table(table, default_instrument),
         _ => {
             return Err(mlua::Error::FromLuaConversionError {
                 from: arg.type_name(),
@@ -371,6 +401,15 @@ pub fn note_events_from_value(
                     arg_index,
                     default_instrument,
                 )?])
+            }
+        }
+        LuaValue::String(str) => {
+            let str = str.to_string_lossy().to_string();
+            // a string with ' is a chord
+            if str.contains('\'') {
+                Ok(chord_events_from_string(&str, default_instrument)?)
+            } else {
+                Ok(vec![note_event_from_string(&str, default_instrument)?])
             }
         }
         _ => Ok(vec![note_event_from_value(

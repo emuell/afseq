@@ -152,6 +152,27 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
         ]
     );
 
+    // Note (chord)
+    assert!(evaluate_chord_userdata(&engine, r#"note("c12'maj")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("j'maj")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("c4'invalid")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("c4'maj'")"#).is_err());
+    assert!(evaluate_chord_userdata(&engine, r#"note("c4'maj xx")"#).is_err());
+
+    assert_eq!(evaluate_chord_userdata(&engine, r#"note("c'maj")"#)?.notes,
+        vec![
+            Some(new_note(None, "c4", 1.0)),
+            Some(new_note(None, "e4", 1.0)),
+            Some(new_note(None, "g4", 1.0)),
+        ]
+    );
+    assert_eq!(evaluate_chord_userdata(&engine, r#"note("c7'maj 0.2")"#)?.notes,
+        vec![
+            Some(new_note(None, "c7", 0.2)),
+            Some(new_note(None, "e7", 0.2)),
+            Some(new_note(None, "g7", 0.2)),
+        ]
+    );
     Ok(())
 }
 

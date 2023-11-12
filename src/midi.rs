@@ -166,16 +166,27 @@ impl Note {
     pub fn is_note_off(&self) -> bool {
         *self == Note::OFF && *self != Note::EMPTY
     }
+}
 
-    /// Try converting the given string to a Note.
-    /// returns Self and the number of consumed characters read from the string.
-    pub fn try_from_with_offset(s: &str) -> Result<(Self, usize), String> {
+impl TryFrom<&str> for Note {
+    type Error = String;
+
+    /// Try converting the given string to a Note value
+    fn try_from(s: &str) -> Result<Self, String> {
         fn is_note_off(s: &str) -> bool {
             s.to_lowercase() == "off"
         }
         fn is_sharp_symbol(s: &str, index: usize) -> bool {
             if let Some(c) = s.chars().nth(index) {
                 if c == 'S' || c == 's' || c == '#' || c == '♮' {
+                    return true;
+                }
+            }
+            false
+        }
+        fn is_white_space_symbol(s: &str, index: usize) -> bool {
+            if let Some(c) = s.chars().nth(index) {
+                if c == ' ' || c == '\t' {
                     return true;
                 }
             }
@@ -253,20 +264,21 @@ impl Note {
 
         // Note-Off
         if is_note_off(s) {
-            return Ok((Note::OFF, 3));
+            return Ok(Note::OFF);
         }
 
         // Note-On
-        let consumed_chars;
         let note = note_value_at(s, 0)? as i32;
         let octave = if is_sharp_symbol(s, 1) || is_flat_symbol(s, 1) || is_empty_symbol(s, 1) {
-            let value = octave_value_at(s, 2)?;
-            consumed_chars = if value >= 10 { 4 } else { 3 };
-            value
+            if s.len() > 2 && !is_white_space_symbol(s, 2) {
+                octave_value_at(s, 2)?
+            } else {
+                4
+            }
+        } else if s.len() > 1 && !is_white_space_symbol(s, 1) {
+            octave_value_at(s, 1)?
         } else {
-            let value = octave_value_at(s, 1)?;
-            consumed_chars = if value >= 10 { 3 } else { 2 };
-            value
+            4
         };
         if !(0..=10).contains(&octave) {
             return Err(format!(
@@ -274,16 +286,7 @@ impl Note {
                 s, octave
             ));
         }
-        Ok((((octave * 12 + note) as u8).into(), consumed_chars))
-    }
-}
-
-impl TryFrom<&str> for Note {
-    type Error = String;
-
-    /// Try converting the given string to a Note
-    fn try_from(s: &str) -> Result<Self, String> {
-        Ok(Self::try_from_with_offset(s)?.0)
+        Ok(Self::from((octave * 12 + note) as u8))
     }
 }
 

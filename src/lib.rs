@@ -7,6 +7,9 @@ pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
 pub mod midi;
 pub use midi::Note;
 
+pub mod chords;
+pub use chords::Chord;
+
 pub mod event;
 pub use event::{Event, EventIter};
 
