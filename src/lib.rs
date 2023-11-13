@@ -4,8 +4,8 @@
 pub mod time;
 pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
 
-pub mod midi;
-pub use midi::Note;
+pub mod note;
+pub use note::Note;
 
 pub mod chords;
 pub use chords::Chord;

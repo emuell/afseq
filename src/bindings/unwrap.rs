@@ -182,7 +182,7 @@ pub fn note_event_from_number(
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Option<NoteEvent>> {
     Ok(Some(NoteEvent {
-        note: crate::midi::Note::from(note_value as u8),
+        note: Note::from(note_value as u8),
         volume: 1.0,
         instrument: default_instrument,
     }))
@@ -281,7 +281,7 @@ pub fn note_event_from_table(
         };
         // { key = 60, [volume = 1.0] }
         if let Ok(note_value) = table.get::<&str, u8>("key") {
-            let note = crate::midi::Note::from(note_value);
+            let note = Note::from(note_value);
             Ok(Some(NoteEvent {
                 note,
                 volume,
@@ -290,7 +290,7 @@ pub fn note_event_from_table(
         }
         // { key = "C4", [volume = 1.0] }
         else if let Ok(note_str) = table.get::<&str, String>("key") {
-            if let Ok(note) = crate::midi::Note::try_from(note_str.as_str()) {
+            if let Ok(note) = Note::try_from(note_str.as_str()) {
                 Ok(Some(NoteEvent {
                     note,
                     volume,

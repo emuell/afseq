@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use crate::midi::Note;
+use crate::note::Note;
 
 // --------------------------------------------------------------------------------------------------
 

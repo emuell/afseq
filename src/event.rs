@@ -1,6 +1,6 @@
 //! Value and value iters which get emitted by `Rhythms`.
 
-use crate::midi::Note;
+use crate::note::Note;
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use derive_more::{Deref, Display, From, Into};
