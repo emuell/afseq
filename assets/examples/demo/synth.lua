@@ -3,8 +3,9 @@ return Emitter {
   resolution = 4,
   offset = 16,
   emit = sequence(
-    "c4'min  0.3",
-    "g3'min7 0.4",
-    "c4'min  0.3",
-    "g3'min  0.4")
+    note("c-4'm"),
+    note("g-3'm7"),
+    note("c-4'm"),
+    note("c-4'm"):transpose({0, 0, 3})
+  ):amplify({0.5, 0.4, 0.5, 0.4})
 }

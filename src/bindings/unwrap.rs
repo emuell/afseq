@@ -1,8 +1,25 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use mlua::prelude::*;
 
 use crate::{event::scripted::ScriptedEventIter, prelude::*};
+
+// ---------------------------------------------------------------------------------------------
+
+// Error helpers
+pub fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'static str>>>(
+    func: S1,
+    arg: S2,
+    pos: usize,
+    message: &str,
+) -> mlua::Error {
+    mlua::Error::BadArgument {
+        to: func.into().map(String::from),
+        name: arg.into().map(String::from),
+        pos,
+        cause: Arc::new(mlua::Error::RuntimeError(message.to_string())),
+    }
+}
 
 // ---------------------------------------------------------------------------------------------
 
@@ -42,23 +59,37 @@ impl NoteUserData {
 
 impl LuaUserData for NoteUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_function(
-            "with_volume",
-            |_lua, (ud, volume): (LuaAnyUserData, f32)| {
-                let mut this = ud.borrow::<Self>()?.clone();
-                for note in this.notes.iter_mut().flatten() {
+        methods.add_method_mut("with_volume", |lua, this, volume: LuaValue| {
+            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
+            for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
+                if let Some(note) = note {
                     note.volume = volume;
                 }
-                Ok(this)
-            },
-        );
-
-        methods.add_function("amplify", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
-            let mut this = ud.borrow::<Self>()?.clone();
-            for note in this.notes.iter_mut().flatten() {
-                note.volume *= volume;
             }
-            Ok(this)
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("amplify", |lua, this, volume: LuaValue| {
+            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
+            for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
+                if let Some(note) = note {
+                    note.volume *= volume;
+                }
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
+            let steps = transpose_steps_from_value(lua, volume, this.notes.len())?;
+            for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
+                if let Some(note) = note {
+                    if note.note.is_note_on() {
+                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
+                        note.note = Note::from(transposed_note as u8);
+                    }
+                }
+            }
+            Ok(this.clone())
         });
     }
 }
@@ -106,35 +137,38 @@ impl SequenceUserData {
 
 impl LuaUserData for SequenceUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_function(
-            "with_volume",
-            |_lua, (ud, volume): (LuaAnyUserData, f32)| {
-                let mut this = ud.borrow::<Self>()?.clone();
-                for note in this.notes.iter_mut().flatten().flatten() {
+        methods.add_method_mut("with_volume", |lua, this, volume: LuaValue| {
+            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
+            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
+                for note in notes.iter_mut().flatten() {
                     note.volume = volume;
                 }
-                Ok(this)
-            },
-        );
-
-        methods.add_function("amplify", |_lua, (ud, volume): (LuaAnyUserData, f32)| {
-            let mut this = ud.borrow::<Self>()?.clone();
-            for note in this.notes.iter_mut().flatten().flatten() {
-                note.volume *= volume;
             }
-            Ok(this)
+            Ok(this.clone())
         });
-    }
-}
 
-// ---------------------------------------------------------------------------------------------
+        methods.add_method_mut("amplify", |lua, this, volume: LuaValue| {
+            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
+            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
+                for note in notes.iter_mut().flatten() {
+                    note.volume *= volume;
+                }
+            }
+            Ok(this.clone())
+        });
 
-pub fn bad_argument_error(func: &str, arg: &str, pos: usize, message: &str) -> mlua::Error {
-    mlua::Error::BadArgument {
-        to: Some(func.to_string()),
-        name: Some(arg.to_string()),
-        pos,
-        cause: mlua::Error::RuntimeError(message.to_string()).into(),
+        methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
+            let steps = transpose_steps_from_value(lua, volume, this.notes.len())?;
+            for (notes, step) in this.notes.iter_mut().zip(steps.into_iter()) {
+                for note in notes.iter_mut().flatten() {
+                    if note.note.is_note_on() {
+                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
+                        note.note = Note::from(transposed_note as u8);
+                    }
+                }
+            }
+            Ok(this.clone())
+        });
     }
 }
 
@@ -172,6 +206,50 @@ fn volume_from_string(str: &str) -> mlua::Result<f32> {
     }
     Ok(volume)
 }
+
+fn volume_factors_from_value(lua: &Lua, volume: LuaValue, len: usize) -> mlua::Result<Vec<f32>> {
+    let volumes;
+    if let Some(volume_table) = volume.as_table() {
+        volumes = volume_table
+            .clone()
+            .sequence_values::<f32>()
+            .enumerate()
+            .map(|(_, result)| result)
+            .collect::<mlua::Result<Vec<f32>>>()?;
+    } else {
+        let volume = f32::from_lua(volume, lua)?;
+        volumes = (0..len).map(|_| volume).collect::<Vec<f32>>()
+    }
+    for volume in volumes.iter().copied() {
+        if volume < 0.0 {
+            return Err(bad_argument_error(
+                None,
+                "volume",
+                1,
+                format!("Volume must be >= 0 but is '{}", volume).as_str(),
+            ));
+        }
+    }
+    Ok(volumes)
+}
+
+fn transpose_steps_from_value(lua: &Lua, step: LuaValue, len: usize) -> mlua::Result<Vec<i32>> {
+    let steps;
+    if let Some(volume_table) = step.as_table() {
+        steps = volume_table
+            .clone()
+            .sequence_values::<i32>()
+            .enumerate()
+            .map(|(_, result)| result)
+            .collect::<mlua::Result<Vec<i32>>>()?;
+    } else {
+        let step = i32::from_lua(step, lua)?;
+        steps = (0..len).map(|_| step).collect::<Vec<i32>>()
+    }
+    Ok(steps)
+}
+
+// ---------------------------------------------------------------------------------------------
 
 fn is_empty_note_string(s: &str) -> bool {
     matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
@@ -327,9 +405,7 @@ pub fn note_event_from_value(
     match arg {
         LuaValue::Nil => Ok(None),
         LuaValue::Integer(note_value) => note_event_from_number(note_value, default_instrument),
-        LuaValue::String(str) => {
-            note_event_from_string(&str.to_string_lossy(), default_instrument)
-        }
+        LuaValue::String(str) => note_event_from_string(&str.to_string_lossy(), default_instrument),
         LuaValue::Table(table) => note_event_from_table(table, default_instrument),
         _ => {
             return Err(mlua::Error::FromLuaConversionError {
