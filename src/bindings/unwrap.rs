@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, ops::RangeBounds, rc::Rc, sync::Arc};
 
 use mlua::prelude::*;
 
@@ -59,8 +59,21 @@ impl NoteUserData {
 
 impl LuaUserData for NoteUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("with_volume", |lua, this, volume: LuaValue| {
-            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
+        methods.add_method_mut("transpose", |lua, this, value: LuaValue| {
+            let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
+            for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
+                if let Some(note) = note {
+                    if note.note.is_note_on() {
+                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
+                        note.note = Note::from(transposed_note as u8);
+                    }
+                }
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
+            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if let Some(note) = note {
                     note.volume = volume;
@@ -68,9 +81,8 @@ impl LuaUserData for NoteUserData {
             }
             Ok(this.clone())
         });
-
-        methods.add_method_mut("amplify", |lua, this, volume: LuaValue| {
-            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
+        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
+            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if let Some(note) = note {
                     note.volume *= volume;
@@ -78,15 +90,21 @@ impl LuaUserData for NoteUserData {
             }
             Ok(this.clone())
         });
-
-        methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
-            let steps = transpose_steps_from_value(lua, volume, this.notes.len())?;
-            for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
+        methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
+            let pannings = panning_array_from_value(lua, value, this.notes.len())?;
+            for (note, panning) in this.notes.iter_mut().zip(pannings.into_iter()) {
                 if let Some(note) = note {
-                    if note.note.is_note_on() {
-                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
-                        note.note = Note::from(transposed_note as u8);
-                    }
+                    note.panning = panning;
+                }
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
+            let delays = delay_array_from_value(lua, value, this.notes.len())?;
+            for (note, delay) in this.notes.iter_mut().zip(delays.into_iter()) {
+                if let Some(note) = note {
+                    note.delay = delay;
                 }
             }
             Ok(this.clone())
@@ -137,28 +155,8 @@ impl SequenceUserData {
 
 impl LuaUserData for SequenceUserData {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("with_volume", |lua, this, volume: LuaValue| {
-            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
-            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
-                for note in notes.iter_mut().flatten() {
-                    note.volume = volume;
-                }
-            }
-            Ok(this.clone())
-        });
-
-        methods.add_method_mut("amplify", |lua, this, volume: LuaValue| {
-            let volumes = volume_factors_from_value(lua, volume, this.notes.len())?;
-            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
-                for note in notes.iter_mut().flatten() {
-                    note.volume *= volume;
-                }
-            }
-            Ok(this.clone())
-        });
-
         methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
-            let steps = transpose_steps_from_value(lua, volume, this.notes.len())?;
+            let steps = transpose_steps_array_from_value(lua, volume, this.notes.len())?;
             for (notes, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 for note in notes.iter_mut().flatten() {
                     if note.note.is_note_on() {
@@ -169,71 +167,91 @@ impl LuaUserData for SequenceUserData {
             }
             Ok(this.clone())
         });
+
+        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
+            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
+            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
+                for note in notes.iter_mut().flatten() {
+                    note.volume = volume;
+                }
+            }
+            Ok(this.clone())
+        });
+        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
+            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
+            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
+                for note in notes.iter_mut().flatten() {
+                    note.volume *= volume;
+                }
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
+            let pannings = panning_array_from_value(lua, value, this.notes.len())?;
+            for (notes, panning) in this.notes.iter_mut().zip(pannings) {
+                for note in notes.iter_mut().flatten() {
+                    note.panning = panning;
+                }
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
+            let delays = delay_array_from_value(lua, value, this.notes.len())?;
+            for (notes, delay) in this.notes.iter_mut().zip(delays) {
+                for note in notes.iter_mut().flatten() {
+                    note.delay = delay;
+                }
+            }
+            Ok(this.clone())
+        });
     }
 }
 
 // ---------------------------------------------------------------------------------------------
 
-fn volume_from_string(str: &str) -> mlua::Result<f32> {
-    let mut volume = 1.0;
-    if !str.is_empty() {
-        if let Ok(int) = str.parse::<i32>() {
-            volume = int as f32;
-        } else if let Ok(float) = str.parse::<f32>() {
-            volume = float;
-        } else {
-            return Err(mlua::Error::FromLuaConversionError {
-                from: "string",
-                to: "Note",
-                message: Some(format!(
-                    "Failed to parse volume: \
-                        Argument '{}' is neither a float or int value",
-                    str
-                )),
-            });
-        }
-        if volume < 0.0 {
-            return Err(mlua::Error::FromLuaConversionError {
-                from: "string",
-                to: "Note",
-                message: Some(format!(
-                    "Failed to parse volume propery in node: \
-                        Volume must be >= 0 but is '{}",
-                    volume
-                )),
-            });
-        }
-    }
-    Ok(volume)
-}
-
-fn volume_factors_from_value(lua: &Lua, volume: LuaValue, len: usize) -> mlua::Result<Vec<f32>> {
-    let volumes;
-    if let Some(volume_table) = volume.as_table() {
-        volumes = volume_table
+fn value_array_from_value<Range>(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+    name: &str,
+    range: Range,
+    _default: f32,
+) -> mlua::Result<Vec<f32>>
+where
+    Range: RangeBounds<f32> + std::fmt::Debug,
+{
+    let values;
+    if let Some(value_table) = value.as_table() {
+        values = value_table
             .clone()
             .sequence_values::<f32>()
             .enumerate()
             .map(|(_, result)| result)
             .collect::<mlua::Result<Vec<f32>>>()?;
     } else {
-        let volume = f32::from_lua(volume, lua)?;
-        volumes = (0..len).map(|_| volume).collect::<Vec<f32>>()
+        let value = f32::from_lua(value, lua)?;
+        values = (0..array_len).map(|_| value).collect::<Vec<f32>>()
     }
-    for volume in volumes.iter().copied() {
-        if volume < 0.0 {
+    for value in values.iter() {
+        if !range.contains(value) {
             return Err(bad_argument_error(
                 None,
                 "volume",
                 1,
-                format!("Volume must be >= 0 but is '{}", volume).as_str(),
+                format!("{} must be in range {:?} but is '{}'", name, range, value).as_str(),
             ));
         }
     }
-    Ok(volumes)
+    Ok(values)
 }
 
-fn transpose_steps_from_value(lua: &Lua, step: LuaValue, len: usize) -> mlua::Result<Vec<i32>> {
+fn transpose_steps_array_from_value(
+    lua: &Lua,
+    step: LuaValue,
+    array_len: usize,
+) -> mlua::Result<Vec<i32>> {
     let steps;
     if let Some(volume_table) = step.as_table() {
         steps = volume_table
@@ -244,12 +262,133 @@ fn transpose_steps_from_value(lua: &Lua, step: LuaValue, len: usize) -> mlua::Re
             .collect::<mlua::Result<Vec<i32>>>()?;
     } else {
         let step = i32::from_lua(step, lua)?;
-        steps = (0..len).map(|_| step).collect::<Vec<i32>>()
+        steps = (0..array_len).map(|_| step).collect::<Vec<i32>>()
     }
     Ok(steps)
 }
 
+fn volume_array_from_value(lua: &Lua, value: LuaValue, array_len: usize) -> mlua::Result<Vec<f32>> {
+    value_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX, 1.0)
+}
+
+fn panning_array_from_value(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+) -> mlua::Result<Vec<f32>> {
+    value_array_from_value(lua, value, array_len, "panning", -1.0..=1.0, 0.0)
+}
+
+fn delay_array_from_value(lua: &Lua, value: LuaValue, array_len: usize) -> mlua::Result<Vec<f32>> {
+    value_array_from_value(lua, value, array_len, "delay", 0.0..=1.0, 0.0)
+}
+
 // ---------------------------------------------------------------------------------------------
+
+fn float_value_from_table<Range>(
+    table: &LuaTable,
+    name: &str,
+    range: Range,
+    default: f32,
+) -> mlua::Result<f32>
+where
+    Range: RangeBounds<f32> + std::fmt::Debug,
+{
+    if table.contains_key::<&str>(name)? {
+        if let Ok(value) = table.get::<&str, f32>(name) {
+            if !range.contains(&value) {
+                Err(mlua::Error::FromLuaConversionError {
+                    from: "string",
+                    to: "Note",
+                    message: Some(format!(
+                        "Invalid note {} value: Value must be in range {:?} but is '{}'",
+                        name, range, value
+                    )),
+                })
+            } else {
+                Ok(value)
+            }
+        } else {
+            Err(mlua::Error::FromLuaConversionError {
+                from: "string",
+                to: "Note",
+                message: Some(format!(
+                    "Invalid note {} value: Value is not a number",
+                    name
+                )),
+            })
+        }
+    } else {
+        Ok(default)
+    }
+}
+
+fn volume_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+    float_value_from_table(table, "volume", 0.0..=f32::MAX, 1.0)
+}
+
+fn panning_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+    float_value_from_table(table, "panning", -1.0..=1.0, 0.0)
+}
+
+fn delay_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+    float_value_from_table(table, "delay", 0.0..1.0, 0.0)
+}
+
+fn is_empty_float_value_string(str: &str) -> bool {
+    str == ".." || str == "--"
+}
+
+fn float_value_from_string<Range>(
+    str: &str,
+    name: &str,
+    range: Range,
+    default: f32,
+) -> mlua::Result<f32>
+where
+    Range: RangeBounds<f32> + std::fmt::Debug,
+{
+    let mut value = default;
+    if !str.is_empty() && !is_empty_float_value_string(str) {
+        if let Ok(int) = str.parse::<i32>() {
+            value = int as f32;
+        } else if let Ok(float) = str.parse::<f32>() {
+            value = float;
+        } else {
+            return Err(mlua::Error::FromLuaConversionError {
+                from: "string",
+                to: "Note",
+                message: Some(format!(
+                    "Invalid note {} value: Value '{}' is not a number",
+                    name, str
+                )),
+            });
+        }
+        if !range.contains(&value) {
+            return Err(mlua::Error::FromLuaConversionError {
+                from: "string",
+                to: "Note",
+                message: Some(format!(
+                    "Invalid note {} value: Value must be in range {:?} but is '{}'",
+                    name, range, value
+                )),
+            });
+        }
+    }
+    Ok(value)
+}
+
+fn volume_value_from_string(str: &str) -> mlua::Result<f32> {
+    float_value_from_string(str, "volume", 0.0..=f32::MAX, 1.0)
+}
+
+fn panning_value_from_string(str: &str) -> mlua::Result<f32> {
+    float_value_from_string(str, "panning", -1.0..=1.0, 0.0)
+}
+
+fn delay_value_from_string(str: &str) -> mlua::Result<f32> {
+    float_value_from_string(str, "delay", 0.0..1.0, 0.0)
+}
 
 fn is_empty_note_string(s: &str) -> bool {
     matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
@@ -259,11 +398,7 @@ pub fn note_event_from_number(
     note_value: i64,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Option<NoteEvent>> {
-    Ok(Some(NoteEvent {
-        note: Note::from(note_value as u8),
-        volume: 1.0,
-        instrument: default_instrument,
-    }))
+    Ok(new_note((default_instrument, note_value as u8)))
 }
 
 pub fn note_event_from_string(
@@ -281,18 +416,10 @@ pub fn note_event_from_string(
                 to: "Note",
                 message: Some(format!("Invalid note value '{}': {}", note_part, err)),
             })?;
-        let volume = {
-            if let Some(volume_part) = white_space_splits.next() {
-                volume_from_string(volume_part)?
-            } else {
-                1.0
-            }
-        };
-        Ok(Some(NoteEvent {
-            instrument: default_instrument,
-            note,
-            volume,
-        }))
+        let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
+        let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
+        let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
+        Ok(new_note((default_instrument, note, volume, panning, delay)))
     }
 }
 
@@ -307,22 +434,20 @@ pub fn chord_events_from_string(
         to: "Note",
         message: Some(format!("Invalid chord value '{}': {}", chord_part, err)),
     })?;
-    let volume = {
-        if let Some(volume_part) = white_space_splits.next() {
-            volume_from_string(volume_part)?
-        } else {
-            1.0
-        }
-    };
+    let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
+    let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
+    let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
     Ok(chord
         .intervals
         .iter()
         .map(|i| {
-            Some(NoteEvent {
-                instrument: default_instrument,
-                note: Note::from(chord.note as u8 + i),
+            new_note((
+                default_instrument,
+                Note::from(chord.note as u8 + i),
                 volume,
-            })
+                panning,
+                delay,
+            ))
         })
         .collect::<Vec<_>>())
 }
@@ -334,46 +459,25 @@ pub fn note_event_from_table(
     if table.is_empty() {
         return Ok(None);
     }
+
     if table.contains_key("key")? {
-        // get optional volume value
-        let volume = if table.contains_key::<&str>("volume")? {
-            if let Ok(value) = table.get::<&str, f32>("volume") {
-                if value < 0.0 {
-                    return Err(mlua::Error::FromLuaConversionError {
-                        from: "string",
-                        to: "Note",
-                        message: Some("Invalid note volume value".to_string()),
-                    });
-                } else {
-                    value
-                }
-            } else {
-                return Err(mlua::Error::FromLuaConversionError {
-                    from: "string",
-                    to: "Note",
-                    message: Some("Invalid note volume value".to_string()),
-                });
-            }
-        } else {
-            1.0
-        };
-        // { key = 60, [volume = 1.0] }
-        if let Ok(note_value) = table.get::<&str, u8>("key") {
-            let note = Note::from(note_value);
-            Ok(Some(NoteEvent {
-                note,
+        let volume = volume_value_from_table(&table)?;
+        let panning = panning_value_from_table(&table)?;
+        let delay = delay_value_from_table(&table)?;
+        // { key = 60, [volume = 1.0, panning = 0.0, delay = 0.0] }
+        if let Ok(note_value) = table.get::<&str, i32>("key") {
+            Ok(new_note((
+                default_instrument,
+                Note::from(note_value as u8),
                 volume,
-                instrument: default_instrument,
-            }))
+                panning,
+                delay,
+            )))
         }
-        // { key = "C4", [volume = 1.0] }
+        // { key = "C4", [volume = 1.0, panning = 0.0, delay = 0.0] }
         else if let Ok(note_str) = table.get::<&str, String>("key") {
             if let Ok(note) = Note::try_from(note_str.as_str()) {
-                Ok(Some(NoteEvent {
-                    note,
-                    volume,
-                    instrument: default_instrument,
-                }))
+                Ok(new_note((default_instrument, note, volume, panning, delay)))
             } else {
                 Err(mlua::Error::FromLuaConversionError {
                     from: "string",

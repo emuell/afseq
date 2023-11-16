@@ -99,47 +99,65 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(note_event.notes, vec![None]);
 
     // Note Off
-    assert!(evaluate_note_userdata(&engine, r#"note("X#1")"#).is_err());
-    assert!(evaluate_note_userdata(&engine, r#"note("C#-2"#).is_err());
-    let note_event = evaluate_note_userdata(&engine, r#"note("g#1")"#)?;
-    assert_eq!(note_event.notes, vec![Some(new_note(None, "g#1", 1.0))]);
+    assert!(evaluate_note_userdata(&engine, r#"note("off")"#).is_ok());
+    let note_event = evaluate_note_userdata(&engine, r#"note("OFF")"#)?;
+    assert_eq!(note_event.notes, vec![new_note((None, Note::OFF))]);
 
     // Note string
     assert!(evaluate_note_userdata(&engine, r#"note("X#1")"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("0.5")"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("C#1 -0.5")"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("C#1", 0.5)"#).is_err());
-    let note_event = evaluate_note_userdata(&engine, r#"note("C#1 0.5")"#)?;
-    assert_eq!(note_event.notes, vec![Some(new_note(None, "c#1", 0.5))]);
+    assert!(evaluate_note_userdata(&engine, r#"note("C#1 ..")"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("C#1 .. -2.0")"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("C#1 ..  -1.0")"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("C#1 .. ..")"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("C#1 .. .. -1.0")"#).is_err());
+    let note_event = evaluate_note_userdata(&engine, r#"note("C#1 0.5 0.1 0.2")"#)?;
+    assert_eq!(
+        note_event.notes,
+        vec![Some(NoteEvent {
+            instrument: None,
+            note: Note::Cs1,
+            volume: 0.5,
+            panning: 0.1,
+            delay: 0.2
+        })]
+    );
+    let note_event = evaluate_note_userdata(&engine, r#"note("C#1 .. .. 0.2")"#)?;
+    assert_eq!(
+        note_event.notes,
+        vec![Some(NoteEvent {
+            instrument: None,
+            note: Note::Cs1,
+            volume: 1.0,
+            panning: 0.0,
+            delay: 0.2
+        })]
+    );
 
     // Note string array
     assert!(evaluate_note_userdata(&engine, r#"note({"X#1"})"#).is_err());
     let note_event = evaluate_note_userdata(&engine, r#"note({"C#1"})"#)?;
-    assert_eq!(note_event.notes, vec![Some(new_note(None, "c#1", 1.0))]);
+    assert_eq!(note_event.notes, vec![new_note((None, "c#1"))]);
 
     assert!(evaluate_note_userdata(&engine, r#"note("X#1")"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("C#1 abc")"#).is_err());
     let note_event = evaluate_note_userdata(&engine, r#"note({"C#1 0.5", "C5"})"#)?;
     assert_eq!(
         note_event.notes,
-        vec![
-            Some(new_note(None, "c#1", 0.5)),
-            Some(new_note(None, "c5", 1.0))
-        ]
+        vec![new_note((None, "c#1", 0.5)), new_note((None, "c5", 1.0))]
     );
 
     // Note int
     let note_event = evaluate_note_userdata(&engine, r#"note(0x32)"#)?;
-    assert_eq!(note_event.notes, vec![Some(new_note(None, "d4", 1.0))]);
+    assert_eq!(note_event.notes, vec![new_note((None, "d4"))]);
 
     // Note int array
     let note_event = evaluate_note_userdata(&engine, r#"note({0x32, 48})"#)?;
     assert_eq!(
         note_event.notes,
-        vec![
-            Some(new_note(None, "d4", 1.0)),
-            Some(new_note(None, "c4", 1.0))
-        ]
+        vec![new_note((None, "d4")), new_note((None, "c4"))]
     );
 
     // Note table
@@ -148,9 +166,9 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     assert!(evaluate_note_userdata(&engine, r#"note({key = "C#1", volume = "abc"})"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note({key = "C#1", volume = -1})"#).is_err());
     let note_event = evaluate_note_userdata(&engine, r#"note({key = "c8"})"#)?;
-    assert_eq!(note_event.notes, vec![Some(new_note(None, "c8", 1.0))]);
+    assert_eq!(note_event.notes, vec![new_note((None, "c8"))]);
     let note_event = evaluate_note_userdata(&engine, r#"note({key = "G8", volume = 2})"#)?;
-    assert_eq!(note_event.notes, vec![Some(new_note(None, "g8", 2.0))]);
+    assert_eq!(note_event.notes, vec![new_note((None, "g8", 2.0))]);
 
     // Note table or array
     let poly_note_event = evaluate_note_userdata(
@@ -160,8 +178,8 @@ fn note() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         poly_note_event.notes,
         vec![
-            Some(new_note(None, "c#1", 0.5)),
-            Some(new_note(None, "g2", 0.75)),
+            new_note((None, "c#1", 0.5)),
+            new_note((None, "g2", 0.75)),
             None
         ]
     );
@@ -192,17 +210,17 @@ fn note_chord() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         evaluate_note_userdata(&engine, r#"note("c'maj")"#)?.notes,
         vec![
-            Some(new_note(None, "c4", 1.0)),
-            Some(new_note(None, "e4", 1.0)),
-            Some(new_note(None, "g4", 1.0)),
+            new_note((None, "c4")),
+            new_note((None, "e4")),
+            new_note((None, "g4")),
         ]
     );
     assert_eq!(
         evaluate_note_userdata(&engine, r#"note("c7'maj 0.2")"#)?.notes,
         vec![
-            Some(new_note(None, "c7", 0.2)),
-            Some(new_note(None, "e7", 0.2)),
-            Some(new_note(None, "g7", 0.2)),
+            new_note((None, "c7", 0.2)),
+            new_note((None, "e7", 0.2)),
+            new_note((None, "g7", 0.2)),
         ]
     );
     Ok(())
@@ -222,6 +240,28 @@ fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
         None,
     )?;
 
+    // transpose
+    assert_eq!(
+        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):transpose(12)"#)?.notes,
+        vec![
+            new_note((None, "c5")),
+            new_note((None, "d5")),
+            new_note((None, "e5")),
+        ]
+    );
+    assert_eq!(
+        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):transpose({2, 4})"#)?.notes,
+        vec![
+            new_note((None, "d_4")),
+            new_note((None, "f#4")),
+            new_note((None, "e_4")),
+        ]
+    );
+    assert_eq!(
+        evaluate_note_userdata(&engine, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
+        vec![new_note((None, 0x0_u8)), new_note((None, 0x7f_u8)),]
+    );
+
     // with_volume
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_volume(1.0)"#).is_ok());
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_volume()"#).is_err());
@@ -229,74 +269,132 @@ fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_volume({})"#).is_ok());
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_volume({"wurst"})"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_volume({-1})"#).is_err());
-
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4 0.5", "d4 0.5", "e4 0.5"):with_volume(2.0)"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4 0.5", "d4 0.5", "e4 0.5"):with_volume(2.0)"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "c4", 2.0)),
-            Some(new_note(None, "d4", 2.0)),
-            Some(new_note(None, "e4", 2.0)),
+            new_note((None, "c4", 2.0)),
+            new_note((None, "d4", 2.0)),
+            new_note((None, "e4", 2.0)),
         ]
     );
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4 0.5", "d4 0.5", "e4 0.5"):with_volume({2.0, 4.0})"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4 0.5", "d4 0.5", "e4 0.5"):with_volume({2.0, 4.0})"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "c4", 2.0)),
-            Some(new_note(None, "d4", 4.0)),
-            Some(new_note(None, "e4", 0.5)),
+            new_note((None, "c4", 2.0)),
+            new_note((None, "d4", 4.0)),
+            new_note((None, "e4", 0.5)),
         ]
     );
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4 0.5", "d4 0.5", "e4 0.5"):with_volume({2.0, 2.0, 2.0, 2.0})"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4 0.5", "d4 0.5", "e4 0.5"):with_volume({2.0, 2.0, 2.0, 2.0})"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "c4", 2.0)),
-            Some(new_note(None, "d4", 2.0)),
-            Some(new_note(None, "e4", 2.0)),
+            new_note((None, "c4", 2.0)),
+            new_note((None, "d4", 2.0)),
+            new_note((None, "e4", 2.0)),
         ]
     );
 
     // amplify
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4 0.5", "d4 0.5", "e4 0.5"):amplify(2.0)"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4 0.5", "d4 0.5", "e4 0.5"):amplify(2.0)"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "c4", 1.0)),
-            Some(new_note(None, "d4", 1.0)),
-            Some(new_note(None, "e4", 1.0)),
+            new_note((None, "c4", 1.0)),
+            new_note((None, "d4", 1.0)),
+            new_note((None, "e4", 1.0)),
         ]
     );
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4 0.5", "d4 0.5", "e4 0.5"):amplify({2.0, 4.0})"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4 0.5", "d4 0.5", "e4 0.5"):amplify({2.0, 4.0})"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "c4", 1.0)),
-            Some(new_note(None, "d4", 2.0)),
-            Some(new_note(None, "e4", 0.5)),
+            new_note((None, "c4", 1.0)),
+            new_note((None, "d4", 2.0)),
+            new_note((None, "e4", 0.5)),
         ]
     );
 
-    // transpose
+    // with_panning
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning(1.0)"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning()"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning(-2)"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning({})"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning({"wurst"})"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning({2})"#).is_err());
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):transpose(12)"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4", "d4", "e4"):with_panning(-1.0)"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "c5", 1.0)),
-            Some(new_note(None, "d5", 1.0)),
-            Some(new_note(None, "e5", 1.0)),
+            new_note((None, "c4", 1.0, -1.0)),
+            new_note((None, "d4", 1.0, -1.0)),
+            new_note((None, "e4", 1.0, -1.0)),
         ]
     );
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):transpose({2, 4})"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4", "d4", "e4"):with_panning({-1.0, 1.0})"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, "d4", 1.0)),
-            Some(new_note(None, "f#4", 1.0)),
-            Some(new_note(None, "e4", 1.0)),
+            new_note((None, "c4", 1.0, -1.0)),
+            new_note((None, "d4", 1.0, 1.0)),
+            new_note((None, "e4", 1.0, 0.0)),
         ]
-    );    
+    );
+
+    // with_delay
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay(1.0)"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay()"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay(-1)"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay({})"#).is_ok());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay({"wurst"})"#).is_err());
+    assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay({2})"#).is_err());
     assert_eq!(
-        evaluate_note_userdata(&engine, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4", "d4", "e4"):with_delay(0.75)"#
+        )?
+        .notes,
         vec![
-            Some(new_note(None, 0x0_u8, 1.0)),
-            Some(new_note(None, 0x7f_u8, 1.0)),
+            new_note((None, "c4", 1.0, 0.0, 0.75)),
+            new_note((None, "d4", 1.0, 0.0, 0.75)),
+            new_note((None, "e4", 1.0, 0.0, 0.75)),
         ]
-    );    
+    );
+    assert_eq!(
+        evaluate_note_userdata(
+            &engine,
+            r#"note("c4", "d4", "e4"):with_delay({0.25, 0.5})"#
+        )?
+        .notes,
+        vec![
+            new_note((None, "c4", 1.0, 0.0, 0.25)),
+            new_note((None, "d4", 1.0, 0.0, 0.5)),
+            new_note((None, "e4", 1.0, 0.0)),
+        ]
+    );
 
     Ok(())
 }
@@ -322,12 +420,11 @@ fn sequence() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         note_sequence_event.notes,
         vec![
-            vec![Some(new_note(instrument, "c#1", 0.5))],
+            vec![new_note((instrument, "c#1", 0.5))],
             vec![None],
-            vec![Some(new_note(instrument, "g2", 1.0))]
+            vec![new_note((instrument, "g2", 1.0))]
         ]
     );
-
     let poly_note_sequence_event = evaluate_sequence_userdata(
         &engine,
         r#"sequence(
@@ -339,17 +436,28 @@ fn sequence() -> Result<(), Box<dyn std::error::Error>> {
         poly_note_sequence_event.notes,
         vec![
             vec![
-                Some(new_note(instrument, "c#1", 1.0)),
+                new_note((instrument, "c#1", 1.0)),
                 None,
-                Some(new_note(instrument, "g2", 0.75)),
+                new_note((instrument, "g2", 0.75)),
             ],
             vec![
-                Some(new_note(instrument, "a#5", 0.2)),
+                new_note((instrument, "a#5", 0.2)),
                 None,
-                Some(new_note(instrument, "b1", 0.1))
+                new_note((instrument, "b1", 0.1))
             ]
         ]
     );
+
+    // with_xxx
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):transpose(1)"#).is_ok());
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_volume(2.0)"#).is_ok());
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_panning(0.0)"#).is_ok());
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_delay(0.0)"#).is_ok());
+
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):transpose({1, 2})"#).is_ok());
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_volume({2.0, 1.0})"#).is_ok());
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_panning({0.0, 1.0})"#).is_ok());
+    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_delay({0.0, 0.25})"#).is_ok());
 
     Ok(())
 }
@@ -401,7 +509,9 @@ fn beat_time() {
             Some(Event::NoteEvents(vec![Some(NoteEvent {
                 instrument: None,
                 note: Note::C6,
-                volume: 1.0
+                volume: 1.0,
+                panning: 0.0,
+                delay: 0.0
             })]))
         ))
     );

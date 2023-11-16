@@ -24,13 +24,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // preload samples
     fn sample_path(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(path::PathBuf::from(format!("./assets/examples/demo/{file_name}"))
-            .to_str()
-            .ok_or(anyhow!(
-                "Failed to create asset path for file '{}'",
-                file_name
-            ))?
-            .to_string())
+        Ok(
+            path::PathBuf::from(format!("./assets/examples/demo/{file_name}"))
+                .to_str()
+                .ok_or(anyhow!(
+                    "Failed to create asset path for file '{}'",
+                    file_name
+                ))?
+                .to_string(),
+        )
     }
     let sample_pool = SamplePool::new();
     let KICK = sample_pool.load_sample(&sample_path("kick.wav")?)?;
@@ -64,17 +66,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
             1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
         ])
-        .trigger(new_note_event(KICK, "C_5", 1.0));
+        .trigger(new_note_event((KICK, "C_5")));
 
     let snare_pattern = beat_time
         .every_nth_beat(2.0)
         .with_offset(BeatTimeStep::Beats(1.0))
-        .trigger(new_note_event(SNARE, "C_5", 1.0));
+        .trigger(new_note_event((SNARE, "C_5")));
 
     let hihat_pattern =
         beat_time
             .every_nth_sixteenth(2.0)
-            .trigger(new_note_event(HIHAT, "C_5", 1.0).mutate({
+            .trigger(new_note_event((HIHAT, "C_5")).mutate({
                 let mut step = 0;
                 move |mut event| {
                     if let Event::NoteEvents(notes) = &mut event {
@@ -94,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hihat_pattern2 = beat_time
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
-        .trigger(new_note_event(HIHAT, "C_5", 1.0).mutate({
+        .trigger(new_note_event((HIHAT, "C_5")).mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |mut event| {
@@ -130,47 +132,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .every_nth_eighth(1.0)
         .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1])
         .trigger(new_note_event_sequence(vec![
-            (BASS, Note::from(&bass_notes[0]), 0.5),
-            (BASS, Note::from(&bass_notes[2]), 0.5),
-            (BASS, Note::from(&bass_notes[3]), 0.5),
-            (BASS, Note::from(&bass_notes[0]), 0.5),
-            (BASS, Note::from(&bass_notes[2]), 0.5),
-            (BASS, Note::from(&bass_notes[3]), 0.5),
-            (BASS, Note::from(&bass_notes[6]) - 12, 0.5),
+            new_note((BASS, Note::from(&bass_notes[0]), 0.5)),
+            new_note((BASS, Note::from(&bass_notes[2]), 0.5)),
+            new_note((BASS, Note::from(&bass_notes[3]), 0.5)),
+            new_note((BASS, Note::from(&bass_notes[0]), 0.5)),
+            new_note((BASS, Note::from(&bass_notes[2]), 0.5)),
+            new_note((BASS, Note::from(&bass_notes[3]), 0.5)),
+            new_note((BASS, Note::from(&bass_notes[6]) - 12, 0.5)),
         ]));
 
-    let synth_pattern = beat_time
-        .every_nth_bar(4.0)
-        .trigger(new_polyphonic_note_sequence_event(vec![
-            vec![
-                (SYNTH, "C 4", 0.3),
-                (SYNTH, "D#4", 0.3),
-                (SYNTH, "G 4", 0.3),
-            ],
-            vec![
-                (SYNTH, "C 4", 0.3),
-                (SYNTH, "D#4", 0.3),
-                (SYNTH, "F 4", 0.3),
-            ],
-            vec![
-                (SYNTH, "C 4", 0.3),
-                (SYNTH, "D#4", 0.3),
-                (SYNTH, "G 4", 0.3),
-            ],
-            vec![
-                (SYNTH, "C 4", 0.3),
-                (SYNTH, "D#4", 0.3),
-                (SYNTH, "A#4", 0.3),
-            ],
-        ]));
+    let synth_pattern =
+        beat_time
+            .every_nth_bar(4.0)
+            .trigger(new_polyphonic_note_sequence_event(vec![
+                vec![
+                    new_note((SYNTH, "C 4", 0.3)),
+                    new_note((SYNTH, "D#4", 0.3)),
+                    new_note((SYNTH, "G 4", 0.3)),
+                ],
+                vec![
+                    new_note((SYNTH, "C 4", 0.3)),
+                    new_note((SYNTH, "D#4", 0.3)),
+                    new_note((SYNTH, "F 4", 0.3)),
+                ],
+                vec![
+                    new_note((SYNTH, "C 4", 0.3)),
+                    new_note((SYNTH, "D#4", 0.3)),
+                    new_note((SYNTH, "G 4", 0.3)),
+                ],
+                vec![
+                    new_note((SYNTH, "C 4", 0.3)),
+                    new_note((SYNTH, "D#4", 0.3)),
+                    new_note((SYNTH, "A#4", 0.3)),
+                ],
+            ]));
 
     let fx_pattern =
         second_time
             .every_nth_seconds(8.0)
             .trigger(new_polyphonic_note_sequence_event(vec![
-                vec![Some((FX, "C 4", 0.2)), None, None],
-                vec![None, Some((FX, "C 4", 0.2)), None],
-                vec![None, None, Some((FX, "F 4", 0.2))],
+                vec![new_note((FX, "C 4", 0.2)), None, None],
+                vec![None, new_note((FX, "C 4", 0.2)), None],
+                vec![None, None, new_note((FX, "F 4", 0.2))],
             ]));
 
     // arrange rhytms into phrases and sequence up these phrases to create a litte arrangement

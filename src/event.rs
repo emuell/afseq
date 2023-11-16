@@ -42,24 +42,103 @@ pub fn unique_instrument_id() -> InstrumentId {
 pub struct NoteEvent {
     pub instrument: Option<InstrumentId>,
     pub note: Note,
-    pub volume: f32,
+    pub volume: f32,  // [0 - INF]
+    pub panning: f32, // [-1 - 1]
+    pub delay: f32,   // [0 - 1]
 }
 
 impl NoteEvent {
     pub fn to_string(&self, show_instruments: bool) -> String {
         if show_instruments {
             format!(
-                "{} {} {:.2}",
+                "{} {} {:.2} {:.2} {:.2}",
                 if let Some(instrument) = self.instrument {
                     format!("{:02}", instrument)
                 } else {
                     "NA".to_string()
                 },
                 self.note,
-                self.volume
+                self.volume,
+                self.panning,
+                self.delay
             )
         } else {
-            format!("{} {:.3}", self.note, self.volume)
+            format!(
+                "{} {:.2} {:.2} {:.2}",
+                self.note, self.volume, self.panning, self.delay
+            )
+        }
+    }
+}
+
+impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N)> for NoteEvent
+where
+    <N as TryInto<Note>>::Error: std::fmt::Debug,
+{
+    // Initialize from a (Instrument, Note) tuple
+    fn from((instrument, note): (I, N)) -> Self {
+        let note = note.try_into().expect("Failed to convert note");
+        let instrument = instrument.into();
+        Self {
+            note,
+            instrument,
+            volume: 1.0,
+            panning: 0.0,
+            delay: 0.0,
+        }
+    }
+}
+
+impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N, f32)> for NoteEvent
+where
+    <N as TryInto<Note>>::Error: std::fmt::Debug,
+{
+    // Initialize from a (Instrument, Note, Volume) tuple
+    fn from((instrument, note, volume): (I, N, f32)) -> Self {
+        let note = note.try_into().expect("Failed to convert note");
+        let instrument = instrument.into();
+        Self {
+            note,
+            instrument,
+            volume,
+            panning: 0.0,
+            delay: 0.0,
+        }
+    }
+}
+
+impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N, f32, f32)> for NoteEvent
+where
+    <N as TryInto<Note>>::Error: std::fmt::Debug,
+{
+    // Initialize from a (Instrument, Note, Volume, Panning) tuple
+    fn from((instrument, note, volume, panning): (I, N, f32, f32)) -> Self {
+        let note = note.try_into().expect("Failed to convert note");
+        let instrument = instrument.into();
+        Self {
+            note,
+            instrument,
+            volume,
+            panning,
+            delay: 0.0,
+        }
+    }
+}
+
+impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N, f32, f32, f32)> for NoteEvent
+where
+    <N as TryInto<Note>>::Error: std::fmt::Debug,
+{
+    // Initialize from a (Instrument, Note, Volume, Panning, Delay) tuple
+    fn from((instrument, note, volume, panning, delay): (I, N, f32, f32, f32)) -> Self {
+        let note = note.try_into().expect("Failed to convert note");
+        let instrument = instrument.into();
+        Self {
+            note,
+            instrument,
+            volume,
+            panning,
+            delay,
         }
     }
 }
@@ -71,51 +150,25 @@ impl Display for NoteEvent {
     }
 }
 
-/// Shortcut for creating an empty [`NoteEvent`] [`EventIter`].
+/// Shortcut for creating an empty [`NoteEvent`]
 pub fn new_empty_note() -> Option<NoteEvent> {
     None
 }
 
 /// Shortcut for creating a new [`NoteEvent`].
-pub fn new_note<I: Into<Option<InstrumentId>>, N: TryInto<Note>>(
-    instrument: I,
-    note: N,
-    volume: f32,
-) -> NoteEvent
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
-{
-    let instrument: Option<InstrumentId> = instrument.into();
-    let note: Note = note.try_into().expect("Invalid note value");
-    NoteEvent {
-        instrument,
-        note,
-        volume,
-    }
+pub fn new_note<E: Into<NoteEvent>>(note_event: E) -> Option<NoteEvent> {
+    Some(note_event.into())
 }
 
 /// Shortcut for creating a vector of [`NoteEvent`]:
 /// e.g. a sequence of single notes
-pub fn new_note_vector<
-    I: Into<Option<InstrumentId>>,
-    N: TryInto<Note>,
-    T: Into<Option<(I, N, f32)>>,
->(
-    sequence: Vec<T>,
-) -> Vec<Option<NoteEvent>>
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
-{
+pub fn new_note_vector<E: Into<NoteEvent>>(
+    sequence: Vec<Option<E>>,
+) -> Vec<Option<NoteEvent>> {
     let mut event_sequence = Vec::with_capacity(sequence.len());
     for event in sequence {
-        if let Some((instrument, note, volume)) = event.into() {
-            let instrument = instrument.into();
-            let note = note.try_into().expect("Invalid note value");
-            event_sequence.push(Some(NoteEvent {
-                instrument,
-                note,
-                volume,
-            }));
+        if let Some(event) = event {
+            event_sequence.push(Some(event.into()));
         } else {
             event_sequence.push(None);
         }
@@ -125,28 +178,15 @@ where
 
 /// Shortcut for creating a new sequence of polyphonic [`NoteEvent`]:
 /// e.g. a sequence of chords
-pub fn new_polyphonic_note_sequence<
-    I: Into<Option<InstrumentId>>,
-    N: TryInto<Note>,
-    T: Into<Option<(I, N, f32)>>,
->(
-    polyphonic_sequence: Vec<Vec<T>>,
-) -> Vec<Vec<Option<NoteEvent>>>
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
-{
+pub fn new_polyphonic_note_sequence<E: Into<NoteEvent>>(
+    polyphonic_sequence: Vec<Vec<Option<E>>>,
+) -> Vec<Vec<Option<NoteEvent>>> {
     let mut polyphonic_event_sequence = Vec::with_capacity(polyphonic_sequence.len());
     for sequence in polyphonic_sequence {
         let mut event_sequence = Vec::with_capacity(sequence.len());
         for event in sequence {
-            if let Some((instrument, note, volume)) = event.into() {
-                let instrument = instrument.into();
-                let note = note.try_into().expect("Invalid note value");
-                event_sequence.push(Some(NoteEvent {
-                    instrument,
-                    note,
-                    volume,
-                }));
+            if let Some(event) = event {
+                event_sequence.push(Some(event.into()));
             } else {
                 event_sequence.push(None)
             }
@@ -162,54 +202,33 @@ pub fn new_empty_note_event() -> FixedEventIter {
 }
 
 /// Shortcut for creating a new [`NoteEvent`] [`EventIter`].
-pub fn new_note_event<I: Into<Option<InstrumentId>>, N: TryInto<Note>>(
-    instrument: I,
-    note: N,
-    velocity: f32,
+pub fn new_note_event<E: Into<NoteEvent>>(
+    event: E,
 ) -> FixedEventIter
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
 {
-    new_note(instrument, note, velocity).to_event()
+    new_note(event).to_event()
 }
 
 /// Shortcut for creating a new sequence of [`NoteEvent`] [`EventIter`].
-pub fn new_note_event_sequence<
-    I: Into<Option<InstrumentId>>,
-    N: TryInto<Note>,
-    T: Into<Option<(I, N, f32)>>,
->(
-    sequence: Vec<T>,
-) -> FixedEventIter
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
-{
+pub fn new_note_event_sequence<E: Into<NoteEvent>>(
+    sequence: Vec<Option<E>>,
+) -> FixedEventIter {
     new_note_vector(sequence).to_event_sequence()
 }
 
 /// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
 /// e.g. a chord.
-pub fn new_polyphonic_note_event<I: Into<Option<InstrumentId>>, N: TryInto<Note>>(
-    polyphonic_events: Vec<Option<(I, N, f32)>>,
-) -> FixedEventIter
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
-{
+pub fn new_polyphonic_note_event<E: Into<NoteEvent>>(
+    polyphonic_events: Vec<Option<E>>,
+) -> FixedEventIter {
     new_note_vector(polyphonic_events).to_event()
 }
 
 /// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
 /// e.g. a sequence of chords.
-pub fn new_polyphonic_note_sequence_event<
-    I: Into<Option<InstrumentId>>,
-    N: TryInto<Note>,
-    T: Into<Option<(I, N, f32)>>,
->(
-    polyphonic_sequence: Vec<Vec<T>>,
-) -> FixedEventIter
-where
-    <N as TryInto<Note>>::Error: std::fmt::Debug,
-{
+pub fn new_polyphonic_note_sequence_event<E: Into<NoteEvent>>(
+    polyphonic_sequence: Vec<Vec<Option<E>>>,
+) -> FixedEventIter {
     new_polyphonic_note_sequence(polyphonic_sequence).to_event_sequence()
 }
 
