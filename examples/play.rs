@@ -1,6 +1,6 @@
 use std::{
     path,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, atomic::{AtomicBool, Ordering}},
 };
 
 use anyhow::anyhow;
@@ -9,8 +9,19 @@ use simplelog::*;
 
 use afseq::prelude::*;
 
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(feature = "dhat-profiler")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+// -------------------------------------------------------------------------------------------------
+
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "dhat-profiler")]
+    let profiler = dhat::Profiler::builder().trim_backtraces(Some(100)).build();
+
     // init logging
     TermLogger::init(
         log::STATIC_MAX_LEVEL,
@@ -141,31 +152,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             new_note((BASS, Note::from(&bass_notes[6]) - 12, 0.5)),
         ]));
 
-    let synth_pattern =
-        beat_time
-            .every_nth_bar(4.0)
-            .trigger(new_polyphonic_note_sequence_event(vec![
-                vec![
-                    new_note((SYNTH, "C 4", 0.3)),
-                    new_note((SYNTH, "D#4", 0.3)),
-                    new_note((SYNTH, "G 4", 0.3)),
-                ],
-                vec![
-                    new_note((SYNTH, "C 4", 0.3)),
-                    new_note((SYNTH, "D#4", 0.3)),
-                    new_note((SYNTH, "F 4", 0.3)),
-                ],
-                vec![
-                    new_note((SYNTH, "C 4", 0.3)),
-                    new_note((SYNTH, "D#4", 0.3)),
-                    new_note((SYNTH, "G 4", 0.3)),
-                ],
-                vec![
-                    new_note((SYNTH, "C 4", 0.3)),
-                    new_note((SYNTH, "D#4", 0.3)),
-                    new_note((SYNTH, "A#4", 0.3)),
-                ],
-            ]));
+    let synth_pattern = beat_time
+        .every_nth_bar(4.0)
+        .trigger(new_polyphonic_note_sequence_event(vec![
+            vec![
+                new_note((SYNTH, "C 4", 0.3)),
+                new_note((SYNTH, "D#4", 0.3)),
+                new_note((SYNTH, "G 4", 0.3)),
+            ],
+            vec![
+                new_note((SYNTH, "C 4", 0.3)),
+                new_note((SYNTH, "D#4", 0.3)),
+                new_note((SYNTH, "F 4", 0.3)),
+            ],
+            vec![
+                new_note((SYNTH, "C 4", 0.3)),
+                new_note((SYNTH, "D#4", 0.3)),
+                new_note((SYNTH, "G 4", 0.3)),
+            ],
+            vec![
+                new_note((SYNTH, "C 4", 0.3)),
+                new_note((SYNTH, "D#4", 0.3)),
+                new_note((SYNTH, "A#4", 0.3)),
+            ],
+        ]));
 
     let fx_pattern =
         second_time
@@ -231,9 +241,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     );
 
+    // stop on Control-C
+    let stop_running = Arc::new(AtomicBool::new(false));
+    ctrlc::set_handler({
+        let stop_running = stop_running.clone();
+        move || {
+            stop_running.store(true, Ordering::Relaxed);
+        }
+    })?;
+    
     // play the sequence and dump events to stdout
-    const RESET_PLAYBACK_POS: bool = true;
-    player.run(&mut sequence, &beat_time, RESET_PLAYBACK_POS);
+    let reset_playback_pos = false;
+    player.run_until(&mut sequence, &beat_time, reset_playback_pos, || {
+        stop_running.load(Ordering::Relaxed)
+    });
+
+    #[cfg(feature = "dhat-profiler")]
+    drop(profiler);
 
     Ok(())
 }

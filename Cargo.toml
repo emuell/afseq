@@ -20,21 +20,25 @@ serde = { version = "^1.0" }
 serde_json = { version = "^1.0" }
 uuid = {version = "^1.3", features = [ "v4", "fast-rng" ]}
 rust-music-theory = { version = "^0.2" }
+# optional -> dhat-profiler
+dhat = { version = "0.3.2", optional = true }
 # optional -> scripting
-mlua = { version = "^0.9", features = ["luajit52", "vendored", "macros", "unstable"], optional = true }
+mlua = { version = "^0.9", features = ["lua52", "vendored", "macros", "unstable"], optional = true }
 # optional -> player
 afplay = { path = "../afplay", default-features = false, features = ["cpal-output"], optional = true }
 
 [dev-dependencies]
 notify = { version = "^6.1" }
+ctrlc = { version = "3.4.0"}
 
 [profile.release]
 debug = 1
 
 [features]
+dhat-profiler = ["dhat"]
 scripting = ["mlua"]
 player = ["afplay"]
-default = ["scripting", "player"]
+default = ["scripting"]
 
 [[example]]
 name = "play"

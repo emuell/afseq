@@ -15,6 +15,12 @@ use afseq::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
 
+#[cfg(feature = "dhat-profiler")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+// -------------------------------------------------------------------------------------------------
+
 // TODO: make this configurable with an cmd line arg
 const DEMO_PATH: &str = "./assets/examples/demo";
 
@@ -22,6 +28,9 @@ const DEMO_PATH: &str = "./assets/examples/demo";
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "dhat-profiler")]
+    let profiler = dhat::Profiler::builder().trim_backtraces(Some(100)).build();
+
     // init logging
     TermLogger::init(
         log::STATIC_MAX_LEVEL,
@@ -98,8 +107,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
     watcher.watch(Path::new(DEMO_PATH), RecursiveMode::Recursive)?;
 
+    // stop on Control-C
+    let stop_running = Arc::new(AtomicBool::new(false));
+    ctrlc::set_handler({
+        let stop_running = stop_running.clone();
+        move || {
+            stop_running.store(true, Ordering::Relaxed);
+        }
+    })?;
+
     // (re)run all scripts
-    loop {
+    while !stop_running.load(Ordering::Relaxed) {
         if script_files_changed.load(Ordering::Relaxed) {
             script_files_changed.store(false, Ordering::Relaxed);
             log::info!("Rebuilding all rhythms...");
@@ -123,7 +141,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let reset_playback_pos = false;
         player.run_until(&mut sequence, &beat_time, reset_playback_pos, || {
-            script_files_changed.load(Ordering::Relaxed)
+            script_files_changed.load(Ordering::Relaxed) || stop_running.load(Ordering::Relaxed)
         });
     }
+
+    #[cfg(feature = "dhat-profiler")]
+    drop(profiler);
+
+    Ok(())
 }
