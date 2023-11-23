@@ -132,13 +132,27 @@ impl SequenceUserData {
                     "Failed to access table content".to_string(),
                 ))?
                 .clone();
+            if let Some(userdata) = arg.as_userdata() {
+                if userdata.is::<SequenceUserData>() {
+                    return Err(mlua::Error::FromLuaConversionError {
+                        from: "Sequence",
+                        to: "Note",
+                        message: Some("Can not nest sequences into sequences".to_string()),
+                    });
+                } else if let Ok(chord) = userdata.take::<NoteUserData>() {
+                    // do not flatten the note chords into a sequence
+                    return Ok(SequenceUserData {
+                        notes: vec![chord.notes],
+                    });
+                }
+            }
             Ok(SequenceUserData {
                 notes: note_events_from_value(arg, None, default_instrument)?
                     .into_iter()
                     .map(|v| vec![v])
                     .collect::<Vec<Vec<_>>>(),
             })
-        // multiple values, maybe of different type
+        // multiple values, maybe ofdifferent type
         } else {
             let mut notes = vec![];
             for (index, arg) in args.into_iter().enumerate() {
