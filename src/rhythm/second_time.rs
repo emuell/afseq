@@ -144,6 +144,13 @@ impl Rhythm for SecondTimeRhythm {
         Box::new(self.time_base)
     }
 
+    fn samples_per_step(&self) -> f64 {
+        self.step * self.time_base.samples_per_second() as f64
+    }
+    fn pattern_length(&self) -> usize {
+        self.pattern.len()    
+    }
+
     fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }

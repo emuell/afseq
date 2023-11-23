@@ -130,6 +130,13 @@ impl Rhythm for Sequence {
         Box::new(self.time_base)
     }
 
+    fn samples_per_step(&self) -> f64 {
+        self.current_phrase().samples_per_step()
+    }
+    fn pattern_length(&self) -> usize {
+        self.current_phrase().pattern_length()
+    }
+
     fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }
@@ -152,6 +159,6 @@ impl Rhythm for Sequence {
 
 /// Allow sending sequences accross threads: We only do so, to allow building sequences outside
 /// the thread they are played in, and never reuse phrases from other already running sequences.
-/// 
+///
 /// So this is **safe as long as new sequences only reference phrases within itself**.
 unsafe impl Send for Sequence {}

@@ -20,9 +20,15 @@ pub mod second_time;
 /// change events, so all emitted events are fetched from some iterator as well and thus may
 /// dynamically change over time as well.
 pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
-    /// create a time display printer, which serializes the given sample time to the Rhythm's
-    /// time base (seconds or beats)
+    /// Create a time display printer, which serializes the given sample time to the Rhythm's
+    /// time base (seconds or beats).
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;
+
+    /// Length in samples of a single step in the rhythm's pattern.
+    fn samples_per_step(&self) -> f64;
+    /// Get length of the rhythm's internal pattern (cycle length in steps).
+    /// A rhythm pattern repeats after self.samples_per_step() * self.pattern_length() samples.
+    fn pattern_length(&self) -> usize;
 
     /// Custom sample offset value which is applied to emitted events.
     fn sample_offset(&self) -> SampleTime;

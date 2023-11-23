@@ -244,6 +244,14 @@ impl Rhythm for Phrase {
         Box::new(self.time_base)
     }
 
+    fn samples_per_step(&self) -> f64 {
+        self.length.samples_per_step(&self.time_base)    
+    }
+    fn pattern_length(&self) -> usize {
+        // use our length's step, likely won't be used anyway for phrases
+        self.length.steps() as usize
+    }
+
     fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }

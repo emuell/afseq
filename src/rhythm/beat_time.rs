@@ -149,6 +149,13 @@ impl Rhythm for BeatTimeRhythm {
         Box::new(self.time_base)
     }
 
+    fn samples_per_step(&self) -> f64 {
+        self.step.samples_per_step(&self.time_base)
+    }
+    fn pattern_length(&self) -> usize {
+        self.pattern.len()    
+    }
+
     fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }
