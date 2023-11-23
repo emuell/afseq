@@ -23,6 +23,34 @@ pub fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'stat
 
 // ---------------------------------------------------------------------------------------------
 
+// Check if a lua value is a sequence alike table and return it.
+pub fn sequence_from_value<'lua>(value: &'lua LuaValue<'lua>) -> Option<Vec<LuaValue<'lua>>> {
+    if let Some(table) = value.as_table() {
+        sequence_from_table(table)
+    } else {
+        None
+    }
+}
+
+// Check if a lua table is a sequence and return it.
+pub fn sequence_from_table<'lua>(table: &'lua LuaTable<'lua>) -> Option<Vec<LuaValue<'lua>>> {
+    let sequence = table
+        .clone()
+        .sequence_values::<LuaValue>()
+        .collect::<Vec<_>>();
+    if !sequence.is_empty() {
+        return Some(
+            sequence
+                .into_iter()
+                .map(|value: mlua::Result<LuaValue<'lua>>| value.unwrap())
+                .collect(),
+        );
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------------------------
+
 // Note Userdata in bindings
 #[derive(Clone, Debug)]
 pub struct NoteUserData {
@@ -34,23 +62,40 @@ impl NoteUserData {
         args: LuaMultiValue,
         default_instrument: Option<InstrumentId>,
     ) -> mlua::Result<Self> {
-        // single value, probably a table?
+        // a single value, probably a sequence
+        let args = args.into_vec();
         if args.len() == 1 {
             let arg = args
-                .iter()
-                .next()
+                .first()
                 .ok_or(mlua::Error::RuntimeError(
                     "Failed to access table content".to_string(),
-                ))?
-                .clone();
-            Ok(NoteUserData {
-                notes: note_events_from_value(arg, None, default_instrument)?,
-            })
+                ))
+                .cloned()?;
+            if let Some(sequence) = sequence_from_value(&arg.clone()) {
+                let mut notes = vec![];
+                for (index, arg) in sequence.into_iter().enumerate() {
+                    // flatten sequence events into a single array
+                    notes.append(&mut note_events_from_value(
+                        arg,
+                        Some(index),
+                        default_instrument,
+                    )?);
+                }
+                Ok(NoteUserData { notes })
+            } else {
+                Ok(NoteUserData {
+                    notes: note_events_from_value(arg, None, default_instrument)?,
+                })
+            }
         // multiple values, maybe of different type
         } else {
             let mut notes = vec![];
             for (index, arg) in args.into_iter().enumerate() {
-                notes.push(note_event_from_value(arg, Some(index), default_instrument)?);
+                notes.append(&mut note_events_from_value(
+                    arg,
+                    Some(index),
+                    default_instrument,
+                )?);
             }
             Ok(NoteUserData { notes })
         }
@@ -123,36 +168,32 @@ impl SequenceUserData {
         args: LuaMultiValue,
         default_instrument: Option<InstrumentId>,
     ) -> mlua::Result<Self> {
-        // single value, probably a table?
+        // a single value, probably a sequence array
+        let args = args.into_vec();
         if args.len() == 1 {
             let arg = args
-                .iter()
-                .next()
+                .first()
                 .ok_or(mlua::Error::RuntimeError(
                     "Failed to access table content".to_string(),
-                ))?
-                .clone();
-            if let Some(userdata) = arg.as_userdata() {
-                if userdata.is::<SequenceUserData>() {
-                    return Err(mlua::Error::FromLuaConversionError {
-                        from: "Sequence",
-                        to: "Note",
-                        message: Some("Can not nest sequences into sequences".to_string()),
-                    });
-                } else if let Ok(chord) = userdata.take::<NoteUserData>() {
-                    // do not flatten the note chords into a sequence
-                    return Ok(SequenceUserData {
-                        notes: vec![chord.notes],
-                    });
+                ))
+                .cloned()?;
+            if let Some(sequence) = sequence_from_value(&arg.clone()) {
+                let mut notes = vec![];
+                for (index, arg) in sequence.into_iter().enumerate() {
+                    // add each sequence item as separate sequence event
+                    notes.push(note_events_from_value(
+                        arg,
+                        Some(index),
+                        default_instrument,
+                    )?);
                 }
+                Ok(SequenceUserData { notes })
+            } else {
+                Ok(SequenceUserData {
+                    notes: vec![note_events_from_value(arg, None, default_instrument)?],
+                })
             }
-            Ok(SequenceUserData {
-                notes: note_events_from_value(arg, None, default_instrument)?
-                    .into_iter()
-                    .map(|v| vec![v])
-                    .collect::<Vec<Vec<_>>>(),
-            })
-        // multiple values, maybe ofdifferent type
+        // multiple values, maybe of different type
         } else {
             let mut notes = vec![];
             for (index, arg) in args.into_iter().enumerate() {
@@ -466,7 +507,7 @@ pub fn chord_events_from_string(
         .collect::<Vec<_>>())
 }
 
-pub fn note_event_from_table(
+pub fn note_event_from_table_map(
     table: LuaTable,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Option<NoteEvent>> {
@@ -524,15 +565,18 @@ pub fn note_event_from_value(
         LuaValue::Nil => Ok(None),
         LuaValue::Integer(note_value) => note_event_from_number(note_value, default_instrument),
         LuaValue::String(str) => note_event_from_string(&str.to_string_lossy(), default_instrument),
-        LuaValue::Table(table) => note_event_from_table(table, default_instrument),
+        LuaValue::Table(table) => note_event_from_table_map(table, default_instrument),
         _ => {
             return Err(mlua::Error::FromLuaConversionError {
                 from: arg.type_name(),
                 to: "Note",
                 message: if let Some(index) = arg_index {
                     Some(
-                        format!("Note arg #{} does not contain a valid note property", index)
-                            .to_string(),
+                        format!(
+                            "Note arg #{} does not contain a valid note property",
+                            index + 1
+                        )
+                        .to_string(),
                     )
                 } else {
                     Some("Argument does not contain a valid note property".to_string())
@@ -565,7 +609,7 @@ pub fn note_events_from_value(
                         Some(
                             format!(
                                 "Sequence arg #{} does not contain a valid note property",
-                                index
+                                index + 1
                             )
                             .to_string(),
                         )
@@ -577,18 +621,18 @@ pub fn note_events_from_value(
         }
         LuaValue::Table(table) => {
             // array like { "C4", "C5" }
-            if table.clone().sequence_values::<LuaValue>().count() > 0 {
+            if let Some(sequence) = sequence_from_table(&table.clone()) {
                 let mut note_events = vec![];
-                for (arg_index, arg) in table.sequence_values::<LuaValue>().enumerate() {
-                    let value = arg?;
-                    note_events.push(note_event_from_value(
-                        value,
+                for (arg_index, arg) in sequence.into_iter().enumerate() {
+                    // flatten sequence events into a single array
+                    note_events.append(&mut note_events_from_value(
+                        arg,
                         Some(arg_index),
                         default_instrument,
                     )?);
                 }
                 Ok(note_events)
-            // { key = xxx } struct
+            // { key = xxx } map
             } else {
                 Ok(vec![note_event_from_value(
                     mlua::Value::Table(table),

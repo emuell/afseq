@@ -340,11 +340,7 @@ fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning({"wurst"})"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_panning({2})"#).is_err());
     assert_eq!(
-        evaluate_note_userdata(
-            &engine,
-            r#"note("c4", "d4", "e4"):with_panning(-1.0)"#
-        )?
-        .notes,
+        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):with_panning(-1.0)"#)?.notes,
         vec![
             new_note((None, "c4", 1.0, -1.0)),
             new_note((None, "d4", 1.0, -1.0)),
@@ -372,11 +368,7 @@ fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay({"wurst"})"#).is_err());
     assert!(evaluate_note_userdata(&engine, r#"note("c4"):with_delay({2})"#).is_err());
     assert_eq!(
-        evaluate_note_userdata(
-            &engine,
-            r#"note("c4", "d4", "e4"):with_delay(0.75)"#
-        )?
-        .notes,
+        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):with_delay(0.75)"#)?.notes,
         vec![
             new_note((None, "c4", 1.0, 0.0, 0.75)),
             new_note((None, "d4", 1.0, 0.0, 0.75)),
@@ -384,11 +376,7 @@ fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
         ]
     );
     assert_eq!(
-        evaluate_note_userdata(
-            &engine,
-            r#"note("c4", "d4", "e4"):with_delay({0.25, 0.5})"#
-        )?
-        .notes,
+        evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):with_delay({0.25, 0.5})"#)?.notes,
         vec![
             new_note((None, "c4", 1.0, 0.0, 0.25)),
             new_note((None, "d4", 1.0, 0.0, 0.5)),
@@ -416,7 +404,7 @@ fn sequence() -> Result<(), Box<dyn std::error::Error>> {
 
     // Note Sequence
     let note_sequence_event =
-        evaluate_sequence_userdata(&engine, r#"sequence({"C#1 0.5"}, {"---"}, {"G_2"})"#)?;
+        evaluate_sequence_userdata(&engine, r#"sequence({"C#1 0.5"}, "---", "G_2")"#)?;
     assert_eq!(
         note_sequence_event.notes,
         vec![
@@ -448,16 +436,80 @@ fn sequence() -> Result<(), Box<dyn std::error::Error>> {
         ]
     );
 
-    // with_xxx
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):transpose(1)"#).is_ok());
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_volume(2.0)"#).is_ok());
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_panning(0.0)"#).is_ok());
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_delay(0.0)"#).is_ok());
+    let chord_sequence_event = evaluate_sequence_userdata(
+        &engine, //
+        r#"sequence("c'maj")"#,
+    )?;
+    assert_eq!(
+        chord_sequence_event.notes,
+        vec![vec![
+            new_note((instrument, "c4")),
+            new_note((instrument, "e4")),
+            new_note((instrument, "g4")),
+        ],]
+    );
 
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):transpose({1, 2})"#).is_ok());
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_volume({2.0, 1.0})"#).is_ok());
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_panning({0.0, 1.0})"#).is_ok());
-    assert!(evaluate_sequence_userdata(&engine, r#"sequence({"C"}, {"d"}, {"f"}):with_delay({0.0, 0.25})"#).is_ok());
+    let poly_chord_sequence_event = evaluate_sequence_userdata(
+        &engine,
+        r#"sequence( "c'maj", {"as5 0.2", "---", {key = "B_1", volume = 0.1}})"#,
+    )?;
+    assert_eq!(
+        poly_chord_sequence_event.notes,
+        vec![
+            vec![
+                new_note((instrument, "c4")),
+                new_note((instrument, "e4")),
+                new_note((instrument, "g4")),
+            ],
+            vec![
+                new_note((instrument, "a#5", 0.2)),
+                None,
+                new_note((instrument, "b1", 0.1))
+            ]
+        ]
+    );
+
+    // with_xxx
+    assert!(evaluate_sequence_userdata(
+        &engine, //
+        r#"sequence("c", "d", "f"):transpose(1)"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine, //
+        r#"sequence("c'maj"):with_volume(2.0)"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine, //
+        r#"sequence(12, 24, 48):with_panning(0.0)"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine,
+        r#"sequence({key = "c"}, "d", "f"):with_delay(0.0)"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine, //
+        r#"sequence("c", "d", "f"):transpose({1, 2})"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine,
+        r#"sequence("c", "d", "f"):with_volume({2.0, 1.0})"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine,
+        r#"sequence("c", "d", "f"):with_panning({0.0, 1.0})"#
+    )
+    .is_ok());
+    assert!(evaluate_sequence_userdata(
+        &engine,
+        r#"sequence("c", "d", "f"):with_delay({0.0, 0.25})"#
+    )
+    .is_ok());
 
     Ok(())
 }
