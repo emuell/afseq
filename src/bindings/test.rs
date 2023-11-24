@@ -223,6 +223,16 @@ fn note_chord() -> Result<(), Box<dyn std::error::Error>> {
             new_note((None, "g7", 0.2)),
         ]
     );
+    assert_eq!(
+        evaluate_note_userdata(&engine, r#"note("c4'm 0.2", "c7")"#)?.notes,
+        vec![
+            new_note((None, "c4", 0.2)),
+            new_note((None, "d#4", 0.2)),
+            new_note((None, "g4", 0.2)),
+            new_note((None, "c7")),
+        ]
+    );
+
     Ok(())
 }
 
@@ -451,7 +461,7 @@ fn sequence() -> Result<(), Box<dyn std::error::Error>> {
 
     let poly_chord_sequence_event = evaluate_sequence_userdata(
         &engine,
-        r#"sequence( "c'maj", {"as5 0.2", "---", {key = "B_1", volume = 0.1}})"#,
+        r#"sequence("c'maj", {"as5 0.2", "---", {key = "B_1", volume = 0.1}})"#,
     )?;
     assert_eq!(
         poly_chord_sequence_event.notes,
@@ -468,6 +478,35 @@ fn sequence() -> Result<(), Box<dyn std::error::Error>> {
             ]
         ]
     );
+
+    let note_sequence_event =
+        evaluate_sequence_userdata(&engine, r#"sequence{note{"c"}, note("d", "e"), {"f"}}"#)?;
+    assert_eq!(
+        note_sequence_event.notes,
+        vec![
+            vec![new_note((instrument, "c")),],
+            vec![new_note((instrument, "d")), new_note((instrument, "e")),],
+            vec![new_note((instrument, "f")),]
+        ]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn sequence_methods() -> Result<(), Box<dyn std::error::Error>> {
+    // create a new engine and register bindings
+    let mut engine = new_engine();
+    let instrument = Some(InstrumentId::from(76));
+    register_bindings(
+        &mut engine,
+        BeatTimeBase {
+            beats_per_min: 120.0,
+            beats_per_bar: 4,
+            samples_per_sec: 44100,
+        },
+        instrument,
+    )?;
 
     // with_xxx
     assert!(evaluate_sequence_userdata(
