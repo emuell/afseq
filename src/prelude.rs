@@ -18,7 +18,7 @@ pub use super::{
     phrase::{Phrase, RhythmSlot},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
     time::{BeatTimeBase, BeatTimeStep, SecondTimeBase, SecondTimeStep, TimeBase},
-    Chord, Event, EventIter, Rhythm, SampleTime, Sequence,
+    Chord, Event, EventIter, Rhythm, SampleTime, Scale, Sequence,
 };
 
 #[cfg(feature = "scripting")]

@@ -10,6 +10,9 @@ pub use note::Note;
 pub mod chords;
 pub use chords::Chord;
 
+pub mod scales;
+pub use scales::Scale;
+
 pub mod event;
 pub use event::{Event, EventIter};
 
