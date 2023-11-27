@@ -1,6 +1,6 @@
 local scales = {
-  notes_in_scale("f major"),
-  notes_in_scale("c mixolydian"),
+  scale("f", "major").notes,
+  scale("c", "mixolydian").notes,
 }
 
 return Emitter {
@@ -19,9 +19,9 @@ return Emitter {
 
     return function()
       -- get current note set
-      local notes = fun.to_table(fun.map(function(v)
-        return scales[scale_index][v] - 12
-      end, { 1, 6, 3, 4, 8, 3 }))
+      local notes = fun.to_table(fun.map(function(note_index)
+        return scales[scale_index][note_index] or 0
+      end, { 1, 6, 3, 4, 0, 3 }))
       -- move note step
       local note = notes[math.floor(note_step % #notes) + 1]
       note_step = note_step + 1
@@ -37,7 +37,11 @@ return Emitter {
         volume_direction = -volume_direction
       end
       -- return final note
-      return { key = note, volume = volume * 0.12 }
+      if note == 0 then
+        return {}
+      else
+        return { key = note, volume = volume * 0.25 }
+      end
     end
   end
 }

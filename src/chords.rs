@@ -1,3 +1,5 @@
+//! Musical chords as list of `Note` with intervals.
+
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 

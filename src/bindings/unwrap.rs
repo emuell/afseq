@@ -23,30 +23,16 @@ pub fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'stat
 
 // ---------------------------------------------------------------------------------------------
 
-// Check if a lua value is a sequence alike table and return it.
-pub fn sequence_from_value<'lua>(value: &'lua LuaValue<'lua>) -> Option<Vec<LuaValue<'lua>>> {
-    if let Some(table) = value.as_table() {
-        sequence_from_table(table)
-    } else {
-        None
+impl LuaUserData for Scale {
+    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_field_method_get("notes", |lua, this| -> mlua::Result<LuaTable> {
+            lua.create_sequence_from(
+                this.notes()
+                    .iter()
+                    .map(|n| LuaValue::Integer(*n as u8 as i64)),
+            )
+        })
     }
-}
-
-// Check if a lua table is a sequence and return it.
-pub fn sequence_from_table<'lua>(table: &'lua LuaTable<'lua>) -> Option<Vec<LuaValue<'lua>>> {
-    let sequence = table
-        .clone()
-        .sequence_values::<LuaValue>()
-        .collect::<Vec<_>>();
-    if !sequence.is_empty() {
-        return Some(
-            sequence
-                .into_iter()
-                .map(|value: mlua::Result<LuaValue<'lua>>| value.unwrap())
-                .collect(),
-        );
-    }
-    None
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -157,6 +143,8 @@ impl LuaUserData for NoteUserData {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+
 // Sequence
 #[derive(Clone, Debug)]
 pub struct SequenceUserData {
@@ -265,6 +253,32 @@ impl LuaUserData for SequenceUserData {
 }
 
 // ---------------------------------------------------------------------------------------------
+
+// Check if a lua value is a sequence alike table and return it.
+fn sequence_from_value<'lua>(value: &'lua LuaValue<'lua>) -> Option<Vec<LuaValue<'lua>>> {
+    if let Some(table) = value.as_table() {
+        sequence_from_table(table)
+    } else {
+        None
+    }
+}
+
+// Check if a lua table is a sequence and return it.
+fn sequence_from_table<'lua>(table: &'lua LuaTable<'lua>) -> Option<Vec<LuaValue<'lua>>> {
+    let sequence = table
+        .clone()
+        .sequence_values::<LuaValue>()
+        .collect::<Vec<_>>();
+    if !sequence.is_empty() {
+        return Some(
+            sequence
+                .into_iter()
+                .map(|value: mlua::Result<LuaValue<'lua>>| value.unwrap())
+                .collect(),
+        );
+    }
+    None
+}
 
 fn value_array_from_value<Range>(
     lua: &Lua,
@@ -447,6 +461,40 @@ fn delay_value_from_string(str: &str) -> mlua::Result<f32> {
 
 fn is_empty_note_string(s: &str) -> bool {
     matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
+}
+
+pub fn note_from_value(arg: LuaValue, arg_index: Option<usize>) -> mlua::Result<Note> {
+    match arg {
+        LuaValue::Integer(note_value) => Ok(Note::from(note_value as u8)),
+        LuaValue::String(str) => Note::try_from(&str.to_string_lossy() as &str).map_err(|err| {
+            mlua::Error::FromLuaConversionError {
+                from: "string",
+                to: "Note",
+                message: Some(format!(
+                    "Invalid note value '{}': {}",
+                    str.to_string_lossy(),
+                    err
+                )),
+            }
+        }),
+        _ => {
+            return Err(mlua::Error::FromLuaConversionError {
+                from: arg.type_name(),
+                to: "Note",
+                message: if let Some(index) = arg_index {
+                    Some(
+                        format!(
+                            "Note arg #{} does not contain a valid note property",
+                            index + 1
+                        )
+                        .to_string(),
+                    )
+                } else {
+                    Some("Argument does not contain a valid note property".to_string())
+                },
+            });
+        }
+    }
 }
 
 pub fn note_event_from_number(

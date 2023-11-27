@@ -1,10 +1,12 @@
 use std::{
     path,
-    sync::{Arc, RwLock, atomic::{AtomicBool, Ordering}},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, RwLock,
+    },
 };
 
 use anyhow::anyhow;
-use rust_music_theory::{note::Notes, scale};
 use simplelog::*;
 
 use afseq::prelude::*;
@@ -138,18 +140,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         BeatTimeStep::Bar(4.0),
     );
 
-    let bass_notes = scale::Scale::from_regex("c aeolian")?.notes();
+    let bass_notes = Scale::try_from((Note::C5, "aeolian"))?.notes();
     let bass_pattern = beat_time
         .every_nth_eighth(1.0)
         .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1])
         .trigger(new_note_event_sequence(vec![
-            new_note((BASS, Note::from(&bass_notes[0]), 0.5)),
-            new_note((BASS, Note::from(&bass_notes[2]), 0.5)),
-            new_note((BASS, Note::from(&bass_notes[3]), 0.5)),
-            new_note((BASS, Note::from(&bass_notes[0]), 0.5)),
-            new_note((BASS, Note::from(&bass_notes[2]), 0.5)),
-            new_note((BASS, Note::from(&bass_notes[3]), 0.5)),
-            new_note((BASS, Note::from(&bass_notes[6]) - 12, 0.5)),
+            new_note((BASS, bass_notes[0], 0.5)),
+            new_note((BASS, bass_notes[2], 0.5)),
+            new_note((BASS, bass_notes[3], 0.5)),
+            new_note((BASS, bass_notes[0], 0.5)),
+            new_note((BASS, bass_notes[2], 0.5)),
+            new_note((BASS, bass_notes[3], 0.5)),
+            new_note((BASS, bass_notes[6].transpose(-12), 0.5)),
         ]));
 
     let synth_pattern = beat_time
@@ -249,7 +251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             stop_running.store(true, Ordering::Relaxed);
         }
     })?;
-    
+
     // play the sequence and dump events to stdout
     let reset_playback_pos = false;
     player.run_until(&mut sequence, &beat_time, reset_playback_pos, || {

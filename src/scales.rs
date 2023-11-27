@@ -335,8 +335,8 @@ impl Scale {
         Self { key, octave, mode }
     }
 
-    pub fn scale_names() -> Vec<&'static str> {
-        SCALE_MODES.iter().map(|scale| scale.name).collect()
+    pub fn mode_names() -> Vec<&'static str> {
+        SCALE_MODES.iter().map(|mode| mode.name).collect()
     }
 
     pub fn degrees(&self) -> Vec<usize> {

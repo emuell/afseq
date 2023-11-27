@@ -4,7 +4,6 @@ use std::{cell::RefCell, env, rc::Rc};
 
 use anyhow::anyhow;
 use mlua::{chunk, prelude::*};
-use rust_music_theory::{note::Notes, scale};
 
 use crate::{prelude::*, rhythm::euclidean::euclidean};
 
@@ -242,27 +241,6 @@ fn register_global_bindings(
 ) -> mlua::Result<()> {
     let globals = lua.globals();
 
-    // function notes_in_scale(expression)
-    globals.set(
-        "notes_in_scale",
-        lua.create_function(|lua, string: String| -> mlua::Result<LuaTable> {
-            match scale::Scale::from_regex(string.as_str()) {
-                Ok(scale) => Ok(lua.create_sequence_from(
-                    scale
-                        .notes()
-                        .iter()
-                        .map(|n| LuaValue::Integer(Note::from(n) as u8 as i64)),
-                )?),
-                Err(err) => Err(bad_argument_error(
-                    "notes_in_scale",
-                    "scale",
-                    1,
-                    format!("{}. Valid modes are e.g. 'c major'", err).as_str(),
-                )),
-            }
-        })?,
-    )?;
-
     // function euclidean(pulses, steps, [offset])
     globals.set(
         "euclidean",
@@ -298,6 +276,49 @@ fn register_global_bindings(
                         .iter()
                         .map(|v| *v as i32),
                 )
+            },
+        )?,
+    )?;
+
+    // function scale(note, mode|intervals)
+    globals.set(
+        "scale",
+        lua.create_function(
+            |_lua, (note, mode_or_intervals): (LuaValue, LuaValue)| -> mlua::Result<Scale> {
+                let note = note_from_value(note, Some(0))?;
+                if let Some(mode) = mode_or_intervals.as_str() {
+                    match Scale::try_from((note, mode)) {
+                        Ok(scale) => Ok(scale),
+                        Err(err) => Err(bad_argument_error(
+                            "scale",
+                            "mode",
+                            1,
+                            format!(
+                                "{}. Valid modes are: {}",
+                                err,
+                                Scale::mode_names().join(", ")
+                            )
+                            .as_str(),
+                        )),
+                    }
+                } else if let Some(table) = mode_or_intervals.as_table() {
+                    let intervals = table
+                        .clone()
+                        .sequence_values::<usize>()
+                        .enumerate()
+                        .map(|(_, result)| result)
+                        .collect::<mlua::Result<Vec<usize>>>()?;
+                    Ok(Scale::try_from((note, &intervals)).map_err(|err| {
+                        bad_argument_error("scale", "intervals", 1, err.to_string().as_str())
+                    })?)
+                } else {
+                    Err(bad_argument_error(
+                        "scale",
+                        "mode|interval",
+                        1,
+                        "Expecting either a mode string or interval table",
+                    ))
+                }
             },
         )?,
     )?;

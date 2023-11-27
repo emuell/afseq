@@ -1,4 +1,5 @@
-local scale = notes_in_scale("c aeolian")
+-- local scale = scale("c5", {0,1,3,5,7,9,11}).notes
+local scale = scale("c5", "minor").notes
 
 local bass_line = fun.to_table(fun.map(function(x)
     if x >= 5 then 

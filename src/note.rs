@@ -6,8 +6,6 @@ use std::{
     ops::{Add, Sub},
 };
 
-use rust_music_theory::note as rmt_note;
-
 // -------------------------------------------------------------------------------------------------
 
 /// A note representable in a 7 bit unsigned int. The subscript 'S' to a note means sharp.
@@ -158,13 +156,28 @@ pub enum Note {
 }
 
 impl Note {
-    /// Test if this note value is a note-on.
+    /// returns if this note value is a note-on.
     pub fn is_note_on(&self) -> bool {
         *self != Note::OFF && *self != Note::EMPTY
     }
-    /// Test if this note value is a note-off.
+    /// returns if this note value is a note-off.
     pub fn is_note_off(&self) -> bool {
         *self == Note::OFF && *self != Note::EMPTY
+    }
+
+    /// Get root key of the note as number: 0 = C, 1 = C# ...
+    pub fn key(&self) -> u8 {
+        *self as u8 % 12
+    }
+
+    /// Get note's octave value.
+    pub fn octave(&self) -> u8 {
+        *self as u8 / 12
+    }
+
+    /// return a new transposed note with the given offset.
+    pub fn transpose(&self, offset: i32) -> Self {
+        Note::from((*self as i32 + offset).clamp(0, 0x7f) as u8)
     }
 }
 
@@ -295,12 +308,6 @@ impl From<Note> for i8 {
     #[inline(always)]
     fn from(note: Note) -> Self {
         note as i8
-    }
-}
-
-impl From<&rmt_note::Note> for Note {
-    fn from(note: &rmt_note::Note) -> Self {
-        Self::from(note.pitch_class.into_u8() + 12 * note.octave + 12)
     }
 }
 
