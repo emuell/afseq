@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use crate::{event::Event, time::SampleTimeDisplay, SampleTime};
+use crate::{event::Event, time::SampleTimeDisplay, BeatTimeBase, SampleTime};
 
 pub mod beat_time;
 pub mod euclidean;
@@ -21,8 +21,11 @@ pub mod second_time;
 /// dynamically change over time as well.
 pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     /// Create a time display printer, which serializes the given sample time to the Rhythm's
-    /// time base (seconds or beats).
+    /// time base as appropriated (in seconds or beats).
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;
+    /// Update the rhythms internal beat or second time bases with the new time base.
+    /// Note: SampleTimeBase can be derived from BeatTimeBase via Into::<SampleTimeBase>(beat_time)
+    fn set_time_base(&mut self, time_base: BeatTimeBase);
 
     /// Length in samples of a single step in the rhythm's pattern.
     fn samples_per_step(&self) -> f64;

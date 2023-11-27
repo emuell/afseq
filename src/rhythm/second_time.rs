@@ -2,11 +2,10 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter},
-    time::{SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
+    rhythm::euclidean::euclidean,
+    time::{BeatTimeBase, SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
     Rhythm, SampleTime,
 };
-
-use super::euclidean::euclidean;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -144,11 +143,15 @@ impl Rhythm for SecondTimeRhythm {
         Box::new(self.time_base)
     }
 
+    fn set_time_base(&mut self, beat_time_base: BeatTimeBase) {
+        self.time_base = beat_time_base.into();
+    }
+
     fn samples_per_step(&self) -> f64 {
         self.step * self.time_base.samples_per_second() as f64
     }
     fn pattern_length(&self) -> usize {
-        self.pattern.len()    
+        self.pattern.len()
     }
 
     fn sample_offset(&self) -> SampleTime {

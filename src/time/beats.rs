@@ -1,7 +1,7 @@
 use crate::{
     rhythm::beat_time::BeatTimeRhythm,
     time::{SampleTimeDisplay, TimeBase},
-    SampleTime,
+    SampleTime, SecondTimeBase,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -22,6 +22,12 @@ impl BeatTimeBase {
     /// Time base's samples per bar, in order to convert bar to sample time and vice versa.
     pub fn samples_per_bar(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64 * self.beats_per_bar as f64
+    }
+}
+
+impl From<BeatTimeBase> for SecondTimeBase {
+    fn from(val: BeatTimeBase) -> Self {
+        SecondTimeBase { samples_per_sec: val.samples_per_sec }
     }
 }
 

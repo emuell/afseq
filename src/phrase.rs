@@ -26,8 +26,8 @@ pub enum RhythmSlot {
     Stop,
     /// Continue playing a previously played rhythm in a [`Sequence`].
     Continue,
-    /// Play a shared rhytm in this slot. 
-    /// NB: This is a shared reference, in order to resolve 'Continue' modes in sequences. 
+    /// Play a shared rhytm in this slot.
+    /// NB: This is a shared reference, in order to resolve 'Continue' modes in sequences.
     Rhythm(Rc<RefCell<dyn Rhythm>>),
 }
 
@@ -243,9 +243,16 @@ impl Rhythm for Phrase {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
     }
+    fn set_time_base(&mut self, time_base: BeatTimeBase) {
+        for rhythm_slot in self.rhythm_slots.iter_mut() {
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.borrow_mut().set_time_base(time_base)
+            }
+        }
+    }
 
     fn samples_per_step(&self) -> f64 {
-        self.length.samples_per_step(&self.time_base)    
+        self.length.samples_per_step(&self.time_base)
     }
     fn pattern_length(&self) -> usize {
         // use our length's step, likely won't be used anyway for phrases
