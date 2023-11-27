@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-use crate::bindings::unwrap::note_events_from_value;
+use crate::bindings::new_note_events_from_lua;
 use crate::{event::InstrumentId, Event, EventIter};
 
 // -------------------------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ impl ScriptedEventIter {
             let result = inner_function.call::<(), LuaValue>(())?;
             let environment = inner_function.environment().map(|env| env.into_owned());
             let function = inner_function.clone().into_owned();
-            let event = Some(Event::NoteEvents(note_events_from_value(
+            let event = Some(Event::NoteEvents(new_note_events_from_lua(
                 result, None, instrument,
             )?));
             Ok(Self {
@@ -37,7 +37,7 @@ impl ScriptedEventIter {
             // function returned an event. use this function.
             let environment = function.environment().map(|env| env.into_owned());
             let function = function.into_owned();
-            let event = Some(Event::NoteEvents(note_events_from_value(
+            let event = Some(Event::NoteEvents(new_note_events_from_lua(
                 result, None, instrument,
             )?));
             Ok(Self {
@@ -51,7 +51,7 @@ impl ScriptedEventIter {
 
     fn next_event(&self) -> mlua::Result<Event> {
         let result = self.function.call::<(), LuaValue>(())?;
-        Ok(Event::NoteEvents(note_events_from_value(
+        Ok(Event::NoteEvents(new_note_events_from_lua(
             result,
             None,
             self.instrument,

@@ -1,13 +1,18 @@
+//! Various lua->rust conversion helpers
+
 use std::{cell::RefCell, ops::RangeBounds, rc::Rc, sync::Arc};
 
 use mlua::prelude::*;
 
-use crate::{event::scripted::ScriptedEventIter, prelude::*};
+use crate::{
+    bindings::{note::NoteUserData, sequence::SequenceUserData},
+    prelude::*,
+};
 
 // ---------------------------------------------------------------------------------------------
 
 // Error helpers
-pub fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'static str>>>(
+pub(crate) fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'static str>>>(
     func: S1,
     arg: S2,
     pos: usize,
@@ -23,239 +28,10 @@ pub fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'stat
 
 // ---------------------------------------------------------------------------------------------
 
-impl LuaUserData for Scale {
-    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
-        fields.add_field_method_get("notes", |lua, this| -> mlua::Result<LuaTable> {
-            lua.create_sequence_from(
-                this.notes()
-                    .iter()
-                    .map(|n| LuaValue::Integer(*n as u8 as i64)),
-            )
-        })
-    }
-}
-
-// ---------------------------------------------------------------------------------------------
-
-// Note Userdata in bindings
-#[derive(Clone, Debug)]
-pub struct NoteUserData {
-    pub notes: Vec<Option<NoteEvent>>,
-}
-
-impl NoteUserData {
-    pub fn from(
-        args: LuaMultiValue,
-        default_instrument: Option<InstrumentId>,
-    ) -> mlua::Result<Self> {
-        // a single value, probably a sequence
-        let args = args.into_vec();
-        if args.len() == 1 {
-            let arg = args
-                .first()
-                .ok_or(mlua::Error::RuntimeError(
-                    "Failed to access table content".to_string(),
-                ))
-                .cloned()?;
-            if let Some(sequence) = sequence_from_value(&arg.clone()) {
-                let mut notes = vec![];
-                for (index, arg) in sequence.into_iter().enumerate() {
-                    // flatten sequence events into a single array
-                    notes.append(&mut note_events_from_value(
-                        arg,
-                        Some(index),
-                        default_instrument,
-                    )?);
-                }
-                Ok(NoteUserData { notes })
-            } else {
-                Ok(NoteUserData {
-                    notes: note_events_from_value(arg, None, default_instrument)?,
-                })
-            }
-        // multiple values, maybe of different type
-        } else {
-            let mut notes = vec![];
-            for (index, arg) in args.into_iter().enumerate() {
-                notes.append(&mut note_events_from_value(
-                    arg,
-                    Some(index),
-                    default_instrument,
-                )?);
-            }
-            Ok(NoteUserData { notes })
-        }
-    }
-}
-
-impl LuaUserData for NoteUserData {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transpose", |lua, this, value: LuaValue| {
-            let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
-            for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
-                if let Some(note) = note {
-                    if note.note.is_note_on() {
-                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
-                        note.note = Note::from(transposed_note as u8);
-                    }
-                }
-            }
-            Ok(this.clone())
-        });
-
-        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
-            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
-            for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
-                if let Some(note) = note {
-                    note.volume = volume;
-                }
-            }
-            Ok(this.clone())
-        });
-        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
-            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
-            for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
-                if let Some(note) = note {
-                    note.volume *= volume;
-                }
-            }
-            Ok(this.clone())
-        });
-        methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
-            let pannings = panning_array_from_value(lua, value, this.notes.len())?;
-            for (note, panning) in this.notes.iter_mut().zip(pannings.into_iter()) {
-                if let Some(note) = note {
-                    note.panning = panning;
-                }
-            }
-            Ok(this.clone())
-        });
-
-        methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
-            let delays = delay_array_from_value(lua, value, this.notes.len())?;
-            for (note, delay) in this.notes.iter_mut().zip(delays.into_iter()) {
-                if let Some(note) = note {
-                    note.delay = delay;
-                }
-            }
-            Ok(this.clone())
-        });
-    }
-}
-
-// ---------------------------------------------------------------------------------------------
-
-// Sequence
-#[derive(Clone, Debug)]
-pub struct SequenceUserData {
-    pub notes: Vec<Vec<Option<NoteEvent>>>,
-}
-
-impl SequenceUserData {
-    pub fn from(
-        args: LuaMultiValue,
-        default_instrument: Option<InstrumentId>,
-    ) -> mlua::Result<Self> {
-        // a single value, probably a sequence array
-        let args = args.into_vec();
-        if args.len() == 1 {
-            let arg = args
-                .first()
-                .ok_or(mlua::Error::RuntimeError(
-                    "Failed to access table content".to_string(),
-                ))
-                .cloned()?;
-            if let Some(sequence) = sequence_from_value(&arg.clone()) {
-                let mut notes = vec![];
-                for (index, arg) in sequence.into_iter().enumerate() {
-                    // add each sequence item as separate sequence event
-                    notes.push(note_events_from_value(
-                        arg,
-                        Some(index),
-                        default_instrument,
-                    )?);
-                }
-                Ok(SequenceUserData { notes })
-            } else {
-                Ok(SequenceUserData {
-                    notes: vec![note_events_from_value(arg, None, default_instrument)?],
-                })
-            }
-        // multiple values, maybe of different type
-        } else {
-            let mut notes = vec![];
-            for (index, arg) in args.into_iter().enumerate() {
-                notes.push(note_events_from_value(
-                    arg,
-                    Some(index),
-                    default_instrument,
-                )?);
-            }
-            Ok(SequenceUserData { notes })
-        }
-    }
-}
-
-impl LuaUserData for SequenceUserData {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
-            let steps = transpose_steps_array_from_value(lua, volume, this.notes.len())?;
-            for (notes, step) in this.notes.iter_mut().zip(steps.into_iter()) {
-                for note in notes.iter_mut().flatten() {
-                    if note.note.is_note_on() {
-                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
-                        note.note = Note::from(transposed_note as u8);
-                    }
-                }
-            }
-            Ok(this.clone())
-        });
-
-        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
-            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
-            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
-                for note in notes.iter_mut().flatten() {
-                    note.volume = volume;
-                }
-            }
-            Ok(this.clone())
-        });
-        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
-            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
-            for (notes, volume) in this.notes.iter_mut().zip(volumes) {
-                for note in notes.iter_mut().flatten() {
-                    note.volume *= volume;
-                }
-            }
-            Ok(this.clone())
-        });
-
-        methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
-            let pannings = panning_array_from_value(lua, value, this.notes.len())?;
-            for (notes, panning) in this.notes.iter_mut().zip(pannings) {
-                for note in notes.iter_mut().flatten() {
-                    note.panning = panning;
-                }
-            }
-            Ok(this.clone())
-        });
-
-        methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
-            let delays = delay_array_from_value(lua, value, this.notes.len())?;
-            for (notes, delay) in this.notes.iter_mut().zip(delays) {
-                for note in notes.iter_mut().flatten() {
-                    note.delay = delay;
-                }
-            }
-            Ok(this.clone())
-        });
-    }
-}
-
-// ---------------------------------------------------------------------------------------------
-
-// Check if a lua value is a sequence alike table and return it.
-fn sequence_from_value<'lua>(value: &'lua LuaValue<'lua>) -> Option<Vec<LuaValue<'lua>>> {
+// Check if a lua value is a sequence (an array alike table).
+pub(crate) fn sequence_from_value<'lua>(
+    value: &'lua LuaValue<'lua>,
+) -> Option<Vec<LuaValue<'lua>>> {
     if let Some(table) = value.as_table() {
         sequence_from_table(table)
     } else {
@@ -263,8 +39,10 @@ fn sequence_from_value<'lua>(value: &'lua LuaValue<'lua>) -> Option<Vec<LuaValue
     }
 }
 
-// Check if a lua table is a sequence and return it.
-fn sequence_from_table<'lua>(table: &'lua LuaTable<'lua>) -> Option<Vec<LuaValue<'lua>>> {
+// Check if a lua table is a sequence (an array alike table).
+pub(crate) fn sequence_from_table<'lua>(
+    table: &'lua LuaTable<'lua>,
+) -> Option<Vec<LuaValue<'lua>>> {
     let sequence = table
         .clone()
         .sequence_values::<LuaValue>()
@@ -280,7 +58,9 @@ fn sequence_from_table<'lua>(table: &'lua LuaTable<'lua>) -> Option<Vec<LuaValue
     None
 }
 
-fn value_array_from_value<Range>(
+// ---------------------------------------------------------------------------------------------
+
+fn float_array_from_value<Range>(
     lua: &Lua,
     value: LuaValue,
     array_len: usize,
@@ -316,7 +96,7 @@ where
     Ok(values)
 }
 
-fn transpose_steps_array_from_value(
+pub(crate) fn transpose_steps_array_from_value(
     lua: &Lua,
     step: LuaValue,
     array_len: usize,
@@ -336,20 +116,28 @@ fn transpose_steps_array_from_value(
     Ok(steps)
 }
 
-fn volume_array_from_value(lua: &Lua, value: LuaValue, array_len: usize) -> mlua::Result<Vec<f32>> {
-    value_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX, 1.0)
-}
-
-fn panning_array_from_value(
+pub(crate) fn volume_array_from_value(
     lua: &Lua,
     value: LuaValue,
     array_len: usize,
 ) -> mlua::Result<Vec<f32>> {
-    value_array_from_value(lua, value, array_len, "panning", -1.0..=1.0, 0.0)
+    float_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX, 1.0)
 }
 
-fn delay_array_from_value(lua: &Lua, value: LuaValue, array_len: usize) -> mlua::Result<Vec<f32>> {
-    value_array_from_value(lua, value, array_len, "delay", 0.0..=1.0, 0.0)
+pub(crate) fn panning_array_from_value(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+) -> mlua::Result<Vec<f32>> {
+    float_array_from_value(lua, value, array_len, "panning", -1.0..=1.0, 0.0)
+}
+
+pub(crate) fn delay_array_from_value(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+) -> mlua::Result<Vec<f32>> {
+    float_array_from_value(lua, value, array_len, "delay", 0.0..=1.0, 0.0)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -392,19 +180,19 @@ where
     }
 }
 
-fn volume_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+pub(crate) fn volume_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
     float_value_from_table(table, "volume", 0.0..=f32::MAX, 1.0)
 }
 
-fn panning_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+pub(crate) fn panning_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
     float_value_from_table(table, "panning", -1.0..=1.0, 0.0)
 }
 
-fn delay_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+pub(crate) fn delay_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
     float_value_from_table(table, "delay", 0.0..1.0, 0.0)
 }
 
-fn is_empty_float_value_string(str: &str) -> bool {
+pub(crate) fn is_empty_float_value_string(str: &str) -> bool {
     str == ".." || str == "--"
 }
 
@@ -447,23 +235,25 @@ where
     Ok(value)
 }
 
-fn volume_value_from_string(str: &str) -> mlua::Result<f32> {
+pub(crate) fn volume_value_from_string(str: &str) -> mlua::Result<f32> {
     float_value_from_string(str, "volume", 0.0..=f32::MAX, 1.0)
 }
 
-fn panning_value_from_string(str: &str) -> mlua::Result<f32> {
+pub(crate) fn panning_value_from_string(str: &str) -> mlua::Result<f32> {
     float_value_from_string(str, "panning", -1.0..=1.0, 0.0)
 }
 
-fn delay_value_from_string(str: &str) -> mlua::Result<f32> {
+pub(crate) fn delay_value_from_string(str: &str) -> mlua::Result<f32> {
     float_value_from_string(str, "delay", 0.0..1.0, 0.0)
 }
 
-fn is_empty_note_string(s: &str) -> bool {
+// -------------------------------------------------------------------------------------------------
+
+pub(crate) fn is_empty_note_string(s: &str) -> bool {
     matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
 }
 
-pub fn note_from_value(arg: LuaValue, arg_index: Option<usize>) -> mlua::Result<Note> {
+pub(crate) fn note_from_value(arg: LuaValue, arg_index: Option<usize>) -> mlua::Result<Note> {
     match arg {
         LuaValue::Integer(note_value) => Ok(Note::from(note_value as u8)),
         LuaValue::String(str) => Note::try_from(&str.to_string_lossy() as &str).map_err(|err| {
@@ -497,14 +287,14 @@ pub fn note_from_value(arg: LuaValue, arg_index: Option<usize>) -> mlua::Result<
     }
 }
 
-pub fn note_event_from_number(
+pub(crate) fn note_event_from_number(
     note_value: i64,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Option<NoteEvent>> {
     Ok(new_note((default_instrument, note_value as u8)))
 }
 
-pub fn note_event_from_string(
+pub(crate) fn note_event_from_string(
     str: &str,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Option<NoteEvent>> {
@@ -526,11 +316,11 @@ pub fn note_event_from_string(
     }
 }
 
-pub fn chord_events_from_string(
-    str: &str,
+pub(crate) fn chord_events_from_string(
+    chord_string: &str,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Vec<Option<NoteEvent>>> {
-    let mut white_space_splits = str.split(' ').filter(|v| !v.is_empty());
+    let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
     let chord_part = white_space_splits.next().unwrap_or("");
     let chord = Chord::try_from(chord_part).map_err(|err| mlua::Error::FromLuaConversionError {
         from: "string",
@@ -555,7 +345,7 @@ pub fn chord_events_from_string(
         .collect::<Vec<_>>())
 }
 
-pub fn note_event_from_table_map(
+pub(crate) fn note_event_from_table_map(
     table: LuaTable,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Option<NoteEvent>> {
@@ -604,7 +394,7 @@ pub fn note_event_from_table_map(
     }
 }
 
-pub fn note_event_from_value(
+pub(crate) fn note_event_from_value(
     arg: LuaValue,
     arg_index: Option<usize>,
     default_instrument: Option<InstrumentId>,
@@ -634,7 +424,7 @@ pub fn note_event_from_value(
     }
 }
 
-pub fn note_events_from_value(
+pub(crate) fn note_events_from_value(
     arg: LuaValue,
     arg_index: Option<usize>,
     default_instrument: Option<InstrumentId>,
@@ -708,7 +498,7 @@ pub fn note_events_from_value(
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn event_iter_from_value(
+pub(crate) fn event_iter_from_value(
     value: LuaValue,
     default_instrument: Option<InstrumentId>,
 ) -> mlua::Result<Rc<RefCell<dyn EventIter>>> {

@@ -1,4 +1,4 @@
-use crate::bindings::*;
+use crate::bindings::{note::NoteUserData, sequence::SequenceUserData, *};
 
 // --------------------------------------------------------------------------------------------------
 // unwrap helpers

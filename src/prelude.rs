@@ -16,13 +16,16 @@ pub use super::{
     },
     note::Note,
     phrase::{Phrase, RhythmSlot},
-    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
+    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, euclidean::euclidean},
     time::{BeatTimeBase, BeatTimeStep, SecondTimeBase, SecondTimeStep, TimeBase},
     Chord, Event, EventIter, Rhythm, SampleTime, Scale, Sequence,
 };
 
 #[cfg(feature = "scripting")]
-pub use super::bindings::{self};
+pub use super::{
+    bindings::{self},
+    event::scripted::ScriptedEventIter,
+};
 
 #[cfg(feature = "player")]
 pub use super::player::{NewNoteAction, SamplePlaybackContext, SamplePlayer, SamplePool};
