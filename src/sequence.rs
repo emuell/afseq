@@ -1,4 +1,4 @@
-//! Combine multiple `Phrase` iterators into a single one to play them sequentially.
+//! Combine multiple `Phrase` iterators into a single one, in order to play them sequentially.
 
 use crate::{
     event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,

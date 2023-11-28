@@ -176,10 +176,12 @@ lazy_static! {
 
 // --------------------------------------------------------------------------------------------------
 
+/// return list of all known chords with aliases.
 pub fn chords() -> HashMap<&'static str, Vec<u8>> {
     CHORD_TABLE.clone()
 }
 
+/// return list of all known chord names.
 pub fn chord_names() -> String {
     CHORD_TABLE
         .keys()
@@ -190,16 +192,16 @@ pub fn chord_names() -> String {
 
 /// return chord intervals for the given chord string or []
 pub fn chord_intervals(p: &str) -> Vec<u8> {
-    CHORD_TABLE.get(p).unwrap_or(&vec![]).clone()
+    CHORD_TABLE.get(p).cloned().unwrap_or(vec![])
 }
 
 // --------------------------------------------------------------------------------------------------
 
-/// A midi note with note intervals
+/// Note vector, created from a root note and intervals.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chord {
-    pub note: Note,
-    pub intervals: Vec<u8>,
+    note: Note,
+    intervals: Vec<u8>,
 }
 
 impl Chord {
@@ -209,6 +211,16 @@ impl Chord {
             note: note.into(),
             intervals,
         }
+    }
+
+    /// Root note.
+    pub fn note(&self) -> Note {
+        self.note
+    }
+
+    /// Note intervals / steps.
+    pub fn intervals(&self) -> &Vec<u8> {
+        &self.intervals
     }
 }
 

@@ -7,11 +7,11 @@ pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
 pub mod note;
 pub use note::Note;
 
-pub mod chords;
-pub use chords::Chord;
+pub mod chord;
+pub use chord::Chord;
 
-pub mod scales;
-pub use scales::Scale;
+pub mod scale;
+pub use scale::Scale;
 
 pub mod event;
 pub use event::{Event, EventIter};

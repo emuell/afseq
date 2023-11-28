@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 
-use crate::prelude::*;
 use super::unwrap::*;
+use crate::prelude::*;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -109,5 +109,182 @@ impl LuaUserData for SequenceUserData {
             }
             Ok(this.clone())
         });
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::bindings::*;
+
+    fn evaluate_sequence_userdata(
+        engine: &Lua,
+        expression: &str,
+    ) -> mlua::Result<SequenceUserData> {
+        Ok(engine
+            .load(expression)
+            .eval::<LuaValue>()?
+            .as_userdata()
+            .ok_or(mlua::Error::RuntimeError("No user data".to_string()))?
+            .borrow::<SequenceUserData>()?
+            .clone())
+    }
+
+    #[test]
+    fn sequence() -> Result<(), Box<dyn std::error::Error>> {
+        // create a new engine and register bindings
+        let mut engine = new_engine();
+        let instrument = Some(InstrumentId::from(76));
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 120.0,
+                beats_per_bar: 4,
+                samples_per_sec: 44100,
+            },
+            instrument,
+        )?;
+
+        // Note Sequence
+        let note_sequence_event =
+            evaluate_sequence_userdata(&engine, r#"sequence({"C#1 0.5"}, "---", "G_2")"#)?;
+        assert_eq!(
+            note_sequence_event.notes,
+            vec![
+                vec![new_note((instrument, "c#1", 0.5))],
+                vec![None],
+                vec![new_note((instrument, "g2", 1.0))]
+            ]
+        );
+        let poly_note_sequence_event = evaluate_sequence_userdata(
+            &engine,
+            r#"sequence(
+                    {"C#1", "", "G_2 0.75"},
+                    {"A#5 0.2", "---", {key = "B_1", volume = 0.1}}
+                )"#,
+        )?;
+        assert_eq!(
+            poly_note_sequence_event.notes,
+            vec![
+                vec![
+                    new_note((instrument, "c#1", 1.0)),
+                    None,
+                    new_note((instrument, "g2", 0.75)),
+                ],
+                vec![
+                    new_note((instrument, "a#5", 0.2)),
+                    None,
+                    new_note((instrument, "b1", 0.1))
+                ]
+            ]
+        );
+
+        let chord_sequence_event = evaluate_sequence_userdata(
+            &engine, //
+            r#"sequence("c'maj")"#,
+        )?;
+        assert_eq!(
+            chord_sequence_event.notes,
+            vec![vec![
+                new_note((instrument, "c4")),
+                new_note((instrument, "e4")),
+                new_note((instrument, "g4")),
+            ],]
+        );
+
+        let poly_chord_sequence_event = evaluate_sequence_userdata(
+            &engine,
+            r#"sequence("c'maj", {"as5 0.2", "---", {key = "B_1", volume = 0.1}})"#,
+        )?;
+        assert_eq!(
+            poly_chord_sequence_event.notes,
+            vec![
+                vec![
+                    new_note((instrument, "c4")),
+                    new_note((instrument, "e4")),
+                    new_note((instrument, "g4")),
+                ],
+                vec![
+                    new_note((instrument, "a#5", 0.2)),
+                    None,
+                    new_note((instrument, "b1", 0.1))
+                ]
+            ]
+        );
+
+        let note_sequence_event =
+            evaluate_sequence_userdata(&engine, r#"sequence{note{"c"}, note("d", "e"), {"f"}}"#)?;
+        assert_eq!(
+            note_sequence_event.notes,
+            vec![
+                vec![new_note((instrument, "c")),],
+                vec![new_note((instrument, "d")), new_note((instrument, "e")),],
+                vec![new_note((instrument, "f")),]
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn sequence_methods() -> Result<(), Box<dyn std::error::Error>> {
+        // create a new engine and register bindings
+        let mut engine = new_engine();
+        let instrument = Some(InstrumentId::from(76));
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 120.0,
+                beats_per_bar: 4,
+                samples_per_sec: 44100,
+            },
+            instrument,
+        )?;
+
+        // with_xxx
+        assert!(evaluate_sequence_userdata(
+            &engine, //
+            r#"sequence("c", "d", "f"):transpose(1)"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine, //
+            r#"sequence("c'maj"):with_volume(2.0)"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine, //
+            r#"sequence(12, 24, 48):with_panning(0.0)"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine,
+            r#"sequence({key = "c"}, "d", "f"):with_delay(0.0)"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine, //
+            r#"sequence("c", "d", "f"):transpose({1, 2})"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine,
+            r#"sequence("c", "d", "f"):with_volume({2.0, 1.0})"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine,
+            r#"sequence("c", "d", "f"):with_panning({0.0, 1.0})"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &engine,
+            r#"sequence("c", "d", "f"):with_delay({0.0, 0.25})"#
+        )
+        .is_ok());
+
+        Ok(())
     }
 }

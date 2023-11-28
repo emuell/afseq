@@ -1,24 +1,34 @@
-//! Lua script bindings for the entire crate.
+//! Lua script bindings, to create rhythms dynamically.
 
 use std::{cell::RefCell, env, rc::Rc};
 
 use mlua::{chunk, prelude::*};
 
-use crate::prelude::*;
+// ---------------------------------------------------------------------------------------------
+
+mod rhythm;
+use rhythm::rhythm_from_userdata;
+
+mod scale;
+
+mod note;
+use note::NoteUserData;
+
+mod sequence;
+use sequence::SequenceUserData;
+
+mod unwrap;
+use unwrap::*;
 
 // ---------------------------------------------------------------------------------------------
 
-mod note;
-mod rhythm;
-mod scale;
-mod sequence;
-mod unwrap;
-
-#[cfg(test)]
-mod test;
-
-use self::{
-    note::NoteUserData, rhythm::rhythm_from_userdata, sequence::SequenceUserData, unwrap::*,
+use crate::{
+    event::{InstrumentId, NoteEvent},
+    rhythm::{
+        beat_time::BeatTimeRhythm, euclidean::euclidean, second_time::SecondTimeRhythm, Rhythm,
+    },
+    time::{BeatTimeBase, BeatTimeStep},
+    Scale, SecondTimeBase,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -284,4 +294,36 @@ fn register_fun_bindings(lua: &mut Lua) -> mlua::Result<()> {
         .load(include_str!("./bindings/lua/fun.lua"))
         .set_name("[inbuilt:fun.lua]");
     chunk.exec()
+}
+
+// --------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn extensions() {
+        // create a new engine and register bindings
+        let mut engine = new_engine();
+        register_bindings(
+            &mut engine,
+            BeatTimeBase {
+                beats_per_min: 160.0,
+                beats_per_bar: 6,
+                samples_per_sec: 96000,
+            },
+            Some(InstrumentId::from(76)),
+        )
+        .unwrap();
+
+        // pattern.lua is present
+        assert!(engine.load(r#"pattern.new()"#).eval::<LuaTable>().is_ok());
+
+        // fun.lua is present
+        assert!(engine
+            .load(r#"fun.map(function(v) return v end, {1,2,3})"#)
+            .eval::<LuaTable>()
+            .is_ok());
+    }
 }

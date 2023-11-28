@@ -1,4 +1,5 @@
-//! Combine multiple `Rythm` iterators into a single one to play them at the same time.
+//! Combine, stack multiple `Rythm` iterators into a single one, in order to play multiple 
+//! Rhythms at once.
 
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 

@@ -1,10 +1,12 @@
 //! Example player implementation, which plays back a `Sequence` via the `afplay` crate.
-use crossbeam_channel::Sender;
+
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
     time::Duration,
 };
+
+use crossbeam_channel::Sender;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,

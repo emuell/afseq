@@ -316,35 +316,6 @@ pub(crate) fn note_event_from_string(
     }
 }
 
-pub(crate) fn chord_events_from_string(
-    chord_string: &str,
-    default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Vec<Option<NoteEvent>>> {
-    let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
-    let chord_part = white_space_splits.next().unwrap_or("");
-    let chord = Chord::try_from(chord_part).map_err(|err| mlua::Error::FromLuaConversionError {
-        from: "string",
-        to: "Note",
-        message: Some(format!("Invalid chord value '{}': {}", chord_part, err)),
-    })?;
-    let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
-    let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
-    let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
-    Ok(chord
-        .intervals
-        .iter()
-        .map(|i| {
-            new_note((
-                default_instrument,
-                Note::from(chord.note as u8 + i),
-                volume,
-                panning,
-                delay,
-            ))
-        })
-        .collect::<Vec<_>>())
-}
-
 pub(crate) fn note_event_from_table_map(
     table: LuaTable,
     default_instrument: Option<InstrumentId>,
@@ -494,6 +465,35 @@ pub(crate) fn note_events_from_value(
             default_instrument,
         )?]),
     }
+}
+
+pub(crate) fn chord_events_from_string(
+    chord_string: &str,
+    default_instrument: Option<InstrumentId>,
+) -> mlua::Result<Vec<Option<NoteEvent>>> {
+    let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
+    let chord_part = white_space_splits.next().unwrap_or("");
+    let chord = Chord::try_from(chord_part).map_err(|err| mlua::Error::FromLuaConversionError {
+        from: "string",
+        to: "Note",
+        message: Some(format!("Invalid chord value '{}': {}", chord_part, err)),
+    })?;
+    let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
+    let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
+    let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
+    Ok(chord
+        .intervals()
+        .iter()
+        .map(|i| {
+            new_note((
+                default_instrument,
+                Note::from(chord.note() as u8 + i),
+                volume,
+                panning,
+                delay,
+            ))
+        })
+        .collect::<Vec<_>>())
 }
 
 // -------------------------------------------------------------------------------------------------

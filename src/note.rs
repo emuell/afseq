@@ -1,4 +1,4 @@
-//! MIDI Notes used by `Event`.
+//! Raw note events triggered by an `Event`.
 
 use std::{
     fmt::Display,

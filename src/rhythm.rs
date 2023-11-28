@@ -1,4 +1,4 @@
-//! Periodically emit `Events` via an `EventIter` on a given time base.
+//! Periodically emit `Events` via an `EventIter` with a given time base.
 
 use std::fmt::Debug;
 
@@ -12,19 +12,18 @@ pub mod second_time;
 
 /// A `Rhythm` is an iterator which emits optional [`Event`] in sample-rate resolution.
 ///
-/// A `Rhythm` is what triggers events rythmically or periodically, producing events that happen
-/// at a specific sample time. An audio players will use the sample time to schedule those events
-/// within the audio stream.
+/// It triggers events periodically, producing events at a specific sample time.
+/// An audio player can then use the sample time to schedule those events within the audio stream.
 ///
-/// Rhythm impls will typically use a [EventIter][`super::EventIter`] to produce note or parameter
-/// change events, so all emitted events are fetched from some iterator as well and thus may
-/// dynamically change over time as well.
+/// Rhythm impls typically will use a [EventIter][`super::EventIter`] to produce one or multiple
+/// note or parameter change events. The event iter impl is an iterator too, so the emitted content
+/// may dynamically change over time as well.
 pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     /// Create a time display printer, which serializes the given sample time to the Rhythm's
     /// time base as appropriated (in seconds or beats).
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;
     /// Update the rhythms internal beat or second time bases with the new time base.
-    /// Note: SampleTimeBase can be derived from BeatTimeBase via Into::<SampleTimeBase>(beat_time)
+    /// Note: SampleTimeBase can be derived from BeatTimeBase via `Into::<SampleTimeBase>(beat_time)`
     fn set_time_base(&mut self, time_base: BeatTimeBase);
 
     /// Length in samples of a single step in the rhythm's pattern.

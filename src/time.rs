@@ -1,4 +1,4 @@
-//! The time base that `Rhythms` can run on.
+//! Defines musical or wall clock time bases that `Rhythms` can run on.
 
 use std::fmt::Debug;
 

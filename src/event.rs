@@ -1,4 +1,4 @@
-//! Value and value iters which get emitted by `Rhythms`.
+//! Value and value iterators which can get emitted by `Rhythms`.
 
 use crate::note::Note;
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};

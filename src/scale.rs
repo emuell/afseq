@@ -296,6 +296,7 @@ pub enum TransposeStrictness {
 
 // -------------------------------------------------------------------------------------------------
 
+/// A musical scale / mode.
 #[derive(Debug, Clone)]
 pub struct Scale {
     key: u8,    // 0..12
@@ -335,18 +336,28 @@ impl Scale {
         Self { key, octave, mode }
     }
 
+    /// Known mode/scaling names.
     pub fn mode_names() -> Vec<&'static str> {
         SCALE_MODES.iter().map(|mode| mode.name).collect()
     }
 
+    /// Key note as number [0..12].
+    pub fn key(&self) -> u8 {
+        self.key
+    }
+
+    /// List of raw degrees where 0 indicates no step.
     pub fn degrees(&self) -> Vec<usize> {
         self.mode.degrees.to_vec()
     }
 
+    /// List of steps / intervals.
     pub fn steps(&self) -> Vec<usize> {
         self.mode.steps()
     }
 
+    /// Generate an ascending list of notes in the scale, using the Note passed in the
+    /// constructor as root note.
     pub fn notes(&self) -> Vec<Note> {
         self.steps()
             .iter()
@@ -356,10 +367,12 @@ impl Scale {
             .collect()
     }
 
+    /// Transpose the given note into this scale, using the most strict strictness level.
     pub fn transpose(&self, note: Note, offset: i32) -> Note {
         self.transpose_with_strictness(note, offset, TransposeStrictness::ForceAllNotes)
     }
 
+    /// Transpose the given note into the scale, using the specified strictness level.
     pub fn transpose_with_strictness(
         &self,
         note: Note,
