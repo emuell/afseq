@@ -42,7 +42,7 @@ impl<'lua> FromLua<'lua> for Note {
                 Note::try_from(&str.to_string_lossy() as &str).map_err(|err| {
                     LuaError::FromLuaConversionError {
                         from: "string",
-                        to: "Note",
+                        to: "note",
                         message: Some(err.to_string()),
                     }
                 })
@@ -192,7 +192,7 @@ pub(crate) fn delay_array_from_value(
 
 fn float_value_from_table<Range>(
     table: &LuaTable,
-    name: &str,
+    name: &'static str,
     range: Range,
     default: f32,
 ) -> LuaResult<f32>
@@ -204,9 +204,9 @@ where
             if !range.contains(&value) {
                 Err(LuaError::FromLuaConversionError {
                     from: "string",
-                    to: "Note",
+                    to: "number",
                     message: Some(format!(
-                        "Invalid note {} value: Value must be in range {:?} but is '{}'",
+                        "'{}' property must be in range {:?} but is '{}'",
                         name, range, value
                     )),
                 })
@@ -215,12 +215,9 @@ where
             }
         } else {
             Err(LuaError::FromLuaConversionError {
-                from: "string",
-                to: "Note",
-                message: Some(format!(
-                    "Invalid note {} value: Value is not a number",
-                    name
-                )),
+                from: name,
+                to: "number",
+                message: Some(format!("'{}' property is missing but required", name)),
             })
         }
     } else {
@@ -246,7 +243,7 @@ pub(crate) fn is_empty_float_value_string(str: &str) -> bool {
 
 fn float_value_from_string<Range>(
     str: &str,
-    name: &str,
+    name: &'static str,
     range: Range,
     default: f32,
 ) -> LuaResult<f32>
@@ -262,19 +259,16 @@ where
         } else {
             return Err(LuaError::FromLuaConversionError {
                 from: "string",
-                to: "Note",
-                message: Some(format!(
-                    "Invalid note {} value: Value '{}' is not a number",
-                    name, str
-                )),
+                to: "number",
+                message: Some(format!("'{}' property '{}' is not a number", name, str)),
             });
         }
         if !range.contains(&value) {
             return Err(LuaError::FromLuaConversionError {
                 from: "string",
-                to: "Note",
+                to: "number",
                 message: Some(format!(
-                    "Invalid note {} value: Value must be in range {:?} but is '{}'",
+                    "'{}' property must be in range {:?} but is '{}'",
                     name, range, value
                 )),
             });
@@ -321,8 +315,8 @@ pub(crate) fn note_event_from_string(
     } else {
         let note = Note::try_from(note_part).map_err(|err| LuaError::FromLuaConversionError {
             from: "string",
-            to: "Note",
-            message: Some(format!("Invalid note value '{}': {}", note_part, err)),
+            to: "note",
+            message: Some(err.to_string()),
         })?;
         let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
         let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
@@ -338,7 +332,6 @@ pub(crate) fn note_event_from_table_map(
     if table.is_empty() {
         return Ok(None);
     }
-
     if table.contains_key("key")? {
         let volume = volume_value_from_table(&table)?;
         let panning = panning_value_from_table(&table)?;
@@ -355,27 +348,26 @@ pub(crate) fn note_event_from_table_map(
         }
         // { key = "C4", [volume = 1.0, panning = 0.0, delay = 0.0] }
         else if let Ok(note_str) = table.get::<&str, String>("key") {
-            if let Ok(note) = Note::try_from(note_str.as_str()) {
-                Ok(new_note((default_instrument, note, volume, panning, delay)))
-            } else {
-                Err(LuaError::FromLuaConversionError {
+            let note = Note::try_from(note_str.as_str()).map_err(|err| {
+                LuaError::FromLuaConversionError {
                     from: "string",
-                    to: "Note",
-                    message: Some(format!("Invalid note value: '{}'", note_str)),
-                })
-            }
+                    to: "note",
+                    message: Some(err.to_string()),
+                }
+            })?;
+            Ok(new_note((default_instrument, note, volume, panning, delay)))
         } else {
             Err(LuaError::FromLuaConversionError {
                 from: "table",
-                to: "Note",
-                message: Some("Table does not contain a valid 'key' property".to_string()),
+                to: "note",
+                message: Some("invalid 'key' property for note".to_string()),
             })
         }
     } else {
         Err(LuaError::FromLuaConversionError {
             from: "table",
-            to: "Note",
-            message: Some("Table does not contain valid note properties".to_string()),
+            to: "note",
+            message: Some("missing 'key' property for note".to_string()),
         })
     }
 }
@@ -395,15 +387,9 @@ pub(crate) fn note_event_from_value(
                 from: arg.type_name(),
                 to: "Note",
                 message: if let Some(index) = arg_index {
-                    Some(
-                        format!(
-                            "Note arg #{} does not contain a valid note property",
-                            index + 1
-                        )
-                        .to_string(),
-                    )
+                    Some(format!("arg #{} is not a valid note property", index + 1).to_string())
                 } else {
-                    Some("Argument does not contain a valid note property".to_string())
+                    Some("invalid note property".to_string())
                 },
             });
         }
@@ -427,18 +413,18 @@ pub(crate) fn note_events_from_value(
                 Ok(chord.notes)
             } else {
                 Err(LuaError::FromLuaConversionError {
-                    from: "UserData",
-                    to: "Note",
+                    from: "userdata",
+                    to: "note",
                     message: if let Some(index) = arg_index {
                         Some(
                             format!(
-                                "Sequence arg #{} does not contain a valid note property",
+                                "user data at #{} can't be converted to note list",
                                 index + 1
                             )
                             .to_string(),
                         )
                     } else {
-                        Some("Argument does not contain a valid note property".to_string())
+                        Some("given user data can't be converted to note list".to_string())
                     },
                 })
             }
@@ -490,8 +476,8 @@ pub(crate) fn chord_events_from_string(
     let chord_part = white_space_splits.next().unwrap_or("");
     let chord = Chord::try_from(chord_part).map_err(|err| LuaError::FromLuaConversionError {
         from: "string",
-        to: "Note",
-        message: Some(format!("Invalid chord value '{}': {}", chord_part, err)),
+        to: "chord",
+        message: Some(format!("invalid chord '{}': {}", chord_part, err)),
     })?;
     let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
     let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
@@ -527,9 +513,11 @@ pub(crate) fn event_iter_from_value(
                 Ok(Rc::new(RefCell::new(sequence.notes.to_event_sequence())))
             } else {
                 Err(LuaError::FromLuaConversionError {
-                    from: "table",
-                    to: "Note",
-                    message: Some("Invalid note table argument".to_string()),
+                    from: "userdata",
+                    to: "note",
+                    message: Some(
+                        "given user data can't be converted to note event list".to_string(),
+                    ),
                 })
             }
         }
