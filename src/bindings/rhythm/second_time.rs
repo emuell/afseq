@@ -15,7 +15,7 @@ impl SecondTimeRhythm {
         table: LuaTable,
         default_time_base: SecondTimeBase,
         default_instrument: Option<InstrumentId>,
-    ) -> mlua::Result<SecondTimeRhythm> {
+    ) -> LuaResult<SecondTimeRhythm> {
         let mut resolution = table.get::<&str, f64>("resolution").unwrap_or(1.0);
         if resolution <= 0.0 {
             return Err(bad_argument_error(

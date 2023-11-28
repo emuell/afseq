@@ -99,7 +99,7 @@ pub(crate) fn sequence_from_table<'lua>(
         return Some(
             sequence
                 .into_iter()
-                .map(|value: mlua::Result<LuaValue<'lua>>| value.unwrap())
+                .map(|value: LuaResult<LuaValue<'lua>>| value.unwrap())
                 .collect(),
         );
     }
@@ -115,7 +115,7 @@ fn float_array_from_value<Range>(
     name: &str,
     range: Range,
     _default: f32,
-) -> mlua::Result<Vec<f32>>
+) -> LuaResult<Vec<f32>>
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
@@ -126,7 +126,7 @@ where
             .sequence_values::<f32>()
             .enumerate()
             .map(|(_, result)| result)
-            .collect::<mlua::Result<Vec<f32>>>()?;
+            .collect::<LuaResult<Vec<f32>>>()?;
     } else {
         let value = f32::from_lua(value, lua)?;
         values = (0..array_len).map(|_| value).collect::<Vec<f32>>()
@@ -148,7 +148,7 @@ pub(crate) fn transpose_steps_array_from_value(
     lua: &Lua,
     step: LuaValue,
     array_len: usize,
-) -> mlua::Result<Vec<i32>> {
+) -> LuaResult<Vec<i32>> {
     let steps;
     if let Some(volume_table) = step.as_table() {
         steps = volume_table
@@ -156,7 +156,7 @@ pub(crate) fn transpose_steps_array_from_value(
             .sequence_values::<i32>()
             .enumerate()
             .map(|(_, result)| result)
-            .collect::<mlua::Result<Vec<i32>>>()?;
+            .collect::<LuaResult<Vec<i32>>>()?;
     } else {
         let step = i32::from_lua(step, lua)?;
         steps = (0..array_len).map(|_| step).collect::<Vec<i32>>()
@@ -168,7 +168,7 @@ pub(crate) fn volume_array_from_value(
     lua: &Lua,
     value: LuaValue,
     array_len: usize,
-) -> mlua::Result<Vec<f32>> {
+) -> LuaResult<Vec<f32>> {
     float_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX, 1.0)
 }
 
@@ -176,7 +176,7 @@ pub(crate) fn panning_array_from_value(
     lua: &Lua,
     value: LuaValue,
     array_len: usize,
-) -> mlua::Result<Vec<f32>> {
+) -> LuaResult<Vec<f32>> {
     float_array_from_value(lua, value, array_len, "panning", -1.0..=1.0, 0.0)
 }
 
@@ -184,7 +184,7 @@ pub(crate) fn delay_array_from_value(
     lua: &Lua,
     value: LuaValue,
     array_len: usize,
-) -> mlua::Result<Vec<f32>> {
+) -> LuaResult<Vec<f32>> {
     float_array_from_value(lua, value, array_len, "delay", 0.0..=1.0, 0.0)
 }
 
@@ -195,14 +195,14 @@ fn float_value_from_table<Range>(
     name: &str,
     range: Range,
     default: f32,
-) -> mlua::Result<f32>
+) -> LuaResult<f32>
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
     if table.contains_key::<&str>(name)? {
         if let Ok(value) = table.get::<&str, f32>(name) {
             if !range.contains(&value) {
-                Err(mlua::Error::FromLuaConversionError {
+                Err(LuaError::FromLuaConversionError {
                     from: "string",
                     to: "Note",
                     message: Some(format!(
@@ -214,7 +214,7 @@ where
                 Ok(value)
             }
         } else {
-            Err(mlua::Error::FromLuaConversionError {
+            Err(LuaError::FromLuaConversionError {
                 from: "string",
                 to: "Note",
                 message: Some(format!(
@@ -228,15 +228,15 @@ where
     }
 }
 
-pub(crate) fn volume_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+pub(crate) fn volume_value_from_table(table: &LuaTable) -> LuaResult<f32> {
     float_value_from_table(table, "volume", 0.0..=f32::MAX, 1.0)
 }
 
-pub(crate) fn panning_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+pub(crate) fn panning_value_from_table(table: &LuaTable) -> LuaResult<f32> {
     float_value_from_table(table, "panning", -1.0..=1.0, 0.0)
 }
 
-pub(crate) fn delay_value_from_table(table: &LuaTable) -> mlua::Result<f32> {
+pub(crate) fn delay_value_from_table(table: &LuaTable) -> LuaResult<f32> {
     float_value_from_table(table, "delay", 0.0..1.0, 0.0)
 }
 
@@ -249,7 +249,7 @@ fn float_value_from_string<Range>(
     name: &str,
     range: Range,
     default: f32,
-) -> mlua::Result<f32>
+) -> LuaResult<f32>
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
@@ -260,7 +260,7 @@ where
         } else if let Ok(float) = str.parse::<f32>() {
             value = float;
         } else {
-            return Err(mlua::Error::FromLuaConversionError {
+            return Err(LuaError::FromLuaConversionError {
                 from: "string",
                 to: "Note",
                 message: Some(format!(
@@ -270,7 +270,7 @@ where
             });
         }
         if !range.contains(&value) {
-            return Err(mlua::Error::FromLuaConversionError {
+            return Err(LuaError::FromLuaConversionError {
                 from: "string",
                 to: "Note",
                 message: Some(format!(
@@ -283,15 +283,15 @@ where
     Ok(value)
 }
 
-pub(crate) fn volume_value_from_string(str: &str) -> mlua::Result<f32> {
+pub(crate) fn volume_value_from_string(str: &str) -> LuaResult<f32> {
     float_value_from_string(str, "volume", 0.0..=f32::MAX, 1.0)
 }
 
-pub(crate) fn panning_value_from_string(str: &str) -> mlua::Result<f32> {
+pub(crate) fn panning_value_from_string(str: &str) -> LuaResult<f32> {
     float_value_from_string(str, "panning", -1.0..=1.0, 0.0)
 }
 
-pub(crate) fn delay_value_from_string(str: &str) -> mlua::Result<f32> {
+pub(crate) fn delay_value_from_string(str: &str) -> LuaResult<f32> {
     float_value_from_string(str, "delay", 0.0..1.0, 0.0)
 }
 
@@ -306,25 +306,24 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
 pub(crate) fn note_event_from_number(
     note_value: i64,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Option<NoteEvent>> {
+) -> LuaResult<Option<NoteEvent>> {
     Ok(new_note((default_instrument, note_value as u8)))
 }
 
 pub(crate) fn note_event_from_string(
     str: &str,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Option<NoteEvent>> {
+) -> LuaResult<Option<NoteEvent>> {
     let mut white_space_splits = str.split(' ').filter(|v| !v.is_empty());
     let note_part = white_space_splits.next().unwrap_or("");
     if is_empty_note_string(note_part) {
         Ok(None)
     } else {
-        let note =
-            Note::try_from(note_part).map_err(|err| mlua::Error::FromLuaConversionError {
-                from: "string",
-                to: "Note",
-                message: Some(format!("Invalid note value '{}': {}", note_part, err)),
-            })?;
+        let note = Note::try_from(note_part).map_err(|err| LuaError::FromLuaConversionError {
+            from: "string",
+            to: "Note",
+            message: Some(format!("Invalid note value '{}': {}", note_part, err)),
+        })?;
         let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
         let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
         let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
@@ -335,7 +334,7 @@ pub(crate) fn note_event_from_string(
 pub(crate) fn note_event_from_table_map(
     table: LuaTable,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Option<NoteEvent>> {
+) -> LuaResult<Option<NoteEvent>> {
     if table.is_empty() {
         return Ok(None);
     }
@@ -359,21 +358,21 @@ pub(crate) fn note_event_from_table_map(
             if let Ok(note) = Note::try_from(note_str.as_str()) {
                 Ok(new_note((default_instrument, note, volume, panning, delay)))
             } else {
-                Err(mlua::Error::FromLuaConversionError {
+                Err(LuaError::FromLuaConversionError {
                     from: "string",
                     to: "Note",
                     message: Some(format!("Invalid note value: '{}'", note_str)),
                 })
             }
         } else {
-            Err(mlua::Error::FromLuaConversionError {
+            Err(LuaError::FromLuaConversionError {
                 from: "table",
                 to: "Note",
                 message: Some("Table does not contain a valid 'key' property".to_string()),
             })
         }
     } else {
-        Err(mlua::Error::FromLuaConversionError {
+        Err(LuaError::FromLuaConversionError {
             from: "table",
             to: "Note",
             message: Some("Table does not contain valid note properties".to_string()),
@@ -385,14 +384,14 @@ pub(crate) fn note_event_from_value(
     arg: LuaValue,
     arg_index: Option<usize>,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Option<NoteEvent>> {
+) -> LuaResult<Option<NoteEvent>> {
     match arg {
         LuaValue::Nil => Ok(None),
         LuaValue::Integer(note_value) => note_event_from_number(note_value, default_instrument),
         LuaValue::String(str) => note_event_from_string(&str.to_string_lossy(), default_instrument),
         LuaValue::Table(table) => note_event_from_table_map(table, default_instrument),
         _ => {
-            return Err(mlua::Error::FromLuaConversionError {
+            return Err(LuaError::FromLuaConversionError {
                 from: arg.type_name(),
                 to: "Note",
                 message: if let Some(index) = arg_index {
@@ -415,11 +414,11 @@ pub(crate) fn note_events_from_value(
     arg: LuaValue,
     arg_index: Option<usize>,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Vec<Option<NoteEvent>>> {
+) -> LuaResult<Vec<Option<NoteEvent>>> {
     match arg {
         LuaValue::UserData(userdata) => {
             if userdata.is::<SequenceUserData>() {
-                Err(mlua::Error::FromLuaConversionError {
+                Err(LuaError::FromLuaConversionError {
                     from: "Sequence",
                     to: "Note",
                     message: Some("Can not nest sequences into sequences".to_string()),
@@ -427,7 +426,7 @@ pub(crate) fn note_events_from_value(
             } else if let Ok(chord) = userdata.take::<NoteUserData>() {
                 Ok(chord.notes)
             } else {
-                Err(mlua::Error::FromLuaConversionError {
+                Err(LuaError::FromLuaConversionError {
                     from: "UserData",
                     to: "Note",
                     message: if let Some(index) = arg_index {
@@ -486,10 +485,10 @@ pub(crate) fn note_events_from_value(
 pub(crate) fn chord_events_from_string(
     chord_string: &str,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Vec<Option<NoteEvent>>> {
+) -> LuaResult<Vec<Option<NoteEvent>>> {
     let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
     let chord_part = white_space_splits.next().unwrap_or("");
-    let chord = Chord::try_from(chord_part).map_err(|err| mlua::Error::FromLuaConversionError {
+    let chord = Chord::try_from(chord_part).map_err(|err| LuaError::FromLuaConversionError {
         from: "string",
         to: "Note",
         message: Some(format!("Invalid chord value '{}': {}", chord_part, err)),
@@ -517,7 +516,7 @@ pub(crate) fn chord_events_from_string(
 pub(crate) fn event_iter_from_value(
     value: LuaValue,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Rc<RefCell<dyn EventIter>>> {
+) -> LuaResult<Rc<RefCell<dyn EventIter>>> {
     match value {
         LuaValue::UserData(userdata) => {
             if userdata.is::<NoteUserData>() {
@@ -527,7 +526,7 @@ pub(crate) fn event_iter_from_value(
                 let sequence = userdata.take::<SequenceUserData>()?;
                 Ok(Rc::new(RefCell::new(sequence.notes.to_event_sequence())))
             } else {
-                Err(mlua::Error::FromLuaConversionError {
+                Err(LuaError::FromLuaConversionError {
                     from: "table",
                     to: "Note",
                     message: Some("Invalid note table argument".to_string()),

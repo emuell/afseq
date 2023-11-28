@@ -14,7 +14,7 @@ pub struct ScriptedEventIter {
 }
 
 impl ScriptedEventIter {
-    pub fn new(function: LuaFunction<'_>, instrument: Option<InstrumentId>) -> mlua::Result<Self> {
+    pub fn new(function: LuaFunction<'_>, instrument: Option<InstrumentId>) -> LuaResult<Self> {
         // immediately fetch/evaluate the first event and get its environment, so we can immediately
         // show errors from the function and can reset the environment later on to this state.
         let result = function.call::<(), LuaValue>(())?;
@@ -48,7 +48,7 @@ impl ScriptedEventIter {
         }
     }
 
-    fn next_event(&self) -> mlua::Result<Event> {
+    fn next_event(&self) -> LuaResult<Event> {
         let result = self.function.call::<(), LuaValue>(())?;
         Ok(Event::NoteEvents(new_note_events_from_lua(
             result,

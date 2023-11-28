@@ -15,7 +15,7 @@ impl BeatTimeRhythm {
         table: LuaTable,
         default_time_base: BeatTimeBase,
         default_instrument: Option<InstrumentId>,
-    ) -> mlua::Result<BeatTimeRhythm> {
+    ) -> LuaResult<BeatTimeRhythm> {
         let resolution = table.get::<&str, f32>("resolution").unwrap_or(1.0);
         if resolution <= 0.0 {
             return Err(bad_argument_error(
