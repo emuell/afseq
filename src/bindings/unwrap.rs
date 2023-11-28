@@ -521,6 +521,26 @@ pub(crate) fn event_iter_from_value(
             let iter = ScriptedEventIter::new(function, default_instrument)?;
             Ok(Rc::new(RefCell::new(iter)))
         }
+        LuaValue::Table(ref table) => {
+            // convert an array alike table to a event sequence
+            if let Some(sequence) = sequence_from_table(&table.clone()) {
+                let mut note_event_sequence = vec![];
+                for (arg_index, arg) in sequence.into_iter().enumerate() {
+                    note_event_sequence.push(note_events_from_value(
+                        arg,
+                        Some(arg_index),
+                        default_instrument,
+                    )?);
+                }
+                let iter = note_event_sequence.to_event_sequence();
+                Ok(Rc::new(RefCell::new(iter)))
+            }
+            // convert table to a single note event
+            else {
+                let iter = note_event_from_value(value, None, default_instrument)?.to_event();
+                Ok(Rc::new(RefCell::new(iter)))
+            }
+        }
         _ => {
             let iter = note_event_from_value(value, None, default_instrument)?.to_event();
             Ok(Rc::new(RefCell::new(iter)))
