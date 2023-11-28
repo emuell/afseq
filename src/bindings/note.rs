@@ -1,7 +1,11 @@
 use mlua::prelude::*;
 
+use crate::{
+    event::{InstrumentId, NoteEvent},
+    note::Note,
+};
+
 use super::unwrap::*;
-use crate::prelude::*;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -15,13 +19,13 @@ impl NoteUserData {
     pub fn from(
         args: LuaMultiValue,
         default_instrument: Option<InstrumentId>,
-    ) -> mlua::Result<Self> {
+    ) -> LuaResult<Self> {
         // a single value, probably a sequence
         let args = args.into_vec();
         if args.len() == 1 {
             let arg = args
                 .first()
-                .ok_or(mlua::Error::RuntimeError(
+                .ok_or(LuaError::RuntimeError(
                     "Failed to access table content".to_string(),
                 ))
                 .cloned()?;
@@ -57,6 +61,20 @@ impl NoteUserData {
 }
 
 impl LuaUserData for NoteUserData {
+    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_field_method_get("notes", |lua, this| -> LuaResult<LuaTable> {
+            let sequence = lua.create_table()?;
+            for (index, note_event) in this.notes.iter().enumerate() {
+                if let Some(note_event) = note_event {
+                    sequence.set(index + 1, note_event.clone().into_lua(lua)?)?;
+                } else {
+                    sequence.set(index + 1, LuaValue::Table(lua.create_table()?))?;
+                }
+            }
+            Ok(sequence)
+        })
+    }
+
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method_mut("transpose", |lua, this, value: LuaValue| {
             let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
@@ -115,17 +133,17 @@ impl LuaUserData for NoteUserData {
 
 #[cfg(test)]
 mod test {
-    use crate::bindings::*;
     use super::*;
+    use crate::{bindings::*, event::new_note};
 
-    fn evaluate_note_userdata(engine: &Lua, expression: &str) -> mlua::Result<NoteUserData> {
-    Ok(engine
-        .load(expression)
-        .eval::<LuaValue>()?
-        .as_userdata()
-        .ok_or(mlua::Error::RuntimeError("No user data".to_string()))?
-        .borrow::<NoteUserData>()?
-        .clone())
+    fn evaluate_note_userdata(engine: &Lua, expression: &str) -> LuaResult<NoteUserData> {
+        Ok(engine
+            .load(expression)
+            .eval::<LuaValue>()?
+            .as_userdata()
+            .ok_or(LuaError::RuntimeError("No user data".to_string()))?
+            .borrow::<NoteUserData>()?
+            .clone())
     }
 
     #[test]
@@ -288,6 +306,7 @@ mod test {
     fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
         let mut engine = new_engine();
+                let instrument = Some(InstrumentId::from(76));
         register_bindings(
             &mut engine,
             BeatTimeBase {
@@ -295,29 +314,40 @@ mod test {
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            None,
+            instrument,
         )?;
+
+        // notes
+        assert_eq!(
+            evaluate_note_userdata(&engine, r#"note(note("c4 0.2 0.3 0.4", "", "e4").notes)"#)?
+                .notes,
+            vec![
+                new_note((instrument, "c4", 0.2, 0.3, 0.4)),
+                None,
+                new_note((instrument, "e4")),
+            ]
+        );
 
         // transpose
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):transpose(12)"#)?.notes,
             vec![
-                new_note((None, "c5")),
-                new_note((None, "d5")),
-                new_note((None, "e5")),
+                new_note((instrument, "c5")),
+                new_note((instrument, "d5")),
+                new_note((instrument, "e5")),
             ]
         );
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):transpose({2, 4})"#)?.notes,
             vec![
-                new_note((None, "d_4")),
-                new_note((None, "f#4")),
-                new_note((None, "e_4")),
+                new_note((instrument, "d_4")),
+                new_note((instrument, "f#4")),
+                new_note((instrument, "e_4")),
             ]
         );
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
-            vec![new_note((None, 0x0_u8)), new_note((None, 0x7f_u8)),]
+            vec![new_note((instrument, 0x0_u8)), new_note((instrument, 0x7f_u8)),]
         );
 
         // with_volume
@@ -334,9 +364,9 @@ mod test {
             )?
             .notes,
             vec![
-                new_note((None, "c4", 2.0)),
-                new_note((None, "d4", 2.0)),
-                new_note((None, "e4", 2.0)),
+                new_note((instrument, "c4", 2.0)),
+                new_note((instrument, "d4", 2.0)),
+                new_note((instrument, "e4", 2.0)),
             ]
         );
         assert_eq!(
@@ -346,9 +376,9 @@ mod test {
             )?
             .notes,
             vec![
-                new_note((None, "c4", 2.0)),
-                new_note((None, "d4", 4.0)),
-                new_note((None, "e4", 0.5)),
+                new_note((instrument, "c4", 2.0)),
+                new_note((instrument, "d4", 4.0)),
+                new_note((instrument, "e4", 0.5)),
             ]
         );
         assert_eq!(
@@ -358,9 +388,9 @@ mod test {
             )?
             .notes,
             vec![
-                new_note((None, "c4", 2.0)),
-                new_note((None, "d4", 2.0)),
-                new_note((None, "e4", 2.0)),
+                new_note((instrument, "c4", 2.0)),
+                new_note((instrument, "d4", 2.0)),
+                new_note((instrument, "e4", 2.0)),
             ]
         );
 
@@ -372,9 +402,9 @@ mod test {
             )?
             .notes,
             vec![
-                new_note((None, "c4", 1.0)),
-                new_note((None, "d4", 1.0)),
-                new_note((None, "e4", 1.0)),
+                new_note((instrument, "c4", 1.0)),
+                new_note((instrument, "d4", 1.0)),
+                new_note((instrument, "e4", 1.0)),
             ]
         );
         assert_eq!(
@@ -384,9 +414,9 @@ mod test {
             )?
             .notes,
             vec![
-                new_note((None, "c4", 1.0)),
-                new_note((None, "d4", 2.0)),
-                new_note((None, "e4", 0.5)),
+                new_note((instrument, "c4", 1.0)),
+                new_note((instrument, "d4", 2.0)),
+                new_note((instrument, "e4", 0.5)),
             ]
         );
 
@@ -400,9 +430,9 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):with_panning(-1.0)"#)?.notes,
             vec![
-                new_note((None, "c4", 1.0, -1.0)),
-                new_note((None, "d4", 1.0, -1.0)),
-                new_note((None, "e4", 1.0, -1.0)),
+                new_note((instrument, "c4", 1.0, -1.0)),
+                new_note((instrument, "d4", 1.0, -1.0)),
+                new_note((instrument, "e4", 1.0, -1.0)),
             ]
         );
         assert_eq!(
@@ -412,9 +442,9 @@ mod test {
             )?
             .notes,
             vec![
-                new_note((None, "c4", 1.0, -1.0)),
-                new_note((None, "d4", 1.0, 1.0)),
-                new_note((None, "e4", 1.0, 0.0)),
+                new_note((instrument, "c4", 1.0, -1.0)),
+                new_note((instrument, "d4", 1.0, 1.0)),
+                new_note((instrument, "e4", 1.0, 0.0)),
             ]
         );
 
@@ -428,18 +458,18 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):with_delay(0.75)"#)?.notes,
             vec![
-                new_note((None, "c4", 1.0, 0.0, 0.75)),
-                new_note((None, "d4", 1.0, 0.0, 0.75)),
-                new_note((None, "e4", 1.0, 0.0, 0.75)),
+                new_note((instrument, "c4", 1.0, 0.0, 0.75)),
+                new_note((instrument, "d4", 1.0, 0.0, 0.75)),
+                new_note((instrument, "e4", 1.0, 0.0, 0.75)),
             ]
         );
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "d4", "e4"):with_delay({0.25, 0.5})"#)?
                 .notes,
             vec![
-                new_note((None, "c4", 1.0, 0.0, 0.25)),
-                new_note((None, "d4", 1.0, 0.0, 0.5)),
-                new_note((None, "e4", 1.0, 0.0)),
+                new_note((instrument, "c4", 1.0, 0.0, 0.25)),
+                new_note((instrument, "d4", 1.0, 0.0, 0.5)),
+                new_note((instrument, "e4", 1.0, 0.0)),
             ]
         );
 

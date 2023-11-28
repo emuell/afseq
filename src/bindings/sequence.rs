@@ -12,16 +12,13 @@ pub struct SequenceUserData {
 }
 
 impl SequenceUserData {
-    pub fn from(
-        args: LuaMultiValue,
-        default_instrument: Option<InstrumentId>,
-    ) -> mlua::Result<Self> {
+    pub fn from(args: LuaMultiValue, default_instrument: Option<InstrumentId>) -> LuaResult<Self> {
         // a single value, probably a sequence array
         let args = args.into_vec();
         if args.len() == 1 {
             let arg = args
                 .first()
-                .ok_or(mlua::Error::RuntimeError(
+                .ok_or(LuaError::RuntimeError(
                     "Failed to access table content".to_string(),
                 ))
                 .cloned()?;
@@ -57,6 +54,24 @@ impl SequenceUserData {
 }
 
 impl LuaUserData for SequenceUserData {
+    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_field_method_get("notes", |lua, this| -> LuaResult<LuaTable> {
+            let sequence = lua.create_table()?;
+            for (index, note_events) in this.notes.iter().enumerate() {
+                let notes = lua.create_table()?;
+                for (index, note_event) in note_events.iter().enumerate() {
+                    if let Some(note_event) = note_event {
+                        notes.set(index + 1, note_event.clone().into_lua(lua)?)?;
+                    } else {
+                        notes.set(index + 1, LuaValue::Table(lua.create_table()?))?;
+                    }
+                }
+                sequence.set(index + 1, notes)?;
+            }
+            Ok(sequence)
+        })
+    }
+
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
             let steps = transpose_steps_array_from_value(lua, volume, this.notes.len())?;
@@ -119,15 +134,12 @@ mod test {
     use super::*;
     use crate::bindings::*;
 
-    fn evaluate_sequence_userdata(
-        engine: &Lua,
-        expression: &str,
-    ) -> mlua::Result<SequenceUserData> {
+    fn evaluate_sequence_userdata(engine: &Lua, expression: &str) -> LuaResult<SequenceUserData> {
         Ok(engine
             .load(expression)
             .eval::<LuaValue>()?
             .as_userdata()
-            .ok_or(mlua::Error::RuntimeError("No user data".to_string()))?
+            .ok_or(LuaError::RuntimeError("No user data".to_string()))?
             .borrow::<SequenceUserData>()?
             .clone())
     }
@@ -242,6 +254,23 @@ mod test {
             },
             instrument,
         )?;
+
+        // notes
+        assert_eq!(
+            evaluate_sequence_userdata(
+                &engine,
+                r#"sequence(sequence{{"c4 0.2 0.3 0.4", "d4"}, {}, {"e4"}}.notes)"#
+            )?
+            .notes,
+            vec![
+                vec![
+                    new_note((instrument, "c4", 0.2, 0.3, 0.4)),
+                    new_note((instrument, "d4")),
+                ],
+                vec![None],
+                vec![new_note((instrument, "e4"))],
+            ]
+        );
 
         // with_xxx
         assert!(evaluate_sequence_userdata(
