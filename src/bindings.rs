@@ -123,7 +123,7 @@ pub fn new_note_events_from_lua(
     arg: LuaValue,
     arg_index: Option<usize>,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<Vec<Option<NoteEvent>>> {
+) -> LuaResult<Vec<Option<NoteEvent>>> {
     unwrap::note_events_from_value(arg, arg_index, default_instrument)
 }
 
@@ -145,14 +145,14 @@ fn register_global_bindings(
     lua: &mut Lua,
     default_time_base: BeatTimeBase,
     default_instrument: Option<InstrumentId>,
-) -> mlua::Result<()> {
+) -> LuaResult<()> {
     let globals = lua.globals();
 
     // function euclidean(pulses, steps, [offset])
     globals.set(
         "euclidean",
         lua.create_function(
-            |lua, (pulses, steps, offset): (i32, i32, Option<i32>)| -> mlua::Result<LuaTable> {
+            |lua, (pulses, steps, offset): (i32, i32, Option<i32>)| -> LuaResult<LuaTable> {
                 let offset = offset.unwrap_or(0);
                 if pulses <= 0 {
                     return Err(bad_argument_error(
@@ -191,8 +191,8 @@ fn register_global_bindings(
     globals.set(
         "scale",
         lua.create_function(
-            |_lua, (note, mode_or_intervals): (LuaValue, LuaValue)| -> mlua::Result<Scale> {
-                let note = note_from_value(note, Some(0))?;
+            |lua, (note, mode_or_intervals): (LuaValue, LuaValue)| -> LuaResult<Scale> {
+                let note = FromLua::from_lua(note, lua)?;
                 if let Some(mode) = mode_or_intervals.as_str() {
                     match Scale::try_from((note, mode)) {
                         Ok(scale) => Ok(scale),
@@ -214,7 +214,7 @@ fn register_global_bindings(
                         .sequence_values::<usize>()
                         .enumerate()
                         .map(|(_, result)| result)
-                        .collect::<mlua::Result<Vec<usize>>>()?;
+                        .collect::<LuaResult<Vec<usize>>>()?;
                     Ok(Scale::try_from((note, &intervals)).map_err(|err| {
                         bad_argument_error("scale", "intervals", 1, err.to_string().as_str())
                     })?)
@@ -235,7 +235,7 @@ fn register_global_bindings(
         "note",
         lua.create_function({
             let default_instrument = default_instrument;
-            move |_lua, args: LuaMultiValue| -> mlua::Result<NoteUserData> {
+            move |_lua, args: LuaMultiValue| -> LuaResult<NoteUserData> {
                 NoteUserData::from(args, default_instrument)
             }
         })?,
@@ -246,7 +246,7 @@ fn register_global_bindings(
         "sequence",
         lua.create_function({
             let default_instrument = default_instrument;
-            move |_lua, args: LuaMultiValue| -> mlua::Result<SequenceUserData> {
+            move |_lua, args: LuaMultiValue| -> LuaResult<SequenceUserData> {
                 SequenceUserData::from(args, default_instrument)
             }
         })?,
@@ -257,7 +257,7 @@ fn register_global_bindings(
         "Emitter",
         lua.create_function({
             let default_time_base = default_time_base;
-            move |lua, table: LuaTable| -> mlua::Result<LuaValue> {
+            move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 let second_time_unit = match table.get::<&str, String>("unit") {
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
                     Err(_) => false,
@@ -280,7 +280,7 @@ fn register_global_bindings(
     Ok(())
 }
 
-fn register_pattern_bindings(lua: &mut Lua) -> mlua::Result<()> {
+fn register_pattern_bindings(lua: &mut Lua) -> LuaResult<()> {
     // implemented in lua: load and evaluate chunk
     let chunk = lua
         .load(include_str!("./bindings/lua/pattern.lua"))
@@ -288,7 +288,7 @@ fn register_pattern_bindings(lua: &mut Lua) -> mlua::Result<()> {
     chunk.exec()
 }
 
-fn register_fun_bindings(lua: &mut Lua) -> mlua::Result<()> {
+fn register_fun_bindings(lua: &mut Lua) -> LuaResult<()> {
     // implemented in lua: load and evaluate chunk
     let chunk = lua
         .load(include_str!("./bindings/lua/fun.lua"))

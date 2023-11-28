@@ -17,12 +17,60 @@ pub(crate) fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option
     arg: S2,
     pos: usize,
     message: &str,
-) -> mlua::Error {
-    mlua::Error::BadArgument {
+) -> LuaError {
+    LuaError::BadArgument {
         to: func.into().map(String::from),
         name: arg.into().map(String::from),
         pos,
-        cause: Arc::new(mlua::Error::RuntimeError(message.to_string())),
+        cause: Arc::new(LuaError::RuntimeError(message.to_string())),
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
+impl<'lua> IntoLua<'lua> for Note {
+    fn into_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        self.to_string().into_lua(lua)
+    }
+}
+
+impl<'lua> FromLua<'lua> for Note {
+    fn from_lua(value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::Integer(note_value) => Ok(Note::from(note_value as u8)),
+            LuaValue::String(str) => {
+                Note::try_from(&str.to_string_lossy() as &str).map_err(|err| {
+                    LuaError::FromLuaConversionError {
+                        from: "string",
+                        to: "Note",
+                        message: Some(err.to_string()),
+                    }
+                })
+            }
+            _ => {
+                return Err(LuaError::FromLuaConversionError {
+                    from: value.type_name(),
+                    to: "note",
+                    message: Some("expected a note number or note string".to_string()),
+                })
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
+impl<'lua> IntoLua<'lua> for NoteEvent {
+    fn into_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        let table = lua.create_table()?;
+        table.set("key", self.note.into_lua(lua)?)?;
+        if let Some(instrument) = self.instrument {
+            table.set("instrument", usize::from(instrument) as i64)?;
+        }
+        table.set("volume", self.volume as f64)?;
+        table.set("panning", self.panning as f64)?;
+        table.set("delay", self.delay as f64)?;
+        Ok(LuaValue::Table(table))
     }
 }
 
@@ -253,39 +301,7 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
     matches!(s, "" | "-" | "--" | "---" | "." | ".." | "...")
 }
 
-pub(crate) fn note_from_value(arg: LuaValue, arg_index: Option<usize>) -> mlua::Result<Note> {
-    match arg {
-        LuaValue::Integer(note_value) => Ok(Note::from(note_value as u8)),
-        LuaValue::String(str) => Note::try_from(&str.to_string_lossy() as &str).map_err(|err| {
-            mlua::Error::FromLuaConversionError {
-                from: "string",
-                to: "Note",
-                message: Some(format!(
-                    "Invalid note value '{}': {}",
-                    str.to_string_lossy(),
-                    err
-                )),
-            }
-        }),
-        _ => {
-            return Err(mlua::Error::FromLuaConversionError {
-                from: arg.type_name(),
-                to: "Note",
-                message: if let Some(index) = arg_index {
-                    Some(
-                        format!(
-                            "Note arg #{} does not contain a valid note property",
-                            index + 1
-                        )
-                        .to_string(),
-                    )
-                } else {
-                    Some("Argument does not contain a valid note property".to_string())
-                },
-            });
-        }
-    }
-}
+// ---------------------------------------------------------------------------------------------
 
 pub(crate) fn note_event_from_number(
     note_value: i64,
