@@ -19,9 +19,9 @@ return Emitter {
 
     return function()
       -- get current note set
-      local notes = fun.to_table(fun.map(function(note_index)
-        return scales[scale_index][note_index] or 0
-      end, { 1, 6, 3, 4, 0, 3 }))
+      local notes = fun.iter({ 1, 6, 3, 4, 0, 3 })
+          :map(function(note_index) return scales[scale_index][note_index] or 0 end)
+          :to_table()
       -- move note step
       local note = notes[math.floor(note_step % #notes) + 1]
       note_step = note_step + 1

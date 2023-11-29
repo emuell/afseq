@@ -12,7 +12,7 @@ return Emitter {
         key = "c5"
         volume = volume * 0.6
       end
-      return note({key = key, volume = volume})
+      return {key = key, volume = volume}
     end
   end
 }
