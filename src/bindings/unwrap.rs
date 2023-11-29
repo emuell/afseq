@@ -403,10 +403,14 @@ pub(crate) fn note_events_from_value(
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     match arg {
         LuaValue::UserData(userdata) => {
-            if let Ok(sequence) = userdata.take::<SequenceUserData>() {
-                Ok(sequence.notes.into_iter().flatten().collect())
-            } else if let Ok(chord) = userdata.take::<NoteUserData>() {
+            if let Ok(chord) = userdata.take::<NoteUserData>() {
                 Ok(chord.notes)
+            } else if userdata.is::<SequenceUserData>() {
+                Err(LuaError::FromLuaConversionError {
+                    from: "userdata",
+                    to: "note",
+                    message: Some("can't nest sequences in sequences".to_string()),
+                })
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
