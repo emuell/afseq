@@ -24,7 +24,7 @@ dhat = { version = "0.3.2", optional = true }
 # optional -> scripting
 mlua = { version = "^0.9", features = ["lua52", "vendored", "macros", "unstable"], optional = true }
 # optional -> player
-afplay = { path = "../afplay", default-features = false, features = ["cpal-output"], optional = true }
+afplay = { git = "ssh://git@git.renoise.com:2229/nerdbox/afplay.git", default-features = false, features = ["cpal-output"], optional = true }
 
 [dev-dependencies]
 notify = { version = "^6.1" }

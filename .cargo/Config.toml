@@ -1,0 +1,9 @@
+[net]
+git-fetch-with-cli = true
+
+[net.ssh]
+known-hosts = [
+  "[git.renoise.com]:2229 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJDs1V2Y2tRgrUkkA+OEZdKYWkq2mzUoDG/suupsvf72GEP5YbLEYVa6vsOxeZ6lQPrC6Ch+ut7P5D8fHmyv+3o=",
+  "[git.renoise.com]:2229 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIANWY+dK9+JEH/XJyBklHen4hJRIkuy3M5dKY+cXpKg",
+  "[git.renoise.com]:2229 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCmIOTjQsD1TaD9MiECcRqwfAXfRdbI+2pkuF+zhBUkrX41NA4LzifPY4Iw3PlklE0YGIOzYyNitzkdgxIWkeqa0Y9iL3gGZBuLFORj5YXWlDKB2RrPAsZRL8y69y4H6RWPpL6DHHsf9eT+HgRzWzzn5nUFLfkCsuM96BqjIKN1pinIBcE6gst1UUSwSTjK8XZA5d4BiSrLF4HiNXnDm+qniYGbGkzZcjn1ua+l0GdGbfg9TotFnSK/QXgN3MeHHDZKnIjOIkOXCY+L5URe0RHo6pBFdj+BLr211AJhB52MrDNudQcY6eSQiJ08LeE6SkcrsQO/VZ/JnOkHxHd2mOyH"
+]
