@@ -136,6 +136,7 @@ pub fn register_bindings(
     default_instrument: Option<InstrumentId>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_global_bindings(lua, default_time_base, default_instrument)?;
+    register_table_bindings(lua)?;
     register_pattern_module(lua)?;
     register_fun_module(lua)?;
     Ok(())
@@ -278,6 +279,14 @@ fn register_global_bindings(
     )?;
 
     Ok(())
+}
+
+fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
+    // implemented in lua: load and evaluate chunk
+    let chunk = lua
+        .load(include_str!("./bindings/lua/table.lua"))
+        .set_name("[inbuilt:table.lua]");
+    chunk.exec()
 }
 
 fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
