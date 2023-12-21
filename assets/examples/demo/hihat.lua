@@ -1,3 +1,5 @@
+local pattern = require "pattern"
+
 return Emitter {
   unit = "16th",
   offset = 16 * 8,

@@ -1,3 +1,6 @@
+local pattern = require "pattern"
+local fun = require "fun"
+
 local scales = {
   scale("f", "major").notes,
   scale("c", "mixolydian").notes,
@@ -21,7 +24,7 @@ return Emitter {
       -- get current note set
       local notes = fun.iter({ 1, 6, 3, 4, 0, 3 })
           :map(function(note_index) return scales[scale_index][note_index] or 0 end)
-          :to_table()
+          :totable()
       -- move note step
       local note = notes[math.floor(note_step % #notes) + 1]
       note_step = note_step + 1

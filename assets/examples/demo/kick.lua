@@ -1,3 +1,5 @@
+local pattern = require "pattern"
+
 return Emitter {
   unit = "sixteenth",
   pattern = pattern.from({ 1, 0, 0, 0 }, { 0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 0, 0} ),

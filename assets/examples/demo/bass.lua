@@ -1,3 +1,6 @@
+local fun = require "fun"
+local pattern = require "pattern"
+
 -- local scale = scale("c5", {0,1,3,5,7,9,11}).notes
 local scale = scale("c5", "minor").notes
 

@@ -6,8 +6,7 @@
 --- Copyright (c) 2023 Eduard Müller <mail@emuell.net>
 ---
 
----@diagnostic disable-next-line: lowercase-global
-pattern = {}
+local pattern = {}
 
 pattern.mt = {
   -- all table functions can be accessed as member functions

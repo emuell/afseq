@@ -136,8 +136,8 @@ pub fn register_bindings(
     default_instrument: Option<InstrumentId>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_global_bindings(lua, default_time_base, default_instrument)?;
-    register_pattern_bindings(lua)?;
-    register_fun_bindings(lua)?;
+    register_pattern_module(lua)?;
+    register_fun_module(lua)?;
     Ok(())
 }
 
@@ -280,20 +280,38 @@ fn register_global_bindings(
     Ok(())
 }
 
-fn register_pattern_bindings(lua: &mut Lua) -> LuaResult<()> {
-    // implemented in lua: load and evaluate chunk
-    let chunk = lua
-        .load(include_str!("./bindings/lua/pattern.lua"))
-        .set_name("[inbuilt:pattern.lua]");
-    chunk.exec()
+fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
+    // see https://github.com/khvzak/mlua/discussions/322
+    let package: LuaTable = lua.globals().get("package")?;
+    let loaders: LuaTable = package.get("searchers")?; // NB: "loaders" in lua 5.1
+    loaders.push(LuaFunction::wrap(|lua, path: String| {
+        if path == "pattern" {
+            LuaFunction::wrap(|lua, ()| {
+                let data = include_str!("./bindings/lua/pattern.lua");
+                lua.load(data).call::<_, LuaValue>(())
+            })
+            .into_lua(lua)
+        } else {
+            "not found".into_lua(lua)
+        }
+    }))
 }
 
-fn register_fun_bindings(lua: &mut Lua) -> LuaResult<()> {
-    // implemented in lua: load and evaluate chunk
-    let chunk = lua
-        .load(include_str!("./bindings/lua/fun.lua"))
-        .set_name("[inbuilt:fun.lua]");
-    chunk.exec()
+fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
+    // see https://github.com/khvzak/mlua/discussions/322
+    let package: LuaTable = lua.globals().get("package")?;
+    let loaders: LuaTable = package.get("searchers")?; // NB: "loaders" in lua 5.1
+    loaders.push(LuaFunction::wrap(|lua, path: String| {
+        if path == "fun" {
+            LuaFunction::wrap(|lua, ()| {
+                let data = include_str!("./bindings/lua/fun.lua");
+                lua.load(data).call::<_, LuaValue>(())
+            })
+            .into_lua(lua)
+        } else {
+            "not found".into_lua(lua)
+        }
+    }))
 }
 
 // --------------------------------------------------------------------------------------------------
@@ -317,12 +335,33 @@ mod test {
         )
         .unwrap();
 
-        // pattern.lua is present
-        assert!(engine.load(r#"pattern.new()"#).eval::<LuaTable>().is_ok());
+        // table.lua is present
+        assert!(engine.load(r#"return table.new()"#).eval::<LuaTable>().is_ok());
 
-        // fun.lua is present
+        // pattern.lua is present, but only when required
+        assert!(engine.load(r#"return pattern.new()"#).eval::<LuaTable>().is_err());
         assert!(engine
-            .load(r#"fun.map(function(v) return v end, {1,2,3})"#)
+            .load(
+                r#"
+                local pattern = require "pattern"
+                return pattern.new()
+                "#
+            )
+            .eval::<LuaTable>()
+            .is_ok());
+
+        // fun.lua is present, but only when required
+        assert!(engine
+            .load(r#"return fun.iter {1,2,3}:map(function(v) return v*2 end):totable()"#)
+            .eval::<LuaTable>()
+            .is_err());
+        assert!(engine
+            .load(
+                r#"
+                local fun = require "fun"
+                return fun.iter {1,2,3}:map(function(v) return v*2 end):totable()
+                "#
+            )
             .eval::<LuaTable>()
             .is_ok());
     }
