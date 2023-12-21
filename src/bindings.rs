@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, env, rc::Rc};
 
+use lazy_static::lazy_static;
 use mlua::{chunk, prelude::*};
 
 // ---------------------------------------------------------------------------------------------
@@ -290,14 +291,28 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
 }
 
 fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
+    // cache module bytecode to speed up requires
+    lazy_static! {
+        static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
+            let strip = true;
+            Lua::new()
+                .load(include_str!("./bindings/lua/pattern.lua"))
+                .into_function()
+                .map(|x| x.dump(strip))
+        };
+    }
     // see https://github.com/khvzak/mlua/discussions/322
     let package: LuaTable = lua.globals().get("package")?;
     let loaders: LuaTable = package.get("searchers")?; // NB: "loaders" in lua 5.1
     loaders.push(LuaFunction::wrap(|lua, path: String| {
         if path == "pattern" {
-            LuaFunction::wrap(|lua, ()| {
-                let data = include_str!("./bindings/lua/pattern.lua");
-                lua.load(data).call::<_, LuaValue>(())
+            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.clone() {
+                Ok(bytecode) => lua
+                    .load(bytecode)
+                    .set_name("[inbuilt:pattern.lua]")
+                    .set_mode(mlua::ChunkMode::Binary)
+                    .call::<_, LuaValue>(()),
+                Err(err) => err.into_lua(lua),
             })
             .into_lua(lua)
         } else {
@@ -307,14 +322,28 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
 }
 
 fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
+    // cache module bytecode to speed up requires
+    lazy_static! {
+        static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
+            let strip = true;
+            Lua::new()
+                .load(include_str!("./bindings/lua/fun.lua"))
+                .into_function()
+                .map(|x| x.dump(strip))
+        };
+    }
     // see https://github.com/khvzak/mlua/discussions/322
     let package: LuaTable = lua.globals().get("package")?;
     let loaders: LuaTable = package.get("searchers")?; // NB: "loaders" in lua 5.1
     loaders.push(LuaFunction::wrap(|lua, path: String| {
         if path == "fun" {
-            LuaFunction::wrap(|lua, ()| {
-                let data = include_str!("./bindings/lua/fun.lua");
-                lua.load(data).call::<_, LuaValue>(())
+            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.clone() {
+                Ok(bytecode) => lua
+                    .load(bytecode)
+                    .set_name("[inbuilt:fun.lua]")
+                    .set_mode(mlua::ChunkMode::Binary)
+                    .call::<_, LuaValue>(()),
+                Err(err) => err.into_lua(lua),
             })
             .into_lua(lua)
         } else {
@@ -345,10 +374,16 @@ mod test {
         .unwrap();
 
         // table.lua is present
-        assert!(engine.load(r#"return table.new()"#).eval::<LuaTable>().is_ok());
+        assert!(engine
+            .load(r#"return table.new()"#)
+            .eval::<LuaTable>()
+            .is_ok());
 
         // pattern.lua is present, but only when required
-        assert!(engine.load(r#"return pattern.new()"#).eval::<LuaTable>().is_err());
+        assert!(engine
+            .load(r#"return pattern.new()"#)
+            .eval::<LuaTable>()
+            .is_err());
         assert!(engine
             .load(
                 r#"
