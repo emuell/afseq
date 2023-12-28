@@ -25,9 +25,7 @@ use unwrap::*;
 
 use crate::{
     event::{InstrumentId, NoteEvent},
-    rhythm::{
-        beat_time::BeatTimeRhythm, euclidean::euclidean, second_time::SecondTimeRhythm, Rhythm,
-    },
+    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::{BeatTimeBase, BeatTimeStep},
     Scale, SecondTimeBase,
 };
@@ -149,45 +147,6 @@ fn register_global_bindings(
     default_instrument: Option<InstrumentId>,
 ) -> LuaResult<()> {
     let globals = lua.globals();
-
-    // function euclidean(pulses, steps, [offset])
-    globals.set(
-        "euclidean",
-        lua.create_function(
-            |lua, (pulses, steps, offset): (i32, i32, Option<i32>)| -> LuaResult<LuaTable> {
-                let offset = offset.unwrap_or(0);
-                if pulses <= 0 {
-                    return Err(bad_argument_error(
-                        "euclidean",
-                        "pulses",
-                        1,
-                        "pulses must be > 0",
-                    ));
-                }
-                if steps <= 0 {
-                    return Err(bad_argument_error(
-                        "euclidean",
-                        "steps",
-                        2,
-                        "steps must be > 0",
-                    ));
-                }
-                if pulses > steps {
-                    return Err(bad_argument_error(
-                        "euclidean",
-                        "steps",
-                        1,
-                        "pulse must be <= step",
-                    ));
-                }
-                lua.create_sequence_from(
-                    euclidean(pulses as u32, steps as u32, offset)
-                        .iter()
-                        .map(|v| *v as i32),
-                )
-            },
-        )?,
-    )?;
 
     // function scale(note, mode|intervals)
     globals.set(
