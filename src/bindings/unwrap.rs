@@ -298,7 +298,7 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
 // ---------------------------------------------------------------------------------------------
 
 pub(crate) fn note_event_from_number(
-    note_value: i64,
+    note_value: LuaInteger,
     default_instrument: Option<InstrumentId>,
 ) -> LuaResult<Option<NoteEvent>> {
     Ok(new_note((default_instrument, note_value as u8)))

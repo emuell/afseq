@@ -10,7 +10,7 @@ impl LuaUserData for Scale {
             lua.create_sequence_from(
                 this.notes()
                     .iter()
-                    .map(|n| LuaValue::Integer(*n as u8 as i64)),
+                    .map(|n| LuaValue::Integer(*n as u8 as LuaInteger)),
             )
         })
     }
