@@ -16,10 +16,7 @@ pub struct NoteUserData {
 }
 
 impl NoteUserData {
-    pub fn from(
-        args: LuaMultiValue,
-        default_instrument: Option<InstrumentId>,
-    ) -> LuaResult<Self> {
+    pub fn from(args: LuaMultiValue, default_instrument: Option<InstrumentId>) -> LuaResult<Self> {
         // a single value, probably a sequence
         let args = args.into_vec();
         if args.len() == 1 {
@@ -306,7 +303,7 @@ mod test {
     fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
         let mut engine = new_engine();
-                let instrument = Some(InstrumentId::from(76));
+        let instrument = Some(InstrumentId::from(76));
         register_bindings(
             &mut engine,
             BeatTimeBase {
@@ -347,7 +344,10 @@ mod test {
         );
         assert_eq!(
             evaluate_note_userdata(&engine, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
-            vec![new_note((instrument, 0x0_u8)), new_note((instrument, 0x7f_u8)),]
+            vec![
+                new_note((instrument, 0x0_u8)),
+                new_note((instrument, 0x7f_u8)),
+            ]
         );
 
         // with_volume
