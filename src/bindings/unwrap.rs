@@ -546,7 +546,8 @@ pub(crate) fn event_iter_from_value(
             }
         }
         _ => {
-            let iter = note_event_from_value(value, None, default_instrument)?.to_event();
+            // try converting a note number or note/chord string to an event iter
+            let iter = note_events_from_value(value, None, default_instrument)?.to_event();
             Ok(Rc::new(RefCell::new(iter)))
         }
     }
