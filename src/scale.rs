@@ -511,6 +511,16 @@ mod test {
 
     #[test]
     fn scale_from_string() {
+        // debug: print all scale names
+        /* 
+        let names = Scale::mode_names()
+            .into_iter()
+            .map(|e| format!("\"{}\"", e))
+            .collect::<Vec<_>>()
+            .join("|");
+        println!("{}", names);
+        */
+
         assert!(Mode::try_from("mel min").is_err());
         assert!(Mode::try_from("wurst").is_err());
         assert!(Mode::try_from("Lydian Augmented Major").is_err());
