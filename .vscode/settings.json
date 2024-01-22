@@ -3,7 +3,7 @@
         "note",
         "sequence",
         "scale",
-        "Emitter",
+        "emitter",
         "totable",
         "chain",
         "cycle",

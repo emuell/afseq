@@ -1,4 +1,4 @@
-return Emitter {
+return emitter {
   unit = "seconds",
   resolution = 8,
   offset = 64,

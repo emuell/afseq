@@ -1,4 +1,4 @@
-return Emitter {
+return emitter {
   unit = "bars",
   resolution = 4,
   offset = 16,

@@ -1,6 +1,6 @@
 local pattern = require "pattern"
 
-return Emitter {
+return emitter {
   unit = "16th",
   offset = 16 * 8,
   pattern = pattern.euclidean(14, 16, 6),

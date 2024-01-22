@@ -213,9 +213,9 @@ fn register_global_bindings(
         })?,
     )?;
 
-    // function Emitter { args... }
+    // function emitter { args... }
     globals.set(
-        "Emitter",
+        "emitter",
         lua.create_function({
             let default_time_base = default_time_base;
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {

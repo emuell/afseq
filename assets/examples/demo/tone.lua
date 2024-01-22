@@ -6,7 +6,7 @@ local scales = {
   scale("c", "mixolydian").notes,
 }
 
-return Emitter {
+return emitter {
   unit = "16th",
   pattern = pattern.euclidean(6, 8, -5),
   offset = 16 * 64,
