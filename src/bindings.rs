@@ -244,7 +244,7 @@ fn register_global_bindings(
 fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     // implemented in lua: load and evaluate chunk
     let chunk = lua
-        .load(include_str!("./bindings/lua/table.lua"))
+        .load(include_str!("../types/nerdo/library/table.lua"))
         .set_name("[inbuilt:table.lua]");
     chunk.exec()
 }
@@ -255,7 +255,7 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
         static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
             let strip = true;
             Lua::new()
-                .load(include_str!("./bindings/lua/pattern.lua"))
+                .load(include_str!("../types/nerdo/library/extras/pattern.lua"))
                 .into_function()
                 .map(|x| x.dump(strip))
         };
@@ -286,7 +286,7 @@ fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
         static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
             let strip = true;
             Lua::new()
-                .load(include_str!("./bindings/lua/fun.lua"))
+                .load(include_str!("../types/nerdo/library/extras/fun.lua"))
                 .into_function()
                 .map(|x| x.dump(strip))
         };

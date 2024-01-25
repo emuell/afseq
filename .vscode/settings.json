@@ -1,14 +1,3 @@
 {
-    "Lua.diagnostics.globals": [
-        "note",
-        "sequence",
-        "scale",
-        "emitter",
-        "totable",
-        "chain",
-        "cycle",
-        "map",
-        "take",
-        "to_table"
-    ],
+    "Lua.workspace.library": [ "types" ]
 }

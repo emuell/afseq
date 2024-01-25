@@ -1,0 +1,7 @@
+{
+    "name": "nerdo",
+    "words"  : ["%s*emitter.*"],
+    "settings" : {
+        "Lua.runtime.version" : "Lua 5.1"
+    }
+}

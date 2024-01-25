@@ -1,0 +1,62 @@
+---@meta
+---Do not try to execute this file. It's just a type definition file.
+---
+---Part of the afseq trait: Defines LuaLS annotations for the afseq Emitter class.
+---
+
+----------------------------------------------------------------------------------------------------
+
+---@class EmitterOptions
+---Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
+---create other less common rhythm bases.
+---### examples:
+---```lua
+---unit = "beats", resolution = 1.01 --> slightly off beat pulse
+---unit = "1/16", resolution = 4/3 --> tripplet
+---```
+---@field unit "16th"|"1/16"|"sixteenth"|"8th"|"1/8"|"eighth"|"4th"|"1/4"|"beats"|"bars"?
+---Factor which is applied on `unit` to specify the final time resolution of the emitter.
+---### examples:
+---```lua
+---unit = "beats", resolution = 1.01 --> slightly off beat pulse
+---unit = "1/16", resolution = 4/3 --> tripplet
+---```
+---@field resolution number?
+---Specify the rythmical pattern of the emitter. Patterns are repeated endlessly by default.
+---When not defined, a constant rhythmical pattern of `1` is triggered.
+---@see pattern to help creating patterns.
+---### examples:
+---```lua
+---pattern = { 1, 0, 0, 1 },
+---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
+---pattern = pattern.euclidean(7, 16, 2)
+---```
+---@field pattern (0|1)[]?
+---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
+---next event from the specified emit sequence gets triggered. When the end of the sequence is
+---reached, it restarts from the beginning.<br>
+---In order to dynamically generate notes, you can pass a function or a generator function, instead
+---of a fixed note array or sequence.
+---### examples:
+---```lua
+---emit = {"c4", "g4"}, -- a sequence of c4, g4
+---emit = {{"c4", "g4"}}, -- a chord of c4, g4
+---emit = sequence{"c4", "g4"}:with_volume(0.5), -- a sequence of c4, g4 with volume 0.5
+---
+---emit = function() -- a function
+---  return 48 + math.random(1, 4) * 5
+---end,
+---
+---emit = function() -- a generator (function with upvalue state)
+---  local i, step, notes = 1, 2, scale("c5", "minor").notes
+---  return function()
+---    local key = notes[i]
+---    i = (i + step - 1) % #notes + 1
+---    return { key = key, volume = 0.5 }
+---  end
+---end
+---```
+---@field emit Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun():NoteValue)|(fun():fun():NoteValue)
+---@param options EmitterOptions
+---@return userdata
+function emitter(options) end
