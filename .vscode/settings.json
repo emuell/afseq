@@ -1,3 +1,4 @@
 {
+    "Lua.runtime.version" : "Lua 5.1",
     "Lua.workspace.library": [ "types" ]
 }

@@ -262,7 +262,7 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
     }
     // see https://github.com/khvzak/mlua/discussions/322
     let package: LuaTable = lua.globals().get("package")?;
-    let loaders: LuaTable = package.get("searchers")?; // NB: "loaders" in lua 5.1
+    let loaders: LuaTable = package.get("loaders")?; // NB: "searchers" in lua 5.2
     loaders.push(LuaFunction::wrap(|lua, path: String| {
         if path == "pattern" {
             LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.clone() {
@@ -293,7 +293,7 @@ fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
     }
     // see https://github.com/khvzak/mlua/discussions/322
     let package: LuaTable = lua.globals().get("package")?;
-    let loaders: LuaTable = package.get("searchers")?; // NB: "loaders" in lua 5.1
+    let loaders: LuaTable = package.get("loaders")?; // NB: "searchers" in lua 5.2
     loaders.push(LuaFunction::wrap(|lua, path: String| {
         if path == "fun" {
             LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.clone() {

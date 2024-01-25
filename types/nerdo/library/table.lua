@@ -5,6 +5,12 @@
 
 ----------------------------------------------------------------------------------------------------
 
+-- backwards compatibility for Lua 5.1
+---@diagnostic disable-next-line: deprecated
+table.unpack = table.unpack or unpack
+
+----------------------------------------------------------------------------------------------------
+
 ---Create an empty table that uses 'table' functions as methods
 ---@return table
 function table.new()

@@ -22,7 +22,7 @@ uuid = {version = "^1.3", features = [ "v4", "fast-rng" ]}
 # optional -> dhat-profiler
 dhat = { version = "0.3.2", optional = true }
 # optional -> scripting
-mlua = { version = "^0.9", features = ["lua52", "vendored", "macros", "unstable"], optional = true }
+mlua = { version = "^0.9", features = ["lua51", "vendored", "macros", "unstable"], optional = true }
 # optional -> player
 afplay = { git = "ssh://git@git.renoise.com:2229/nerdbox/afplay.git", default-features = false, features = ["cpal-output"], optional = true }
 
