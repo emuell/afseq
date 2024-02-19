@@ -37,6 +37,9 @@ pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     /// Set a new custom sample offset value.
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
+    /// Sample time iter: returns self.next() up and until the given sample time
+    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)>;
+
     /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);
 }

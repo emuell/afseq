@@ -122,6 +122,7 @@ impl Iterator for BeatTimeRhythm {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pattern.is_empty() {
+            self.event_iter_sample_time += self.step.to_samples(&self.time_base);
             return None;
         }
         // fetch current value
@@ -152,7 +153,7 @@ impl Rhythm for BeatTimeRhythm {
     }
 
     fn samples_per_step(&self) -> f64 {
-        self.step.samples_per_step(&self.time_base)
+        self.step.to_samples(&self.time_base)
     }
     fn pattern_length(&self) -> usize {
         self.pattern.len()
@@ -163,6 +164,15 @@ impl Rhythm for BeatTimeRhythm {
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset
+    }
+
+    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
+        let current_sample_time = self.event_iter_sample_time + self.sample_offset as f64;
+        if current_sample_time + self.samples_per_step() < sample_time as f64 {
+            self.next()
+        } else {
+            None
+        }
     }
 
     fn reset(&mut self) {

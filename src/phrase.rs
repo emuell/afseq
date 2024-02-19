@@ -1,4 +1,4 @@
-//! Combine, stack multiple `Rythm` iterators into a single one, in order to play multiple 
+//! Combine, stack multiple `Rythm` iterators into a single one, in order to play multiple
 //! Rhythms at once.
 
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
@@ -65,7 +65,6 @@ pub struct Phrase {
     length: BeatTimeStep,
     rhythm_slots: Vec<RhythmSlot>,
     next_events: Vec<Option<RhythmEvent>>,
-    held_back_event: Option<RhythmEvent>,
     sample_offset: SampleTime,
 }
 
@@ -79,7 +78,6 @@ impl Phrase {
         length: BeatTimeStep,
     ) -> Self {
         let next_events = vec![None; rhythm_slots.len()];
-        let held_back_event = None;
         let sample_offset = 0;
         Self {
             time_base,
@@ -89,7 +87,6 @@ impl Phrase {
                 .map(|rhythm| -> RhythmSlot { rhythm.into() })
                 .collect::<Vec<_>>(),
             next_events,
-            held_back_event,
             sample_offset,
         }
     }
@@ -111,23 +108,11 @@ impl Phrase {
     where
         F: FnMut(RhythmIndex, SampleTime, Option<Event>),
     {
-        // emit last held back event first
-        if let Some((rhythm_index, sample_time, event)) = self.held_back_event.take() {
-            if sample_time < run_until_time {
-                consumer(rhythm_index, sample_time, event);
-            } else {
-                // held back event is not yet due. put it back...
-                self.held_back_event = Some((rhythm_index, sample_time, event));
-                return;
-            }
-        }
-        // then emit next events until we've reached the desired sample_time
-        while let Some((rhythm_index, sample_time, event)) = self.next_event() {
-            if sample_time >= run_until_time {
-                // hold this event back for the next run
-                self.held_back_event = Some((rhythm_index, sample_time, event));
-                break;
-            }
+        // emit next events until we've reached the desired sample_time
+        while let Some((rhythm_index, sample_time, event)) =
+            self.next_event_until_time(run_until_time)
+        {
+            assert!(sample_time < run_until_time);
             consumer(rhythm_index, sample_time, event);
         }
     }
@@ -146,29 +131,14 @@ impl Phrase {
                         rhythm.set_sample_offset(sample_offset);
                     }
                     self.next_events[rhythm_index] = None;
-                    if let Some((index, _, _)) = self.held_back_event {
-                        if index == rhythm_index {
-                            self.held_back_event = None
-                        }
-                    }
                 }
                 RhythmSlot::Stop => {
                     self.next_events[rhythm_index] = None;
-                    if let Some((index, _, _)) = self.held_back_event {
-                        if index == rhythm_index {
-                            self.held_back_event = None
-                        }
-                    }
                 }
                 RhythmSlot::Continue => {
                     // take over pending events
                     self.next_events[rhythm_index] =
                         previous_phrase.next_events[rhythm_index].clone();
-                    if let Some((index, _, _)) = previous_phrase.held_back_event {
-                        if index == rhythm_index {
-                            self.held_back_event = previous_phrase.held_back_event.clone();
-                        }
-                    }
                     // take over rhythm
                     self.rhythm_slots[rhythm_index] =
                         previous_phrase.rhythm_slots[rhythm_index].clone();
@@ -177,7 +147,7 @@ impl Phrase {
         }
     }
 
-    fn next_event(&mut self) -> Option<RhythmEvent> {
+    fn next_event_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmEvent> {
         // fetch next events in all rhythms
         for (rhythm_index, (rhythm_slot, next_event)) in self
             .rhythm_slots
@@ -190,7 +160,9 @@ impl Phrase {
                     // NB: Continue mode is resolved by the Sequence - if not, it should behave like Stop
                     RhythmSlot::Stop | RhythmSlot::Continue => *next_event = None,
                     RhythmSlot::Rhythm(rhythm) => {
-                        if let Some((sample_time, event)) = rhythm.borrow_mut().next() {
+                        if let Some((sample_time, event)) =
+                            rhythm.borrow_mut().next_until_time(sample_time)
+                        {
                             *next_event = Some((rhythm_index, sample_time, event));
                         } else {
                             *next_event = None;
@@ -232,7 +204,7 @@ impl Iterator for Phrase {
     type Item = (SampleTime, Option<Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((_, sample_time, event)) = self.next_event() {
+        if let Some((_, sample_time, event)) = self.next_event_until_time(SampleTime::MAX) {
             Some((sample_time, event))
         } else {
             None
@@ -267,12 +239,19 @@ impl Rhythm for Phrase {
         self.sample_offset = sample_offset
     }
 
+    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
+        if let Some((_, sample_time, event)) = self.next_event_until_time(sample_time) {
+            Some((sample_time, event))
+        } else {
+            None
+        }
+    }
+
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;
         // reset iterator state
         self.next_events.fill(None);
-        self.held_back_event = None;
         // reset all rhythms in our slots as well
         for rhythm_slot in self.rhythm_slots.iter_mut() {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {

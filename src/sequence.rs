@@ -107,8 +107,11 @@ impl Sequence {
         &mut self.phrases[self.phrase_index]
     }
 
-    fn next_event(&mut self) -> Option<(SampleTime, Option<Event>)> {
-        let event = self.current_phrase_mut().next();
+    fn next_event_until_time(
+        &mut self,
+        sample_time: SampleTime,
+    ) -> Option<(SampleTime, Option<Event>)> {
+        let event = self.current_phrase_mut().next_until_time(sample_time);
         if let Some((sample_time, event)) = event {
             Some((sample_time + self.sample_offset, event))
         } else {
@@ -121,7 +124,7 @@ impl Iterator for Sequence {
     type Item = (SampleTime, Option<Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_event()
+        self.next_event_until_time(SampleTime::MAX)
     }
 }
 
@@ -147,6 +150,10 @@ impl Rhythm for Sequence {
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset
+    }
+
+    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
+        self.next_event_until_time(sample_time)
     }
 
     fn reset(&mut self) {

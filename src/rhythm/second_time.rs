@@ -117,6 +117,7 @@ impl Iterator for SecondTimeRhythm {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pattern.is_empty() {
+            self.event_iter_sample_time += self.samples_per_step();
             return None;
         }
         // fetch current value
@@ -127,7 +128,7 @@ impl Iterator for SecondTimeRhythm {
             Some((sample_time, None))
         };
         // move sample_time
-        self.event_iter_sample_time += self.time_base.samples_per_second() as f64 * self.step;
+        self.event_iter_sample_time += self.samples_per_step();
         // move pattern pos
         self.pattern_pos += 1;
         if self.pattern_pos >= self.pattern.len() {
@@ -159,6 +160,15 @@ impl Rhythm for SecondTimeRhythm {
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset
+    }
+
+    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
+        let current_sample_time = self.event_iter_sample_time + self.sample_offset as f64;
+        if current_sample_time + self.samples_per_step() < sample_time as f64 {
+            self.next()
+        } else {
+            None
+        }
     }
 
     fn reset(&mut self) {
