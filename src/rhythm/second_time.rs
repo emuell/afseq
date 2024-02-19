@@ -164,7 +164,7 @@ impl Rhythm for SecondTimeRhythm {
 
     fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
         let current_sample_time = self.event_iter_sample_time + self.sample_offset as f64;
-        if current_sample_time + self.samples_per_step() < sample_time as f64 {
+        if (current_sample_time as SampleTime) < sample_time {
             self.next()
         } else {
             None
