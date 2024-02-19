@@ -1,4 +1,12 @@
 {
-    "Lua.runtime.version" : "Lua 5.1",
-    "Lua.workspace.library": [ "types" ]
+    "Lua.runtime.version": "Lua 5.1",
+    "Lua.runtime.builtin": {
+        "debug": "disable",
+        "ffi": "disable",
+        "os": "disable",
+        "io": "disable"
+    },
+    "Lua.workspace.library": [
+        "types/nerdo"
+    ]
 }

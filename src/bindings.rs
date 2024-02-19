@@ -35,7 +35,11 @@ use crate::{
 /// Create a new raw lua engine with preloaded packages, but no bindings.
 /// See also `register_bindings`
 pub fn new_engine() -> Lua {
-    let lua = Lua::new();
+    let lua = Lua::new_with(
+        LuaStdLib::STRING | LuaStdLib::TABLE | LuaStdLib::MATH | LuaStdLib::PACKAGE,
+        LuaOptions::default(),
+    )
+    .expect("Failed to create a new lua engine");
     // add cwd/lib to package path
     let cwd = env::current_dir()
         .unwrap_or(".".into())
