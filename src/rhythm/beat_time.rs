@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter},
-    rhythm::euclidean::euclidean,
+    pattern::{Pattern, fixed::FixedPattern},
     time::{BeatTimeBase, BeatTimeStep, SampleTimeDisplay},
     Rhythm, SampleTime,
 };
@@ -15,8 +15,7 @@ pub struct BeatTimeRhythm {
     time_base: BeatTimeBase,
     step: BeatTimeStep,
     offset: BeatTimeStep,
-    pattern: Rc<Vec<bool>>,
-    pattern_pos: usize,
+    pattern: Rc<RefCell<dyn Pattern>>,
     event_iter: Rc<RefCell<dyn EventIter>>,
     event_iter_sample_time: f64,
     sample_offset: SampleTime,
@@ -26,8 +25,7 @@ impl BeatTimeRhythm {
     /// Create a new pattern based emitter which emits `value` every beat_time `step`.  
     pub fn new(time_base: BeatTimeBase, step: BeatTimeStep) -> Self {
         let offset = BeatTimeStep::Beats(0.0);
-        let pattern = Rc::new(vec![true]);
-        let pattern_pos = 0;
+        let pattern = Rc::new(RefCell::new(FixedPattern::default()));
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = offset.to_samples(&time_base);
         let sample_offset = 0;
@@ -36,7 +34,6 @@ impl BeatTimeRhythm {
             step,
             offset,
             pattern,
-            pattern_pos,
             event_iter,
             event_iter_sample_time,
             sample_offset,
@@ -56,31 +53,22 @@ impl BeatTimeRhythm {
         self.offset
     }
     /// Get current pattern.
-    pub fn pattern(&self) -> Vec<bool> {
-        self.pattern.to_vec()
+    pub fn pattern(&self) -> Rc<RefCell<dyn Pattern>> {
+        self.pattern.clone()
     }
 
-    /// Trigger events with the given pattern. Param `pattern` is evaluated as an array of boolean:
-    /// when to trigger an event and when not, but can be specified as number array as well to notate
-    /// things shorter: e.g. via \[0,1,1,1,0\].  
-    pub fn with_pattern_vector<T: Ord + Default>(&self, pattern: Vec<T>) -> Self {
-        let pattern_vec = pattern
-            .iter()
-            .map(|f| *f != T::default())
-            .collect::<Vec<_>>();
+    /// Trigger events with the given [`Pattern`].  
+    pub fn with_pattern<T: Pattern + Sized + 'static>(&self, pattern: T) -> Self {
+        self.with_pattern_dyn(Rc::new(RefCell::new(pattern)))
+    }
+
+    /// Trigger events with the given [`Pattern`].  
+    pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
         Self {
-            pattern: Rc::new(pattern_vec),
+            pattern: pattern.clone(),
             event_iter: self.event_iter.clone(),
             ..*self
         }
-    }
-    pub fn with_pattern<const N: usize, T: Ord + Default + Clone>(&self, pattern: [T; N]) -> Self {
-        self.with_pattern_vector(pattern.to_vec())
-    }
-
-    pub fn with_euclidean_pattern(&self, pulses: u32, steps: u32, offset: i32) -> Self {
-        let pattern = euclidean(pulses, steps, offset);
-        self.with_pattern_vector(pattern)
     }
 
     /// Apply the given beat-time step offset to all events.
@@ -121,26 +109,20 @@ impl Iterator for BeatTimeRhythm {
     type Item = (SampleTime, Option<Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pattern.is_empty() {
-            self.event_iter_sample_time += self.step.to_samples(&self.time_base);
-            return None;
-        }
-        // fetch current value
-        let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
-        let value = if self.pattern[self.pattern_pos] {
-            Some((sample_time, self.event_iter.borrow_mut().next()))
+        let mut pattern = self.pattern.borrow_mut();
+        if pattern.is_empty() {
+            None
         } else {
-            Some((sample_time, None))
-        };
-        // move sample_time
-        self.event_iter_sample_time += self.samples_per_step();
-        // move pattern pos
-        self.pattern_pos += 1;
-        if self.pattern_pos >= self.pattern.len() {
-            self.pattern_pos = 0;
+            let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
+            let value = if pattern.run() > 0.0 {
+                let mut event_iter = self.event_iter.borrow_mut();
+                Some((sample_time, event_iter.next()))
+            } else {
+                Some((sample_time, None))
+            };
+            self.event_iter_sample_time += self.samples_per_step();
+            value
         }
-        // return current value
-        value
     }
 }
 
@@ -156,7 +138,7 @@ impl Rhythm for BeatTimeRhythm {
         self.step.to_samples(&self.time_base)
     }
     fn pattern_length(&self) -> usize {
-        self.pattern.len()
+        self.pattern.borrow().len()
     }
 
     fn sample_offset(&self) -> SampleTime {
@@ -181,6 +163,6 @@ impl Rhythm for BeatTimeRhythm {
         // reset iterator state
         self.event_iter.borrow_mut().reset();
         self.event_iter_sample_time = self.offset.to_samples(&self.time_base);
-        self.pattern_pos = 0;
+        self.pattern.borrow_mut().reset();
     }
 }

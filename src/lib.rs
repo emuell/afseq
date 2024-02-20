@@ -16,6 +16,9 @@ pub use scale::Scale;
 pub mod event;
 pub use event::{Event, EventIter};
 
+pub mod pattern;
+pub use pattern::Pattern;
+
 pub mod rhythm;
 pub use rhythm::Rhythm;
 

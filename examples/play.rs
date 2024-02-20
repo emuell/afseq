@@ -73,12 +73,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // generate a few phrases
     let kick_pattern = beat_time
         .every_nth_sixteenth(1.0)
-        .with_pattern([
-            1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
-            1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
-            1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0, 0, //
-            1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0, 0, //
-        ])
+        .with_pattern(
+            [
+                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
+                0, //
+                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
+                0, //
+                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
+                0, //
+                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0,
+                0, //
+            ]
+            .to_pattern(),
+        )
         .trigger(new_note_event((KICK, "C_5")));
 
     let snare_pattern = beat_time
@@ -143,7 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bass_notes = Scale::try_from((Note::C5, "aeolian"))?.notes();
     let bass_pattern = beat_time
         .every_nth_eighth(1.0)
-        .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1])
+        .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_pattern())
         .trigger(new_note_event_sequence(vec![
             new_note((BASS, bass_notes[0], 0.5)),
             new_note((BASS, bass_notes[2], 0.5)),

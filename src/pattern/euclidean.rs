@@ -1,3 +1,7 @@
+use crate::pattern::fixed::FixedPattern;
+
+// -------------------------------------------------------------------------------------------------
+
 /// Generates an euclidean rhythm pattern with the given pulse, step count and rotation offset.
 pub fn euclidean(pulses: u32, steps: u32, offset: i32) -> Vec<bool> {
     type Group = Vec<bool>;
@@ -45,5 +49,14 @@ pub fn euclidean(pulses: u32, steps: u32, offset: i32) -> Vec<bool> {
         rhythm
     } else {
         vec![true; steps as usize]
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl FixedPattern {
+    /// Create a pattern from an euclidan rhythm.
+    pub fn from_euclidean(pulses: u32, steps: u32, offset: i32) -> Self {
+        Self::from_vector(euclidean(pulses, steps, offset))
     }
 }

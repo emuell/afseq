@@ -60,7 +60,7 @@ mod test {
         let beat_time_rhythm = engine
             .load(
                 r#"
-                Emitter {
+                emitter {
                     unit = "beats",
                     resolution = 0.5,
                     offset = "2",
@@ -71,15 +71,21 @@ mod test {
             )
             .eval::<LuaValue>()
             .unwrap();
-        let mut beat_time_rhythm = beat_time_rhythm
+        let beat_time_rhythm = beat_time_rhythm
             .as_userdata()
             .unwrap()
-            .borrow::<BeatTimeRhythm>();
+            .borrow_mut::<BeatTimeRhythm>();
         assert!(beat_time_rhythm.is_ok());
-        let mut beat_time_rhythm = beat_time_rhythm.as_mut().unwrap().clone();
+        let mut beat_time_rhythm = beat_time_rhythm.unwrap();
         assert_eq!(beat_time_rhythm.step(), BeatTimeStep::Beats(0.5));
         assert_eq!(beat_time_rhythm.offset(), BeatTimeStep::Beats(2.0));
-        assert_eq!(beat_time_rhythm.pattern(), vec![true, false, true, false]);
+        let pattern = beat_time_rhythm.pattern();
+        let mut pattern = pattern.borrow_mut();
+        assert_eq!(
+            vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
+            vec![1.0, 0.0, 1.0, 0.0]
+        );
+        drop(pattern);
         let event = beat_time_rhythm.next();
         assert_eq!(
             event,
@@ -115,7 +121,7 @@ mod test {
         let second_time_rhythm = engine
             .load(
                 r#"
-                Emitter {
+                emitter {
                     unit = "seconds",
                     resolution = 2,
                     offset = 3,
@@ -132,11 +138,15 @@ mod test {
             .unwrap()
             .borrow::<SecondTimeRhythm>();
         assert!(second_time_rhythm.is_ok());
-        assert_eq!(second_time_rhythm.as_ref().unwrap().step(), 2.0);
-        assert_eq!(second_time_rhythm.as_ref().unwrap().offset(), 3.0);
+        let second_time_rhythm = second_time_rhythm.unwrap();
+        assert_eq!(second_time_rhythm.step(), 2.0);
+        assert_eq!(second_time_rhythm.offset(), 3.0);
+        let pattern = second_time_rhythm.pattern();
+        let mut pattern = pattern.borrow_mut();
         assert_eq!(
-            second_time_rhythm.unwrap().pattern(),
-            vec![true, false, true, false]
+            vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
+            vec![1.0, 0.0, 1.0, 0.0]
         );
+        drop(pattern);
     }
 }

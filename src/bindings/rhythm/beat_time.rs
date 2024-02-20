@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 
-use crate::prelude::*;
 use super::super::unwrap::*;
+use crate::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -43,8 +43,8 @@ impl BeatTimeRhythm {
             rhythm = rhythm.with_offset_in_step(offset);
         }
         if table.contains_key("pattern")? {
-            let pattern = table.get::<&str, Vec<i32>>("pattern")?;
-            rhythm = rhythm.with_pattern_vector(pattern);
+            let pulses = table.get::<&str, Vec<f32>>("pattern")?;
+            rhythm = rhythm.with_pattern(pulses.to_pattern());
         }
         if table.contains_key("emit")? {
             let iter =
@@ -54,4 +54,3 @@ impl BeatTimeRhythm {
         Ok(rhythm)
     }
 }
-

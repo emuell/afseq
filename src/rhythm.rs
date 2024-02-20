@@ -1,11 +1,11 @@
-//! Periodically emit `Events` via an `EventIter` with a given time base.
+//! Periodically emit `Events` via an `EventIter` with a given time base on a 
+//! rhythmical pattern defined via a `Pattern`.
 
 use std::fmt::Debug;
 
 use crate::{event::Event, time::SampleTimeDisplay, BeatTimeBase, SampleTime};
 
 pub mod beat_time;
-pub mod euclidean;
 pub mod second_time;
 
 // -------------------------------------------------------------------------------------------------

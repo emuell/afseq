@@ -15,8 +15,9 @@ pub use super::{
         unique_instrument_id, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId,
     },
     note::Note,
+    pattern::{euclidean, fixed::ToFixedPattern, Pattern},
     phrase::{Phrase, RhythmSlot},
-    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, euclidean::euclidean},
+    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
     time::{BeatTimeBase, BeatTimeStep, SecondTimeBase, SecondTimeStep, TimeBase},
     Chord, Event, EventIter, Rhythm, SampleTime, Scale, Sequence,
 };
