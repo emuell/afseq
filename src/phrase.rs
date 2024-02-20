@@ -187,12 +187,16 @@ impl Phrase {
             }
         });
         if let Some(next_due) = next_due {
-            let next = next_due.clone();
-            *next_due = None; // consume
-            if let Some((rhythm_index, sample_time, event)) = next {
-                Some((rhythm_index, self.sample_offset + sample_time, event))
+            if let Some((rhythm_index, event_sample_time, event)) = next_due.clone() {
+                if event_sample_time < sample_time {
+                    *next_due = None; // consume
+                    Some((rhythm_index, self.sample_offset + event_sample_time, event))
+                }
+                else {
+                    None // not yet due
+                }
             } else {
-                None
+                None // no event available
             }
         } else {
             None
