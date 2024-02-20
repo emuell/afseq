@@ -26,6 +26,7 @@ pub use super::{
 pub use super::{
     bindings::{self},
     event::scripted::ScriptedEventIter,
+    pattern::scripted::ScriptedPattern,
 };
 
 #[cfg(feature = "player")]

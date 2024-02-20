@@ -43,8 +43,8 @@ impl BeatTimeRhythm {
             rhythm = rhythm.with_offset_in_step(offset);
         }
         if table.contains_key("pattern")? {
-            let pulses = table.get::<&str, Vec<f32>>("pattern")?;
-            rhythm = rhythm.with_pattern(pulses.to_pattern());
+            let pattern = pattern_from_value(table.get::<&str, LuaValue>("pattern")?)?;
+            rhythm = rhythm.with_pattern_dyn(pattern);
         }
         if table.contains_key("emit")? {
             let iter =

@@ -22,16 +22,35 @@
 ---unit = "1/16", resolution = 4/3 --> tripplet
 ---```
 ---@field resolution number?
----Specify the rythmical pattern of the emitter. Patterns are repeated endlessly by default.
----When not defined, a constant rhythmical pattern of `1` is triggered.
----@see pattern to help creating patterns.
+---Specify the rythmical pattern of the emitter. Each non zero pulse in the pattern will
+---cause an event from the emitter property to be triggered in the emitters time unit. 
+---
+---When not defined, a constant pulse of `1` is triggered.
+---Patterns are repeated endlessly by default.
+---
+---Just like the `emitter` property, patterns can either be a fixed array of values or a
+---function or generator which produce values dynamically.
+---
 ---### examples:
 ---```lua
 ---pattern = { 1, 0, 0, 1 },
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
+---
+---pattern = function()  -- function
+---  return math.random(0, 1)
+---end
+---
+---pattern = function () --- generator 
+---  local pattern, step = table.create({0, 6, 10}), 0
+---  return function ()
+---    local pulse = pattern:find(step % 16) ~= nil
+---    step = step + 1
+---    return pulse
+---  end
+---end,
 ---```
----@field pattern (0|1)[]?
+---@field pattern (0|1|boolean)[]|(fun():(0|1|boolean))|(fun():fun():(0|1|boolean))?
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>

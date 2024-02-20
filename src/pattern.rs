@@ -5,6 +5,8 @@ use std::fmt::Debug;
 pub mod empty;
 pub mod euclidean;
 pub mod fixed;
+#[cfg(feature = "scripting")]
+pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 

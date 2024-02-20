@@ -130,6 +130,11 @@ pub fn new_note_events_from_lua(
     unwrap::note_events_from_value(arg, arg_index, default_instrument)
 }
 
+/// Try converting the given lua value to a pattern pulse value.
+pub fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<f32> {
+    unwrap::pattern_pulse_from_value(value)
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Register afseq bindings with the given lua engine.
@@ -177,8 +182,6 @@ fn register_global_bindings(
                     let intervals = table
                         .clone()
                         .sequence_values::<usize>()
-                        .enumerate()
-                        .map(|(_, result)| result)
                         .collect::<LuaResult<Vec<usize>>>()?;
                     Ok(Scale::try_from((note, &intervals)).map_err(|err| {
                         bad_argument_error("scale", "intervals", 1, err.to_string().as_str())

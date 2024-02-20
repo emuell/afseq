@@ -124,8 +124,6 @@ where
         values = value_table
             .clone()
             .sequence_values::<f32>()
-            .enumerate()
-            .map(|(_, result)| result)
             .collect::<LuaResult<Vec<f32>>>()?;
     } else {
         let value = f32::from_lua(value, lua)?;
@@ -154,8 +152,6 @@ pub(crate) fn transpose_steps_array_from_value(
         steps = volume_table
             .clone()
             .sequence_values::<i32>()
-            .enumerate()
-            .map(|(_, result)| result)
             .collect::<LuaResult<Vec<i32>>>()?;
     } else {
         let step = i32::from_lua(step, lua)?;
@@ -495,6 +491,64 @@ pub(crate) fn chord_events_from_string(
             ))
         })
         .collect::<Vec<_>>())
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<f32> {
+    match value {
+        LuaValue::Nil => Ok(0.0),
+        LuaValue::Boolean(bool) => Ok(bool as u8 as f32),
+        LuaValue::Integer(integer) => Ok(integer as f32),
+        LuaValue::Number(number) => Ok(number as f32),
+        LuaValue::String(str) => {
+            let str = str.to_string_lossy();
+            if let Ok(number) = str.parse::<f32>() {
+                Ok(number)
+            } else if let Ok(integer) = str.parse::<i32>() {
+                Ok(integer as f32)
+            } else if let Ok(bool) = str.parse::<bool>() {
+                Ok(bool as u8 as f32)
+            } else {
+                Err(LuaError::FromLuaConversionError {
+                    from: "string",
+                    to: "pattern pulse",
+                    message: Some("Invalid pattern pulse string value".to_string()),
+                })
+            }
+        }
+        _ => Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "pattern pulse",
+            message: Some("Invalid pattern pulse value".to_string()),
+        }),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub(crate) fn pattern_from_value(value: LuaValue) -> LuaResult<Rc<RefCell<dyn Pattern>>> {
+    match value {
+        LuaValue::Function(func) => {
+            let pattern = ScriptedPattern::new(func)?;
+            Ok(Rc::new(RefCell::new(pattern)))
+        }
+        LuaValue::Table(table) => {
+            let pulses = table
+                .clone()
+                .sequence_values::<LuaValue>()
+                .map(|result| pattern_pulse_from_value(result?))
+                .collect::<LuaResult<Vec<f32>>>()?;
+            Ok(Rc::new(RefCell::new(pulses.to_pattern())))
+        }
+        _ => Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "pattern",
+            message: Some(
+                "Expected either an array or a function as pattern generator".to_string(),
+            ),
+        }),
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
