@@ -7,8 +7,6 @@ local scale = scale("c5", "natural minor").notes
 local bassline = fun.iter({ { 1 }, { 3 }, { 4 }, { 1 }, { 3 }, { 4 }, { 7, -12 } })
     :map(function(x) return scale[x[1]] + (x[2] or 0) end):to_table()
 
-print(table.unpack(_G))
-
 return emitter {
     unit = "1/8",
     pattern = pattern.from({ 1, 0, 1, 0 }, { 0, 1, 0, 0 }, { 1, 0, 1, 0 }, { 0, 1, 0, 1 }),

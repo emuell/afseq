@@ -14,7 +14,7 @@ return emitter {
         key = "c5"
         volume = volume * 0.6
       end
-      return {key = key, volume = volume}
+      return { key = key, volume = volume }
     end
   end
 }
