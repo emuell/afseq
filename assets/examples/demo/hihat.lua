@@ -1,7 +1,7 @@
 local pattern = require "pattern"
 
 return emitter {
-  unit = "16th",
+  unit = "1/16",
   offset = 16 * 8,
   pattern = pattern.euclidean(14, 16, 6),
   emit = function()

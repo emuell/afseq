@@ -31,12 +31,14 @@ impl BeatTimeRhythm {
         if table.contains_key("unit")? {
             let unit = table.get::<&str, String>("unit")?;
             match unit.as_str() {
-                "bars" => step = BeatTimeStep::Bar(resolution),
-                "beats" | "1/4" | "4th" => step = BeatTimeStep::Beats(resolution),
-                "eighth" | "1/8" | "8th" => step = BeatTimeStep::Eighth(resolution),
-                "sixteenth"|"1/16" | "16th" => step = BeatTimeStep::Sixteenth(resolution),
+                "bars" | "1/1" => step = BeatTimeStep::Bar(resolution),
+                "beats" | "1/4" => step = BeatTimeStep::Beats(resolution),
+                "1/8" => step = BeatTimeStep::Eighth(resolution),
+                "1/16" => step = BeatTimeStep::Sixteenth(resolution),
+                "1/32" => step = BeatTimeStep::ThirtySecond(resolution),
+                "1/64" => step = BeatTimeStep::SixtyFourth(resolution),
                 _ => return Err(bad_argument_error("emit", "unit", 1, 
-                "Invalid unit parameter. Expected one of 'seconds', 'bars', 'beats|4th', 'eighth|8th', 'sixteenth|8th'"))
+                "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
         let mut rhythm = BeatTimeRhythm::new(default_time_base, step);

@@ -7,7 +7,7 @@ local scales = {
 }
 
 return emitter {
-  unit = "16th",
+  unit = "1/16",
   pattern = pattern.euclidean(6, 8, -5),
   offset = 16 * 64,
   emit = function()

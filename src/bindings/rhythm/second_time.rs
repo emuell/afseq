@@ -33,7 +33,7 @@ impl SecondTimeRhythm {
                 "seconds" => (),
                 "ms" => resolution /= 1000.0,
                 _ => return Err(bad_argument_error("emit", "unit", 1, 
-                "Invalid unit parameter. Expected one of 'seconds', 'bars', 'beats|4th', 'eighth|8th', 'sixteenth|8th'"))
+                "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
         let mut rhythm = SecondTimeRhythm::new(default_time_base, resolution);

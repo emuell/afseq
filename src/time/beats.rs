@@ -55,6 +55,8 @@ impl SampleTimeDisplay for BeatTimeBase {
 /// Defines a number of steps in sixteenth, beat or bar amounts.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum BeatTimeStep {
+    SixtyFourth(f32),
+    ThirtySecond(f32),
     Sixteenth(f32),
     Eighth(f32),
     Beats(f32),
@@ -65,6 +67,8 @@ impl BeatTimeStep {
     /// Get number of steps in the current time range.
     pub fn steps(&self) -> f32 {
         match *self {
+            BeatTimeStep::SixtyFourth(amount) => amount,
+            BeatTimeStep::ThirtySecond(amount) => amount,
             BeatTimeStep::Sixteenth(amount) => amount,
             BeatTimeStep::Eighth(amount) => amount,
             BeatTimeStep::Beats(amount) => amount,
@@ -74,6 +78,8 @@ impl BeatTimeStep {
     /// Set number of steps in the current time range.
     pub fn set_steps(&mut self, step: f32) {
         match *self {
+            BeatTimeStep::SixtyFourth(_) => *self = BeatTimeStep::SixtyFourth(step),
+            BeatTimeStep::ThirtySecond(_) => *self = BeatTimeStep::ThirtySecond(step),
             BeatTimeStep::Sixteenth(_) => *self = BeatTimeStep::Sixteenth(step),
             BeatTimeStep::Eighth(_) => *self = BeatTimeStep::Eighth(step),
             BeatTimeStep::Beats(_) => *self = BeatTimeStep::Beats(step),
@@ -84,6 +90,8 @@ impl BeatTimeStep {
     /// Get number of samples for a single step.
     pub fn samples_per_step(&self, time_base: &BeatTimeBase) -> f64 {
         match *self {
+            BeatTimeStep::SixtyFourth(_) => time_base.samples_per_beat() / 16.0,
+            BeatTimeStep::ThirtySecond(_) => time_base.samples_per_beat() / 8.0,
             BeatTimeStep::Sixteenth(_) => time_base.samples_per_beat() / 4.0,
             BeatTimeStep::Eighth(_) => time_base.samples_per_beat() / 2.0,
             BeatTimeStep::Beats(_) => time_base.samples_per_beat(),

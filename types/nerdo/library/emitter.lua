@@ -14,7 +14,7 @@
 ---unit = "beats", resolution = 1.01 --> slightly off beat pulse
 ---unit = "1/16", resolution = 4/3 --> tripplet
 ---```
----@field unit "16th"|"1/16"|"sixteenth"|"8th"|"1/8"|"eighth"|"4th"|"1/4"|"beats"|"bars"?
+---@field unit "ms"|"seconds"|"bars"|"beats"|"1/1"|"1/2"|"1/4"|"1/8"|"1/16"|"1/32"|"1/64"
 ---Factor which is applied on `unit` to specify the final time resolution of the emitter.
 ---### examples:
 ---```lua

@@ -10,7 +10,7 @@ local bassline = fun.iter({ { 1 }, { 3 }, { 4 }, { 1 }, { 3 }, { 4 }, { 7, -12 }
 print(table.unpack(_G))
 
 return emitter {
-    unit = "8th",
+    unit = "1/8",
     pattern = pattern.from({ 1, 0, 1, 0 }, { 0, 1, 0, 0 }, { 1, 0, 1, 0 }, { 0, 1, 0, 1 }),
     emit = sequence(bassline):with_volume(0.7)
 }

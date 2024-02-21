@@ -1,7 +1,7 @@
 local pattern = require "pattern"
 
 return emitter {
-  unit = "sixteenth",
+  unit = "1/16",
   pattern = function () 
     local values, step = table.create({0, 6, 10}), 0
     return function ()
