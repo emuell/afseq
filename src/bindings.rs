@@ -70,8 +70,8 @@ impl LuaTimeoutHook {
                     if start.borrow().elapsed() > timeout {
                         *start.borrow_mut() = Instant::now();
                         Err(LuaError::RuntimeError(
-                            String::from("Script execution timeout. ")
-                                + &format!("Script execution took longer than {} ms to complete.\n\n", timeout.as_millis())
+                            String::from("Script timeout. ")
+                                + &format!("Execution took longer than {} ms to complete.\n", timeout.as_millis())
                                 + "Please avoid overhead and check for never ending loops in your script. "
                                 + "Also note that the script is running in real-time thread!",
                         ))
@@ -110,7 +110,7 @@ impl Clone for LuaTimeoutHook {
 
 impl Drop for LuaTimeoutHook {
     fn drop(&mut self) {
-        // decrease active instance refcount. 
+        // decrease active instance refcount.
         *self.active.borrow_mut() -= 1;
         // when reaching 0, this will remove the hook in the hook itself
     }
@@ -443,10 +443,7 @@ mod test {
         timeout_hook.reset();
 
         // table.lua is present
-        assert!(lua
-            .load(r#"return table.new()"#)
-            .eval::<LuaTable>()
-            .is_ok());
+        assert!(lua.load(r#"return table.new()"#).eval::<LuaTable>().is_ok());
 
         // pattern.lua is present, but only when required
         assert!(lua
@@ -489,7 +486,7 @@ mod test {
                 "#,
             )
             .exec()
-            .is_err_and(|e| e.to_string().contains("execution timeout")));
+            .is_err_and(|e| e.to_string().contains("Script timeout")));
 
         // timeout is reset now, so further execution should work
         assert!(lua
