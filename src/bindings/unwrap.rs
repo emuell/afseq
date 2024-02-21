@@ -5,7 +5,7 @@ use std::{cell::RefCell, ops::RangeBounds, rc::Rc, sync::Arc};
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{note::NoteUserData, sequence::SequenceUserData},
+    bindings::{note::NoteUserData, sequence::SequenceUserData, LuaTimeoutHook},
     prelude::*,
 };
 
@@ -527,10 +527,14 @@ pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<f32> {
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn pattern_from_value(value: LuaValue) -> LuaResult<Rc<RefCell<dyn Pattern>>> {
+pub(crate) fn pattern_from_value(
+    lua: &Lua,
+    timeout_hook: &LuaTimeoutHook,
+    value: LuaValue,
+) -> LuaResult<Rc<RefCell<dyn Pattern>>> {
     match value {
         LuaValue::Function(func) => {
-            let pattern = ScriptedPattern::new(func)?;
+            let pattern = ScriptedPattern::new(lua, timeout_hook, func)?;
             Ok(Rc::new(RefCell::new(pattern)))
         }
         LuaValue::Table(table) => {
@@ -554,6 +558,8 @@ pub(crate) fn pattern_from_value(value: LuaValue) -> LuaResult<Rc<RefCell<dyn Pa
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) fn event_iter_from_value(
+    lua: &Lua,
+    timeout_hook: &LuaTimeoutHook,
     value: LuaValue,
     default_instrument: Option<InstrumentId>,
 ) -> LuaResult<Rc<RefCell<dyn EventIter>>> {
@@ -576,7 +582,7 @@ pub(crate) fn event_iter_from_value(
             }
         }
         LuaValue::Function(function) => {
-            let iter = ScriptedEventIter::new(function, default_instrument)?;
+            let iter = ScriptedEventIter::new(lua, timeout_hook, function, default_instrument)?;
             Ok(Rc::new(RefCell::new(iter)))
         }
         LuaValue::Table(ref table) => {

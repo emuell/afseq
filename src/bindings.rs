@@ -1,6 +1,11 @@
 //! Lua script bindings, to create rhythms dynamically.
 
-use std::{cell::RefCell, env, rc::Rc};
+use std::{
+    cell::RefCell,
+    env,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use lazy_static::lazy_static;
 use mlua::{chunk, prelude::*};
@@ -30,11 +35,94 @@ use crate::{
     Scale, SecondTimeBase,
 };
 
+// -------------------------------------------------------------------------------------------------
+
+// Limits script execution time and aborts execution when a script runs too long. This way e.g.
+// never ending loops are stopped automatically with a timeout error.
+//
+// While constructed, it checks every few instructions if a timeout duration has been reached
+// and then aborts the script by firing an error.
+// When cloning and instance, it will use the existing hook, so ensure to call `reset` before
+// invoking new lua functions. The last instance that get's dropped will then remove the hook.
+#[derive(Debug)]
+pub struct LuaTimeoutHook {
+    active: Rc<RefCell<usize>>,
+    start: Rc<RefCell<Instant>>,
+}
+
+impl LuaTimeoutHook {
+    // default number of ms a script may run before a timeout error is fired.
+    // assumes scripts are running in a real-time alike context.
+    const DEFAULT_TIMEOUT: Duration = Duration::from_millis(200);
+
+    pub fn new(lua: &Lua) -> Self {
+        Self::new_with_timeout(lua, Self::DEFAULT_TIMEOUT)
+    }
+
+    pub fn new_with_timeout(lua: &Lua, timeout: Duration) -> Self {
+        let active = Rc::new(RefCell::new(1));
+        let start = Rc::new(RefCell::new(Instant::now()));
+        lua.set_hook(LuaHookTriggers::new().every_nth_instruction(timeout.as_millis() as u32), {
+            let active = active.clone();
+            let start = start.clone();
+            move |lua, _debug| {
+                if *active.borrow() > 0 {
+                    if start.borrow().elapsed() > timeout {
+                        *start.borrow_mut() = Instant::now();
+                        Err(LuaError::RuntimeError(
+                            String::from("Script execution timeout. ")
+                                + &format!("Script execution took longer than {} ms to complete.\n\n", timeout.as_millis())
+                                + "Please avoid overhead and check for never ending loops in your script. "
+                                + "Also note that the script is running in real-time thread!",
+                        ))
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    lua.remove_hook();
+                    Ok(())
+                }
+            }
+        });
+        Self {
+            active: active.clone(),
+            start: start.clone(),
+        }
+    }
+
+    // reset timestamp of the hook when running e.g. a callback again
+    pub fn reset(&mut self) {
+        *self.start.borrow_mut() = Instant::now();
+    }
+}
+
+impl Clone for LuaTimeoutHook {
+    fn clone(&self) -> Self {
+        // increase active isntances refcount
+        *self.active.borrow_mut() += 1;
+        // return a direct clone otherwise
+        Self {
+            active: self.active.clone(),
+            start: self.start.clone(),
+        }
+    }
+}
+
+impl Drop for LuaTimeoutHook {
+    fn drop(&mut self) {
+        // decrease active instance refcount. 
+        *self.active.borrow_mut() -= 1;
+        // when reaching 0, this will remove the hook in the hook itself
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 
-/// Create a new raw lua engine with preloaded packages, but no bindings.
+/// Create a new raw lua engine with preloaded packages, but no bindings. Also returns a timeout
+/// hook instance to limit duration of script calls.
 /// See also `register_bindings`
-pub fn new_engine() -> Lua {
+pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
+    // create a new lua instance with the allowed std libraries
     let lua = Lua::new_with(
         LuaStdLib::STRING | LuaStdLib::TABLE | LuaStdLib::MATH | LuaStdLib::PACKAGE,
         LuaOptions::default(),
@@ -48,7 +136,9 @@ pub fn new_engine() -> Lua {
     lua.load(chunk!(package.path = $cwd.."/assets/lib/?.lua;"..package.path))
         .exec()
         .unwrap_or_else(|err| log::warn!("Failed to initialize lua engine: {}", err));
-    lua
+    // install a timeout hook
+    let timeout_hook = LuaTimeoutHook::new(&lua);
+    (lua, timeout_hook)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -59,9 +149,11 @@ pub fn new_rhythm_from_file(
     time_base: BeatTimeBase,
     file_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
-    // create a new engine
-    let mut lua = new_engine();
-    register_bindings(&mut lua, time_base, Some(instrument))?;
+    // create a new engine and register bindings
+    let (mut lua, mut timeout_hook) = new_engine();
+    register_bindings(&mut lua, &timeout_hook, time_base, Some(instrument))?;
+    // restart the timeout hook
+    timeout_hook.reset();
     // compile and evaluate script
     let chunk = lua.load(std::path::PathBuf::from(file_name));
     let result = chunk.eval::<LuaValue>()?;
@@ -92,9 +184,11 @@ pub fn new_rhythm_from_string(
     script: &str,
     script_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
-    // create a new engine
-    let mut lua = new_engine();
-    register_bindings(&mut lua, time_base, Some(instrument))?;
+    // create a new engine and register bindings
+    let (mut lua, mut timeout_hook) = new_engine();
+    register_bindings(&mut lua, &timeout_hook, time_base, Some(instrument))?;
+    // restart the timeout hook
+    timeout_hook.reset();
     // compile and evaluate script
     let chunk = lua.load(script).set_name(script_name);
     let result = chunk.eval::<LuaValue>()?;
@@ -122,7 +216,7 @@ pub fn new_rhythm_from_string_with_fallback(
 // -------------------------------------------------------------------------------------------------
 
 /// Try converting the given lua value to a note events vector.
-pub fn new_note_events_from_lua(
+pub(crate) fn new_note_events_from_lua(
     arg: LuaValue,
     arg_index: Option<usize>,
     default_instrument: Option<InstrumentId>,
@@ -131,19 +225,20 @@ pub fn new_note_events_from_lua(
 }
 
 /// Try converting the given lua value to a pattern pulse value.
-pub fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<f32> {
+pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<f32> {
     unwrap::pattern_pulse_from_value(value)
 }
 
 // -------------------------------------------------------------------------------------------------
 
 /// Register afseq bindings with the given lua engine.
-pub fn register_bindings(
+pub(crate) fn register_bindings(
     lua: &mut Lua,
+    timeout_hook: &LuaTimeoutHook,
     default_time_base: BeatTimeBase,
     default_instrument: Option<InstrumentId>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_global_bindings(lua, default_time_base, default_instrument)?;
+    register_global_bindings(lua, timeout_hook, default_time_base, default_instrument)?;
     register_table_bindings(lua)?;
     register_pattern_module(lua)?;
     register_fun_module(lua)?;
@@ -152,6 +247,7 @@ pub fn register_bindings(
 
 fn register_global_bindings(
     lua: &mut Lua,
+    timeout_hook: &LuaTimeoutHook,
     default_time_base: BeatTimeBase,
     default_instrument: Option<InstrumentId>,
 ) -> LuaResult<()> {
@@ -225,6 +321,7 @@ fn register_global_bindings(
         "emitter",
         lua.create_function({
             let default_time_base = default_time_base;
+            let timeout_hook = timeout_hook.clone();
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 let second_time_unit = match table.get::<&str, String>("unit") {
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
@@ -235,11 +332,13 @@ fn register_global_bindings(
                         samples_per_sec: default_time_base.samples_per_sec,
                     };
                     let instrument = default_instrument;
-                    SecondTimeRhythm::from_table(table, time_base, instrument)?.into_lua(lua)
+                    SecondTimeRhythm::from_table(lua, &timeout_hook, table, time_base, instrument)?
+                        .into_lua(lua)
                 } else {
                     let time_base = default_time_base;
                     let instrument = default_instrument;
-                    BeatTimeRhythm::from_table(table, time_base, instrument)?.into_lua(lua)
+                    BeatTimeRhythm::from_table(lua, &timeout_hook, table, time_base, instrument)?
+                        .into_lua(lua)
                 }
             }
         })?,
@@ -327,9 +426,10 @@ mod test {
     #[test]
     fn extensions() {
         // create a new engine and register bindings
-        let mut engine = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine();
         register_bindings(
-            &mut engine,
+            &mut lua,
+            &timeout_hook,
             BeatTimeBase {
                 beats_per_min: 160.0,
                 beats_per_bar: 6,
@@ -339,18 +439,21 @@ mod test {
         )
         .unwrap();
 
+        // reset timeout
+        timeout_hook.reset();
+
         // table.lua is present
-        assert!(engine
+        assert!(lua
             .load(r#"return table.new()"#)
             .eval::<LuaTable>()
             .is_ok());
 
         // pattern.lua is present, but only when required
-        assert!(engine
+        assert!(lua
             .load(r#"return pattern.new()"#)
             .eval::<LuaTable>()
             .is_err());
-        assert!(engine
+        assert!(lua
             .load(
                 r#"
                 local pattern = require "pattern"
@@ -361,11 +464,11 @@ mod test {
             .is_ok());
 
         // fun.lua is present, but only when required
-        assert!(engine
+        assert!(lua
             .load(r#"return fun.iter {1,2,3}:map(function(v) return v*2 end):totable()"#)
             .eval::<LuaTable>()
             .is_err());
-        assert!(engine
+        assert!(lua
             .load(
                 r#"
                 local fun = require "fun"
@@ -373,6 +476,32 @@ mod test {
                 "#
             )
             .eval::<LuaTable>()
+            .is_ok());
+
+        // timeout hook is installed and does its job
+        assert!(lua
+            .load(
+                r#"
+                local i = 0
+                while true do 
+                    i = i + 1
+                end
+                "#,
+            )
+            .exec()
+            .is_err_and(|e| e.to_string().contains("execution timeout")));
+
+        // timeout is reset now, so further execution should work
+        assert!(lua
+            .load(
+                r#"
+                local i = 0
+                while i < 100 do 
+                    i = i + 1
+                end
+                "#,
+            )
+            .exec()
             .is_ok());
     }
 }

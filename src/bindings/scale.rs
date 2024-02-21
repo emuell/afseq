@@ -26,9 +26,10 @@ mod test {
     #[test]
     fn scale() {
         // create a new engine and register bindings
-        let mut engine = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine();
         register_bindings(
-            &mut engine,
+            &mut lua,
+            &timeout_hook,
             BeatTimeBase {
                 beats_per_min: 160.0,
                 beats_per_bar: 6,
@@ -37,18 +38,21 @@ mod test {
             Some(InstrumentId::from(76)),
         )
         .unwrap();
+
+        // reset timeout
+        timeout_hook.reset();
+
         // Scale (note, mode_name)
-        assert!(engine
+        assert!(lua
             .load(r#"scale("c", "wurst")"#)
             .eval::<LuaValue>()
             .is_err());
-        assert!(engine
+        assert!(lua
             .load(r#"scale("c", "harmonic minor")"#)
             .eval::<LuaValue>()
             .is_ok());
         assert_eq!(
-            engine
-                .load(r#"scale("c5", "natural major").notes"#)
+            lua.load(r#"scale("c5", "natural major").notes"#)
                 .eval::<Vec<LuaValue>>()
                 .unwrap()
                 .iter()
@@ -58,17 +62,16 @@ mod test {
         );
 
         // Scale (note, interval)
-        assert!(engine
+        assert!(lua
             .load(r#"scale("c", {"wurst"})"#)
             .eval::<LuaValue>()
             .is_err());
-        assert!(engine
+        assert!(lua
             .load(r#"scale("c", {0,1,2,4,5,6,7,8,9,10,11})"#)
             .eval::<LuaValue>()
             .is_ok());
         assert_eq!(
-            engine
-                .load(r#"scale("c5", {0,3,5,7,10}).notes"#)
+            lua.load(r#"scale("c5", {0,3,5,7,10}).notes"#)
                 .eval::<Vec<LuaValue>>()
                 .unwrap()
                 .iter()

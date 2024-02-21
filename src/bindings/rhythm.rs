@@ -44,9 +44,10 @@ mod test {
     #[test]
     fn beat_time() {
         // create a new engine and register bindings
-        let mut engine = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine();
         register_bindings(
-            &mut engine,
+            &mut lua,
+            &timeout_hook,
             BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
@@ -56,8 +57,11 @@ mod test {
         )
         .unwrap();
 
+        // reset timeout
+        timeout_hook.reset();
+
         // BeatTimeRhythm
-        let beat_time_rhythm = engine
+        let beat_time_rhythm = lua
             .load(
                 r#"
                 emitter {
@@ -104,10 +108,11 @@ mod test {
 
     #[test]
     fn second_time() {
-        // create a new engine and register bindings
-        let mut engine = new_engine();
+        // create a new lua and register bindings
+        let (mut lua, mut timeout_hook) = new_engine();
         register_bindings(
-            &mut engine,
+            &mut lua,
+            &timeout_hook,
             BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
@@ -117,8 +122,11 @@ mod test {
         )
         .unwrap();
 
+        // reset timeout
+        timeout_hook.reset();
+
         // SecondTimeRhythm
-        let second_time_rhythm = engine
+        let second_time_rhythm = lua
             .load(
                 r#"
                 emitter {

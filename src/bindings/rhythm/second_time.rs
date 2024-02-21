@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-use super::super::unwrap::*;
+use super::super::{unwrap::*, LuaTimeoutHook};
 use crate::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
@@ -12,6 +12,8 @@ impl LuaUserData for SecondTimeRhythm {
 impl SecondTimeRhythm {
     // create a SecondtimeRhythm from the given Lua table value
     pub(crate) fn from_table(
+        lua: &Lua,
+        timeout_hook: &LuaTimeoutHook,
         table: LuaTable,
         default_time_base: SecondTimeBase,
         default_instrument: Option<InstrumentId>,
@@ -41,12 +43,17 @@ impl SecondTimeRhythm {
             rhythm = rhythm.with_offset(offset);
         }
         if table.contains_key("pattern")? {
-            let pattern = pattern_from_value(table.get::<&str, LuaValue>("pattern")?)?;
+            let pattern =
+                pattern_from_value(lua, timeout_hook, table.get::<&str, LuaValue>("pattern")?)?;
             rhythm = rhythm.with_pattern_dyn(pattern);
         }
         if table.contains_key("emit")? {
-            let iter =
-                event_iter_from_value(table.get::<&str, LuaValue>("emit")?, default_instrument)?;
+            let iter = event_iter_from_value(
+                lua,
+                timeout_hook,
+                table.get::<&str, LuaValue>("emit")?,
+                default_instrument,
+            )?;
             rhythm = rhythm.trigger_dyn(iter);
         }
         Ok(rhythm)

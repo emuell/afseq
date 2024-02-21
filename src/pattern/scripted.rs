@@ -1,6 +1,9 @@
 use mlua::prelude::*;
 
-use crate::{bindings::pattern_pulse_from_lua, Pattern};
+use crate::{
+    bindings::{pattern_pulse_from_lua, LuaTimeoutHook},
+    Pattern,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -9,11 +12,19 @@ use crate::{bindings::pattern_pulse_from_lua, Pattern};
 pub struct ScriptedPattern {
     environment: Option<LuaOwnedTable>,
     function: LuaOwnedFunction,
+    timeout_hook: LuaTimeoutHook,
     pulse: f32,
 }
 
 impl ScriptedPattern {
-    pub fn new(function: LuaFunction<'_>) -> LuaResult<Self> {
+    pub fn new(
+        _lua: &Lua,
+        timeout_hook: &LuaTimeoutHook,
+        function: LuaFunction<'_>,
+    ) -> LuaResult<Self> {
+        // create a new timeout_hook instance and reset it before calling the function
+        let mut timeout_hook = timeout_hook.clone();
+        timeout_hook.reset();
         // immediately fetch/evaluate the first event and get its environment, so we can immediately
         // show errors from the function and can reset the environment later on to this state.
         let result = function.call::<(), LuaValue>(())?;
@@ -26,6 +37,7 @@ impl ScriptedPattern {
             Ok(Self {
                 environment,
                 function,
+                timeout_hook,
                 pulse,
             })
         } else {
@@ -36,13 +48,18 @@ impl ScriptedPattern {
             Ok(Self {
                 environment,
                 function,
+                timeout_hook,
                 pulse,
             })
         }
     }
 
-    fn next_pulse(&self) -> LuaResult<f32> {
-        pattern_pulse_from_lua(self.function.call::<(), LuaValue>(())?)
+    fn next_pulse(&mut self) -> LuaResult<f32> {
+        // reset timeout
+        self.timeout_hook.reset();
+        // call function and evaluate the result
+        let result = self.function.call::<(), LuaValue>(())?;
+        pattern_pulse_from_lua(result)
     }
 }
 
@@ -91,7 +108,7 @@ impl Pattern for ScriptedPattern {
                 );
             }
         }
-        // fetch initial pulse value
-        self.pulse = self.next_pulse().unwrap_or(0.0);
+        // and set new initial pulse value, discarding the last one
+        let _ = self.run();
     }
 }

@@ -134,8 +134,8 @@ mod test {
     use super::*;
     use crate::bindings::*;
 
-    fn evaluate_sequence_userdata(engine: &Lua, expression: &str) -> LuaResult<SequenceUserData> {
-        Ok(engine
+    fn evaluate_sequence_userdata(lua: &Lua, expression: &str) -> LuaResult<SequenceUserData> {
+        Ok(lua
             .load(expression)
             .eval::<LuaValue>()?
             .as_userdata()
@@ -147,10 +147,11 @@ mod test {
     #[test]
     fn sequence() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
-        let mut engine = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine();
         let instrument = Some(InstrumentId::from(76));
         register_bindings(
-            &mut engine,
+            &mut lua,
+            &timeout_hook,
             BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
@@ -159,9 +160,12 @@ mod test {
             instrument,
         )?;
 
+        // reset timeout
+        timeout_hook.reset();
+
         // Note Sequence
         let note_sequence_event =
-            evaluate_sequence_userdata(&engine, r#"sequence({"C#1 0.5"}, "---", "G_2")"#)?;
+            evaluate_sequence_userdata(&lua, r#"sequence({"C#1 0.5"}, "---", "G_2")"#)?;
         assert_eq!(
             note_sequence_event.notes,
             vec![
@@ -171,7 +175,7 @@ mod test {
             ]
         );
         let poly_note_sequence_event = evaluate_sequence_userdata(
-            &engine,
+            &lua,
             r#"sequence(
                     {"C#1", "", "G_2 0.75"},
                     {"A#5 0.2", "---", {key = "B_1", volume = 0.1}}
@@ -194,7 +198,7 @@ mod test {
         );
 
         let chord_sequence_event = evaluate_sequence_userdata(
-            &engine, //
+            &lua, //
             r#"sequence("c'maj")"#,
         )?;
         assert_eq!(
@@ -207,7 +211,7 @@ mod test {
         );
 
         let poly_chord_sequence_event = evaluate_sequence_userdata(
-            &engine,
+            &lua,
             r#"sequence("c'maj", {"as5 0.2", "---", {key = "B_1", volume = 0.1}})"#,
         )?;
         assert_eq!(
@@ -227,7 +231,7 @@ mod test {
         );
 
         let note_sequence_event =
-            evaluate_sequence_userdata(&engine, r#"sequence{note{"c"}, note("d", "e"), {"f"}}"#)?;
+            evaluate_sequence_userdata(&lua, r#"sequence{note{"c"}, note("d", "e"), {"f"}}"#)?;
         assert_eq!(
             note_sequence_event.notes,
             vec![
@@ -243,10 +247,11 @@ mod test {
     #[test]
     fn sequence_methods() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
-        let mut engine = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine();
         let instrument = Some(InstrumentId::from(76));
         register_bindings(
-            &mut engine,
+            &mut lua,
+            &timeout_hook,
             BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
@@ -255,10 +260,13 @@ mod test {
             instrument,
         )?;
 
+        // reset timeout
+        timeout_hook.reset();
+
         // notes
         assert_eq!(
             evaluate_sequence_userdata(
-                &engine,
+                &lua,
                 r#"sequence(sequence{{"c4 0.2 0.3 0.4", "d4"}, {}, {"e4"}}.notes)"#
             )?
             .notes,
@@ -274,42 +282,42 @@ mod test {
 
         // with_xxx
         assert!(evaluate_sequence_userdata(
-            &engine, //
+            &lua, //
             r#"sequence("c", "d", "f"):transpose(1)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine, //
+            &lua, //
             r#"sequence("c'maj"):with_volume(2.0)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine, //
+            &lua, //
             r#"sequence(12, 24, 48):with_panning(0.0)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine,
+            &lua,
             r#"sequence({key = "c"}, "d", "f"):with_delay(0.0)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine, //
+            &lua, //
             r#"sequence("c", "d", "f"):transpose({1, 2})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine,
+            &lua,
             r#"sequence("c", "d", "f"):with_volume({2.0, 1.0})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine,
+            &lua,
             r#"sequence("c", "d", "f"):with_panning({0.0, 1.0})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
-            &engine,
+            &lua,
             r#"sequence("c", "d", "f"):with_delay({0.0, 0.25})"#
         )
         .is_ok());
