@@ -22,7 +22,7 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 // -------------------------------------------------------------------------------------------------
 
 // TODO: make this configurable with an cmd line arg
-const DEMO_PATH: &str = "./assets/examples/demo";
+const DEMO_PATH: &str = "./examples/assets";
 
 // -------------------------------------------------------------------------------------------------
 
