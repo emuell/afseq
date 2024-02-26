@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    event::{empty::EmptyEventIter, Event, EventIter},
-    pattern::{Pattern, fixed::FixedPattern},
+    event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
+    pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, BeatTimeStep, SampleTimeDisplay},
     Rhythm, SampleTime,
 };
@@ -15,6 +15,7 @@ pub struct BeatTimeRhythm {
     time_base: BeatTimeBase,
     step: BeatTimeStep,
     offset: BeatTimeStep,
+    instrument: Option<InstrumentId>,
     pattern: Rc<RefCell<dyn Pattern>>,
     event_iter: Rc<RefCell<dyn EventIter>>,
     event_iter_sample_time: f64,
@@ -25,6 +26,7 @@ impl BeatTimeRhythm {
     /// Create a new pattern based emitter which emits `value` every beat_time `step`.  
     pub fn new(time_base: BeatTimeBase, step: BeatTimeStep) -> Self {
         let offset = BeatTimeStep::Beats(0.0);
+        let instrument = None;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = offset.to_samples(&time_base);
@@ -33,6 +35,7 @@ impl BeatTimeRhythm {
             time_base,
             step,
             offset,
+            instrument,
             pattern,
             event_iter,
             event_iter_sample_time,
@@ -57,20 +60,6 @@ impl BeatTimeRhythm {
         self.pattern.clone()
     }
 
-    /// Trigger events with the given [`Pattern`].  
-    pub fn with_pattern<T: Pattern + Sized + 'static>(&self, pattern: T) -> Self {
-        self.with_pattern_dyn(Rc::new(RefCell::new(pattern)))
-    }
-
-    /// Trigger events with the given [`Pattern`].  
-    pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
-        Self {
-            pattern: pattern.clone(),
-            event_iter: self.event_iter.clone(),
-            ..*self
-        }
-    }
-
     /// Apply the given beat-time step offset to all events.
     pub fn with_offset<O: Into<Option<BeatTimeStep>>>(&self, offset: O) -> Self {
         let offset = offset.into().unwrap_or(BeatTimeStep::Beats(0.0));
@@ -90,6 +79,31 @@ impl BeatTimeRhythm {
         self.with_offset(offset_steps)
     }
 
+    /// Use the given instrument for all note events which have no instrument set
+    pub fn with_instrument<I: Into<Option<InstrumentId>>>(&self, instrument: I) -> Self {
+        let instrument = instrument.into();
+        Self {
+            instrument,
+            pattern: self.pattern.clone(),
+            event_iter: self.event_iter.clone(),
+            ..*self
+        }
+    }
+
+    /// Trigger events with the given [`Pattern`].  
+    pub fn with_pattern<T: Pattern + Sized + 'static>(&self, pattern: T) -> Self {
+        self.with_pattern_dyn(Rc::new(RefCell::new(pattern)))
+    }
+
+    /// Trigger events with the given [`Pattern`].  
+    pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
+        Self {
+            pattern,
+            event_iter: self.event_iter.clone(),
+            ..*self
+        }
+    }
+
     /// Use the given [`EventIter`] to trigger events.
     pub fn trigger<Iter: EventIter + 'static>(&self, iter: Iter) -> Self {
         self.trigger_dyn(Rc::new(RefCell::new(iter)))
@@ -101,6 +115,32 @@ impl BeatTimeRhythm {
             pattern: self.pattern.clone(),
             event_iter,
             ..*self
+        }
+    }
+
+    /// Set default instrument to event if none is set, else return the event as it is
+    fn event_with_default_instrument(&self, event: Option<Event>) -> Option<Event> {
+        if let Some(instrument) = self.instrument {
+            if let Some(event) = event {
+                if let Event::NoteEvents(note_events) = event {
+                    let new_note_events = note_events
+                        .into_iter()
+                        .map(|note_event| {
+                            note_event.map(|mut note_event| {
+                                note_event.instrument = note_event.instrument.or(Some(instrument));
+                                note_event
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    Some(Event::NoteEvents(new_note_events))
+                } else {
+                    Some(event)
+                }
+            } else {
+                event
+            }
+        } else {
+            event
         }
     }
 }
@@ -116,7 +156,10 @@ impl Iterator for BeatTimeRhythm {
             let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
             let value = if pattern.run() > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
-                Some((sample_time, event_iter.next()))
+                Some((
+                    sample_time,
+                    self.event_with_default_instrument(event_iter.next()),
+                ))
             } else {
                 Some((sample_time, None))
             };

@@ -12,7 +12,7 @@ pub struct SequenceUserData {
 }
 
 impl SequenceUserData {
-    pub fn from(args: LuaMultiValue, default_instrument: Option<InstrumentId>) -> LuaResult<Self> {
+    pub fn from(args: LuaMultiValue) -> LuaResult<Self> {
         // a single value, probably a sequence array
         let args = args.into_vec();
         if args.len() == 1 {
@@ -26,27 +26,19 @@ impl SequenceUserData {
                 let mut notes = vec![];
                 for (index, arg) in sequence.into_iter().enumerate() {
                     // add each sequence item as separate sequence event
-                    notes.push(note_events_from_value(
-                        arg,
-                        Some(index),
-                        default_instrument,
-                    )?);
+                    notes.push(note_events_from_value(arg, Some(index))?);
                 }
                 Ok(SequenceUserData { notes })
             } else {
                 Ok(SequenceUserData {
-                    notes: vec![note_events_from_value(arg, None, default_instrument)?],
+                    notes: vec![note_events_from_value(arg, None)?],
                 })
             }
         // multiple values, maybe of different type
         } else {
             let mut notes = vec![];
             for (index, arg) in args.into_iter().enumerate() {
-                notes.push(note_events_from_value(
-                    arg,
-                    Some(index),
-                    default_instrument,
-                )?);
+                notes.push(note_events_from_value(arg, Some(index))?);
             }
             Ok(SequenceUserData { notes })
         }
@@ -148,7 +140,6 @@ mod test {
     fn sequence() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
         let (mut lua, mut timeout_hook) = new_engine();
-        let instrument = Some(InstrumentId::from(76));
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -157,7 +148,6 @@ mod test {
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            instrument,
         )?;
 
         // reset timeout
@@ -169,9 +159,9 @@ mod test {
         assert_eq!(
             note_sequence_event.notes,
             vec![
-                vec![new_note((instrument, "c#1", 0.5))],
+                vec![new_note(("c#1", None, 0.5))],
                 vec![None],
-                vec![new_note((instrument, "g2", 1.0))]
+                vec![new_note(("g2", None, 1.0))]
             ]
         );
         let poly_note_sequence_event = evaluate_sequence_userdata(
@@ -185,14 +175,14 @@ mod test {
             poly_note_sequence_event.notes,
             vec![
                 vec![
-                    new_note((instrument, "c#1", 1.0)),
+                    new_note(("c#1", None, 1.0)),
                     None,
-                    new_note((instrument, "g2", 0.75)),
+                    new_note(("g2", None, 0.75)),
                 ],
                 vec![
-                    new_note((instrument, "a#5", 0.2)),
+                    new_note(("a#5", None, 0.2)),
                     None,
-                    new_note((instrument, "b1", 0.1))
+                    new_note(("b1", None, 0.1))
                 ]
             ]
         );
@@ -203,11 +193,7 @@ mod test {
         )?;
         assert_eq!(
             chord_sequence_event.notes,
-            vec![vec![
-                new_note((instrument, "c4")),
-                new_note((instrument, "e4")),
-                new_note((instrument, "g4")),
-            ],]
+            vec![vec![new_note("c4"), new_note("e4"), new_note("g4"),],]
         );
 
         let poly_chord_sequence_event = evaluate_sequence_userdata(
@@ -217,15 +203,11 @@ mod test {
         assert_eq!(
             poly_chord_sequence_event.notes,
             vec![
+                vec![new_note("c4"), new_note("e4"), new_note("g4"),],
                 vec![
-                    new_note((instrument, "c4")),
-                    new_note((instrument, "e4")),
-                    new_note((instrument, "g4")),
-                ],
-                vec![
-                    new_note((instrument, "a#5", 0.2)),
+                    new_note(("a#5", None, 0.2)),
                     None,
-                    new_note((instrument, "b1", 0.1))
+                    new_note(("b1", None, 0.1))
                 ]
             ]
         );
@@ -235,9 +217,9 @@ mod test {
         assert_eq!(
             note_sequence_event.notes,
             vec![
-                vec![new_note((instrument, "c")),],
-                vec![new_note((instrument, "d")), new_note((instrument, "e")),],
-                vec![new_note((instrument, "f")),]
+                vec![new_note("c"),],
+                vec![new_note("d"), new_note("e"),],
+                vec![new_note("f"),]
             ]
         );
 
@@ -248,7 +230,6 @@ mod test {
     fn sequence_methods() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
         let (mut lua, mut timeout_hook) = new_engine();
-        let instrument = Some(InstrumentId::from(76));
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -257,7 +238,6 @@ mod test {
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            instrument,
         )?;
 
         // reset timeout
@@ -271,12 +251,9 @@ mod test {
             )?
             .notes,
             vec![
-                vec![
-                    new_note((instrument, "c4", 0.2, 0.3, 0.4)),
-                    new_note((instrument, "d4")),
-                ],
+                vec![new_note(("c4", None, 0.2, 0.3, 0.4)), new_note("d4"),],
                 vec![None],
-                vec![new_note((instrument, "e4"))],
+                vec![new_note("e4")],
             ]
         );
 

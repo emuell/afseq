@@ -124,14 +124,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // build final phrase
-        let load = |id: InstrumentId, file_name: &str| {
-            bindings::new_rhythm_from_file_with_fallback(id, beat_time, file_name)
+        let load = |instrument: Option<InstrumentId>, file_name: &str| {
+            bindings::new_rhythm_from_file_with_fallback(beat_time, instrument, file_name)
         };
         let phrase = Phrase::new(
             beat_time,
             entries
                 .iter()
-                .map(|e| load(e.instrument_id, &e.script_path))
+                .map(|e| load(Some(e.instrument_id), &e.script_path))
                 .collect(),
             BeatTimeStep::Bar(4.0),
         );

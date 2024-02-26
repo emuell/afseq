@@ -145,30 +145,30 @@ pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
 
 /// Evaluate a lua script file which creates and returns a rhythm.
 pub fn new_rhythm_from_file(
-    instrument: InstrumentId,
     time_base: BeatTimeBase,
+    instrument: Option<InstrumentId>,
     file_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
     let (mut lua, mut timeout_hook) = new_engine();
-    register_bindings(&mut lua, &timeout_hook, time_base, Some(instrument))?;
+    register_bindings(&mut lua, &timeout_hook, time_base)?;
     // restart the timeout hook
     timeout_hook.reset();
     // compile and evaluate script
     let chunk = lua.load(std::path::PathBuf::from(file_name));
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(result)
+    rhythm_from_userdata(result, instrument)
 }
 
 /// Evaluate a lua script file which creates and returns a rhythm,
 /// returning a fallback rhythm on errors
 pub fn new_rhythm_from_file_with_fallback(
-    instrument: InstrumentId,
     time_base: BeatTimeBase,
+    instrument: Option<InstrumentId>,
     file_name: &str,
 ) -> Rc<RefCell<dyn Rhythm>> {
-    new_rhythm_from_file(instrument, time_base, file_name).unwrap_or_else(|err| {
+    new_rhythm_from_file(time_base, instrument, file_name).unwrap_or_else(|err| {
         log::warn!("Script '{}' failed to compile: {}", file_name, err);
         Rc::new(RefCell::new(BeatTimeRhythm::new(
             time_base,
@@ -179,32 +179,32 @@ pub fn new_rhythm_from_file_with_fallback(
 
 /// Evaluate a Lua expression which creates and returns a rhythm.
 pub fn new_rhythm_from_string(
-    instrument: InstrumentId,
     time_base: BeatTimeBase,
+    instrument: Option<InstrumentId>,
     script: &str,
     script_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
     let (mut lua, mut timeout_hook) = new_engine();
-    register_bindings(&mut lua, &timeout_hook, time_base, Some(instrument))?;
+    register_bindings(&mut lua, &timeout_hook, time_base)?;
     // restart the timeout hook
     timeout_hook.reset();
     // compile and evaluate script
     let chunk = lua.load(script).set_name(script_name);
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(result)
+    rhythm_from_userdata(result, instrument)
 }
 
 /// Evaluate a Lua expression which creates and returns a rhythm,
 /// returning a fallback rhythm on errors.
 pub fn new_rhythm_from_string_with_fallback(
-    instrument: InstrumentId,
     time_base: BeatTimeBase,
+    instrument: Option<InstrumentId>,
     script: &str,
     script_name: &str,
 ) -> Rc<RefCell<dyn Rhythm>> {
-    new_rhythm_from_string(instrument, time_base, script, script_name).unwrap_or_else(|err| {
+    new_rhythm_from_string(time_base, instrument, script, script_name).unwrap_or_else(|err| {
         log::warn!("Script '{}' failed to compile: {}", script_name, err);
         Rc::new(RefCell::new(BeatTimeRhythm::new(
             time_base,
@@ -219,9 +219,8 @@ pub fn new_rhythm_from_string_with_fallback(
 pub(crate) fn new_note_events_from_lua(
     arg: LuaValue,
     arg_index: Option<usize>,
-    default_instrument: Option<InstrumentId>,
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
-    unwrap::note_events_from_value(arg, arg_index, default_instrument)
+    unwrap::note_events_from_value(arg, arg_index)
 }
 
 /// Try converting the given lua value to a pattern pulse value.
@@ -235,10 +234,9 @@ pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<f32> {
 pub(crate) fn register_bindings(
     lua: &mut Lua,
     timeout_hook: &LuaTimeoutHook,
-    default_time_base: BeatTimeBase,
-    default_instrument: Option<InstrumentId>,
+    time_base: BeatTimeBase,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_global_bindings(lua, timeout_hook, default_time_base, default_instrument)?;
+    register_global_bindings(lua, timeout_hook, time_base)?;
     register_table_bindings(lua)?;
     register_pattern_module(lua)?;
     register_fun_module(lua)?;
@@ -248,8 +246,7 @@ pub(crate) fn register_bindings(
 fn register_global_bindings(
     lua: &mut Lua,
     timeout_hook: &LuaTimeoutHook,
-    default_time_base: BeatTimeBase,
-    default_instrument: Option<InstrumentId>,
+    time_base: BeatTimeBase,
 ) -> LuaResult<()> {
     let globals = lua.globals();
 
@@ -297,22 +294,16 @@ fn register_global_bindings(
     // function note(args...)
     globals.set(
         "note",
-        lua.create_function({
-            let default_instrument = default_instrument;
-            move |_lua, args: LuaMultiValue| -> LuaResult<NoteUserData> {
-                NoteUserData::from(args, default_instrument)
-            }
+        lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<NoteUserData> {
+            NoteUserData::from(args)
         })?,
     )?;
 
     // function sequence(args...)
     globals.set(
         "sequence",
-        lua.create_function({
-            let default_instrument = default_instrument;
-            move |_lua, args: LuaMultiValue| -> LuaResult<SequenceUserData> {
-                SequenceUserData::from(args, default_instrument)
-            }
+        lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<SequenceUserData> {
+            SequenceUserData::from(args)
         })?,
     )?;
 
@@ -320,7 +311,7 @@ fn register_global_bindings(
     globals.set(
         "emitter",
         lua.create_function({
-            let default_time_base = default_time_base;
+            let default_time_base = time_base;
             let timeout_hook = timeout_hook.clone();
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 let second_time_unit = match table.get::<&str, String>("unit") {
@@ -331,14 +322,10 @@ fn register_global_bindings(
                     let time_base = SecondTimeBase {
                         samples_per_sec: default_time_base.samples_per_sec,
                     };
-                    let instrument = default_instrument;
-                    SecondTimeRhythm::from_table(lua, &timeout_hook, table, time_base, instrument)?
+                    SecondTimeRhythm::from_table(lua, &timeout_hook, time_base, table)?
                         .into_lua(lua)
                 } else {
-                    let time_base = default_time_base;
-                    let instrument = default_instrument;
-                    BeatTimeRhythm::from_table(lua, &timeout_hook, table, time_base, instrument)?
-                        .into_lua(lua)
+                    BeatTimeRhythm::from_table(lua, &timeout_hook, time_base, table)?.into_lua(lua)
                 }
             }
         })?,
@@ -435,7 +422,6 @@ mod test {
                 beats_per_bar: 6,
                 samples_per_sec: 96000,
             },
-            Some(InstrumentId::from(76)),
         )
         .unwrap();
 

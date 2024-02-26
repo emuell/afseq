@@ -2,7 +2,6 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{new_note_events_from_lua, LuaTimeoutHook},
-    event::InstrumentId,
     Event, EventIter,
 };
 
@@ -14,7 +13,6 @@ pub struct ScriptedEventIter {
     environment: Option<LuaOwnedTable>,
     function: LuaOwnedFunction,
     timeout_hook: LuaTimeoutHook,
-    instrument: Option<InstrumentId>,
     event: Option<Event>,
 }
 
@@ -23,7 +21,6 @@ impl ScriptedEventIter {
         _lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
         function: LuaFunction<'_>,
-        instrument: Option<InstrumentId>,
     ) -> LuaResult<Self> {
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
@@ -36,29 +33,23 @@ impl ScriptedEventIter {
             let result = inner_function.call::<(), LuaValue>(())?;
             let environment = inner_function.environment().map(|env| env.into_owned());
             let function = inner_function.clone().into_owned();
-            let event = Some(Event::NoteEvents(new_note_events_from_lua(
-                result, None, instrument,
-            )?));
+            let event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
             Ok(Self {
                 environment,
                 function,
                 timeout_hook,
                 event,
-                instrument,
             })
         } else {
             // function returned an event. use this function.
             let environment = function.environment().map(|env| env.into_owned());
             let function = function.into_owned();
-            let event = Some(Event::NoteEvents(new_note_events_from_lua(
-                result, None, instrument,
-            )?));
+            let event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
             Ok(Self {
                 environment,
                 function,
                 timeout_hook,
                 event,
-                instrument,
             })
         }
     }
@@ -68,11 +59,7 @@ impl ScriptedEventIter {
         self.timeout_hook.reset();
         // call function and evaluate result
         let result = self.function.call::<(), LuaValue>(())?;
-        Ok(Event::NoteEvents(new_note_events_from_lua(
-            result,
-            None,
-            self.instrument,
-        )?))
+        Ok(Event::NoteEvents(new_note_events_from_lua(result, None)?))
     }
 }
 

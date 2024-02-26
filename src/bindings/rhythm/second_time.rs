@@ -14,9 +14,8 @@ impl SecondTimeRhythm {
     pub(crate) fn from_table(
         lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
+        time_base: SecondTimeBase,
         table: LuaTable,
-        default_time_base: SecondTimeBase,
-        default_instrument: Option<InstrumentId>,
     ) -> LuaResult<SecondTimeRhythm> {
         let mut resolution = table.get::<&str, f64>("resolution").unwrap_or(1.0);
         if resolution <= 0.0 {
@@ -36,7 +35,7 @@ impl SecondTimeRhythm {
                 "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
-        let mut rhythm = SecondTimeRhythm::new(default_time_base, resolution);
+        let mut rhythm = SecondTimeRhythm::new(time_base, resolution);
 
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")? as SecondTimeStep;
@@ -48,12 +47,8 @@ impl SecondTimeRhythm {
             rhythm = rhythm.with_pattern_dyn(pattern);
         }
         if table.contains_key("emit")? {
-            let iter = event_iter_from_value(
-                lua,
-                timeout_hook,
-                table.get::<&str, LuaValue>("emit")?,
-                default_instrument,
-            )?;
+            let iter =
+                event_iter_from_value(lua, timeout_hook, table.get::<&str, LuaValue>("emit")?)?;
             rhythm = rhythm.trigger_dyn(iter);
         }
         Ok(rhythm)

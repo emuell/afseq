@@ -19,7 +19,7 @@ pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Id to refer to a specific instrument in a NoteEvent.
+/// Id to refer to a specific instrument/patch/sample in a NoteEvent.
 #[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
 pub struct InstrumentId(usize);
 
@@ -40,8 +40,8 @@ pub fn unique_instrument_id() -> InstrumentId {
 /// Single note event in a [`Event`].
 #[derive(Clone, PartialEq, Debug)]
 pub struct NoteEvent {
-    pub instrument: Option<InstrumentId>,
     pub note: Note,
+    pub instrument: Option<InstrumentId>,
     pub volume: f32,  // [0 - INF]
     pub panning: f32, // [-1 - 1]
     pub delay: f32,   // [0 - 1]
@@ -52,12 +52,12 @@ impl NoteEvent {
         if show_instruments {
             format!(
                 "{} {} {:.2} {:.2} {:.2}",
+                self.note,
                 if let Some(instrument) = self.instrument {
-                    format!("{:02}", instrument)
+                    format!("#{:02}", instrument)
                 } else {
                     "NA".to_string()
                 },
-                self.note,
                 self.volume,
                 self.panning,
                 self.delay
@@ -71,12 +71,29 @@ impl NoteEvent {
     }
 }
 
-impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N)> for NoteEvent
+impl<N: TryInto<Note>> From<N> for NoteEvent
 where
     <N as TryInto<Note>>::Error: std::fmt::Debug,
 {
-    // Initialize from a (Instrument, Note) tuple
-    fn from((instrument, note): (I, N)) -> Self {
+    // Initialize from a Note
+    fn from(note: N) -> Self {
+        let note = note.try_into().expect("Failed to convert note");
+        Self {
+            note,
+            instrument: None,
+            volume: 1.0,
+            panning: 0.0,
+            delay: 0.0,
+        }
+    }
+}
+
+impl<N: TryInto<Note>, I: Into<Option<InstrumentId>>> From<(N, I)> for NoteEvent
+where
+    <N as TryInto<Note>>::Error: std::fmt::Debug,
+{
+    // Initialize from a (Note, Instrument) tuple
+    fn from((note, instrument): (N, I)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
         Self {
@@ -89,12 +106,12 @@ where
     }
 }
 
-impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N, f32)> for NoteEvent
+impl<N: TryInto<Note>, I: Into<Option<InstrumentId>>> From<(N, I, f32)> for NoteEvent
 where
     <N as TryInto<Note>>::Error: std::fmt::Debug,
 {
     // Initialize from a (Instrument, Note, Volume) tuple
-    fn from((instrument, note, volume): (I, N, f32)) -> Self {
+    fn from((note, instrument, volume): (N, I, f32)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
         Self {
@@ -107,12 +124,12 @@ where
     }
 }
 
-impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N, f32, f32)> for NoteEvent
+impl<N: TryInto<Note>, I: Into<Option<InstrumentId>>> From<(N, I, f32, f32)> for NoteEvent
 where
     <N as TryInto<Note>>::Error: std::fmt::Debug,
 {
     // Initialize from a (Instrument, Note, Volume, Panning) tuple
-    fn from((instrument, note, volume, panning): (I, N, f32, f32)) -> Self {
+    fn from((note, instrument, volume, panning): (N, I, f32, f32)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
         Self {
@@ -125,12 +142,12 @@ where
     }
 }
 
-impl<I: Into<Option<InstrumentId>>, N: TryInto<Note>> From<(I, N, f32, f32, f32)> for NoteEvent
+impl<N: TryInto<Note>, I: Into<Option<InstrumentId>>> From<(N, I, f32, f32, f32)> for NoteEvent
 where
     <N as TryInto<Note>>::Error: std::fmt::Debug,
 {
     // Initialize from a (Instrument, Note, Volume, Panning, Delay) tuple
-    fn from((instrument, note, volume, panning, delay): (I, N, f32, f32, f32)) -> Self {
+    fn from((note, instrument, volume, panning, delay): (N, I, f32, f32, f32)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
         Self {
@@ -162,9 +179,7 @@ pub fn new_note<E: Into<NoteEvent>>(note_event: E) -> Option<NoteEvent> {
 
 /// Shortcut for creating a vector of [`NoteEvent`]:
 /// e.g. a sequence of single notes
-pub fn new_note_vector<E: Into<NoteEvent>>(
-    sequence: Vec<Option<E>>,
-) -> Vec<Option<NoteEvent>> {
+pub fn new_note_vector<E: Into<NoteEvent>>(sequence: Vec<Option<E>>) -> Vec<Option<NoteEvent>> {
     let mut event_sequence = Vec::with_capacity(sequence.len());
     for event in sequence {
         if let Some(event) = event {
@@ -202,17 +217,12 @@ pub fn new_empty_note_event() -> FixedEventIter {
 }
 
 /// Shortcut for creating a new [`NoteEvent`] [`EventIter`].
-pub fn new_note_event<E: Into<NoteEvent>>(
-    event: E,
-) -> FixedEventIter
-{
+pub fn new_note_event<E: Into<NoteEvent>>(event: E) -> FixedEventIter {
     new_note(event).to_event()
 }
 
 /// Shortcut for creating a new sequence of [`NoteEvent`] [`EventIter`].
-pub fn new_note_event_sequence<E: Into<NoteEvent>>(
-    sequence: Vec<Option<E>>,
-) -> FixedEventIter {
+pub fn new_note_event_sequence<E: Into<NoteEvent>>(sequence: Vec<Option<E>>) -> FixedEventIter {
     new_note_vector(sequence).to_event_sequence()
 }
 

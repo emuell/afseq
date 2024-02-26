@@ -3,7 +3,10 @@ use std::{cell::RefCell, rc::Rc};
 use anyhow::anyhow;
 use mlua::prelude::*;
 
-use crate::rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm};
+use crate::{
+    event::InstrumentId,
+    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
+};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -16,12 +19,17 @@ mod second_time;
 // which is expected to be a user data
 pub(crate) fn rhythm_from_userdata(
     result: LuaValue,
+    instrument: Option<InstrumentId>,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     if let Some(user_data) = result.as_userdata() {
         if let Ok(beat_time_rhythm) = user_data.take::<BeatTimeRhythm>() {
-            Ok(Rc::new(RefCell::new(beat_time_rhythm)))
+            Ok(Rc::new(RefCell::new(
+                beat_time_rhythm.with_instrument(instrument),
+            )))
         } else if let Ok(second_time_rhythm) = user_data.take::<SecondTimeRhythm>() {
-            Ok(Rc::new(RefCell::new(second_time_rhythm)))
+            Ok(Rc::new(RefCell::new(
+                second_time_rhythm.with_instrument(instrument),
+            )))
         } else {
             Err(anyhow!("Expected script to return a Rhythm, got some other custom type",).into())
         }
@@ -53,7 +61,6 @@ mod test {
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            None,
         )
         .unwrap();
 
@@ -118,7 +125,6 @@ mod test {
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
             },
-            None,
         )
         .unwrap();
 

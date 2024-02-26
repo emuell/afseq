@@ -73,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // generate a few phrases
     let kick_pattern = beat_time
         .every_nth_sixteenth(1.0)
+        .with_instrument(KICK)
         .with_pattern(
             [
                 1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
@@ -86,37 +87,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
             .to_pattern(),
         )
-        .trigger(new_note_event((KICK, "C_5")));
+        .trigger(new_note_event("C_5"));
 
     let snare_pattern = beat_time
         .every_nth_beat(2.0)
         .with_offset(BeatTimeStep::Beats(1.0))
-        .trigger(new_note_event((SNARE, "C_5")));
+        .with_instrument(SNARE)
+        .trigger(new_note_event("C_5"));
 
-    let hihat_pattern =
-        beat_time
-            .every_nth_sixteenth(2.0)
-            .trigger(new_note_event((HIHAT, "C_5")).mutate({
-                let mut step = 0;
-                move |mut event| {
-                    if let Event::NoteEvents(notes) = &mut event {
-                        for (_index, note) in notes.iter_mut().enumerate() {
-                            if let Some(note) = note {
-                                note.volume = 1.0 / (step + 1) as f32;
-                                step += 1;
-                                if step >= 3 {
-                                    step = 0;
-                                }
+    let hihat_pattern = beat_time
+        .every_nth_sixteenth(2.0)
+        .with_instrument(HIHAT)
+        .trigger(new_note_event("C_5").mutate({
+            let mut step = 0;
+            move |mut event| {
+                if let Event::NoteEvents(notes) = &mut event {
+                    for (_index, note) in notes.iter_mut().enumerate() {
+                        if let Some(note) = note {
+                            note.volume = 1.0 / (step + 1) as f32;
+                            step += 1;
+                            if step >= 3 {
+                                step = 0;
                             }
                         }
                     }
-                    event
                 }
-            }));
+                event
+            }
+        }));
     let hihat_pattern2 = beat_time
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
-        .trigger(new_note_event((HIHAT, "C_5")).mutate({
+        .with_instrument(HIHAT)
+        .trigger(new_note_event("C_5").mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |mut event| {
@@ -150,50 +153,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bass_notes = Scale::try_from((Note::C5, "aeolian"))?.notes();
     let bass_pattern = beat_time
         .every_nth_eighth(1.0)
+        .with_instrument(BASS)
         .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_pattern())
         .trigger(new_note_event_sequence(vec![
-            new_note((BASS, bass_notes[0], 0.5)),
-            new_note((BASS, bass_notes[2], 0.5)),
-            new_note((BASS, bass_notes[3], 0.5)),
-            new_note((BASS, bass_notes[0], 0.5)),
-            new_note((BASS, bass_notes[2], 0.5)),
-            new_note((BASS, bass_notes[3], 0.5)),
-            new_note((BASS, bass_notes[6].transpose(-12), 0.5)),
+            new_note((bass_notes[0], None, 0.5)),
+            new_note((bass_notes[2], None, 0.5)),
+            new_note((bass_notes[3], None, 0.5)),
+            new_note((bass_notes[0], None, 0.5)),
+            new_note((bass_notes[2], None, 0.5)),
+            new_note((bass_notes[3], None, 0.5)),
+            new_note((bass_notes[6].transpose(-12), None, 0.5)),
         ]));
 
-    let synth_pattern = beat_time
-        .every_nth_bar(4.0)
+    let synth_pattern = beat_time.every_nth_bar(4.0).with_instrument(SYNTH).trigger(
+        new_polyphonic_note_sequence_event(vec![
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("G 4", None, 0.3)),
+            ],
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("F 4", None, 0.3)),
+            ],
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("G 4", None, 0.3)),
+            ],
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("A#4", None, 0.3)),
+            ],
+        ]),
+    );
+
+    let fx_pattern = second_time
+        .every_nth_seconds(8.0)
+        .with_instrument(FX)
         .trigger(new_polyphonic_note_sequence_event(vec![
-            vec![
-                new_note((SYNTH, "C 4", 0.3)),
-                new_note((SYNTH, "D#4", 0.3)),
-                new_note((SYNTH, "G 4", 0.3)),
-            ],
-            vec![
-                new_note((SYNTH, "C 4", 0.3)),
-                new_note((SYNTH, "D#4", 0.3)),
-                new_note((SYNTH, "F 4", 0.3)),
-            ],
-            vec![
-                new_note((SYNTH, "C 4", 0.3)),
-                new_note((SYNTH, "D#4", 0.3)),
-                new_note((SYNTH, "G 4", 0.3)),
-            ],
-            vec![
-                new_note((SYNTH, "C 4", 0.3)),
-                new_note((SYNTH, "D#4", 0.3)),
-                new_note((SYNTH, "A#4", 0.3)),
-            ],
+            vec![new_note(("C 4", None, 0.2)), None, None],
+            vec![None, new_note(("C 4", None, 0.2)), None],
+            vec![None, None, new_note(("F 4", None, 0.2))],
         ]));
-
-    let fx_pattern =
-        second_time
-            .every_nth_seconds(8.0)
-            .trigger(new_polyphonic_note_sequence_event(vec![
-                vec![new_note((FX, "C 4", 0.2)), None, None],
-                vec![None, new_note((FX, "C 4", 0.2)), None],
-                vec![None, None, new_note((FX, "F 4", 0.2))],
-            ]));
 
     // arrange rhytms into phrases and sequence up these phrases to create a litte arrangement
     let mut sequence = Sequence::new(

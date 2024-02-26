@@ -1,7 +1,7 @@
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
-    event::{empty::EmptyEventIter, Event, EventIter},
+    event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
     Rhythm, SampleTime,
@@ -16,6 +16,7 @@ pub struct SecondTimeRhythm {
     step: SecondTimeStep,
     offset: SecondTimeStep,
     pattern: Rc<RefCell<dyn Pattern>>,
+    instrument: Option<InstrumentId>,
     event_iter: Rc<RefCell<dyn EventIter>>,
     event_iter_sample_time: f64,
     sample_offset: SampleTime,
@@ -26,6 +27,7 @@ impl SecondTimeRhythm {
     pub fn new(time_base: SecondTimeBase, step: SecondTimeStep) -> Self {
         let offset = 0.0;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
+        let instrument = None;
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = time_base.seconds_to_samples(offset) as f64;
         let sample_offset = 0;
@@ -34,6 +36,7 @@ impl SecondTimeRhythm {
             step,
             offset,
             pattern,
+            instrument,
             event_iter,
             event_iter_sample_time,
             sample_offset,
@@ -70,6 +73,17 @@ impl SecondTimeRhythm {
         }
     }
 
+    /// Use the given instrument for all note events which have no instrument set
+    pub fn with_instrument<I: Into<Option<InstrumentId>>>(&self, instrument: I) -> Self {
+        let instrument = instrument.into();
+        Self {
+            instrument,
+            pattern: self.pattern.clone(),
+            event_iter: self.event_iter.clone(),
+            ..*self
+        }
+    }
+
     /// Trigger events with the given [`Pattern`].  
     pub fn with_pattern<T: Pattern + Sized + 'static>(&self, pattern: T) -> Self {
         self.with_pattern_dyn(Rc::new(RefCell::new(pattern)))
@@ -78,7 +92,7 @@ impl SecondTimeRhythm {
     /// Trigger events with the given [`Pattern`].  
     pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
         Self {
-            pattern: pattern.clone(),
+            pattern,
             event_iter: self.event_iter.clone(),
             ..*self
         }
@@ -97,6 +111,32 @@ impl SecondTimeRhythm {
             ..*self
         }
     }
+
+    /// Set default instrument to event if none is set, else return the event as it is
+    fn event_with_default_instrument(&self, event: Option<Event>) -> Option<Event> {
+        if let Some(instrument) = self.instrument {
+            if let Some(event) = event {
+                if let Event::NoteEvents(note_events) = event {
+                    let new_note_events = note_events
+                        .into_iter()
+                        .map(|note_event| {
+                            note_event.map(|mut note_event| {
+                                note_event.instrument = note_event.instrument.or(Some(instrument));
+                                note_event
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    Some(Event::NoteEvents(new_note_events))
+                } else {
+                    Some(event)
+                }
+            } else {
+                event
+            }
+        } else {
+            event
+        }
+    }
 }
 
 impl Iterator for SecondTimeRhythm {
@@ -110,7 +150,10 @@ impl Iterator for SecondTimeRhythm {
             let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
             let value = if pattern.run() > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
-                Some((sample_time, event_iter.next()))
+                Some((
+                    sample_time,
+                    self.event_with_default_instrument(event_iter.next()),
+                ))
             } else {
                 Some((sample_time, None))
             };

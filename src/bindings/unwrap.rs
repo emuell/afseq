@@ -293,17 +293,11 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
 
 // ---------------------------------------------------------------------------------------------
 
-pub(crate) fn note_event_from_number(
-    note_value: LuaInteger,
-    default_instrument: Option<InstrumentId>,
-) -> LuaResult<Option<NoteEvent>> {
-    Ok(new_note((default_instrument, note_value as u8)))
+pub(crate) fn note_event_from_number(note_value: LuaInteger) -> LuaResult<Option<NoteEvent>> {
+    Ok(new_note(note_value as u8))
 }
 
-pub(crate) fn note_event_from_string(
-    str: &str,
-    default_instrument: Option<InstrumentId>,
-) -> LuaResult<Option<NoteEvent>> {
+pub(crate) fn note_event_from_string(str: &str) -> LuaResult<Option<NoteEvent>> {
     let mut white_space_splits = str.split(' ').filter(|v| !v.is_empty());
     let note_part = white_space_splits.next().unwrap_or("");
     if is_empty_note_string(note_part) {
@@ -317,14 +311,11 @@ pub(crate) fn note_event_from_string(
         let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
         let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
         let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
-        Ok(new_note((default_instrument, note, volume, panning, delay)))
+        Ok(new_note((note, None, volume, panning, delay)))
     }
 }
 
-pub(crate) fn note_event_from_table_map(
-    table: LuaTable,
-    default_instrument: Option<InstrumentId>,
-) -> LuaResult<Option<NoteEvent>> {
+pub(crate) fn note_event_from_table_map(table: LuaTable) -> LuaResult<Option<NoteEvent>> {
     if table.is_empty() {
         return Ok(None);
     }
@@ -335,8 +326,8 @@ pub(crate) fn note_event_from_table_map(
         // { key = 60, [volume = 1.0, panning = 0.0, delay = 0.0] }
         if let Ok(note_value) = table.get::<&str, i32>("key") {
             Ok(new_note((
-                default_instrument,
                 Note::from(note_value as u8),
+                None,
                 volume,
                 panning,
                 delay,
@@ -351,7 +342,7 @@ pub(crate) fn note_event_from_table_map(
                     message: Some(err.to_string()),
                 }
             })?;
-            Ok(new_note((default_instrument, note, volume, panning, delay)))
+            Ok(new_note((note, None, volume, panning, delay)))
         } else {
             Err(LuaError::FromLuaConversionError {
                 from: "table",
@@ -371,13 +362,12 @@ pub(crate) fn note_event_from_table_map(
 pub(crate) fn note_event_from_value(
     arg: LuaValue,
     arg_index: Option<usize>,
-    default_instrument: Option<InstrumentId>,
 ) -> LuaResult<Option<NoteEvent>> {
     match arg {
         LuaValue::Nil => Ok(None),
-        LuaValue::Integer(note_value) => note_event_from_number(note_value, default_instrument),
-        LuaValue::String(str) => note_event_from_string(&str.to_string_lossy(), default_instrument),
-        LuaValue::Table(table) => note_event_from_table_map(table, default_instrument),
+        LuaValue::Integer(note_value) => note_event_from_number(note_value),
+        LuaValue::String(str) => note_event_from_string(&str.to_string_lossy()),
+        LuaValue::Table(table) => note_event_from_table_map(table),
         _ => {
             return Err(LuaError::FromLuaConversionError {
                 from: arg.type_name(),
@@ -395,7 +385,6 @@ pub(crate) fn note_event_from_value(
 pub(crate) fn note_events_from_value(
     arg: LuaValue,
     arg_index: Option<usize>,
-    default_instrument: Option<InstrumentId>,
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     match arg {
         LuaValue::UserData(userdata) => {
@@ -431,11 +420,7 @@ pub(crate) fn note_events_from_value(
                 let mut note_events = vec![];
                 for (arg_index, arg) in sequence.into_iter().enumerate() {
                     // flatten sequence events into a single array
-                    note_events.append(&mut note_events_from_value(
-                        arg,
-                        Some(arg_index),
-                        default_instrument,
-                    )?);
+                    note_events.append(&mut note_events_from_value(arg, Some(arg_index))?);
                 }
                 Ok(note_events)
             // { key = xxx } map
@@ -443,7 +428,6 @@ pub(crate) fn note_events_from_value(
                 Ok(vec![note_event_from_value(
                     mlua::Value::Table(table),
                     arg_index,
-                    default_instrument,
                 )?])
             }
         }
@@ -451,23 +435,16 @@ pub(crate) fn note_events_from_value(
             let str = str.to_string_lossy().to_string();
             // a string with ' is a chord
             if str.contains('\'') {
-                Ok(chord_events_from_string(&str, default_instrument)?)
+                Ok(chord_events_from_string(&str)?)
             } else {
-                Ok(vec![note_event_from_string(&str, default_instrument)?])
+                Ok(vec![note_event_from_string(&str)?])
             }
         }
-        _ => Ok(vec![note_event_from_value(
-            arg,
-            arg_index,
-            default_instrument,
-        )?]),
+        _ => Ok(vec![note_event_from_value(arg, arg_index)?]),
     }
 }
 
-pub(crate) fn chord_events_from_string(
-    chord_string: &str,
-    default_instrument: Option<InstrumentId>,
-) -> LuaResult<Vec<Option<NoteEvent>>> {
+pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Option<NoteEvent>>> {
     let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
     let chord_part = white_space_splits.next().unwrap_or("");
     let chord = Chord::try_from(chord_part).map_err(|err| LuaError::FromLuaConversionError {
@@ -483,8 +460,8 @@ pub(crate) fn chord_events_from_string(
         .iter()
         .map(|i| {
             new_note((
-                default_instrument,
                 Note::from(chord.note() as u8 + i),
+                None,
                 volume,
                 panning,
                 delay,
@@ -561,7 +538,6 @@ pub(crate) fn event_iter_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
     value: LuaValue,
-    default_instrument: Option<InstrumentId>,
 ) -> LuaResult<Rc<RefCell<dyn EventIter>>> {
     match value {
         LuaValue::UserData(userdata) => {
@@ -582,7 +558,7 @@ pub(crate) fn event_iter_from_value(
             }
         }
         LuaValue::Function(function) => {
-            let iter = ScriptedEventIter::new(lua, timeout_hook, function, default_instrument)?;
+            let iter = ScriptedEventIter::new(lua, timeout_hook, function)?;
             Ok(Rc::new(RefCell::new(iter)))
         }
         LuaValue::Table(ref table) => {
@@ -590,24 +566,20 @@ pub(crate) fn event_iter_from_value(
             if let Some(sequence) = sequence_from_table(&table.clone()) {
                 let mut note_event_sequence = vec![];
                 for (arg_index, arg) in sequence.into_iter().enumerate() {
-                    note_event_sequence.push(note_events_from_value(
-                        arg,
-                        Some(arg_index),
-                        default_instrument,
-                    )?);
+                    note_event_sequence.push(note_events_from_value(arg, Some(arg_index))?);
                 }
                 let iter = note_event_sequence.to_event_sequence();
                 Ok(Rc::new(RefCell::new(iter)))
             }
             // convert table to a single note event
             else {
-                let iter = note_event_from_value(value, None, default_instrument)?.to_event();
+                let iter = note_event_from_value(value, None)?.to_event();
                 Ok(Rc::new(RefCell::new(iter)))
             }
         }
         _ => {
             // try converting a note number or note/chord string to an event iter
-            let iter = note_events_from_value(value, None, default_instrument)?.to_event();
+            let iter = note_events_from_value(value, None)?.to_event();
             Ok(Rc::new(RefCell::new(iter)))
         }
     }

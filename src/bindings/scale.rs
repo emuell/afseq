@@ -35,7 +35,6 @@ mod test {
                 beats_per_bar: 6,
                 samples_per_sec: 96000,
             },
-            Some(InstrumentId::from(76)),
         )
         .unwrap();
 
