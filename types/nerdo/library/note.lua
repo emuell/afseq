@@ -8,6 +8,7 @@
 
 ---@class NoteTable
 ---@field key string|number Note Key
+---@field instrument number? Instrument/Sample/Patch >= 0
 ---@field volume number? Volume in range [0.0 - 4.0]
 ---@field panning number? Panning factor in range [-1.0 - 1.0] where 0 is center
 ---@field delay number? Delay factor in range [0.0 - 1.0]
@@ -72,16 +73,26 @@ function Note.with_delay(self, panning) end
 
 --- Create a new monophonic or polyphonic note (a chord) from a number value, 
 --- a note string, chord string or array of note values.
+---
+--- In note strings the following prefixes are used to specify optional note 
+--- attributes: 
+---```md
+--- -'#' -> instrument (integer > 0)
+--- -'v' -> volume (float in range [0-4])
+--- -'p' -> panning (float in range [-1-1])
+--- -'d' -> delay (float in range [0-1])
+---```
 ---@param ... NoteValue
 ---@return Note
 --- #### Examples
 --- ```lua
 --- note(60) -- middle C
 --- note("c4") -- middle C
---- note("c4 0.5") -- middle C with volume 0.5
+--- note("c4 v0.5 d0.333") -- middle C with volume 0.5 and a delay of 1/3
+--- note("c4 #2") -- middle C with instrument/sample/patch 2
 --- note({key = "c4", volume = 0.5}) -- middle C with volume 0.5
---- note("c4'maj 0.7") -- C4 major chord with volume 0.7
---- note("c4", "e4", "off") -- custom chord with a c4, e4 and 'off' note
+--- note("c4'maj v0.7 p0.5") -- C4 major chord with volume 0.7, panning 0.5 R
+--- note("c4", "e4 v0.5", "off") -- custom chord with a c4, e4 and 'off' note
 --- ```
 ---@overload fun(table: NoteValue[]): Note
 ---@overload fun(...: NoteValue): Note

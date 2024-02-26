@@ -3,8 +3,8 @@ return emitter {
   resolution = 8,
   offset = 64,
   emit = {
-    note("C 4", "---", "---"):with_volume(0.2),
-    note("---", "C 5", "---"):with_volume(0.25),
-    note("---", "---", "F 5"):with_volume(0.2)
+    note("c_4", "---", "---"):with_volume(0.2),
+    note("---", "c_5", "---"):with_volume(0.25),
+    note("---", "---", "f_5"):with_volume(0.2)
   }
 }
