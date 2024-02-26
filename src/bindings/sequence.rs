@@ -155,7 +155,7 @@ mod test {
 
         // Note Sequence
         let note_sequence_event =
-            evaluate_sequence_userdata(&lua, r#"sequence({"C#1 0.5"}, "---", "G_2")"#)?;
+            evaluate_sequence_userdata(&lua, r#"sequence({"C#1 v0.5"}, "---", "G_2")"#)?;
         assert_eq!(
             note_sequence_event.notes,
             vec![
@@ -167,8 +167,8 @@ mod test {
         let poly_note_sequence_event = evaluate_sequence_userdata(
             &lua,
             r#"sequence(
-                    {"C#1", "", "G_2 0.75"},
-                    {"A#5 0.2", "---", {key = "B_1", volume = 0.1}}
+                    {"C#1", "", "G_2 v0.75"},
+                    {"A#5 v0.2", "---", {key = "B_1", volume = 0.1}}
                 )"#,
         )?;
         assert_eq!(
@@ -198,7 +198,7 @@ mod test {
 
         let poly_chord_sequence_event = evaluate_sequence_userdata(
             &lua,
-            r#"sequence("c'maj", {"as5 0.2", "---", {key = "B_1", volume = 0.1}})"#,
+            r#"sequence("c'maj", {"as5 v0.2", "---", {key = "B_1", volume = 0.1}})"#,
         )?;
         assert_eq!(
             poly_chord_sequence_event.notes,
@@ -247,11 +247,11 @@ mod test {
         assert_eq!(
             evaluate_sequence_userdata(
                 &lua,
-                r#"sequence(sequence{{"c4 0.2 0.3 0.4", "d4"}, {}, {"e4"}}.notes)"#
+                r#"sequence(sequence{{"c4 #1 v0.2 p0.3 d0.4", "d4"}, {}, {"e4"}}.notes)"#
             )?
             .notes,
             vec![
-                vec![new_note(("c4", None, 0.2, 0.3, 0.4)), new_note("d4"),],
+                vec![new_note(("c4", InstrumentId::from(1), 0.2, 0.3, 0.4)), new_note("d4"),],
                 vec![None],
                 vec![new_note("e4")],
             ]

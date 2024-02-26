@@ -221,6 +221,15 @@ where
     }
 }
 
+pub(crate) fn instrument_value_from_table(table: &LuaTable) -> LuaResult<Option<InstrumentId>> {
+    if table.contains_key::<&str>("instrument")? {
+        let value = table.get::<&str, usize>("instrument")?;
+        Ok(Some(InstrumentId::from(value)))
+    } else {
+        Ok(None)
+    }
+}
+
 pub(crate) fn volume_value_from_table(table: &LuaTable) -> LuaResult<f32> {
     float_value_from_table(table, "volume", 0.0..=f32::MAX, 1.0)
 }
@@ -233,10 +242,6 @@ pub(crate) fn delay_value_from_table(table: &LuaTable) -> LuaResult<f32> {
     float_value_from_table(table, "delay", 0.0..1.0, 0.0)
 }
 
-pub(crate) fn is_empty_float_value_string(str: &str) -> bool {
-    str == ".." || str == "--"
-}
-
 fn float_value_from_string<Range>(
     str: &str,
     name: &'static str,
@@ -247,7 +252,7 @@ where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
     let mut value = default;
-    if !str.is_empty() && !is_empty_float_value_string(str) {
+    if !str.is_empty() {
         if let Ok(int) = str.parse::<i32>() {
             value = int as f32;
         } else if let Ok(float) = str.parse::<f32>() {
@@ -271,6 +276,35 @@ where
         }
     }
     Ok(value)
+}
+
+pub(crate) fn instrument_value_from_string(str: &str) -> LuaResult<Option<InstrumentId>> {
+    if !str.is_empty() {
+        if let Ok(value) = str.parse::<LuaInteger>() {
+            if value < 0 {
+                return Err(LuaError::FromLuaConversionError {
+                    from: "string",
+                    to: "number",
+                    message: Some(format!(
+                        "'{}' property must be >= 0 but is '{}'",
+                        "instrument", value
+                    )),
+                });
+            }
+            Ok(Some(InstrumentId::from(value as usize)))
+        } else {
+            Err(LuaError::FromLuaConversionError {
+                from: "string",
+                to: "number",
+                message: Some(format!(
+                    "'{}' property '{}' is not a number",
+                    "instrument", str
+                )),
+            })
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 pub(crate) fn volume_value_from_string(str: &str) -> LuaResult<f32> {
@@ -308,10 +342,29 @@ pub(crate) fn note_event_from_string(str: &str) -> LuaResult<Option<NoteEvent>> 
             to: "note",
             message: Some(err.to_string()),
         })?;
-        let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
-        let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
-        let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
-        Ok(new_note((note, None, volume, panning, delay)))
+        let mut instrument = None;
+        let mut volume = 1.0;
+        let mut panning = 0.0;
+        let mut delay = 0.0;
+        for split in white_space_splits {
+            if let Some(instrument_str) = split.strip_prefix('#') {
+                instrument = instrument_value_from_string(instrument_str)?;
+            } else if let Some(volume_str) = split.strip_prefix('v') {
+                volume = volume_value_from_string(volume_str)?;
+            } else if let Some(panning_str) = split.strip_prefix('p') {
+                panning = panning_value_from_string(panning_str)?;
+            } else if let Some(delay_str) = split.strip_prefix('d') {
+                delay = delay_value_from_string(delay_str)?;
+            } else {
+                return Err(LuaError::FromLuaConversionError {
+                    from: "string",
+                    to: "note",
+                    message: Some(format!("Invalid note string segment: '{}'. ", split) +
+                        "Expecting a '#' (instrument),'v' (volume), 'p' (panning) of 'd' (delay) prefix here."),
+                });
+            }
+        }
+        Ok(new_note((note, instrument, volume, panning, delay)))
     }
 }
 
@@ -320,6 +373,7 @@ pub(crate) fn note_event_from_table_map(table: LuaTable) -> LuaResult<Option<Not
         return Ok(None);
     }
     if table.contains_key("key")? {
+        let instrument = instrument_value_from_table(&table)?;
         let volume = volume_value_from_table(&table)?;
         let panning = panning_value_from_table(&table)?;
         let delay = delay_value_from_table(&table)?;
@@ -327,13 +381,13 @@ pub(crate) fn note_event_from_table_map(table: LuaTable) -> LuaResult<Option<Not
         if let Ok(note_value) = table.get::<&str, i32>("key") {
             Ok(new_note((
                 Note::from(note_value as u8),
-                None,
+                instrument,
                 volume,
                 panning,
                 delay,
             )))
         }
-        // { key = "C4", [volume = 1.0, panning = 0.0, delay = 0.0] }
+        // { key = "C4", [instrument = 1, volume = 1.0, panning = 0.0, delay = 0.0] }
         else if let Ok(note_str) = table.get::<&str, String>("key") {
             let note = Note::try_from(note_str.as_str()).map_err(|err| {
                 LuaError::FromLuaConversionError {
@@ -342,7 +396,7 @@ pub(crate) fn note_event_from_table_map(table: LuaTable) -> LuaResult<Option<Not
                     message: Some(err.to_string()),
                 }
             })?;
-            Ok(new_note((note, None, volume, panning, delay)))
+            Ok(new_note((note, instrument, volume, panning, delay)))
         } else {
             Err(LuaError::FromLuaConversionError {
                 from: "table",
@@ -452,16 +506,35 @@ pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Opti
         to: "chord",
         message: Some(format!("invalid chord '{}': {}", chord_part, err)),
     })?;
-    let volume = volume_value_from_string(white_space_splits.next().unwrap_or(""))?;
-    let panning = panning_value_from_string(white_space_splits.next().unwrap_or(""))?;
-    let delay = delay_value_from_string(white_space_splits.next().unwrap_or(""))?;
+    let mut instrument = None;
+    let mut volume = 1.0;
+    let mut panning = 0.0;
+    let mut delay = 0.0;
+    for split in white_space_splits {
+        if let Some(instrument_str) = split.strip_prefix('#') {
+            instrument = instrument_value_from_string(instrument_str)?;
+        } else if let Some(volume_str) = split.strip_prefix('v') {
+            volume = volume_value_from_string(volume_str)?;
+        } else if let Some(panning_str) = split.strip_prefix('p') {
+            panning = panning_value_from_string(panning_str)?;
+        } else if let Some(delay_str) = split.strip_prefix('d') {
+            delay = delay_value_from_string(delay_str)?;
+        } else {
+            return Err(LuaError::FromLuaConversionError {
+                from: "string",
+                to: "note",
+                message: Some(format!("Invalid note string segment: '{}'. ", split) +
+                    "Expecting a '#' (instrument),'v' (volume), 'p' (panning) of 'd' (delay) prefix here."),
+            });
+        }
+    }
     Ok(chord
         .intervals()
         .iter()
         .map(|i| {
             new_note((
                 Note::from(chord.note() as u8 + i),
-                None,
+                instrument,
                 volume,
                 panning,
                 delay,

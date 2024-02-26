@@ -140,7 +140,7 @@ mod test {
                     resolution = 2,
                     offset = 3,
                     pattern = {1,0,1,0},
-                    emit = {"c5", "c5 0.4", {"c7", "c7 2.0"}}
+                    emit = {"c5", "c5 v0.4", {"c7", "c7 v2.0"}}
                 }
             "#,
             )
