@@ -19,6 +19,7 @@ pub struct BeatTimeRhythm {
     pattern: Rc<RefCell<dyn Pattern>>,
     event_iter: Rc<RefCell<dyn EventIter>>,
     event_iter_sample_time: f64,
+    event_iter_pos_in_step: f64,
     sample_offset: SampleTime,
 }
 
@@ -30,6 +31,7 @@ impl BeatTimeRhythm {
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = offset.to_samples(&time_base);
+        let event_iter_pos_in_step = 0.0;
         let sample_offset = 0;
         Self {
             time_base,
@@ -39,6 +41,7 @@ impl BeatTimeRhythm {
             pattern,
             event_iter,
             event_iter_sample_time,
+            event_iter_pos_in_step,
             sample_offset,
         }
     }
@@ -174,6 +177,13 @@ impl Rhythm for BeatTimeRhythm {
         Box::new(self.time_base)
     }
     fn set_time_base(&mut self, time_base: BeatTimeBase) {
+        if self.event_iter_pos_in_step > 0.0 {
+            // reschedule next event's sample time to align it to the new time base,
+            // taking into account when exactly the switch happened within a step
+            let step_time_difference =
+                self.step.to_samples(&time_base) - self.step.to_samples(&self.time_base);
+            self.event_iter_sample_time += step_time_difference * self.event_iter_pos_in_step;
+        }
         self.time_base = time_base;
     }
 
@@ -192,10 +202,15 @@ impl Rhythm for BeatTimeRhythm {
     }
 
     fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
-        let current_sample_time = self.event_iter_sample_time + self.sample_offset as f64;
-        if (current_sample_time as SampleTime) < sample_time {
+        let current_sample_time =
+            (self.event_iter_sample_time + self.sample_offset as f64) as SampleTime;
+        if current_sample_time < sample_time {
+            self.event_iter_pos_in_step = 0.0;
             self.next()
         } else {
+            // memorize how far we're away from the next step as fraction
+            self.event_iter_pos_in_step =
+                (current_sample_time - sample_time) as f64 / self.samples_per_step();
             None
         }
     }
@@ -206,6 +221,7 @@ impl Rhythm for BeatTimeRhythm {
         // reset iterator state
         self.event_iter.borrow_mut().reset();
         self.event_iter_sample_time = self.offset.to_samples(&self.time_base);
+        self.event_iter_pos_in_step = 0.0;
         self.pattern.borrow_mut().reset();
     }
 }
