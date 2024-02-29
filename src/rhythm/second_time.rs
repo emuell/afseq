@@ -168,8 +168,8 @@ impl Rhythm for SecondTimeRhythm {
         Box::new(self.time_base)
     }
 
-    fn set_time_base(&mut self, beat_time_base: BeatTimeBase) {
-        self.time_base = beat_time_base.into();
+    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
+        self.time_base = SecondTimeBase::from(*time_base);
     }
 
     fn samples_per_step(&self) -> f64 {

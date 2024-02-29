@@ -176,15 +176,15 @@ impl Rhythm for BeatTimeRhythm {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
     }
-    fn set_time_base(&mut self, time_base: BeatTimeBase) {
+    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
         if self.event_iter_pos_in_step > 0.0 {
             // reschedule next event's sample time to align it to the new time base,
             // taking into account when exactly the switch happened within a step
             let step_time_difference =
-                self.step.to_samples(&time_base) - self.step.to_samples(&self.time_base);
+                self.step.to_samples(time_base) - self.step.to_samples(&self.time_base);
             self.event_iter_sample_time += step_time_difference * self.event_iter_pos_in_step;
         }
-        self.time_base = time_base;
+        self.time_base = *time_base;
     }
 
     fn samples_per_step(&self) -> f64 {

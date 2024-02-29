@@ -132,9 +132,9 @@ impl Rhythm for Sequence {
     fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
     }
-    fn set_time_base(&mut self, time_base: BeatTimeBase) {
+    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
         for phrase in self.phrases.iter_mut() {
-            phrase.set_time_base(time_base);
+            phrase.update_time_base(time_base);
         }
     }
 
