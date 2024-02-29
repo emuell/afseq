@@ -1,4 +1,4 @@
-use crate::pattern::Pattern;
+use crate::{pattern::Pattern, BeatTimeBase};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -15,6 +15,9 @@ impl Pattern for EmptyPattern {
     }
     fn run(&mut self) -> f32 {
         panic!("Empty patterns should not be run");
+    }
+    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
     }
     fn reset(&mut self) {
         // nothing to do

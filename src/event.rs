@@ -1,6 +1,6 @@
 //! Events and event iterators which get emitted by a `Rhythm`.
 
-use crate::note::Note;
+use crate::{BeatTimeBase, Note};
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use derive_more::{Deref, Display, From, Into};
@@ -338,6 +338,10 @@ impl Display for Event {
 /// A resettable [`Event`] iterator, which typically will be used in
 /// [Rhythm](`super::Rhythm`) trait impls to sequencially emit new events.
 pub trait EventIter: Iterator<Item = Event> + Debug {
+    /// Update the iterator's internal beat or second time base with the new time base.
+    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
+    fn update_time_base(&mut self, time_base: &BeatTimeBase);
+
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
 }

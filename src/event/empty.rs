@@ -1,4 +1,7 @@
-use crate::event::{Event, EventIter};
+use crate::{
+    event::{Event, EventIter},
+    BeatTimeBase,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -15,5 +18,10 @@ impl Iterator for EmptyEventIter {
 }
 
 impl EventIter for EmptyEventIter {
-    fn reset(&mut self) {}
+    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+    fn reset(&mut self) {
+        // nothing to do
+    }
 }

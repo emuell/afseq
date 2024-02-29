@@ -111,6 +111,45 @@ mod test {
                 })]))
             ))
         );
+
+        // BeatTimeRhythm function Context
+        let beat_time_rhythm = lua
+            .load(
+                r#"
+                local function validate_context(context) 
+                    assert(context.tempo == 120)
+                    assert(context.beats_per_bar == 4)
+                    assert(context.sample_rate == 44100)
+                    assert(context.step > 0)
+                end 
+                return emitter {
+                    unit = "1/4",
+                    pattern = function(context) validate_context(context); return 1; end,
+                    emit = function(context) validate_context(context); return "c4"; end
+                }
+            "#,
+            )
+            .eval::<LuaValue>()
+            .unwrap();
+        let beat_time_rhythm = beat_time_rhythm
+            .as_userdata()
+            .unwrap()
+            .borrow_mut::<BeatTimeRhythm>();
+        assert!(beat_time_rhythm.is_ok());
+        let event = beat_time_rhythm.unwrap().next();
+        assert_eq!(
+            event,
+            Some((
+                0,
+                Some(Event::NoteEvents(vec![Some(NoteEvent {
+                    instrument: None,
+                    note: Note::C4,
+                    volume: 1.0,
+                    panning: 0.0,
+                    delay: 0.0
+                })]))
+            ))
+        );
     }
 
     #[test]
@@ -121,9 +160,9 @@ mod test {
             &mut lua,
             &timeout_hook,
             BeatTimeBase {
-                beats_per_min: 120.0,
-                beats_per_bar: 4,
-                samples_per_sec: 44100,
+                beats_per_min: 130.0,
+                beats_per_bar: 8,
+                samples_per_sec: 48000,
             },
         )
         .unwrap();
@@ -162,5 +201,44 @@ mod test {
             vec![1.0, 0.0, 1.0, 0.0]
         );
         drop(pattern);
+
+        // SecondTimeRhythm function Context
+        let second_time_rhythm = lua
+            .load(
+                r#"
+                local function validate_context(context) 
+                    assert(context.tempo == 130)
+                    assert(context.beats_per_bar == 8)
+                    assert(context.sample_rate == 48000)
+                    assert(context.step > 0)
+                end 
+                return emitter {
+                    unit = "ms",
+                    pattern = function(context) validate_context(context); return 1; end,
+                    emit = function(context) validate_context(context); return "c4"; end
+                }
+            "#,
+            )
+            .eval::<LuaValue>()
+            .unwrap();
+        let second_time_rhythm = second_time_rhythm
+            .as_userdata()
+            .unwrap()
+            .borrow_mut::<SecondTimeRhythm>();
+        assert!(second_time_rhythm.is_ok());
+        let event = second_time_rhythm.unwrap().next();
+        assert_eq!(
+            event,
+            Some((
+                0,
+                Some(Event::NoteEvents(vec![Some(NoteEvent {
+                    instrument: None,
+                    note: Note::C4,
+                    volume: 1.0,
+                    panning: 0.0,
+                    delay: 0.0
+                })]))
+            ))
+        );
     }
 }

@@ -14,7 +14,7 @@ impl BeatTimeRhythm {
     pub(crate) fn from_table(
         lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
-        time_base: BeatTimeBase,
+        time_base: &BeatTimeBase,
         table: LuaTable,
     ) -> LuaResult<BeatTimeRhythm> {
         let resolution = table.get::<&str, f32>("resolution").unwrap_or(1.0);
@@ -40,19 +40,19 @@ impl BeatTimeRhythm {
                 "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
-        let mut rhythm = BeatTimeRhythm::new(time_base, step);
+        let mut rhythm = BeatTimeRhythm::new(*time_base, step);
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")?;
             rhythm = rhythm.with_offset_in_step(offset);
         }
         if table.contains_key("pattern")? {
-            let pattern =
-                pattern_from_value(lua, timeout_hook, table.get::<&str, LuaValue>("pattern")?)?;
+            let value = table.get::<&str, LuaValue>("pattern")?;
+            let pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(pattern);
         }
         if table.contains_key("emit")? {
-            let iter =
-                event_iter_from_value(lua, timeout_hook, table.get::<&str, LuaValue>("emit")?)?;
+            let value = table.get::<&str, LuaValue>("emit")?;
+            let iter = event_iter_from_value(lua, timeout_hook, value, time_base)?;
             rhythm = rhythm.trigger_dyn(iter);
         }
         Ok(rhythm)

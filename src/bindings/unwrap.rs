@@ -581,10 +581,11 @@ pub(crate) fn pattern_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
     value: LuaValue,
+    time_base: &BeatTimeBase,
 ) -> LuaResult<Rc<RefCell<dyn Pattern>>> {
     match value {
         LuaValue::Function(func) => {
-            let pattern = ScriptedPattern::new(lua, timeout_hook, func)?;
+            let pattern = ScriptedPattern::new(lua, timeout_hook, func, time_base)?;
             Ok(Rc::new(RefCell::new(pattern)))
         }
         LuaValue::Table(table) => {
@@ -611,6 +612,7 @@ pub(crate) fn event_iter_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
     value: LuaValue,
+    time_base: &BeatTimeBase,
 ) -> LuaResult<Rc<RefCell<dyn EventIter>>> {
     match value {
         LuaValue::UserData(userdata) => {
@@ -631,7 +633,7 @@ pub(crate) fn event_iter_from_value(
             }
         }
         LuaValue::Function(function) => {
-            let iter = ScriptedEventIter::new(lua, timeout_hook, function)?;
+            let iter = ScriptedEventIter::new(lua, timeout_hook, function, time_base)?;
             Ok(Rc::new(RefCell::new(iter)))
         }
         LuaValue::Table(ref table) => {

@@ -1,6 +1,9 @@
 use std::fmt::Debug;
 
-use crate::event::{fixed::FixedEventIter, Event, EventIter};
+use crate::{
+    event::{fixed::FixedEventIter, Event, EventIter},
+    BeatTimeBase,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -75,6 +78,10 @@ impl Iterator for MutatedEventIter {
 }
 
 impl EventIter for MutatedEventIter {
+    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
     fn reset(&mut self) {
         self.events = self.initial_events.clone();
         self.map = (self.reset_map)();

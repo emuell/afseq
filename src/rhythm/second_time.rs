@@ -170,6 +170,9 @@ impl Rhythm for SecondTimeRhythm {
 
     fn update_time_base(&mut self, time_base: &BeatTimeBase) {
         self.time_base = SecondTimeBase::from(*time_base);
+        // update pattern end event iter
+        self.pattern.borrow_mut().update_time_base(time_base);
+        self.event_iter.borrow_mut().update_time_base(time_base);
     }
 
     fn samples_per_step(&self) -> f64 {

@@ -2,6 +2,8 @@
 
 use std::fmt::Debug;
 
+use crate::BeatTimeBase;
+
 pub mod empty;
 pub mod euclidean;
 pub mod fixed;
@@ -17,8 +19,8 @@ pub trait Pattern: Debug {
         self.len() == 0
     }
 
-    /// Return number of steps this pattern has. The pattern repeats after this. When the size 
-    /// is unknown, e.g. in external callbacks that generated pulses, 0 is returned, but 
+    /// Return number of steps this pattern has. The pattern repeats after this. When the size
+    /// is unknown, e.g. in external callbacks that generated pulses, 0 is returned, but
     /// self.is_empty will still be true.
     fn len(&self) -> usize;
 
@@ -28,7 +30,11 @@ pub trait Pattern: Debug {
     /// the rhythm impl which is using the pattern.   
     fn run(&mut self) -> f32;
 
+    /// Update the iterator's internal beat or second time base with the new time base.
+    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
+    fn update_time_base(&mut self, time_base: &BeatTimeBase);
+
     /// Reset the pattern genertor, so it emits the same values as if it was freshly initialized.
-    // This does to reset the pattern itself, but onlt the pattern playback position.
+    /// This does to reset the pattern itself, but onlt the pattern playback position.
     fn reset(&mut self);
 }

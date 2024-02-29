@@ -1,4 +1,7 @@
-use crate::event::{Event, EventIter, NoteEvent, ParameterChangeEvent};
+use crate::{
+    event::{Event, EventIter, NoteEvent, ParameterChangeEvent},
+    BeatTimeBase,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -38,7 +41,12 @@ impl Iterator for FixedEventIter {
 }
 
 impl EventIter for FixedEventIter {
+    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
     fn reset(&mut self) {
+        // reset step counter
         self.current = 0;
     }
 }

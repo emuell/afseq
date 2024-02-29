@@ -1,4 +1,4 @@
-use crate::pattern::Pattern;
+use crate::{pattern::Pattern, BeatTimeBase};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -50,6 +50,10 @@ impl FixedPattern {
 impl Pattern for FixedPattern {
     fn len(&self) -> usize {
         self.pulses.len()
+    }
+
+    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
     }
 
     fn run(&mut self) -> f32 {

@@ -32,7 +32,7 @@ use crate::{
     event::{InstrumentId, NoteEvent},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::{BeatTimeBase, BeatTimeStep},
-    Scale, SecondTimeBase,
+    Scale,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -228,6 +228,20 @@ pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<f32> {
     unwrap::pattern_pulse_from_value(value)
 }
 
+/// Initialize table passed as context to emitter and pattern functions
+pub(crate) fn initialize_emitter_context(
+    table: &mut LuaOwnedTable,
+    step_count: usize,
+    time_info: &BeatTimeBase,
+) -> LuaResult<()> {
+    let table = table.to_ref();
+    table.raw_set("tempo", time_info.beats_per_min)?;
+    table.raw_set("beats_per_bar", time_info.beats_per_bar)?;
+    table.raw_set("sample_rate", time_info.samples_per_sec)?;
+    table.raw_set("step", step_count + 1)?;
+    Ok(())
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Register afseq bindings with the given lua engine.
@@ -311,7 +325,6 @@ fn register_global_bindings(
     globals.set(
         "emitter",
         lua.create_function({
-            let default_time_base = time_base;
             let timeout_hook = timeout_hook.clone();
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 let second_time_unit = match table.get::<&str, String>("unit") {
@@ -319,13 +332,10 @@ fn register_global_bindings(
                     Err(_) => false,
                 };
                 if second_time_unit {
-                    let time_base = SecondTimeBase {
-                        samples_per_sec: default_time_base.samples_per_sec,
-                    };
-                    SecondTimeRhythm::from_table(lua, &timeout_hook, time_base, table)?
+                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, table)?
                         .into_lua(lua)
                 } else {
-                    BeatTimeRhythm::from_table(lua, &timeout_hook, time_base, table)?.into_lua(lua)
+                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, table)?.into_lua(lua)
                 }
             }
         })?,

@@ -23,7 +23,7 @@ pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     /// time base as appropriated (in seconds or beats).
     fn time_display(&self) -> Box<dyn SampleTimeDisplay>;
     /// Update the rhythm's internal beat or second time bases with the new time base.
-    /// Note: SampleTimeBase can be derived from BeatTimeBase via `Into::<SampleTimeBase>(beat_time)`
+    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn update_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Length in samples of a single step in the rhythm's pattern.

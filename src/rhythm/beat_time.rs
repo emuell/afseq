@@ -185,6 +185,9 @@ impl Rhythm for BeatTimeRhythm {
             self.event_iter_sample_time += step_time_difference * self.event_iter_pos_in_step;
         }
         self.time_base = *time_base;
+        // update pattern end event iter
+        self.pattern.borrow_mut().update_time_base(time_base);
+        self.event_iter.borrow_mut().update_time_base(time_base);
     }
 
     fn samples_per_step(&self) -> f64 {

@@ -1,12 +1,33 @@
 ---@meta
----Do not try to execute this file. It's just a type definition file.
+error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---Part of the afseq trait: Defines LuaLS annotations for the afseq Emitter class.
 ---
 
 ----------------------------------------------------------------------------------------------------
 
+---Context passed to `emit` and `pattern` functions/generators.
+---@class EmitterContext
+-----TODO: @field playing boolean Transport playback running.
+---@field tempo number Project's tempo in beats per minutes.
+---@field beats_per_bar integer Project's Beats per bar.
+---@field sample_rate integer Project's sample rate in samples per second.
+---
+-----TODO: @field trigger_note integer? Note value that triggered, started the emitter, if any.
+-----TODO: @field trigger_volume number? Note volume that triggered, started the emitter, if any.
+-----TODO: @field trigger_offset integer? Note slice offset value that triggered, started the emitter, if any.
+---
+---@field step integer Continues step counter. Starting with 1 when the emitter starts running.
+-----TODO: @field sample_pos integer absolute project sample time
+-----TODO: @field beat_pos number Project playhead's absolute beat time.
+---
+-----TODO: @field macro_values number[] External input macro values automation.
+
+----------------------------------------------------------------------------------------------------
+
+---Construction options for a new emitter.
 ---@class EmitterOptions
+---
 ---Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
 ---create other less common rhythm bases.
 ---### examples:
@@ -21,9 +42,10 @@
 ---unit = "beats", resolution = 1.01 --> slightly off beat pulse
 ---unit = "1/16", resolution = 4/3 --> tripplet
 ---```
+---
 ---@field resolution number?
 ---Specify the rythmical pattern of the emitter. Each non zero pulse in the pattern will
----cause an event from the emitter property to be triggered in the emitters time unit. 
+---cause an event from the emitter property to be triggered in the emitters time unit.
 ---
 ---When not defined, a constant pulse of `1` is triggered.
 ---Patterns are repeated endlessly by default.
@@ -37,20 +59,20 @@
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
----pattern = function()  -- function
+---pattern = function(_context)  -- function
 ---  return math.random(0, 1)
 ---end
 ---
----pattern = function () --- generator 
----  local pattern, step = table.create({0, 6, 10}), 0
----  return function ()
----    local pulse = pattern:find(step % 16) ~= nil
----    step = step + 1
----    return pulse
+---pattern = function (initial_context) --- generator
+---  local pattern = table.create({0, 6, 10})
+---  ---@param context EmitterContext
+---  return function (context)
+---    return pattern:find((context.step - 1) % 16) ~= nil
 ---  end
 ---end,
 ---```
----@field pattern (0|1|boolean)[]|(fun():(0|1|boolean))|(fun():fun():(0|1|boolean))?
+---
+---@field pattern (0|1|boolean)[]|(fun(context: EmitterContext):(0|1|boolean))|(fun(context: EmitterContext):fun(context: EmitterContext):(0|1|boolean))?
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>
@@ -62,20 +84,60 @@
 ---emit = {{"c4", "g4"}}, -- a chord of c4, g4
 ---emit = sequence{"c4", "g4"}:with_volume(0.5), -- a sequence of c4, g4 with volume 0.5
 ---
----emit = function() -- a function
+---emit = function(context) -- a function
 ---  return 48 + math.random(1, 4) * 5
 ---end,
 ---
----emit = function() -- a generator (function with upvalue state)
----  local i, step, notes = 1, 2, scale("c5", "minor").notes
----  return function()
----    local key = notes[i]
----    i = (i + step - 1) % #notes + 1
+---emit = function(initial_context) -- a generator (function with upvalue state)
+---  local count, step, notes = 1, 2, scale("c5", "minor").notes
+---  ---@param context EmitterContext
+---  return function(context)
+---    local key = notes[count]
+---    count = (count + step - 1) % #notes + 1
 ---    return { key = key, volume = 0.5 }
 ---  end
 ---end
 ---```
----@field emit Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun():NoteValue)|(fun():fun():NoteValue)
+---
+---@field emit Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun(context: EmitterContext):NoteValue)|(fun(context: EmitterContext):fun(context: EmitterContext):NoteValue)
+
+
+----------------------------------------------------------------------------------------------------
+
+---Create a new emitter with the given options.
+---
+---### examples:
+---```lua
+----- trigger a chord sequence every 4 bars
+---return emitter {
+---  unit = "bars",
+---  resolution = 4,
+---  offset = 16,
+---  emit = sequence("c-4'm", note("g-3'm7"):transpose({0, 12, 0, 0}))
+---}
+---
+-----trigger c3 notes in an euclidean tripplet pattern
+---local pattern = require "pattern"
+---return emitter {
+---  unit = "1/8",
+---  resolution = 3/2,
+---  pattern = pattern.euclidean(6, 16, 2), 
+---  emit = sequence("c7", "c7", note{ "c6", "a3" }:with_volume(0.5))
+---}
+---```
+---
+-----trigger random notes in a random pattern from a pentatonic scale
+---local pattern = require "pattern"
+---local scale = scale("c5", "pentatonic minor").notes
+---return emitter {
+---  unit = "1/8",
+---  pattern = function (context)
+---    return math.random() > 0.7 or context.step % 4 == 1
+---  end,
+---  emit = function(context)
+---    return { key = scale[math.random(#scale)] }
+---  end
+---}
 ---@param options EmitterOptions
 ---@return userdata
 function emitter(options) end
