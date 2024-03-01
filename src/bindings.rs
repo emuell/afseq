@@ -345,11 +345,25 @@ fn register_global_bindings(
 }
 
 fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
-    // implemented in lua: load and evaluate chunk
-    let chunk = lua
-        .load(include_str!("../types/nerdo/library/table.lua"))
-        .set_name("[inbuilt:table.lua]");
-    chunk.exec()
+    // cache module bytecode to speed up initialization
+    lazy_static! {
+        static ref TABLE_BYTECODE: LuaResult<Vec<u8>> = {
+            let strip = true;
+            Lua::new()
+                .load(include_str!("../types/nerdo/library/table.lua"))
+                .into_function()
+                .map(|x| x.dump(strip))
+        };
+    }
+    // implemented in lua: load and evaluate cached chunk
+    match TABLE_BYTECODE.clone() {
+        Ok(bytecode) => lua
+            .load(bytecode)
+            .set_name("[inbuilt:table.lua]")
+            .set_mode(mlua::ChunkMode::Binary)
+            .exec(),
+        Err(err) => Err(err),
+    }
 }
 
 fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
