@@ -265,7 +265,7 @@ fn register_global_bindings(
     let globals = lua.globals();
 
     // function scale(note, mode|intervals)
-    globals.set(
+    globals.raw_set(
         "scale",
         lua.create_function(
             |lua, (note, mode_or_intervals): (LuaValue, LuaValue)| -> LuaResult<Scale> {
@@ -306,7 +306,7 @@ fn register_global_bindings(
     )?;
 
     // function note(args...)
-    globals.set(
+    globals.raw_set(
         "note",
         lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<NoteUserData> {
             NoteUserData::from(args)
@@ -314,7 +314,7 @@ fn register_global_bindings(
     )?;
 
     // function sequence(args...)
-    globals.set(
+    globals.raw_set(
         "sequence",
         lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<SequenceUserData> {
             SequenceUserData::from(args)
@@ -322,7 +322,7 @@ fn register_global_bindings(
     )?;
 
     // function emitter { args... }
-    globals.set(
+    globals.raw_set(
         "emitter",
         lua.create_function({
             let timeout_hook = timeout_hook.clone();
@@ -356,13 +356,13 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
         };
     }
     // implemented in lua: load and evaluate cached chunk
-    match TABLE_BYTECODE.clone() {
+    match TABLE_BYTECODE.as_ref() {
         Ok(bytecode) => lua
             .load(bytecode)
             .set_name("[inbuilt:table.lua]")
             .set_mode(mlua::ChunkMode::Binary)
             .exec(),
-        Err(err) => Err(err),
+        Err(err) => Err(err.clone()),
     }
 }
 
@@ -382,13 +382,13 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
     let loaders: LuaTable = package.get("loaders")?; // NB: "searchers" in lua 5.2
     loaders.push(LuaFunction::wrap(|lua, path: String| {
         if path == "pattern" {
-            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.clone() {
+            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.as_ref() {
                 Ok(bytecode) => lua
                     .load(bytecode)
                     .set_name("[inbuilt:pattern.lua]")
                     .set_mode(mlua::ChunkMode::Binary)
                     .call::<_, LuaValue>(()),
-                Err(err) => err.into_lua(lua),
+                Err(err) => Err(err.clone()),
             })
             .into_lua(lua)
         } else {
@@ -413,13 +413,13 @@ fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
     let loaders: LuaTable = package.get("loaders")?; // NB: "searchers" in lua 5.2
     loaders.push(LuaFunction::wrap(|lua, path: String| {
         if path == "fun" {
-            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.clone() {
+            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.as_ref() {
                 Ok(bytecode) => lua
                     .load(bytecode)
                     .set_name("[inbuilt:fun.lua]")
                     .set_mode(mlua::ChunkMode::Binary)
                     .call::<_, LuaValue>(()),
-                Err(err) => err.into_lua(lua),
+                Err(err) => Err(err.clone()),
             })
             .into_lua(lua)
         } else {
