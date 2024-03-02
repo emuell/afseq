@@ -3,8 +3,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
-    SampleTime,
+    event::{Event, InstrumentId},
+    phrase::RhythmIndex,
+    time::SampleTimeDisplay,
+    BeatTimeBase, Phrase, Rhythm, SampleTime,
 };
 
 #[cfg(doc)]
@@ -137,6 +139,16 @@ impl Rhythm for Sequence {
     fn update_time_base(&mut self, time_base: &BeatTimeBase) {
         for phrase in self.phrases.iter_mut() {
             phrase.update_time_base(time_base);
+        }
+    }
+
+    fn instrument(&self) -> Option<InstrumentId> {
+        None
+    }
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        // reset all our phrase iters
+        for phrase in self.phrases.iter_mut() {
+            phrase.set_instrument(instrument)
         }
     }
 

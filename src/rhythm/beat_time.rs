@@ -190,6 +190,13 @@ impl Rhythm for BeatTimeRhythm {
         self.event_iter.borrow_mut().update_time_base(time_base);
     }
 
+    fn instrument(&self) -> Option<InstrumentId> {
+        self.instrument
+    }
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        self.instrument = instrument;
+    }
+
     fn samples_per_step(&self) -> f64 {
         self.step.to_samples(&self.time_base)
     }

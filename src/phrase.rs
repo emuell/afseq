@@ -4,7 +4,10 @@
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
-    event::Event, prelude::BeatTimeStep, time::SampleTimeDisplay, BeatTimeBase, Rhythm, SampleTime,
+    event::{Event, InstrumentId},
+    prelude::BeatTimeStep,
+    time::SampleTimeDisplay,
+    BeatTimeBase, Rhythm, SampleTime,
 };
 
 #[cfg(doc)]
@@ -223,6 +226,17 @@ impl Rhythm for Phrase {
         for rhythm_slot in self.rhythm_slots.iter_mut() {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
                 rhythm.borrow_mut().update_time_base(time_base)
+            }
+        }
+    }
+
+    fn instrument(&self) -> Option<InstrumentId> {
+        None
+    }
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        for rhythm_slot in self.rhythm_slots.iter_mut() {
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.borrow_mut().set_instrument(instrument)
             }
         }
     }
