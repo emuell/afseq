@@ -60,7 +60,7 @@ impl BeatTimeRhythm {
     }
     /// Get current pattern.
     pub fn pattern(&self) -> Rc<RefCell<dyn Pattern>> {
-        self.pattern.clone()
+        Rc::clone(&self.pattern)
     }
 
     /// Apply the given beat-time step offset to all events.
@@ -69,8 +69,8 @@ impl BeatTimeRhythm {
         let event_iter_sample_time = offset.to_samples(&self.time_base);
         Self {
             offset,
-            pattern: self.pattern.clone(),
-            event_iter: self.event_iter.clone(),
+            pattern: Rc::clone(&self.pattern),
+            event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
             ..*self
         }
@@ -87,8 +87,8 @@ impl BeatTimeRhythm {
         let instrument = instrument.into();
         Self {
             instrument,
-            pattern: self.pattern.clone(),
-            event_iter: self.event_iter.clone(),
+            pattern: Rc::clone(&self.pattern),
+            event_iter: Rc::clone(&self.event_iter),
             ..*self
         }
     }
@@ -102,7 +102,7 @@ impl BeatTimeRhythm {
     pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
         Self {
             pattern,
-            event_iter: self.event_iter.clone(),
+            event_iter: Rc::clone(&self.event_iter),
             ..*self
         }
     }
@@ -115,7 +115,7 @@ impl BeatTimeRhythm {
     /// Use the given dyn [`EventIter`] to trigger events.
     pub fn trigger_dyn(&self, event_iter: Rc<RefCell<dyn EventIter>>) -> Self {
         Self {
-            pattern: self.pattern.clone(),
+            pattern: Rc::clone(&self.pattern),
             event_iter,
             ..*self
         }

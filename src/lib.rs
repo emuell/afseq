@@ -1,6 +1,8 @@
 //! An experimental functional musical sequence generator.
 //! Part of the [afplay](https://github.com/emuell/afplay) crates.
 
+#![warn(clippy::clone_on_ref_ptr)]
+
 pub mod time;
 pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
 

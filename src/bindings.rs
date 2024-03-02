@@ -63,8 +63,8 @@ impl LuaTimeoutHook {
         let active = Rc::new(RefCell::new(1));
         let start = Rc::new(RefCell::new(Instant::now()));
         lua.set_hook(LuaHookTriggers::new().every_nth_instruction(timeout.as_millis() as u32), {
-            let active = active.clone();
-            let start = start.clone();
+            let active = Rc::clone(&active);
+            let start = Rc::clone(&start);
             move |lua, _debug| {
                 if *active.borrow() > 0 {
                     if start.borrow().elapsed() > timeout {
@@ -84,10 +84,7 @@ impl LuaTimeoutHook {
                 }
             }
         });
-        Self {
-            active: active.clone(),
-            start: start.clone(),
-        }
+        Self { active, start }
     }
 
     // reset timestamp of the hook when running e.g. a callback again
@@ -102,8 +99,8 @@ impl Clone for LuaTimeoutHook {
         *self.active.borrow_mut() += 1;
         // return a direct clone otherwise
         Self {
-            active: self.active.clone(),
-            start: self.start.clone(),
+            active: Rc::clone(&self.active),
+            start: Rc::clone(&self.start),
         }
     }
 }
