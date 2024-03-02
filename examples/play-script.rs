@@ -126,6 +126,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // build final phrase
         let load = |instrument: Option<InstrumentId>, file_name: &str| {
             bindings::new_rhythm_from_file_with_fallback(beat_time, instrument, file_name)
+                .unwrap_or_else(|err| {
+                    log::warn!("Script '{}' failed to compile: {}", file_name, err);
+                    Rc::new(RefCell::new(BeatTimeRhythm::new(
+                        time_base,
+                        BeatTimeStep::Beats(1.0),
+                    )))
+                })
         };
         let phrase = Phrase::new(
             beat_time,

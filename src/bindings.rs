@@ -31,7 +31,7 @@ use unwrap::*;
 use crate::{
     event::{InstrumentId, NoteEvent},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
-    time::{BeatTimeBase, BeatTimeStep},
+    time::BeatTimeBase,
     Scale,
 };
 
@@ -161,23 +161,7 @@ pub fn new_rhythm_from_file(
     rhythm_from_userdata(result, instrument)
 }
 
-/// Evaluate a lua script file which creates and returns a rhythm,
-/// returning a fallback rhythm on errors
-pub fn new_rhythm_from_file_with_fallback(
-    time_base: BeatTimeBase,
-    instrument: Option<InstrumentId>,
-    file_name: &str,
-) -> Rc<RefCell<dyn Rhythm>> {
-    new_rhythm_from_file(time_base, instrument, file_name).unwrap_or_else(|err| {
-        log::warn!("Script '{}' failed to compile: {}", file_name, err);
-        Rc::new(RefCell::new(BeatTimeRhythm::new(
-            time_base,
-            BeatTimeStep::Beats(1.0),
-        )))
-    })
-}
-
-/// Evaluate a Lua expression which creates and returns a rhythm.
+/// Evaluate a Lua string expression which creates and returns a rhythm.
 pub fn new_rhythm_from_string(
     time_base: BeatTimeBase,
     instrument: Option<InstrumentId>,
@@ -196,21 +180,23 @@ pub fn new_rhythm_from_string(
     rhythm_from_userdata(result, instrument)
 }
 
-/// Evaluate a Lua expression which creates and returns a rhythm,
-/// returning a fallback rhythm on errors.
-pub fn new_rhythm_from_string_with_fallback(
+/// Evaluate a precompiled Lua expression which creates and returns a rhythm.
+pub fn new_rhythm_from_bytecode(
     time_base: BeatTimeBase,
     instrument: Option<InstrumentId>,
-    script: &str,
+    script: &Vec<u8>,
     script_name: &str,
-) -> Rc<RefCell<dyn Rhythm>> {
-    new_rhythm_from_string(time_base, instrument, script, script_name).unwrap_or_else(|err| {
-        log::warn!("Script '{}' failed to compile: {}", script_name, err);
-        Rc::new(RefCell::new(BeatTimeRhythm::new(
-            time_base,
-            BeatTimeStep::Beats(1.0),
-        )))
-    })
+) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
+    // create a new engine and register bindings
+    let (mut lua, mut timeout_hook) = new_engine();
+    register_bindings(&mut lua, &timeout_hook, time_base)?;
+    // restart the timeout hook
+    timeout_hook.reset();
+    // compile and evaluate script
+    let chunk: LuaChunk = lua.load(script).set_name(script_name);
+    let result = chunk.eval::<LuaValue>()?;
+    // convert result
+    rhythm_from_userdata(result, instrument)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -349,7 +335,7 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     lazy_static! {
         static ref TABLE_BYTECODE: LuaResult<Vec<u8>> = {
             let strip = true;
-            Lua::new()
+            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
                 .load(include_str!("../types/nerdo/library/table.lua"))
                 .into_function()
                 .map(|x| x.dump(strip))
@@ -371,7 +357,7 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
     lazy_static! {
         static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
             let strip = true;
-            Lua::new()
+            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
                 .load(include_str!("../types/nerdo/library/extras/pattern.lua"))
                 .into_function()
                 .map(|x| x.dump(strip))
@@ -402,7 +388,7 @@ fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
     lazy_static! {
         static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
             let strip = true;
-            Lua::new()
+            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
                 .load(include_str!("../types/nerdo/library/extras/fun.lua"))
                 .into_function()
                 .map(|x| x.dump(strip))
