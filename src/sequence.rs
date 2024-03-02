@@ -1,5 +1,7 @@
 //! Combine multiple `Phrase` iterators into a single one, in order to play them sequentially.
 
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
     SampleTime,
@@ -156,6 +158,9 @@ impl Rhythm for Sequence {
         self.next_event_until_time(sample_time)
     }
 
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+        Rc::new(RefCell::new(self.clone()))
+    }
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;

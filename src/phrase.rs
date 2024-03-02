@@ -191,8 +191,7 @@ impl Phrase {
                 if event_sample_time < sample_time {
                     *next_due = None; // consume
                     Some((rhythm_index, self.sample_offset + event_sample_time, event))
-                }
-                else {
+                } else {
                     None // not yet due
                 }
             } else {
@@ -249,6 +248,10 @@ impl Rhythm for Phrase {
         } else {
             None
         }
+    }
+
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+        Rc::new(RefCell::new(self.clone()))
     }
 
     fn reset(&mut self) {

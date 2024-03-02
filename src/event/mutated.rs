@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter},
@@ -13,9 +13,9 @@ type EventMapFn = dyn FnMut(Event) -> Event + 'static;
 // -------------------------------------------------------------------------------------------------
 
 /// Endlessly emits [`Event`] which's value can be mutated in each iter step
-/// with a custom closure.
+/// with a custom closure. 
 ///
-/// NB: This event iter can not be cloned.
+/// NB: This event iter can not be cloned. `clone_dyn` thus will cause a panic!
 pub struct MutatedEventIter {
     events: Vec<Event>,
     initial_events: Vec<Event>,
@@ -82,6 +82,9 @@ impl EventIter for MutatedEventIter {
         // nothing to do
     }
 
+    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
+        panic!("Mutated event iters can't be cloned")
+    }
     fn reset(&mut self) {
         self.events = self.initial_events.clone();
         self.map = (self.reset_map)();

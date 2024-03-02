@@ -10,6 +10,7 @@ use core::{
     fmt::Display,
     sync::atomic::{AtomicUsize, Ordering},
 };
+use std::{cell::RefCell, rc::Rc};
 
 pub mod empty;
 pub mod fixed;
@@ -342,6 +343,8 @@ pub trait EventIter: Iterator<Item = Event> + Debug {
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn update_time_base(&mut self, time_base: &BeatTimeBase);
 
+    /// Create a new instance of this event iter.
+    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>>;
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
 }

@@ -1,7 +1,7 @@
-//! Periodically emit `Events` via an `EventIter` with a given time base on a 
+//! Periodically emit `Events` via an `EventIter` with a given time base on a
 //! rhythmical pattern defined via a `Pattern`.
 
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{event::Event, time::SampleTimeDisplay, BeatTimeBase, SampleTime};
 
@@ -40,6 +40,8 @@ pub trait Rhythm: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
     /// Sample time iter: returns self.next() up and until the given sample time
     fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)>;
 
+    /// Create a new instance of this rhythm.
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>>;
     /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);
 }

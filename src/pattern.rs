@@ -1,6 +1,6 @@
 //! Rhythmical pattern as sequence of pulses in a `Rhythm`.
 
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::BeatTimeBase;
 
@@ -34,6 +34,8 @@ pub trait Pattern: Debug {
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn update_time_base(&mut self, time_base: &BeatTimeBase);
 
+    /// Create a new instance of this pattern.
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Pattern>>;
     /// Reset the pattern genertor, so it emits the same values as if it was freshly initialized.
     /// This does to reset the pattern itself, but onlt the pattern playback position.
     fn reset(&mut self);

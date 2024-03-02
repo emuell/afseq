@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     event::{Event, EventIter, NoteEvent, ParameterChangeEvent},
     BeatTimeBase,
@@ -45,6 +47,9 @@ impl EventIter for FixedEventIter {
         // nothing to do
     }
 
+    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
+        Rc::new(RefCell::new(self.clone()))
+    }
     fn reset(&mut self) {
         // reset step counter
         self.current = 0;

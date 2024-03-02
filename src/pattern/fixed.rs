@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{pattern::Pattern, BeatTimeBase};
 
 // -------------------------------------------------------------------------------------------------
@@ -66,6 +68,9 @@ impl Pattern for FixedPattern {
         pulse
     }
 
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Pattern>> {
+        Rc::new(RefCell::new(self.clone()))
+    }
     fn reset(&mut self) {
         self.step = 0;
     }

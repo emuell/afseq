@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use mlua::prelude::*;
 
 use crate::{
@@ -132,6 +134,9 @@ impl Pattern for ScriptedPattern {
         }
     }
 
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Pattern>> {
+        Rc::new(RefCell::new(self.clone()))
+    }
     fn reset(&mut self) {
         // restore function environment
         if let Some(env) = &self.environment {

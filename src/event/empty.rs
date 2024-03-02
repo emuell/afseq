@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     event::{Event, EventIter},
     BeatTimeBase,
@@ -20,6 +22,9 @@ impl Iterator for EmptyEventIter {
 impl EventIter for EmptyEventIter {
     fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
+    }
+    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
+        Rc::new(RefCell::new(self.clone()))
     }
     fn reset(&mut self) {
         // nothing to do

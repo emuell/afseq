@@ -198,6 +198,13 @@ impl Rhythm for SecondTimeRhythm {
         }
     }
 
+    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+        Rc::new(RefCell::new(Self {
+            pattern: self.pattern.borrow().clone_dyn(),
+            event_iter: self.event_iter.borrow().clone_dyn(),
+            ..self.clone()
+        }))
+    }
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;
