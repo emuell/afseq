@@ -9,13 +9,24 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
+fn function_name(function: &LuaOwnedFunction) -> String {
+    function
+        .to_ref()
+        .info()
+        .name
+        .unwrap_or("annonymous function".to_string())
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// EventIter impl, which calls an existing lua script function to generate new events.
 #[derive(Debug, Clone)]
 pub struct ScriptedEventIter {
-    environment: Option<LuaOwnedTable>,
     timeout_hook: LuaTimeoutHook,
-    function: LuaOwnedFunction,
+    function_environment: Option<LuaOwnedTable>,
+    function_generator: Option<LuaOwnedFunction>,
     function_context: LuaOwnedTable,
+    function: LuaOwnedFunction,
     step_count: usize,
     event: Option<Event>,
 }
@@ -40,42 +51,48 @@ impl ScriptedEventIter {
         if let Some(inner_function) = result.as_function() {
             // function returned a function -> is an iterator. use inner function instead.
             let function_context = function_context.clone();
-            let environment = inner_function.environment().map(|env| env.into_owned());
+            let function_environment = function.environment().map(|env| env.into_owned());
+            let function_generator = Some(function.into_owned());
             let function = inner_function.clone().into_owned();
             let result = function.call::<_, LuaValue>(function_context.to_ref())?;
             let event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
             Ok(Self {
-                environment,
                 timeout_hook,
-                function,
+                function_environment,
+                function_generator,
                 function_context,
+                function,
                 step_count,
                 event,
             })
         } else {
             // function returned an event. use this function.
-            let environment = function.environment().map(|env| env.into_owned());
+            let function_environment = None;
+            let function_generator = None;
             let function = function.into_owned();
             let event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
             Ok(Self {
-                environment,
                 timeout_hook,
-                function,
+                function_environment,
+                function_generator,
                 function_context,
+                function,
                 step_count,
                 event,
             })
         }
     }
 
-    fn next_event(&mut self) -> LuaResult<Event> {
+    fn next_event(&mut self, move_step: bool) -> LuaResult<Event> {
         // reset timeout
         self.timeout_hook.reset();
-        // update context
-        self.step_count += 1;
-        self.function_context
-            .to_ref()
-            .raw_set("step", self.step_count + 1)?;
+        // move step counter and update context
+        if move_step {
+            self.step_count += 1;
+            self.function_context
+                .to_ref()
+                .raw_set("step", self.step_count + 1)?;
+        }
         // call function with context and evaluate result
         let result = self
             .function
@@ -89,17 +106,14 @@ impl Iterator for ScriptedEventIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         let event = self.event.clone();
-        self.event = match self.next_event() {
+        let move_step = true;
+        self.event = match self.next_event(move_step) {
             Ok(event) => Some(event),
             Err(err) => {
                 self.event = None;
                 log::warn!(
                     "Failed to run custom event emitter func '{}': {}",
-                    self.function
-                        .to_ref()
-                        .info()
-                        .name
-                        .unwrap_or("annonymous function".to_string()),
+                    function_name(&self.function),
                     err
                 );
                 None
@@ -116,38 +130,83 @@ impl EventIter for ScriptedEventIter {
             initialize_emitter_context(&mut self.function_context, self.step_count, time_base)
         {
             log::warn!(
-                "Failed to update event iter context for custom function '{}': {}",
-                self.function
-                    .to_ref()
-                    .info()
-                    .name
-                    .unwrap_or("annonymous function".to_string()),
+                "Failed to update context for custom event iter function '{}': {}",
+                function_name(&self.function),
                 err
             );
         }
+        // TODO: rerun the generator with new context?
     }
 
     fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
         Rc::new(RefCell::new(self.clone()))
     }
     fn reset(&mut self) {
-        // restore function environment
-        if let Some(env) = &self.environment {
-            if let Err(err) = self.function.to_ref().set_environment(env.to_ref()) {
-                log::warn!(
-                    "Failed to restore custom event emitter func environment '{}': {}",
-                    self.function
-                        .to_ref()
-                        .info()
-                        .name
-                        .unwrap_or("annonymous function".to_string()),
-                    err
-                );
-            }
-        }
+        // reset timeout
+        self.timeout_hook.reset();
         // reset step counter
         self.step_count = 0;
-        // and set new initial event, discarding the last one
-        let _ = self.next();
+        // update step in context
+        if let Err(err) = self
+            .function_context
+            .to_ref()
+            .raw_set("step", self.step_count + 1)
+        {
+            log::warn!(
+                "Failed to update context for custom pattern function '{}': {}",
+                function_name(&self.function),
+                err
+            );
+        }
+        // restore generator function environment
+        if let Some(function_generator) = &self.function_generator {
+            if let Some(env) = &self.function_environment {
+                if let Err(err) = function_generator.to_ref().set_environment(env.to_ref()) {
+                    log::warn!(
+                        "Failed to restore custom event emitter func environment '{}': {}",
+                        function_name(function_generator),
+                        err
+                    );
+                }
+            }
+            // then fetch a new fresh function from the generator
+            let result = function_generator
+                .to_ref()
+                .call::<_, LuaValue>(self.function_context.to_ref());
+            match result {
+                Err(err) => {
+                    log::warn!(
+                        "Failed to call custom event emitter generator function '{}': {}",
+                        function_name(function_generator),
+                        err
+                    );
+                }
+                Ok(value) => {
+                    if let Some(function) = value.as_function() {
+                        self.function = function.clone().into_owned();
+                    } else {
+                        log::warn!(
+                            "Failed to call custom event emitter generator function '{}': {}",
+                            function_name(function_generator),
+                            "Generator does not return a valid emitter function"
+                        );
+                    }
+                }
+            };
+        }
+        // and set new initial event
+        let move_step = false;
+        self.event = match self.next_event(move_step) {
+            Ok(event) => Some(event),
+            Err(err) => {
+                self.event = None;
+                log::warn!(
+                    "Failed to run custom event emitter func '{}': {}",
+                    function_name(&self.function),
+                    err
+                );
+                None
+            }
+        };
     }
 }

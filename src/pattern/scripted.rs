@@ -9,13 +9,24 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
+fn function_name(function: &LuaOwnedFunction) -> String {
+    function
+        .to_ref()
+        .info()
+        .name
+        .unwrap_or("annonymous function".to_string())
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Pattern impl, which calls an existing lua script function to generate pulses.
 #[derive(Debug, Clone)]
 pub struct ScriptedPattern {
-    environment: Option<LuaOwnedTable>,
     timeout_hook: LuaTimeoutHook,
-    function: LuaOwnedFunction,
+    function_environment: Option<LuaOwnedTable>,
+    function_generator: Option<LuaOwnedFunction>,
     function_context: LuaOwnedTable,
+    function: LuaOwnedFunction,
     step_count: usize,
     pulse: f32,
 }
@@ -40,42 +51,48 @@ impl ScriptedPattern {
         if let Some(inner_function) = result.as_function() {
             // function returned a function -> is an iterator. use inner function instead.
             let function_context = function_context.clone();
-            let environment = inner_function.environment().map(|env| env.into_owned());
+            let function_environment = function.environment().map(|env| env.into_owned());
+            let function_generator = Some(function.into_owned());
             let function = inner_function.clone().into_owned();
             let result = function.call::<_, LuaValue>(function_context.to_ref())?;
             let pulse = pattern_pulse_from_lua(result)?;
             Ok(Self {
-                environment,
                 timeout_hook,
-                function,
+                function_environment,
+                function_generator,
                 function_context,
+                function,
                 step_count,
                 pulse,
             })
         } else {
-            // function returned a value. use this function as it is.
-            let environment = function.environment().map(|env| env.into_owned());
+            // function returned an event. use this function.
+            let function_environment = None;
+            let function_generator = None;
             let function = function.into_owned();
             let pulse = pattern_pulse_from_lua(result)?;
             Ok(Self {
-                environment,
                 timeout_hook,
-                function,
+                function_environment,
+                function_generator,
                 function_context,
+                function,
                 step_count,
                 pulse,
             })
         }
     }
 
-    fn next_pulse(&mut self) -> LuaResult<f32> {
+    fn next_pulse(&mut self, move_step: bool) -> LuaResult<f32> {
         // reset timeout
         self.timeout_hook.reset();
-        // update context
-        self.step_count += 1;
-        self.function_context
-            .to_ref()
-            .raw_set("step", self.step_count + 1)?;
+        // move step counter and update context
+        if move_step {
+            self.step_count += 1;
+            self.function_context
+                .to_ref()
+                .raw_set("step", self.step_count + 1)?;
+        }
         // call function with context and evaluate the result
         let result = self
             .function
@@ -98,17 +115,13 @@ impl Pattern for ScriptedPattern {
     fn run(&mut self) -> f32 {
         // generate a new pulse
         let pulse = self.pulse;
-        self.pulse = match self.next_pulse() {
+        let move_step = true;
+        self.pulse = match self.next_pulse(move_step) {
             Ok(pulse) => pulse,
             Err(err) => {
-                self.pulse = 0.0;
                 log::warn!(
                     "Failed to run custom pattern func '{}': {}",
-                    self.function
-                        .to_ref()
-                        .info()
-                        .name
-                        .unwrap_or("annonymous function".to_string()),
+                    function_name(&self.function),
                     err
                 );
                 0.0
@@ -123,12 +136,8 @@ impl Pattern for ScriptedPattern {
             initialize_emitter_context(&mut self.function_context, self.step_count, time_base)
         {
             log::warn!(
-                "Failed to update event iter context for custom function '{}': {}",
-                self.function
-                    .to_ref()
-                    .info()
-                    .name
-                    .unwrap_or("annonymous function".to_string()),
+                "Failed to update context for custom pattern function '{}': {}",
+                function_name(&self.function),
                 err
             );
         }
@@ -138,23 +147,70 @@ impl Pattern for ScriptedPattern {
         Rc::new(RefCell::new(self.clone()))
     }
     fn reset(&mut self) {
-        // restore function environment
-        if let Some(env) = &self.environment {
-            if let Err(err) = self.function.to_ref().set_environment(env.to_ref()) {
-                log::warn!(
-                    "Failed to restore custom pattern func environment '{}': {}",
-                    self.function
-                        .to_ref()
-                        .info()
-                        .name
-                        .unwrap_or("annonymous function".to_string()),
-                    err
-                );
-            }
-        }
+        // reset timeout
+        self.timeout_hook.reset();
         // reset step counter
         self.step_count = 0;
-        // and set new initial pulse value, discarding the last one
-        let _ = self.run();
+        // update step in context
+        if let Err(err) = self
+            .function_context
+            .to_ref()
+            .raw_set("step", self.step_count + 1)
+        {
+            log::warn!(
+                "Failed to update context for custom pattern function '{}': {}",
+                function_name(&self.function),
+                err
+            );
+        }
+        // restore generator function environment
+        if let Some(function_generator) = &self.function_generator {
+            if let Some(env) = &self.function_environment {
+                if let Err(err) = function_generator.to_ref().set_environment(env.to_ref()) {
+                    log::warn!(
+                        "Failed to restore custom pattern emitter func environment '{}': {}",
+                        function_name(function_generator),
+                        err
+                    );
+                }
+            }
+            // then fetch a new fresh function from the generator
+            let result = function_generator
+                .to_ref()
+                .call::<_, LuaValue>(self.function_context.to_ref());
+            match result {
+                Err(err) => {
+                    log::warn!(
+                        "Failed to call custom pattern emitter generator function '{}': {}",
+                        function_name(function_generator),
+                        err
+                    );
+                }
+                Ok(value) => {
+                    if let Some(function) = value.as_function() {
+                        self.function = function.clone().into_owned();
+                    } else {
+                        log::warn!(
+                            "Failed to call custom pattern emitter generator function '{}': {}",
+                            function_name(function_generator),
+                            "Generator does not return a valid emitter function"
+                        );
+                    }
+                }
+            };
+        }
+        // and set new initial pulse value
+        let move_step = false;
+        self.pulse = match self.next_pulse(move_step) {
+            Ok(pulse) => pulse,
+            Err(err) => {
+                log::warn!(
+                    "Failed to run custom pattern func '{}': {}",
+                    function_name(&self.function),
+                    err
+                );
+                0.0
+            }
+        };
     }
 }
