@@ -9,8 +9,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Context passed to `emit` and `pattern` functions/generators.
 ---@class EmitterContext
 -----TODO: @field playing boolean Transport playback running.
----@field tempo number Project's tempo in beats per minutes.
----@field beats_per_bar integer Project's Beats per bar.
+---@field beats_per_min number Project's tempo in beats per minutes.
+---@field beats_per_bar integer Project's beats per bar setting.
 ---@field sample_rate integer Project's sample rate in samples per second.
 ---
 -----TODO: @field trigger_note integer? Note value that triggered, started the emitter, if any.

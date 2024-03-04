@@ -218,7 +218,7 @@ pub(crate) fn initialize_emitter_context(
     time_info: &BeatTimeBase,
 ) -> LuaResult<()> {
     let table = table.to_ref();
-    table.raw_set("tempo", time_info.beats_per_min)?;
+    table.raw_set("beats_per_min", time_info.beats_per_min)?;
     table.raw_set("beats_per_bar", time_info.beats_per_bar)?;
     table.raw_set("sample_rate", time_info.samples_per_sec)?;
     table.raw_set("step", step_count + 1)?;

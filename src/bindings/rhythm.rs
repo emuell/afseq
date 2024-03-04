@@ -117,7 +117,7 @@ mod test {
             .load(
                 r#"
                 local function validate_context(context) 
-                    assert(context.tempo == 120)
+                    assert(context.beats_per_min == 120)
                     assert(context.beats_per_bar == 4)
                     assert(context.sample_rate == 44100)
                     assert(context.step > 0)
@@ -207,7 +207,7 @@ mod test {
             .load(
                 r#"
                 local function validate_context(context) 
-                    assert(context.tempo == 130)
+                    assert(context.beats_per_min == 130)
                     assert(context.beats_per_bar == 8)
                     assert(context.sample_rate == 48000)
                     assert(context.step > 0)
