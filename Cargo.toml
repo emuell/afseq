@@ -19,6 +19,9 @@ simplelog = { version = "^0.12" }
 serde = { version = "^1.0" }
 serde_json = { version = "^1.0" }
 uuid = {version = "^1.3", features = [ "v4", "fast-rng" ]}
+# optional -> tidal
+pest = { version = "2.7.8", optional = true}
+pest_derive = { version = "2.7.8", optional = true}
 # optional -> dhat-profiler
 dhat = { version = "0.3.2", optional = true }
 # optional -> scripting
@@ -35,9 +38,10 @@ debug = 1
 
 [features]
 dhat-profiler = ["dhat"]
+tidal = ["pest", "pest_derive"]
 scripting = ["mlua"]
 player = ["afplay"]
-default = ["scripting"]
+default = ["scripting", "tidal"]
 
 [[example]]
 name = "play"

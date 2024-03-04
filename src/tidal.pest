@@ -1,0 +1,64 @@
+// PEST parser definition for tidal mini-notations, based  
+// on the TidalCycles mini-notation parser by Alex McLean.
+
+// numbers
+number        = @{ minus? ~ int ~ frac? ~ exp? }
+decimal_point = _{ "." }
+digit1_9      = _{ '1'..'9' }
+e             = _{ "e" | "E" }
+exp           = _{ e ~ (minus | plus)? ~ ASCII_DIGIT+ }
+frac          = _{ decimal_point ~ ASCII_DIGIT+ }
+int           = _{ zero | (digit1_9 ~ ASCII_DIGIT*) }
+intneg        = @{ minus? ~ int }
+minus         = _{ "-" }
+plus          = _{ "+" }
+zero          = _{ "0" }
+DIGIT         = _{ ASCII_DIGIT }
+
+// delimiters
+ws    = _{ WHITESPACE* }
+comma = _{ ws ~ "," ~ ws }
+pipe  = _{ ws ~ "|" ~ ws }
+dot   = _{ ws ~ "." ~ ws }
+quote = _{ "\"" | "'" }
+
+// character classes
+UNICODE_ALPHABETIC = _{ 'a'..'z' | 'A'..'Z' }
+WHITESPACE         = _{ " " | "\n" | "\r" | "\t" | "\u{A0}" }
+ASCII_DIGIT        = _{ '0'..'9' }
+
+// mini
+step_char = _{ UNICODE_ALPHABETIC | ASCII_DIGIT | "~" | "-" | "#" | "." | "^" | "_" }
+step      = { ws ~ step_char+ ~ ws }
+
+sub_cycle       = { ws ~ "[" ~ ws ~ stack_or_choose ~ ws ~ "]" ~ ws }
+polymeter       = { ws ~ "{" ~ ws ~ polymeter_stack ~ ws ~ "}" ~ polymeter_steps? ~ ws }
+polymeter_steps = { "%" ~ slice }
+
+slow_sequence = { ws ~ "<" ~ ws ~ polymeter_stack ~ ws ~ ">" ~ ws }
+
+slice = _{ step | sub_cycle | polymeter | slow_sequence }
+
+slice_op = _{ op_weight | op_bjorklund | op_slow | op_fast | op_replicate | op_degrade | op_tail | op_range }
+
+op_weight    = { ws ~ ("@" | "_") ~ number? }
+op_replicate = { ws ~ "!" ~ number? }
+op_bjorklund = { "(" ~ ws ~ slice_with_ops ~ ws ~ comma ~ ws ~ slice_with_ops ~ ws ~ comma? ~ ws ~ slice_with_ops? ~ ws ~ ")" }
+
+op_slow    = { "/" ~ slice }
+op_fast    = { "*" ~ slice }
+op_degrade = { "?" ~ number? }
+op_tail    = { ":" ~ slice }
+op_range   = { ".." ~ slice }
+
+slice_with_ops = _{ slice ~ slice_op* }
+
+sequence    = { slice_with_ops+ }
+stack_tail  = { (comma ~ sequence)+ }
+choose_tail = { (pipe ~ sequence)+ }
+dot_tail    = { (dot ~ sequence)+ }
+
+stack_or_choose = _{ sequence ~ (stack_tail | choose_tail | dot_tail)? }
+polymeter_stack = { sequence ~ stack_tail? }
+
+mini = { ws ~ stack_or_choose ~ ws }
