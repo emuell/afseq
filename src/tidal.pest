@@ -1,4 +1,4 @@
-// PEST parser definition for tidal mini-notations, based  
+// PEST parser definition for tidal mini-notations, based
 // on the TidalCycles mini-notation parser by Alex McLean.
 
 // numbers
@@ -9,56 +9,48 @@ e             = _{ "e" | "E" }
 exp           = _{ e ~ (minus | plus)? ~ ASCII_DIGIT+ }
 frac          = _{ decimal_point ~ ASCII_DIGIT+ }
 int           = _{ zero | (digit1_9 ~ ASCII_DIGIT*) }
-intneg        = @{ minus? ~ int }
 minus         = _{ "-" }
 plus          = _{ "+" }
 zero          = _{ "0" }
-DIGIT         = _{ ASCII_DIGIT }
 
 // delimiters
-ws    = _{ WHITESPACE* }
-comma = _{ ws ~ "," ~ ws }
-pipe  = _{ ws ~ "|" ~ ws }
-dot   = _{ ws ~ "." ~ ws }
-quote = _{ "\"" | "'" }
+comma = _{ "," }
+pipe  = _{ "|" }
+dot   = _{ "." }
 
 // character classes
-UNICODE_ALPHABETIC = _{ 'a'..'z' | 'A'..'Z' }
-WHITESPACE         = _{ " " | "\n" | "\r" | "\t" | "\u{A0}" }
-ASCII_DIGIT        = _{ '0'..'9' }
+WHITESPACE = _{ " " | "\t" | "\u{A0}" }
 
 // mini
-step_char = _{ UNICODE_ALPHABETIC | ASCII_DIGIT | "~" | "-" | "#" | "." | "^" | "_" }
-step      = { ws ~ step_char+ ~ ws }
+step_char = _{ ASCII_ALPHA | ASCII_DIGIT | "~" | "-" | "#" | "." | "^" | "_" }
+step      = @{ step_char+ }
 
-sub_cycle       = { ws ~ "[" ~ ws ~ stack_or_choose ~ ws ~ "]" ~ ws }
-polymeter       = { ws ~ "{" ~ ws ~ polymeter_stack ~ ws ~ "}" ~ polymeter_steps? ~ ws }
+sub_cycle       = { "[" ~ stack_or_choose ~ "]" }
+polymeter       = { "{" ~ polymeter_stack ~ "}" ~ polymeter_steps? }
 polymeter_steps = { "%" ~ slice }
 
-slow_sequence = { ws ~ "<" ~ ws ~ polymeter_stack ~ ws ~ ">" ~ ws }
+slow_sequence = { "<" ~ polymeter_stack ~ ">" }
 
-slice = _{ step | sub_cycle | polymeter | slow_sequence }
-
+slice    = _{ step | sub_cycle | polymeter | slow_sequence }
 slice_op = _{ op_weight | op_bjorklund | op_slow | op_fast | op_replicate | op_degrade | op_tail | op_range }
 
-op_weight    = { ws ~ ("@" | "_") ~ number? }
-op_replicate = { ws ~ "!" ~ number? }
-op_bjorklund = { "(" ~ ws ~ slice_with_ops ~ ws ~ comma ~ ws ~ slice_with_ops ~ ws ~ comma? ~ ws ~ slice_with_ops? ~ ws ~ ")" }
-
-op_slow    = { "/" ~ slice }
-op_fast    = { "*" ~ slice }
-op_degrade = { "?" ~ number? }
-op_tail    = { ":" ~ slice }
-op_range   = { ".." ~ slice }
+op_weight    = { ("@" | "_") ~ number }
+op_replicate = { "!" }
+op_bjorklund = { "(" ~ (slice_with_ops ~ comma)+ ~ slice_with_ops ~ ")" }
+op_slow      = { "/" ~ number }
+op_fast      = { "*" ~ number }
+op_degrade   = { "?" ~ number }
+op_tail      = { ":" ~ number }
+op_range     = { ".." ~ number } // ???
 
 slice_with_ops = _{ slice ~ slice_op* }
+sequence       = _{ slice_with_ops+ }
 
-sequence    = { slice_with_ops+ }
 stack_tail  = { (comma ~ sequence)+ }
 choose_tail = { (pipe ~ sequence)+ }
 dot_tail    = { (dot ~ sequence)+ }
 
 stack_or_choose = _{ sequence ~ (stack_tail | choose_tail | dot_tail)? }
-polymeter_stack = { sequence ~ stack_tail? }
+polymeter_stack = _{ sequence ~ stack_tail? }
 
-mini = { ws ~ stack_or_choose ~ ws }
+mini = { SOI ~ stack_or_choose ~ EOI }
