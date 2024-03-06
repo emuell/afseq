@@ -13,7 +13,7 @@ type EventMapFn = dyn FnMut(Event) -> Event + 'static;
 // -------------------------------------------------------------------------------------------------
 
 /// Endlessly emits [`Event`] which's value can be mutated in each iter step
-/// with a custom closure. 
+/// with a custom closure.
 ///
 /// NB: This event iter can not be cloned. `clone_dyn` thus will cause a panic!
 pub struct MutatedEventIter {
@@ -78,13 +78,14 @@ impl Iterator for MutatedEventIter {
 }
 
 impl EventIter for MutatedEventIter {
-    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
+    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
         panic!("Mutated event iters can't be cloned")
     }
+
     fn reset(&mut self) {
         self.events = self.initial_events.clone();
         self.map = (self.reset_map)();

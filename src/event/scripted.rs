@@ -124,7 +124,7 @@ impl Iterator for ScriptedEventIter {
 }
 
 impl EventIter for ScriptedEventIter {
-    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context with the new time base
         if let Err(err) =
             initialize_emitter_context(&mut self.function_context, self.step_count, time_base)
@@ -138,9 +138,10 @@ impl EventIter for ScriptedEventIter {
         // TODO: rerun the generator with new context?
     }
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
+    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
         Rc::new(RefCell::new(self.clone()))
     }
+
     fn reset(&mut self) {
         // reset timeout
         self.timeout_hook.reset();

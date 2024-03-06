@@ -130,7 +130,7 @@ impl Pattern for ScriptedPattern {
         pulse
     }
 
-    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
         if let Err(err) =
             initialize_emitter_context(&mut self.function_context, self.step_count, time_base)
@@ -143,9 +143,10 @@ impl Pattern for ScriptedPattern {
         }
     }
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn Pattern>> {
+    fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {
         Rc::new(RefCell::new(self.clone()))
     }
+
     fn reset(&mut self) {
         // reset timeout
         self.timeout_hook.reset();

@@ -6,7 +6,7 @@ use crate::{
     event::{Event, InstrumentId},
     phrase::RhythmIndex,
     time::SampleTimeDisplay,
-    BeatTimeBase, Phrase, Rhythm, SampleTime,
+    BeatTimeBase, Phrase, Rhythm, RhythmSampleIter, SampleTime,
 };
 
 #[cfg(doc)]
@@ -132,31 +132,9 @@ impl Iterator for Sequence {
     }
 }
 
-impl Rhythm for Sequence {
-    fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
+impl RhythmSampleIter for Sequence {
+    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
-    }
-    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
-        for phrase in self.phrases.iter_mut() {
-            phrase.update_time_base(time_base);
-        }
-    }
-
-    fn instrument(&self) -> Option<InstrumentId> {
-        None
-    }
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        // reset all our phrase iters
-        for phrase in self.phrases.iter_mut() {
-            phrase.set_instrument(instrument)
-        }
-    }
-
-    fn samples_per_step(&self) -> f64 {
-        self.current_phrase().samples_per_step()
-    }
-    fn pattern_length(&self) -> usize {
-        self.current_phrase().pattern_length()
     }
 
     fn sample_offset(&self) -> SampleTime {
@@ -169,10 +147,34 @@ impl Rhythm for Sequence {
     fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
         self.next_event_until_time(sample_time)
     }
+}
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+impl Rhythm for Sequence {
+    fn pattern_step_length(&self) -> SampleTime {
+        self.current_phrase().pattern_step_length()
+    }
+
+    fn pattern_length(&self) -> usize {
+        self.current_phrase().pattern_length()
+    }
+
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        for phrase in self.phrases.iter_mut() {
+            phrase.set_time_base(time_base);
+        }
+    }
+
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        // reset all our phrase iters
+        for phrase in self.phrases.iter_mut() {
+            phrase.set_instrument(instrument)
+        }
+    }
+
+    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
         Rc::new(RefCell::new(self.clone()))
     }
+
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;

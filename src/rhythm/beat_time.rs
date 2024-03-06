@@ -4,7 +4,7 @@ use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, BeatTimeStep, SampleTimeDisplay},
-    Rhythm, SampleTime,
+    Rhythm, RhythmSampleIter, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -166,42 +166,15 @@ impl Iterator for BeatTimeRhythm {
             } else {
                 Some((sample_time, None))
             };
-            self.event_iter_sample_time += self.samples_per_step();
+            self.event_iter_sample_time += self.step.to_samples(&self.time_base);
             value
         }
     }
 }
 
-impl Rhythm for BeatTimeRhythm {
-    fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
+impl RhythmSampleIter for BeatTimeRhythm {
+    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
-    }
-    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
-        if self.event_iter_pos_in_step > 0.0 {
-            // reschedule next event's sample time to align it to the new time base,
-            // taking into account when exactly the switch happened within a step
-            let step_time_difference =
-                self.step.to_samples(time_base) - self.step.to_samples(&self.time_base);
-            self.event_iter_sample_time += step_time_difference * self.event_iter_pos_in_step;
-        }
-        self.time_base = *time_base;
-        // update pattern end event iter
-        self.pattern.borrow_mut().update_time_base(time_base);
-        self.event_iter.borrow_mut().update_time_base(time_base);
-    }
-
-    fn instrument(&self) -> Option<InstrumentId> {
-        self.instrument
-    }
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        self.instrument = instrument;
-    }
-
-    fn samples_per_step(&self) -> f64 {
-        self.step.to_samples(&self.time_base)
-    }
-    fn pattern_length(&self) -> usize {
-        self.pattern.borrow().len()
     }
 
     fn sample_offset(&self) -> SampleTime {
@@ -219,19 +192,48 @@ impl Rhythm for BeatTimeRhythm {
             self.next()
         } else {
             // memorize how far we're away from the next step as fraction
-            self.event_iter_pos_in_step =
-                (current_sample_time - sample_time) as f64 / self.samples_per_step();
+            self.event_iter_pos_in_step = (current_sample_time - sample_time) as f64
+                / self.step.samples_per_step(&self.time_base);
             None
         }
     }
+}
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+impl Rhythm for BeatTimeRhythm {
+    fn pattern_step_length(&self) -> SampleTime {
+        self.step.to_samples(&self.time_base) as SampleTime
+    }
+
+    fn pattern_length(&self) -> usize {
+        self.pattern.borrow().len()
+    }
+
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        if self.event_iter_pos_in_step > 0.0 {
+            // reschedule next event's sample time to align it to the new time base,
+            // taking into account when exactly the switch happened within a step
+            let step_time_difference =
+                self.step.to_samples(time_base) - self.step.to_samples(&self.time_base);
+            self.event_iter_sample_time += step_time_difference * self.event_iter_pos_in_step;
+        }
+        self.time_base = *time_base;
+        // update pattern end event iter
+        self.pattern.borrow_mut().set_time_base(time_base);
+        self.event_iter.borrow_mut().set_time_base(time_base);
+    }
+
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        self.instrument = instrument;
+    }
+
+    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
         Rc::new(RefCell::new(Self {
-            pattern: self.pattern.borrow().clone_dyn(),
-            event_iter: self.event_iter.borrow().clone_dyn(),
+            pattern: self.pattern.borrow().duplicate(),
+            event_iter: self.event_iter.borrow().duplicate(),
             ..self.clone()
         }))
     }
+    
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;

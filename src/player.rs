@@ -17,7 +17,7 @@ use afplay::{
 use crate::{
     event::{unique_instrument_id, InstrumentId},
     time::TimeBase,
-    Event, Note, Rhythm, SampleTime, Sequence,
+    Event, Note, RhythmSampleIter, SampleTime, Sequence,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -296,7 +296,7 @@ impl SamplePlayer {
         start_offset: SampleTime,
         sample_time: SampleTime,
     ) {
-        let time_display = sequence.time_display();
+        let time_display = sequence.sample_time_display();
         sequence.run_until_time(
             sample_time,
             &mut |rhythm_index, sample_time, event: Option<Event>| {

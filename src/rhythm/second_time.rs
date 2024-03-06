@@ -4,7 +4,7 @@ use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
-    Rhythm, SampleTime,
+    Rhythm, RhythmSampleIter, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -157,36 +157,15 @@ impl Iterator for SecondTimeRhythm {
             } else {
                 Some((sample_time, None))
             };
-            self.event_iter_sample_time += self.samples_per_step();
+            self.event_iter_sample_time += self.step * self.time_base.samples_per_second() as f64;
             value
         }
     }
 }
 
-impl Rhythm for SecondTimeRhythm {
-    fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
+impl RhythmSampleIter for SecondTimeRhythm {
+    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
-    }
-
-    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
-        self.time_base = SecondTimeBase::from(*time_base);
-        // update pattern end event iter
-        self.pattern.borrow_mut().update_time_base(time_base);
-        self.event_iter.borrow_mut().update_time_base(time_base);
-    }
-
-    fn instrument(&self) -> Option<InstrumentId> {
-        self.instrument
-    }
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        self.instrument = instrument;
-    }
-
-    fn samples_per_step(&self) -> f64 {
-        self.step * self.time_base.samples_per_second() as f64
-    }
-    fn pattern_length(&self) -> usize {
-        self.pattern.borrow().len()
     }
 
     fn sample_offset(&self) -> SampleTime {
@@ -204,14 +183,36 @@ impl Rhythm for SecondTimeRhythm {
             None
         }
     }
+}
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+impl Rhythm for SecondTimeRhythm {
+    fn pattern_step_length(&self) -> SampleTime {
+        (self.step * self.time_base.samples_per_second() as f64) as SampleTime
+    }
+    
+    fn pattern_length(&self) -> usize {
+        self.pattern.borrow().len()
+    }
+
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        self.time_base = SecondTimeBase::from(*time_base);
+        // update pattern end event iter
+        self.pattern.borrow_mut().set_time_base(time_base);
+        self.event_iter.borrow_mut().set_time_base(time_base);
+    }
+
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        self.instrument = instrument;
+    }
+
+    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
         Rc::new(RefCell::new(Self {
-            pattern: self.pattern.borrow().clone_dyn(),
-            event_iter: self.event_iter.borrow().clone_dyn(),
+            pattern: self.pattern.borrow().duplicate(),
+            event_iter: self.event_iter.borrow().duplicate(),
             ..self.clone()
         }))
     }
+
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;

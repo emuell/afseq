@@ -7,7 +7,7 @@ use crate::{
     event::{Event, InstrumentId},
     prelude::BeatTimeStep,
     time::SampleTimeDisplay,
-    BeatTimeBase, Rhythm, SampleTime,
+    BeatTimeBase, Rhythm, RhythmSampleIter, SampleTime,
 };
 
 #[cfg(doc)]
@@ -218,35 +218,9 @@ impl Iterator for Phrase {
     }
 }
 
-impl Rhythm for Phrase {
-    fn time_display(&self) -> Box<dyn SampleTimeDisplay> {
+impl RhythmSampleIter for Phrase {
+    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
-    }
-    fn update_time_base(&mut self, time_base: &BeatTimeBase) {
-        for rhythm_slot in self.rhythm_slots.iter_mut() {
-            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().update_time_base(time_base)
-            }
-        }
-    }
-
-    fn instrument(&self) -> Option<InstrumentId> {
-        None
-    }
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        for rhythm_slot in self.rhythm_slots.iter_mut() {
-            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_instrument(instrument)
-            }
-        }
-    }
-
-    fn samples_per_step(&self) -> f64 {
-        self.length.samples_per_step(&self.time_base)
-    }
-    fn pattern_length(&self) -> usize {
-        // use our length's step, likely won't be used anyway for phrases
-        self.length.steps() as usize
     }
 
     fn sample_offset(&self) -> SampleTime {
@@ -263,8 +237,36 @@ impl Rhythm for Phrase {
             None
         }
     }
+}
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn Rhythm>> {
+impl Rhythm for Phrase {
+    fn pattern_step_length(&self) -> SampleTime {
+        // use our length's step, likely won't be used anyway for phrases
+        self.length.samples_per_step(&self.time_base) as SampleTime
+    }
+
+    fn pattern_length(&self) -> usize {
+        // use our length's step, likely won't be used anyway for phrases
+        self.length.steps() as usize
+    }
+
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        for rhythm_slot in self.rhythm_slots.iter_mut() {
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.borrow_mut().set_time_base(time_base)
+            }
+        }
+    }
+
+    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
+        for rhythm_slot in self.rhythm_slots.iter_mut() {
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.borrow_mut().set_instrument(instrument)
+            }
+        }
+    }
+
+    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
         Rc::new(RefCell::new(self.clone()))
     }
 

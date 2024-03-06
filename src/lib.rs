@@ -22,7 +22,7 @@ pub mod pattern;
 pub use pattern::Pattern;
 
 pub mod rhythm;
-pub use rhythm::Rhythm;
+pub use rhythm::{Rhythm, RhythmSampleIter};
 
 pub mod phrase;
 pub use phrase::Phrase;

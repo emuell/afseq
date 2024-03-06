@@ -5,14 +5,14 @@ use crate::{pattern::Pattern, BeatTimeBase};
 // -------------------------------------------------------------------------------------------------
 
 /// A pattern which endlessly emits pulses by stepping through a fixed pulse array.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct FixedPattern {
     pulses: Vec<f32>,
     step: usize,
 }
 
-impl Default for FixedPattern {
-    fn default() -> Self {
+impl FixedPattern {
+    pub fn new() -> Self {
         Self {
             pulses: vec![1.0],
             step: 0,
@@ -54,10 +54,6 @@ impl Pattern for FixedPattern {
         self.pulses.len()
     }
 
-    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
-        // nothing to do
-    }
-
     fn run(&mut self) -> f32 {
         assert!(!self.is_empty(), "Can't run empty patterns");
         let pulse = self.pulses[self.step];
@@ -68,9 +64,14 @@ impl Pattern for FixedPattern {
         pulse
     }
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn Pattern>> {
+    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
+    fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {
         Rc::new(RefCell::new(self.clone()))
     }
+    
     fn reset(&mut self) {
         self.step = 0;
     }

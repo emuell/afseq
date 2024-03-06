@@ -43,13 +43,14 @@ impl Iterator for FixedEventIter {
 }
 
 impl EventIter for FixedEventIter {
-    fn update_time_base(&mut self, _time_base: &BeatTimeBase) {
+    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
 
-    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>> {
+    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
         Rc::new(RefCell::new(self.clone()))
     }
+
     fn reset(&mut self) {
         // reset step counter
         self.current = 0;

@@ -336,15 +336,18 @@ impl Display for Event {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A resettable [`Event`] iterator, which typically will be used in
-/// [Rhythm](`super::Rhythm`) trait impls to sequencially emit new events.
+/// A resettable [`Event`] iterator, which will be used in [Rhythm](`super::Rhythm`) trait impls
+/// to emit events.
 pub trait EventIter: Iterator<Item = Event> + Debug {
     /// Update the iterator's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
-    fn update_time_base(&mut self, time_base: &BeatTimeBase);
+    fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// Create a new instance of this event iter.
-    fn clone_dyn(&self) -> Rc<RefCell<dyn EventIter>>;
+    /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
+    /// a Rc<RefCell<dyn EventIter>>, but called 'duplicate' to avoid conflicts with possible
+    /// Clone impls.
+    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>>;
+
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
 }
