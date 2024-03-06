@@ -94,7 +94,7 @@ mod test {
         let mut pattern = pattern.borrow_mut();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
-            vec![1.0, 0.0, 1.0, 0.0]
+            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
         );
         drop(pattern);
         let event = beat_time_rhythm.next();
@@ -198,7 +198,7 @@ mod test {
         let mut pattern = pattern.borrow_mut();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
-            vec![1.0, 0.0, 1.0, 0.0]
+            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
         );
         drop(pattern);
 

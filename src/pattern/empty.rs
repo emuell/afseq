@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{pattern::Pattern, BeatTimeBase};
+use crate::{BeatTimeBase, Pattern, PulseStepTime, PulseValue};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -23,7 +23,7 @@ impl Pattern for EmptyPattern {
         0
     }
 
-    fn run(&mut self) -> f32 {
+    fn run(&mut self) -> (PulseValue, PulseStepTime) {
         panic!("Empty patterns should not be run");
     }
 

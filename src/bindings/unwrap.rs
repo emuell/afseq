@@ -545,20 +545,20 @@ pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Opti
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<f32> {
+pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<Pulse> {
     match value {
-        LuaValue::Nil => Ok(0.0),
-        LuaValue::Boolean(bool) => Ok(bool as u8 as f32),
-        LuaValue::Integer(integer) => Ok(integer as f32),
-        LuaValue::Number(number) => Ok(number as f32),
+        LuaValue::Nil => Ok(Pulse::Pulse(0.0)),
+        LuaValue::Boolean(bool) => Ok(Pulse::from(bool)),
+        LuaValue::Integer(integer) => Ok(Pulse::from(integer as u32)),
+        LuaValue::Number(number) => Ok(Pulse::from(number as f32)),
         LuaValue::String(str) => {
             let str = str.to_string_lossy();
             if let Ok(number) = str.parse::<f32>() {
-                Ok(number)
-            } else if let Ok(integer) = str.parse::<i32>() {
-                Ok(integer as f32)
+                Ok(Pulse::from(number))
+            } else if let Ok(integer) = str.parse::<u32>() {
+                Ok(Pulse::from(integer))
             } else if let Ok(bool) = str.parse::<bool>() {
-                Ok(bool as u8 as f32)
+                Ok(Pulse::from(bool))
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "string",
@@ -566,6 +566,9 @@ pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<f32> {
                     message: Some("Invalid pattern pulse string value".to_string()),
                 })
             }
+        }
+        LuaValue::Table(_table) => {
+            unimplemented!();
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
@@ -593,7 +596,7 @@ pub(crate) fn pattern_from_value(
                 .clone()
                 .sequence_values::<LuaValue>()
                 .map(|result| pattern_pulse_from_value(result?))
-                .collect::<LuaResult<Vec<f32>>>()?;
+                .collect::<LuaResult<Vec<Pulse>>>()?;
             Ok(Rc::new(RefCell::new(pulses.to_pattern())))
         }
         _ => Err(LuaError::FromLuaConversionError {

@@ -1,51 +1,41 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{pattern::Pattern, BeatTimeBase};
+use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseStepTime, PulseValue};
 
 // -------------------------------------------------------------------------------------------------
 
 /// A pattern which endlessly emits pulses by stepping through a fixed pulse array.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct FixedPattern {
-    pulses: Vec<f32>,
+    pulses: Vec<Pulse>,
+    pulse_iter: Option<PulseIter>,
     step: usize,
 }
 
-impl FixedPattern {
-    pub fn new() -> Self {
-        Self {
-            pulses: vec![1.0],
-            step: 0,
-        }
+impl Default for FixedPattern {
+    fn default() -> Self {
+        Self::from_pulses(vec![Pulse::Pulse(1.0)])
     }
 }
 
 impl FixedPattern {
-    /// Create a pattern from a vector. Param `pulses` is evaluated as an array of numbers:
-    /// when to trigger an event and when not (0, 1), but can also be specified as boolean
-    /// or integer array.
-    pub fn from_vector<T>(pulses: Vec<T>) -> Self
+    /// Create a pattern from a vector of pattern pulses or a vector of values which can be
+    /// converted to pattern pulses (boolean, u32, f32).
+    pub fn from_pulses<T>(pulses: Vec<T>) -> Self
     where
-        f64: std::convert::TryFrom<T>,
+        Pulse: std::convert::From<T> + Sized,
     {
         let pulses = pulses
             .into_iter()
-            .map(|f| f64::try_from(f).unwrap_or(0.0) as f32)
+            .map(|v| Pulse::from(v))
             .collect::<Vec<_>>();
+        let pulse_iter = pulses.first().map(|pulse| pulse.clone().into_iter());
         let step = 0;
-        FixedPattern { pulses, step }
-    }
-
-    /// Create a pattern from a static array of numbers or booleans.
-    pub fn from_array<const N: usize, T>(pulses: [T; N]) -> Self
-    where
-        f64: std::convert::TryFrom<T>,
-    {
-        let pulses = pulses
-            .into_iter()
-            .map(|f| f64::try_from(f).unwrap_or(0.0) as f32)
-            .collect::<Vec<_>>();
-        Self::from_vector::<f32>(pulses)
+        FixedPattern {
+            pulses,
+            pulse_iter,
+            step,
+        }
     }
 }
 
@@ -54,14 +44,21 @@ impl Pattern for FixedPattern {
         self.pulses.len()
     }
 
-    fn run(&mut self) -> f32 {
+    fn run(&mut self) -> (PulseValue, PulseStepTime) {
         assert!(!self.is_empty(), "Can't run empty patterns");
-        let pulse = self.pulses[self.step];
+        // if we have a pulse iterator, consume it
+        if let Some(pulse_iter) = &mut self.pulse_iter {
+            if let Some(pulse) = pulse_iter.next() {
+                return pulse;
+            }
+        }
+        // else move on to the next pulse
         self.step += 1;
         if self.step >= self.pulses.len() {
             self.step = 0;
         }
-        pulse
+        self.pulse_iter = Some(self.pulses[self.step].clone().into_iter());
+        self.pulse_iter.as_mut().unwrap().next().unwrap()
     }
 
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
@@ -71,9 +68,10 @@ impl Pattern for FixedPattern {
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {
         Rc::new(RefCell::new(self.clone()))
     }
-    
+
     fn reset(&mut self) {
         self.step = 0;
+        self.pulse_iter = self.pulses.first().map(|pulse| pulse.clone().into_iter());
     }
 }
 
@@ -86,20 +84,80 @@ pub trait ToFixedPattern {
 
 impl<T> ToFixedPattern for Vec<T>
 where
-    f64: std::convert::TryFrom<T>,
+    Pulse: std::convert::From<T>,
 {
-    /// Wrap a vector of numbers or booleans to a new [`FixedPattern`].
+    /// Create a vector of pulses, numbers or booleans to a new [`FixedPattern`].
     fn to_pattern(self) -> FixedPattern {
-        FixedPattern::from_vector(self)
+        FixedPattern::from_pulses(self)
     }
 }
 
 impl<const N: usize, T> ToFixedPattern for [T; N]
 where
-    f64: std::convert::TryFrom<T>,
+    Pulse: std::convert::From<T>,
 {
-    /// Wrap a static array of numbers or booleans to a new [`FixedPattern`].
+    /// Create a static array of pulses, numbers or booleans to a new [`FixedPattern`].
     fn to_pattern(self) -> FixedPattern {
-        FixedPattern::from_array(self)
+        FixedPattern::from_pulses(self.into_iter().collect::<Vec<_>>())
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn run() {
+        let mut pattern = [1.0, 0.0, 1.0, 0.0].to_pattern();
+        assert_eq!(
+            vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
+            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
+        );
+
+        pattern = [
+            Pulse::from(1.0),
+            Pulse::from(0.0),
+            Pulse::from(vec![1.0, 1.0]),
+            Pulse::from(0.0),
+        ]
+        .to_pattern();
+        assert_eq!(
+            vec![
+                pattern.run(),
+                pattern.run(),
+                pattern.run(),
+                pattern.run(),
+                pattern.run()
+            ],
+            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 0.5), (1.0, 0.5), (0.0, 1.0)]
+        );
+
+        pattern = [
+            Pulse::from(1.0),
+            Pulse::from(0.0),
+            Pulse::from(vec![Pulse::from(vec![0.0, 1.0]), Pulse::from(1.0)]),
+            Pulse::from(0.0),
+        ]
+        .to_pattern();
+        assert_eq!(
+            vec![
+                pattern.run(),
+                pattern.run(),
+                pattern.run(),
+                pattern.run(),
+                pattern.run(),
+                pattern.run()
+            ],
+            vec![
+                (1.0, 1.0),
+                (0.0, 1.0),
+                (0.0, 0.25),
+                (1.0, 0.25),
+                (1.0, 0.5),
+                (0.0, 1.0)
+            ]
+        );
     }
 }

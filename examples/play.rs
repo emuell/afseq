@@ -72,18 +72,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // generate a few phrases
     let kick_pattern = beat_time
-        .every_nth_sixteenth(1.0)
+        .every_nth_beat(1.0)
         .with_instrument(KICK)
         .with_pattern(
-            [
-                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
-                0, //
-                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
-                0, //
-                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 0,
-                0, //
-                1, 0, 0, 0, /**/ 0, 0, 1, 0, /**/ 0, 0, 1, 0, /**/ 0, 1, 0,
-                0, //
+            vec![
+                Pulse::from(1.0),
+                Pulse::from(vec![0.0, 1.0]),
+                Pulse::from(0.0),
+                Pulse::from(0.0),
+                Pulse::from(1.0),
+                Pulse::from(vec![0.0, 1.0]),
+                Pulse::from(0.0),
+                Pulse::from(0.0),
+                Pulse::from(1.0),
+                Pulse::from(vec![0.0, 1.0]),
+                Pulse::from(0.0),
+                Pulse::from(0.0),
+                Pulse::from(1.0),
+                Pulse::from(vec![0.0, 1.0]),
+                Pulse::from(vec![0.0, 1.0]),
+                Pulse::from(vec![0.0, 1.0, 0.0, 0.0]),
             ]
             .to_pattern(),
         )

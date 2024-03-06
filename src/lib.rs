@@ -18,6 +18,9 @@ pub use scale::Scale;
 pub mod event;
 pub use event::{Event, EventIter};
 
+pub mod pulse;
+pub use pulse::{Pulse, PulseIter, PulseStepTime, PulseValue};
+
 pub mod pattern;
 pub use pattern::Pattern;
 

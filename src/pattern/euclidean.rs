@@ -57,6 +57,6 @@ pub fn euclidean(pulses: u32, steps: u32, offset: i32) -> Vec<bool> {
 impl FixedPattern {
     /// Create a pattern from an euclidan rhythm.
     pub fn from_euclidean(pulses: u32, steps: u32, offset: i32) -> Self {
-        Self::from_vector(euclidean(pulses, steps, offset))
+        Self::from_pulses(euclidean(pulses, steps, offset))
     }
 }

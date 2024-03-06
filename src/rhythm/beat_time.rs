@@ -157,7 +157,8 @@ impl Iterator for BeatTimeRhythm {
             None
         } else {
             let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
-            let value = if pattern.run() > 0.0 {
+            let (pulse, pulse_time_step) = pattern.run();
+            let value = if pulse > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
                 Some((
                     sample_time,
@@ -166,7 +167,7 @@ impl Iterator for BeatTimeRhythm {
             } else {
                 Some((sample_time, None))
             };
-            self.event_iter_sample_time += self.step.to_samples(&self.time_base);
+            self.event_iter_sample_time += self.step.to_samples(&self.time_base) * pulse_time_step;
             value
         }
     }
@@ -233,7 +234,7 @@ impl Rhythm for BeatTimeRhythm {
             ..self.clone()
         }))
     }
-    
+
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;

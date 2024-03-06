@@ -32,7 +32,7 @@ use crate::{
     event::{InstrumentId, NoteEvent},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::BeatTimeBase,
-    Scale,
+    Pulse, Scale,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -207,7 +207,7 @@ pub(crate) fn new_note_events_from_lua(
 }
 
 /// Try converting the given lua value to a pattern pulse value.
-pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<f32> {
+pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<Pulse> {
     unwrap::pattern_pulse_from_value(value)
 }
 

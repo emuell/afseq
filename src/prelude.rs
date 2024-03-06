@@ -17,6 +17,7 @@ pub use super::{
     note::Note,
     pattern::{euclidean, fixed::ToFixedPattern, Pattern},
     phrase::{Phrase, RhythmSlot},
+    pulse::{Pulse, PulseIter},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
     time::{BeatTimeBase, BeatTimeStep, SecondTimeBase, SecondTimeStep, TimeBase},
     Chord, Event, EventIter, Rhythm, SampleTime, Scale, Sequence,

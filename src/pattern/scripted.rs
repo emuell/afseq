@@ -4,7 +4,7 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{initialize_emitter_context, pattern_pulse_from_lua, LuaTimeoutHook},
-    BeatTimeBase, Pattern,
+    BeatTimeBase, Pattern, Pulse, PulseIter, PulseStepTime, PulseValue,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -28,7 +28,8 @@ pub struct ScriptedPattern {
     function_context: LuaOwnedTable,
     function: LuaOwnedFunction,
     step_count: usize,
-    pulse: f32,
+    pulse: Pulse,
+    pulse_iter: Option<PulseIter>,
 }
 
 impl ScriptedPattern {
@@ -56,6 +57,7 @@ impl ScriptedPattern {
             let function = inner_function.clone().into_owned();
             let result = function.call::<_, LuaValue>(function_context.to_ref())?;
             let pulse = pattern_pulse_from_lua(result)?;
+            let pulse_iter = Some(pulse.clone().into_iter());
             Ok(Self {
                 timeout_hook,
                 function_environment,
@@ -64,6 +66,7 @@ impl ScriptedPattern {
                 function,
                 step_count,
                 pulse,
+                pulse_iter,
             })
         } else {
             // function returned an event. use this function.
@@ -71,6 +74,7 @@ impl ScriptedPattern {
             let function_generator = None;
             let function = function.into_owned();
             let pulse = pattern_pulse_from_lua(result)?;
+            let pulse_iter = Some(pulse.clone().into_iter());
             Ok(Self {
                 timeout_hook,
                 function_environment,
@@ -79,11 +83,12 @@ impl ScriptedPattern {
                 function,
                 step_count,
                 pulse,
+                pulse_iter,
             })
         }
     }
 
-    fn next_pulse(&mut self, move_step: bool) -> LuaResult<f32> {
+    fn next_pulse(&mut self, move_step: bool) -> LuaResult<Pulse> {
         // reset timeout
         self.timeout_hook.reset();
         // move step counter and update context
@@ -112,9 +117,16 @@ impl Pattern for ScriptedPattern {
         0
     }
 
-    fn run(&mut self) -> f32 {
-        // generate a new pulse
-        let pulse = self.pulse;
+    fn run(&mut self) -> (PulseValue, PulseStepTime) {
+        // if we have a pulse iterator, consume it
+        if let Some(pulse_iter) = &mut self.pulse_iter {
+            if let Some(pulse) = pulse_iter.next() {
+                return pulse;
+            } else {
+                self.pulse_iter = None;
+            }
+        }
+        // else move on and generate a new pulse
         let move_step = true;
         self.pulse = match self.next_pulse(move_step) {
             Ok(pulse) => pulse,
@@ -124,10 +136,11 @@ impl Pattern for ScriptedPattern {
                     function_name(&self.function),
                     err
                 );
-                0.0
+                Pulse::from(0.0)
             }
         };
-        pulse
+        self.pulse_iter = Some(self.pulse.clone().into_iter());
+        self.pulse_iter.as_mut().unwrap().next().unwrap()
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
@@ -210,8 +223,9 @@ impl Pattern for ScriptedPattern {
                     function_name(&self.function),
                     err
                 );
-                0.0
+                Pulse::from(0.0)
             }
         };
+        self.pulse_iter = Some(self.pulse.clone().into_iter());
     }
 }

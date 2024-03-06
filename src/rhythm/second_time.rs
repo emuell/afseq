@@ -148,7 +148,8 @@ impl Iterator for SecondTimeRhythm {
             None
         } else {
             let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
-            let value = if pattern.run() > 0.0 {
+            let (pulse, pulse_time_step) = pattern.run();
+            let value = if pulse > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
                 Some((
                     sample_time,
@@ -157,7 +158,8 @@ impl Iterator for SecondTimeRhythm {
             } else {
                 Some((sample_time, None))
             };
-            self.event_iter_sample_time += self.step * self.time_base.samples_per_second() as f64;
+            self.event_iter_sample_time +=
+                self.step * self.time_base.samples_per_second() as f64 * pulse_time_step;
             value
         }
     }
@@ -189,7 +191,7 @@ impl Rhythm for SecondTimeRhythm {
     fn pattern_step_length(&self) -> f64 {
         self.step * self.time_base.samples_per_second() as f64
     }
-    
+
     fn pattern_length(&self) -> usize {
         self.pattern.borrow().len()
     }
