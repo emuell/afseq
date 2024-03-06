@@ -240,9 +240,9 @@ impl RhythmSampleIter for Phrase {
 }
 
 impl Rhythm for Phrase {
-    fn pattern_step_length(&self) -> SampleTime {
+    fn pattern_step_length(&self) -> f64 {
         // use our length's step, likely won't be used anyway for phrases
-        self.length.samples_per_step(&self.time_base) as SampleTime
+        self.length.samples_per_step(&self.time_base)
     }
 
     fn pattern_length(&self) -> usize {

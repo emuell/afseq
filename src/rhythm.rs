@@ -44,7 +44,7 @@ pub trait RhythmSampleIter: Iterator<Item = (SampleTime, Option<Event>)> + Debug
 /// possibly different patterns and time bases.
 pub trait Rhythm: RhythmSampleIter {
     /// Length in samples of a single step in the rhythm's internal pattern.
-    fn pattern_step_length(&self) -> SampleTime;
+    fn pattern_step_length(&self) -> f64;
     /// Get length in steps of the rhythm's internal pattern (cycle length in steps).
     /// A rhythm pattern repeats after self.pattern_step_length() * self.pattern_length() samples.
     fn pattern_length(&self) -> usize;

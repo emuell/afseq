@@ -150,7 +150,7 @@ impl RhythmSampleIter for Sequence {
 }
 
 impl Rhythm for Sequence {
-    fn pattern_step_length(&self) -> SampleTime {
+    fn pattern_step_length(&self) -> f64 {
         self.current_phrase().pattern_step_length()
     }
 

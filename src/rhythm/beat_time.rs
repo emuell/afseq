@@ -200,8 +200,8 @@ impl RhythmSampleIter for BeatTimeRhythm {
 }
 
 impl Rhythm for BeatTimeRhythm {
-    fn pattern_step_length(&self) -> SampleTime {
-        self.step.to_samples(&self.time_base) as SampleTime
+    fn pattern_step_length(&self) -> f64 {
+        self.step.to_samples(&self.time_base)
     }
 
     fn pattern_length(&self) -> usize {
