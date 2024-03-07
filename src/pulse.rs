@@ -20,6 +20,14 @@ pub type PulseStepTime = f64;
 ///
 /// By using pulses with sub divisions, one can create any kind of complex rhythms without
 /// increasing the step resolution.
+/// 
+/// # Examples:
+/// 
+/// ```rust
+/// // Assuming pulse step is 1 beat. 
+/// // Defines a pattern with one quater note followed by a 16th note triplet. 
+/// let pattern = vec![Pulse::from(1), Pulse::from(vec![1, 1, 1])];
+/// ````
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Pulse {
     Pulse(PulseValue),

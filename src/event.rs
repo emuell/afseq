@@ -344,7 +344,7 @@ pub trait EventIter: Iterator<Item = Event> + Debug {
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
-    /// a Rc<RefCell<dyn EventIter>>, but called 'duplicate' to avoid conflicts with possible
+    /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible
     /// Clone impls.
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>>;
 

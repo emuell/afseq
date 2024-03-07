@@ -1,3 +1,5 @@
+//! Wallclock time based `Rhythm` implementations.
+
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{

@@ -12,7 +12,7 @@ pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Interface for a pulse pattern generator as used by [`Rhythm`].
+/// Interface for a pulse pattern generator as used by [Rhythm](`crate::Rhythm`).
 pub trait Pattern: Debug {
     /// Returns if there is a valid pattern. If empty, it can't be run.
     fn is_empty(&self) -> bool {
@@ -35,7 +35,7 @@ pub trait Pattern: Debug {
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
-    /// a Rc<RefCell<dyn EventIter>>, but called 'duplicate' to avoid conflicts with possible
+    /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible
     /// Clone impls.
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>>;
 
