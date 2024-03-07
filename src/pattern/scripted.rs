@@ -140,7 +140,11 @@ impl Pattern for ScriptedPattern {
             }
         };
         self.pulse_iter = Some(self.pulse.clone().into_iter());
-        self.pulse_iter.as_mut().unwrap().next().unwrap()
+        self.pulse_iter
+            .as_mut()
+            .unwrap()
+            .next()
+            .unwrap_or((0.0, 1.0))
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {

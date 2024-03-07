@@ -58,7 +58,11 @@ impl Pattern for FixedPattern {
             self.step = 0;
         }
         self.pulse_iter = Some(self.pulses[self.step].clone().into_iter());
-        self.pulse_iter.as_mut().unwrap().next().unwrap()
+        self.pulse_iter
+            .as_mut()
+            .unwrap()
+            .next()
+            .unwrap_or((0.0, 1.0))
     }
 
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
