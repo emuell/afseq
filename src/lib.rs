@@ -33,9 +33,6 @@ pub use phrase::Phrase;
 pub mod sequence;
 pub use sequence::Sequence;
 
-#[cfg(feature = "tidal")]
-pub mod tidal;
-
 #[cfg(feature = "scripting")]
 pub mod bindings;
 

@@ -1,10 +1,12 @@
+//! PEST parser for tidal mini-notations, based on the TidalCycles mini-notation. WIP!
+
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 
 // --------------------------------------------------------------------------------------------------
 
 #[derive(Parser)]
-#[grammar = "tidal.pest"]
+#[grammar = "rhythm/tidal.pest"]
 pub struct ExprParser;
 
 // --------------------------------------------------------------------------------------------------

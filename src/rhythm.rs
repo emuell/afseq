@@ -12,6 +12,9 @@ use crate::{
 pub mod beat_time;
 pub mod second_time;
 
+#[cfg(feature = "tidal")]
+pub mod tidal;
+
 // -------------------------------------------------------------------------------------------------
 
 /// A `RhythmSampleIter` is an iterator which emits optional [`Event`] in sample-rate resolution.
@@ -57,7 +60,7 @@ pub trait Rhythm: RhythmSampleIter {
     fn set_instrument(&mut self, instrument: Option<InstrumentId>);
 
     /// Create a new cloned instance of this rhythm. This actualy is a clone(), wrapped into
-    /// a Rc<RefCell<dyn Rhythm>>, but called 'duplicate' to avoid conflicts with possible Clone impls.
+    /// a `Rc<RefCell<dyn Rhythm>>`, but called 'duplicate' to avoid conflicts with possible Clone impls.
     fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>>;
     /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);
