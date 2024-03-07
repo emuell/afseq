@@ -567,8 +567,13 @@ pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<Pulse> {
                 })
             }
         }
-        LuaValue::Table(_table) => {
-            unimplemented!();
+        LuaValue::Table(table) => {
+            let sub_div = table
+                .clone()
+                .sequence_values()
+                .map(|result| pattern_pulse_from_value(result?))
+                .collect::<LuaResult<Vec<Pulse>>>()?;
+            Ok(Pulse::from(sub_div))
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),

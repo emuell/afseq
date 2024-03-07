@@ -72,7 +72,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---end,
 ---```
 ---
----@field pattern (0|1|boolean)[]|(fun(context: EmitterContext):(0|1|boolean))|(fun(context: EmitterContext):fun(context: EmitterContext):(0|1|boolean))?
+---@alias Pulse 0|1|boolean|(0|1|boolean)[]
+---@field pattern Pulse[]|(fun(context: EmitterContext):Pulse)|(fun(context: EmitterContext):fun(context: EmitterContext):Pulse)?
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>
@@ -121,7 +122,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---return emitter {
 ---  unit = "1/8",
 ---  resolution = 3/2,
----  pattern = pattern.euclidean(6, 16, 2), 
+---  pattern = pattern.euclidean(6, 16, 2),
 ---  emit = sequence("c7", "c7", note{ "c6", "a3" }:with_volume(0.5))
 ---}
 ---```
