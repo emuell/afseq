@@ -1,6 +1,6 @@
 //! Wallclock time based `Rhythm` implementations.
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
@@ -17,10 +17,11 @@ pub struct SecondTimeRhythm {
     time_base: SecondTimeBase,
     step: SecondTimeStep,
     offset: SecondTimeStep,
-    pattern: Rc<RefCell<dyn Pattern>>,
     instrument: Option<InstrumentId>,
+    pattern: Rc<RefCell<dyn Pattern>>,
     event_iter: Rc<RefCell<dyn EventIter>>,
-    event_iter_sample_time: f64,
+    event_iter_sample_time: SampleTime,
+    event_iter_next_sample_time: f64,
     sample_offset: SampleTime,
 }
 
@@ -31,16 +32,18 @@ impl SecondTimeRhythm {
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
         let instrument = None;
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
-        let event_iter_sample_time = time_base.seconds_to_samples(offset) as f64;
+        let event_iter_sample_time = 0;
+        let event_iter_next_sample_time = offset * time_base.samples_per_second() as f64;
         let sample_offset = 0;
         Self {
             time_base,
             step,
             offset,
-            pattern,
             instrument,
+            pattern,
             event_iter,
             event_iter_sample_time,
+            event_iter_next_sample_time,
             sample_offset,
         }
     }
@@ -65,12 +68,14 @@ impl SecondTimeRhythm {
     /// Apply the given second offset to all events.
     pub fn with_offset<O: Into<Option<SecondTimeStep>>>(&self, offset: O) -> Self {
         let offset = offset.into().unwrap_or(0.0);
-        let event_iter_sample_time = self.time_base.samples_per_second() as f64 * offset;
+        let event_iter_sample_time = 0;
+        let event_iter_next_sample_time = offset * self.time_base.samples_per_second() as f64;
         Self {
             offset,
             pattern: Rc::clone(&self.pattern),
             event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
+            event_iter_next_sample_time,
             ..*self
         }
     }
@@ -149,9 +154,9 @@ impl Iterator for SecondTimeRhythm {
         if pattern.is_empty() {
             None
         } else {
-            let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
+            let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
             let (pulse, pulse_time_step) = pattern.run();
-            let value = if pulse > 0.0 {
+            let event = if pulse > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
                 Some((
                     sample_time,
@@ -160,9 +165,9 @@ impl Iterator for SecondTimeRhythm {
             } else {
                 Some((sample_time, None))
             };
-            self.event_iter_sample_time +=
+            self.event_iter_next_sample_time +=
                 self.step * self.time_base.samples_per_second() as f64 * pulse_time_step;
-            value
+            event
         }
     }
 }
@@ -180,8 +185,11 @@ impl RhythmSampleIter for SecondTimeRhythm {
     }
 
     fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
-        let current_sample_time = self.event_iter_sample_time + self.sample_offset as f64;
-        if (current_sample_time as SampleTime) < sample_time {
+        // memorize target sample time for self.set_time_base updates
+        self.event_iter_sample_time = sample_time;
+        // check if the next event is scheduled before the given target time
+        let next_sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
+        if next_sample_time < sample_time {
             self.next()
         } else {
             None
@@ -199,6 +207,13 @@ impl Rhythm for SecondTimeRhythm {
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        // reschedule next event's sample time to the new time base
+        if self.event_iter_sample_time > 0 {
+            self.event_iter_next_sample_time = self.event_iter_sample_time as f64
+                + (self.event_iter_next_sample_time - self.event_iter_sample_time as f64)
+                    / self.time_base.samples_per_sec as f64
+                    * time_base.samples_per_sec as f64;
+        }
         self.time_base = SecondTimeBase::from(*time_base);
         // update pattern end event iter
         self.pattern.borrow_mut().set_time_base(time_base);
@@ -222,7 +237,8 @@ impl Rhythm for SecondTimeRhythm {
         self.sample_offset = 0;
         // reset iterator state
         self.event_iter.borrow_mut().reset();
-        self.event_iter_sample_time = self.time_base.samples_per_second() as f64 * self.offset;
+        self.event_iter_sample_time = 0;
+        self.event_iter_next_sample_time = self.offset * self.time_base.samples_per_second() as f64;
         self.pattern.borrow_mut().reset();
     }
 }

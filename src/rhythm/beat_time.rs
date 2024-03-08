@@ -20,8 +20,8 @@ pub struct BeatTimeRhythm {
     instrument: Option<InstrumentId>,
     pattern: Rc<RefCell<dyn Pattern>>,
     event_iter: Rc<RefCell<dyn EventIter>>,
-    event_iter_sample_time: f64,
-    event_iter_pos_in_step: f64,
+    event_iter_sample_time: SampleTime,
+    event_iter_next_sample_time: f64,
     sample_offset: SampleTime,
 }
 
@@ -32,8 +32,8 @@ impl BeatTimeRhythm {
         let instrument = None;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
-        let event_iter_sample_time = offset.to_samples(&time_base);
-        let event_iter_pos_in_step = 0.0;
+        let event_iter_sample_time = 0;
+        let event_iter_next_sample_time = offset.to_samples(&time_base);
         let sample_offset = 0;
         Self {
             time_base,
@@ -43,7 +43,7 @@ impl BeatTimeRhythm {
             pattern,
             event_iter,
             event_iter_sample_time,
-            event_iter_pos_in_step,
+            event_iter_next_sample_time,
             sample_offset,
         }
     }
@@ -68,12 +68,14 @@ impl BeatTimeRhythm {
     /// Apply the given beat-time step offset to all events.
     pub fn with_offset<O: Into<Option<BeatTimeStep>>>(&self, offset: O) -> Self {
         let offset = offset.into().unwrap_or(BeatTimeStep::Beats(0.0));
-        let event_iter_sample_time = offset.to_samples(&self.time_base);
+        let event_iter_sample_time = 0;
+        let event_iter_next_sample_time = offset.to_samples(&self.time_base);
         Self {
             offset,
             pattern: Rc::clone(&self.pattern),
             event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
+            event_iter_next_sample_time,
             ..*self
         }
     }
@@ -158,9 +160,9 @@ impl Iterator for BeatTimeRhythm {
         if pattern.is_empty() {
             None
         } else {
-            let sample_time = self.event_iter_sample_time as SampleTime + self.sample_offset;
+            let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
             let (pulse, pulse_time_step) = pattern.run();
-            let value = if pulse > 0.0 {
+            let event = if pulse > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
                 Some((
                     sample_time,
@@ -169,8 +171,9 @@ impl Iterator for BeatTimeRhythm {
             } else {
                 Some((sample_time, None))
             };
-            self.event_iter_sample_time += self.step.to_samples(&self.time_base) * pulse_time_step;
-            value
+            self.event_iter_next_sample_time +=
+                self.step.to_samples(&self.time_base) * pulse_time_step;
+            event
         }
     }
 }
@@ -188,15 +191,13 @@ impl RhythmSampleIter for BeatTimeRhythm {
     }
 
     fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
-        let current_sample_time =
-            (self.event_iter_sample_time + self.sample_offset as f64) as SampleTime;
-        if current_sample_time < sample_time {
-            self.event_iter_pos_in_step = 0.0;
+        // memorize target sample time for self.set_time_base updates
+        self.event_iter_sample_time = sample_time;
+        // check if the next event is scheduled before the given target time
+        let next_sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
+        if next_sample_time < sample_time {
             self.next()
         } else {
-            // memorize how far we're away from the next step as fraction
-            self.event_iter_pos_in_step = (current_sample_time - sample_time) as f64
-                / self.step.samples_per_step(&self.time_base);
             None
         }
     }
@@ -212,12 +213,12 @@ impl Rhythm for BeatTimeRhythm {
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
-        if self.event_iter_pos_in_step > 0.0 {
-            // reschedule next event's sample time to align it to the new time base,
-            // taking into account when exactly the switch happened within a step
-            let step_time_difference =
-                self.step.to_samples(time_base) - self.step.to_samples(&self.time_base);
-            self.event_iter_sample_time += step_time_difference * self.event_iter_pos_in_step;
+        // reschedule next event's sample time to the new time base
+        if self.event_iter_sample_time > 0 {
+            self.event_iter_next_sample_time = self.event_iter_sample_time as f64
+                + (self.event_iter_next_sample_time - self.event_iter_sample_time as f64)
+                    / self.step.to_samples(&self.time_base)
+                    * self.step.to_samples(time_base);
         }
         self.time_base = *time_base;
         // update pattern end event iter
@@ -242,8 +243,8 @@ impl Rhythm for BeatTimeRhythm {
         self.sample_offset = 0;
         // reset iterator state
         self.event_iter.borrow_mut().reset();
-        self.event_iter_sample_time = self.offset.to_samples(&self.time_base);
-        self.event_iter_pos_in_step = 0.0;
+        self.event_iter_sample_time = 0;
+        self.event_iter_next_sample_time = self.offset.to_samples(&self.time_base);
         self.pattern.borrow_mut().reset();
     }
 }
