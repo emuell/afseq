@@ -127,7 +127,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  pattern = pattern.euclidean(6, 16, 2),
 ---  emit = sequence("c7", "c7", note{ "c6", "a3" }:with_volume(0.5))
 ---}
----```
 ---
 -----trigger random notes in a random pattern from a pentatonic scale
 ---local pattern = require "pattern"
@@ -141,6 +140,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---    return { key = scale[math.random(#scale)] }
 ---  end
 ---}
+---```
 ---@param options EmitterOptions
 ---@return userdata
 function emitter(options) end

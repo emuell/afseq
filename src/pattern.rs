@@ -23,8 +23,8 @@ pub trait Pattern: Debug {
     /// self.is_empty will still be true.
     fn len(&self) -> usize;
 
-    /// Run and move the pattern by a single step. Returns the pulse value in range [0, 1] and
-    /// the sub division step the pattern moved along, also in range [0, 1].
+    /// Run and move the pattern by a single step. Returns the pulse value in range `[0, 1]` and
+    /// the sub division step the pattern moved along, also in range `[0, 1]`.
     /// A pulse value of 1 means that an event should be emitted and 0 that no event should be
     /// emitted. Values inbetween 0 and 1 may be treated as probablilities or get clamped,
     /// depending on the rhythm impl which is using the pattern.
