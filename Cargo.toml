@@ -13,7 +13,6 @@ lazy_static = { version = "^1.4" }
 anyhow = { version = "^1.0" }
 paste = { version = "^1.0"}
 derive_more = { version = "^0.99" }
-crossbeam-channel = { version = "^0.5" }
 log = { version = "^0.4" }
 simplelog = { version = "^0.12" }
 serde = { version = "^1.0" }
@@ -27,6 +26,7 @@ dhat = { version = "0.3.2", optional = true }
 # optional -> scripting
 mlua = { version = "^0.9", features = ["lua51", "vendored", "macros", "unstable"], optional = true }
 # optional -> player
+crossbeam-channel = { version = "^0.5", optional = true }
 afplay = { git = "ssh://git@git.renoise.com:2229/nerdbox/afplay.git", default-features = false, features = ["cpal-output"], optional = true }
 
 [dev-dependencies]
@@ -40,7 +40,7 @@ debug = 1
 dhat-profiler = ["dhat"]
 tidal = ["pest", "pest_derive"]
 scripting = ["mlua"]
-player = ["afplay"]
+player = ["crossbeam-channel", "afplay"]
 default = ["scripting", "tidal"]
 
 [[example]]
