@@ -285,7 +285,7 @@ impl SamplePlayer {
     }
 
     fn seek_sequence_until_time(&mut self, sequence: &mut Sequence, sample_time: SampleTime) {
-        sequence.run_until_time(sample_time, &mut |_, _, _| {
+        sequence.run_until_time(sample_time, &mut |_, _, _, _| {
             // ignore all events
         });
     }
@@ -299,7 +299,7 @@ impl SamplePlayer {
         let time_display = sequence.sample_time_display();
         sequence.run_until_time(
             sample_time,
-            &mut |rhythm_index, sample_time, event: Option<Event>| {
+            &mut |rhythm_index, sample_time, event: Option<Event>, event_duration| {
                 // print
                 if self.show_events {
                     const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
@@ -354,11 +354,14 @@ impl SamplePlayer {
                                             rhythm_index: rhythm_index as isize,
                                             voice_index: voice_index as isize,
                                         });
+                                        let sample_delay = (note_event.delay
+                                            * event_duration as f32)
+                                            as SampleTime;
                                         let playback_id = self
                                             .player
                                             .play_file_source_with_context(
                                                 sample,
-                                                Some(start_offset + sample_time),
+                                                Some(start_offset + sample_time + sample_delay),
                                                 Some(context),
                                             )
                                             .expect("Failed to play file source");

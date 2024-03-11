@@ -25,7 +25,11 @@ pub mod tidal;
 /// RhythmIterator impls typically will use a [EventIter][`super::EventIter`] to produce one or
 /// multiple note or parameter change events. The event iter impl is an iterator too, so the
 /// emitted content may dynamically change over time as well.
-pub trait RhythmSampleIter: Iterator<Item = (SampleTime, Option<Event>)> + Debug {
+/// 
+/// Iter item tuple args are: `(sample_time, optional_event, event_duration_in_samples)`.
+pub trait RhythmSampleIter:
+    Iterator<Item = (SampleTime, Option<Event>, SampleTime)> + Debug
+{
     /// Create a sample time display printer, which serializes the given sample time to the Rhythm's
     /// time base as appropriated (in seconds or beats). May be useful for debugging purposes.
     fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay>;
@@ -36,7 +40,10 @@ pub trait RhythmSampleIter: Iterator<Item = (SampleTime, Option<Event>)> + Debug
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
     /// Sample time iter: returns self.next() up and until the given sample time
-    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)>;
+    fn next_until_time(
+        &mut self,
+        sample_time: SampleTime,
+    ) -> Option<(SampleTime, Option<Event>, SampleTime)>;
 }
 
 // -------------------------------------------------------------------------------------------------

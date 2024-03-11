@@ -62,7 +62,7 @@ impl Sequence {
     /// function for all emitted events to consume them.
     pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, SampleTime, Option<Event>),
+        F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
         debug_assert!(
             run_until_time >= self.sample_position,
@@ -114,10 +114,10 @@ impl Sequence {
     fn next_event_until_time(
         &mut self,
         sample_time: SampleTime,
-    ) -> Option<(SampleTime, Option<Event>)> {
+    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
         let event = self.current_phrase_mut().next_until_time(sample_time);
-        if let Some((sample_time, event)) = event {
-            Some((sample_time + self.sample_offset, event))
+        if let Some((sample_time, event, event_duration)) = event {
+            Some((sample_time + self.sample_offset, event, event_duration))
         } else {
             None
         }
@@ -125,7 +125,7 @@ impl Sequence {
 }
 
 impl Iterator for Sequence {
-    type Item = (SampleTime, Option<Event>);
+    type Item = (SampleTime, Option<Event>, SampleTime);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_event_until_time(SampleTime::MAX)
@@ -144,7 +144,10 @@ impl RhythmSampleIter for Sequence {
         self.sample_offset = sample_offset
     }
 
-    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
+    fn next_until_time(
+        &mut self,
+        sample_time: SampleTime,
+    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
         self.next_event_until_time(sample_time)
     }
 }

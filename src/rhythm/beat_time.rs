@@ -153,7 +153,7 @@ impl BeatTimeRhythm {
 }
 
 impl Iterator for BeatTimeRhythm {
-    type Item = (SampleTime, Option<Event>);
+    type Item = (SampleTime, Option<Event>, SampleTime);
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut pattern = self.pattern.borrow_mut();
@@ -162,15 +162,17 @@ impl Iterator for BeatTimeRhythm {
         } else {
             let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
             let pulse = pattern.run();
+            let event_duration = (pulse.step_time * self.pattern_step_length()) as SampleTime;
             let event = if pulse.value > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
                 event_iter.set_context(pulse, pattern.len());
                 Some((
                     sample_time,
                     self.event_with_default_instrument(event_iter.next()),
+                    event_duration,
                 ))
             } else {
-                Some((sample_time, None))
+                Some((sample_time, None, event_duration))
             };
             self.event_iter_next_sample_time +=
                 self.step.to_samples(&self.time_base) * pulse.step_time;
@@ -191,7 +193,10 @@ impl RhythmSampleIter for BeatTimeRhythm {
         self.sample_offset = sample_offset
     }
 
-    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
+    fn next_until_time(
+        &mut self,
+        sample_time: SampleTime,
+    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
         // memorize target sample time for self.set_time_base updates
         self.event_iter_sample_time = sample_time;
         // check if the next event is scheduled before the given target time

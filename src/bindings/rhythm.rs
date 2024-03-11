@@ -114,7 +114,7 @@ mod test {
             ]
         );
         drop(pattern);
-        
+
         let event = beat_time_rhythm.next();
         assert_eq!(
             event,
@@ -126,7 +126,8 @@ mod test {
                     volume: 1.0,
                     panning: 0.0,
                     delay: 0.0
-                })]))
+                })])),
+                11025
             ))
         );
 
@@ -174,7 +175,8 @@ mod test {
                     volume: 1.0,
                     panning: 0.0,
                     delay: 0.0
-                })]))
+                })])),
+                22050,
             ))
         );
     }
@@ -290,7 +292,8 @@ mod test {
                     volume: 1.0,
                     panning: 0.0,
                     delay: 0.0
-                })]))
+                })],),),
+                48
             ))
         );
     }

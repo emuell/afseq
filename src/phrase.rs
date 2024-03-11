@@ -17,8 +17,8 @@ use crate::Sequence;
 
 /// Rhythm index in `RhythmEvent`.
 pub type RhythmIndex = usize;
-/// Event as emitted by Phrase, tagged with a sample time and rhythm index.
-pub type RhythmEvent = (RhythmIndex, SampleTime, Option<Event>);
+/// Event as emitted by Phrase, tagged with a sample time, event duration and rhythm index.
+pub type RhythmEvent = (RhythmIndex, SampleTime, Option<Event>, SampleTime);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -109,14 +109,14 @@ impl Phrase {
     /// function for all emitted events to consume them.
     pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, SampleTime, Option<Event>),
+        F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
         // emit next events until we've reached the desired sample_time
-        while let Some((rhythm_index, sample_time, event)) =
+        while let Some((rhythm_index, sample_time, event, event_duration)) =
             self.next_event_until_time(run_until_time)
         {
             assert!(sample_time < run_until_time);
-            consumer(rhythm_index, sample_time, event);
+            consumer(rhythm_index, sample_time, event, event_duration);
         }
     }
 
@@ -163,10 +163,10 @@ impl Phrase {
                     // NB: Continue mode is resolved by the Sequence - if not, it should behave like Stop
                     RhythmSlot::Stop | RhythmSlot::Continue => *next_event = None,
                     RhythmSlot::Rhythm(rhythm) => {
-                        if let Some((sample_time, event)) =
+                        if let Some((sample_time, event, event_duration)) =
                             rhythm.borrow_mut().next_until_time(sample_time)
                         {
-                            *next_event = Some((rhythm_index, sample_time, event));
+                            *next_event = Some((rhythm_index, sample_time, event, event_duration));
                         } else {
                             *next_event = None;
                         }
@@ -176,8 +176,8 @@ impl Phrase {
         }
         // select the next from all pre-fetched events with the smallest sample time
         let next_due = self.next_events.iter_mut().reduce(|min, next| {
-            if let Some((_, min_sample_time, _)) = min {
-                if let Some((_, next_sample_time, _)) = next {
+            if let Some((_, min_sample_time, _, _)) = min {
+                if let Some((_, next_sample_time, _, _)) = next {
                     match min_sample_time.cmp(&next_sample_time) {
                         Ordering::Less | Ordering::Equal => min,
                         Ordering::Greater => next,
@@ -190,10 +190,16 @@ impl Phrase {
             }
         });
         if let Some(next_due) = next_due {
-            if let Some((rhythm_index, event_sample_time, event)) = next_due.clone() {
+            if let Some((rhythm_index, event_sample_time, event, event_duration)) = next_due.clone()
+            {
                 if event_sample_time < sample_time {
                     *next_due = None; // consume
-                    Some((rhythm_index, self.sample_offset + event_sample_time, event))
+                    Some((
+                        rhythm_index,
+                        self.sample_offset + event_sample_time,
+                        event,
+                        event_duration,
+                    ))
                 } else {
                     None // not yet due
                 }
@@ -207,11 +213,13 @@ impl Phrase {
 }
 
 impl Iterator for Phrase {
-    type Item = (SampleTime, Option<Event>);
+    type Item = (SampleTime, Option<Event>, SampleTime);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((_, sample_time, event)) = self.next_event_until_time(SampleTime::MAX) {
-            Some((sample_time, event))
+        if let Some((_, sample_time, event, event_duration)) =
+            self.next_event_until_time(SampleTime::MAX)
+        {
+            Some((sample_time, event, event_duration))
         } else {
             None
         }
@@ -230,9 +238,14 @@ impl RhythmSampleIter for Phrase {
         self.sample_offset = sample_offset
     }
 
-    fn next_until_time(&mut self, sample_time: SampleTime) -> Option<(SampleTime, Option<Event>)> {
-        if let Some((_, sample_time, event)) = self.next_event_until_time(sample_time) {
-            Some((sample_time, event))
+    fn next_until_time(
+        &mut self,
+        sample_time: SampleTime,
+    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
+        if let Some((_, sample_time, event, event_duration)) =
+            self.next_event_until_time(sample_time)
+        {
+            Some((sample_time, event, event_duration))
         } else {
             None
         }
