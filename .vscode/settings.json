@@ -1,4 +1,5 @@
 {
+    "rust-analyzer.cargo.features": "all",
     "Lua.runtime.version": "Lua 5.1",
     "Lua.runtime.builtin": {
         "debug": "disable",
