@@ -3,8 +3,11 @@ use std::{cell::RefCell, rc::Rc};
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{initialize_emitter_context, pattern_pulse_from_lua, LuaTimeoutHook},
-    BeatTimeBase, Pattern, Pulse, PulseIter, PulseStepTime, PulseValue,
+    bindings::{
+        initialize_context_step_count, initialize_context_time_base, initialize_pattern_context,
+        pattern_pulse_from_lua, LuaTimeoutHook,
+    },
+    BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -42,7 +45,7 @@ impl ScriptedPattern {
         // create a new function context
         let step_count = 0;
         let mut function_context = lua.create_table()?.into_owned();
-        initialize_emitter_context(&mut function_context, step_count, time_base)?;
+        initialize_pattern_context(&mut function_context, time_base, step_count)?;
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
         timeout_hook.reset();
@@ -55,8 +58,8 @@ impl ScriptedPattern {
             let function_environment = function.environment().map(|env| env.into_owned());
             let function_generator = Some(function.into_owned());
             let function = inner_function.clone().into_owned();
-            let result = function.call::<_, LuaValue>(function_context.to_ref())?;
-            let pulse = pattern_pulse_from_lua(result)?;
+            let pulse =
+                pattern_pulse_from_lua(function.call::<_, LuaValue>(function_context.to_ref())?)?;
             let pulse_iter = Some(pulse.clone().into_iter());
             Ok(Self {
                 timeout_hook,
@@ -94,9 +97,7 @@ impl ScriptedPattern {
         // move step counter and update context
         if move_step {
             self.step_count += 1;
-            self.function_context
-                .to_ref()
-                .raw_set("step", self.step_count + 1)?;
+            initialize_context_step_count(&mut self.function_context, self.step_count)?;
         }
         // call function with context and evaluate the result
         let result = self
@@ -108,16 +109,26 @@ impl ScriptedPattern {
 
 impl Pattern for ScriptedPattern {
     fn is_empty(&self) -> bool {
-        // not empty
         false
     }
 
     fn len(&self) -> usize {
-        // unknown length
-        0
+        if let Some(pulse_iter) = &self.pulse_iter {
+            pulse_iter.len()
+        } else {
+            1
+        }
     }
 
-    fn run(&mut self) -> (PulseValue, PulseStepTime) {
+    fn peek(&self) -> PulseIterItem {
+        if let Some(mut pulse_iter) = self.pulse_iter.clone() {
+            pulse_iter.next().unwrap_or_default()
+        } else {
+            PulseIterItem::default()
+        }
+    }
+
+    fn run(&mut self) -> PulseIterItem {
         // if we have a pulse iterator, consume it
         if let Some(pulse_iter) = &mut self.pulse_iter {
             if let Some(pulse) = pulse_iter.next() {
@@ -139,19 +150,15 @@ impl Pattern for ScriptedPattern {
                 Pulse::from(0.0)
             }
         };
-        self.pulse_iter = Some(self.pulse.clone().into_iter());
-        self.pulse_iter
-            .as_mut()
-            .unwrap()
-            .next()
-            .unwrap_or((0.0, 1.0))
+        let mut pulse_iter = self.pulse.clone().into_iter();
+        let pulse = pulse_iter.next().unwrap_or(PulseIterItem::default());
+        self.pulse_iter = Some(pulse_iter);
+        pulse
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
-        if let Err(err) =
-            initialize_emitter_context(&mut self.function_context, self.step_count, time_base)
-        {
+        if let Err(err) = initialize_context_time_base(&mut self.function_context, time_base) {
             log::warn!(
                 "Failed to update context for custom pattern function '{}': {}",
                 function_name(&self.function),
@@ -170,10 +177,7 @@ impl Pattern for ScriptedPattern {
         // reset step counter
         self.step_count = 0;
         // update step in context
-        if let Err(err) = self
-            .function_context
-            .to_ref()
-            .raw_set("step", self.step_count + 1)
+        if let Err(err) = initialize_context_step_count(&mut self.function_context, self.step_count)
         {
             log::warn!(
                 "Failed to update context for custom pattern function '{}': {}",

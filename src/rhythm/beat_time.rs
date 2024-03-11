@@ -161,9 +161,10 @@ impl Iterator for BeatTimeRhythm {
             None
         } else {
             let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-            let (pulse, pulse_time_step) = pattern.run();
-            let event = if pulse > 0.0 {
+            let pulse = pattern.run();
+            let event = if pulse.value > 0.0 {
                 let mut event_iter = self.event_iter.borrow_mut();
+                event_iter.set_context(pulse, pattern.len());
                 Some((
                     sample_time,
                     self.event_with_default_instrument(event_iter.next()),
@@ -172,7 +173,7 @@ impl Iterator for BeatTimeRhythm {
                 Some((sample_time, None))
             };
             self.event_iter_next_sample_time +=
-                self.step.to_samples(&self.time_base) * pulse_time_step;
+                self.step.to_samples(&self.time_base) * pulse.step_time;
             event
         }
     }

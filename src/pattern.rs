@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
-use crate::{BeatTimeBase, PulseStepTime, PulseValue};
+use crate::{BeatTimeBase, PulseIterItem};
 
 pub mod empty;
 pub mod euclidean;
@@ -23,12 +23,10 @@ pub trait Pattern: Debug {
     /// self.is_empty will still be true.
     fn len(&self) -> usize;
 
-    /// Run and move the pattern by a single step. Returns the pulse value in range `[0, 1]` and
-    /// the sub division step the pattern moved along, also in range `[0, 1]`.
-    /// A pulse value of 1 means that an event should be emitted and 0 that no event should be
-    /// emitted. Values inbetween 0 and 1 may be treated as probablilities or get clamped,
-    /// depending on the rhythm impl which is using the pattern.
-    fn run(&mut self) -> (PulseValue, PulseStepTime);
+    /// Returns the next pulse in the pattern without running it.
+    fn peek(&self) -> PulseIterItem;
+    /// Run and move the pattern by a single step and return the to emitted pulse.
+    fn run(&mut self) -> PulseIterItem;
 
     /// Set or update the pattern's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`

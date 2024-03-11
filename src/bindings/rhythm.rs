@@ -94,9 +94,27 @@ mod test {
         let mut pattern = pattern.borrow_mut();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
-            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
+            vec![
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                }
+            ]
         );
         drop(pattern);
+        
         let event = beat_time_rhythm.next();
         assert_eq!(
             event,
@@ -116,16 +134,25 @@ mod test {
         let beat_time_rhythm = lua
             .load(
                 r#"
-                local function validate_context(context) 
+                local pattern_step, emitter_step = 1, 1
+                local function validate_context(context, step) 
                     assert(context.beats_per_min == 120)
                     assert(context.beats_per_bar == 4)
                     assert(context.sample_rate == 44100)
-                    assert(context.step > 0)
+                    assert(context.step == step)
                 end 
                 return emitter {
                     unit = "1/4",
-                    pattern = function(context) validate_context(context); return 1; end,
-                    emit = function(context) validate_context(context); return "c4"; end
+                    pattern = function(context)
+                      validate_context(context, pattern_step)
+                      pattern_step = pattern_step + 1
+                      return 1
+                    end,
+                    emit = function(context)
+                      validate_context(context, emitter_step)
+                      emitter_step = emitter_step + 1
+                      return "c4"
+                    end
                 }
             "#,
             )
@@ -198,7 +225,24 @@ mod test {
         let mut pattern = pattern.borrow_mut();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
-            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
+            vec![
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                }
+            ]
         );
         drop(pattern);
 
@@ -206,16 +250,25 @@ mod test {
         let second_time_rhythm = lua
             .load(
                 r#"
-                local function validate_context(context) 
+                local pattern_step, emitter_step = 1, 1
+                local function validate_context(context, step) 
                     assert(context.beats_per_min == 130)
                     assert(context.beats_per_bar == 8)
                     assert(context.sample_rate == 48000)
-                    assert(context.step > 0)
+                    assert(context.step == step)
                 end 
                 return emitter {
                     unit = "ms",
-                    pattern = function(context) validate_context(context); return 1; end,
-                    emit = function(context) validate_context(context); return "c4"; end
+                    pattern = function(context)
+                      validate_context(context, pattern_step)
+                      pattern_step = pattern_step + 1
+                      return 1
+                    end,
+                    emit = function(context)
+                      validate_context(context, emitter_step)
+                      emitter_step = emitter_step + 1
+                      return "c4"
+                    end
                 }
             "#,
             )

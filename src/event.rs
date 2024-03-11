@@ -1,6 +1,6 @@
 //! Events and event iterators which get emitted by a `Rhythm`.
 
-use crate::{BeatTimeBase, Note};
+use crate::{BeatTimeBase, Note, PulseIterItem};
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use derive_more::{Deref, Display, From, Into};
@@ -342,6 +342,9 @@ pub trait EventIter: Iterator<Item = Event> + Debug {
     /// Update the iterator's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
+
+    /// Set optional pulse context for the next iteration step.
+    fn set_context(&mut self, context: PulseIterItem, pulse_count: usize);
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible

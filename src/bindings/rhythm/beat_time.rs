@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use mlua::prelude::*;
 
 use super::super::{unwrap::*, LuaTimeoutHook};
@@ -17,15 +19,20 @@ impl BeatTimeRhythm {
         time_base: &BeatTimeBase,
         table: LuaTable,
     ) -> LuaResult<BeatTimeRhythm> {
-        let resolution = table.get::<&str, f32>("resolution").unwrap_or(1.0);
-        if resolution <= 0.0 {
-            return Err(bad_argument_error(
-                "emit",
-                "resolution",
-                1,
-                "resolution must be > 0",
-            ));
+        // resolution
+        let mut resolution = 1.0;
+        if table.contains_key("resolution")? {
+            resolution = table.get::<&str, f32>("resolution")?;
+            if resolution <= 0.0 {
+                return Err(bad_argument_error(
+                    "emit",
+                    "resolution",
+                    1,
+                    "resolution must be > 0",
+                ));
+            }
         }
+        // step
         let mut step = BeatTimeStep::Beats(resolution);
         if table.contains_key("unit")? {
             let unit = table.get::<&str, String>("unit")?;
@@ -40,19 +47,24 @@ impl BeatTimeRhythm {
                 "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
+        // create a new BeatTimeRhythm with the given time base and step
         let mut rhythm = BeatTimeRhythm::new(*time_base, step);
+        // offset
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")?;
             rhythm = rhythm.with_offset_in_step(offset);
         }
+        // pattern
+        let mut pattern = rhythm.pattern();
         if table.contains_key("pattern")? {
             let value = table.get::<&str, LuaValue>("pattern")?;
-            let pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
-            rhythm = rhythm.with_pattern_dyn(pattern);
+            pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
+            rhythm = rhythm.with_pattern_dyn(Rc::clone(&pattern));
         }
+        // emit
         if table.contains_key("emit")? {
             let value = table.get::<&str, LuaValue>("emit")?;
-            let iter = event_iter_from_value(lua, timeout_hook, value, time_base)?;
+            let iter = event_iter_from_value(lua, timeout_hook, value, time_base, pattern)?;
             rhythm = rhythm.trigger_dyn(iter);
         }
         Ok(rhythm)

@@ -6,22 +6,41 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to `emit` and `pattern` functions/generators.
----@class EmitterContext
------TODO: @field playing boolean Transport playback running.
----@field beats_per_min number Project's tempo in beats per minutes.
----@field beats_per_bar integer Project's beats per bar setting.
----@field sample_rate integer Project's sample rate in samples per second.
+---Context passed to `pattern` functions/generators.
+---@class PatternContext
+-----Transport playback running.
+-----TODO: @field playing boolean
+-----Project's tempo in beats per minutes.
+---@field beats_per_min number
+-----Project's beats per bar setting.
+---@field beats_per_bar integer
+-----Project's sample rate in samples per second.
+---@field sample_rate integer
 ---
------TODO: @field trigger_note integer? Note value that triggered, started the emitter, if any.
------TODO: @field trigger_volume number? Note volume that triggered, started the emitter, if any.
------TODO: @field trigger_offset integer? Note slice offset value that triggered, started the emitter, if any.
+---Continues step counter, incrementing with each new emitted value. 
+---Starts from 1 when the emitter starts running or is reset.
+---@field step integer
+
+----------------------------------------------------------------------------------------------------
+
+---Context passed to 'emit' functions/generators.
+---@class EmitterContext : PatternContext
 ---
----@field step integer Continues step counter. Starting with 1 when the emitter starts running.
------TODO: @field sample_pos integer absolute project sample time
------TODO: @field beat_pos number Project playhead's absolute beat time.
----
------TODO: @field macro_values number[] External input macro values automation.
+---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
+---will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
+---subdivision, relative to the parent subdivisions pulse step time.
+---### Example
+---```lua
+---{1, {1, 1}} --> step times: {1, {0.5, 0.5}}
+---```
+---@field step_time number
+---Current pulse value. For binary pulses this will be 1, 0 pulse values will not cause the emitter
+---to be called, so they never end up here.
+---Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
+---@field step_value number
+---Number of steps in the pattern, aka 'pattern_length'. When the pattern is a function or genenator
+---this will only count the number of subdivisions in the currently emitted pulse. 
+---@field step_count integer
 
 ----------------------------------------------------------------------------------------------------
 
@@ -42,8 +61,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---unit = "beats", resolution = 1.01 --> slightly off beat pulse
 ---unit = "1/16", resolution = 4/3 --> tripplet
 ---```
----
 ---@field resolution number?
+---
 ---Specify the rythmical pattern of the emitter. Each non zero pulse in the pattern will
 ---cause an event from the emitter property to be triggered in the emitters time unit.
 ---
@@ -73,9 +92,9 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  end
 ---end,
 ---```
----
 ---@alias Pulse (0|1|boolean)|(Pulse)[]
----@field pattern Pulse[]|(fun(context: EmitterContext):Pulse)|(fun(context: EmitterContext):fun(context: EmitterContext):Pulse)?
+---@field pattern Pulse[]|(fun(context: PatternContext):Pulse)|(fun(context: PatternContext):fun(context: PatternContext):Pulse)?
+---
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>
@@ -101,7 +120,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  end
 ---end
 ---```
----
 ---@field emit Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun(context: EmitterContext):NoteValue)|(fun(context: EmitterContext):fun(context: EmitterContext):NoteValue)
 
 
@@ -116,7 +134,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  unit = "bars",
 ---  resolution = 4,
 ---  offset = 16,
----  emit = sequence("c-4'm", note("g-3'm7"):transpose({0, 12, 0, 0}))
+---  emit = sequence("c4'm", note("g3'm7"):transpose({0, 12, 0, 0}))
 ---}
 ---
 -----trigger c3 notes in an euclidean tripplet pattern

@@ -1,19 +1,31 @@
 local pattern = require "pattern"
 
+---comment
+---@param index integer
+---@param size integer
+---@return integer
+local function iwrap(index, size)
+  return (index - 1) % size + 1
+end
+
 return emitter {
-  unit = "1/16",
-  offset = 16 * 8,
-  pattern = pattern.euclidean(14, 16, 6),
-  emit = function(initial_context)
-    ---@param context EmitterContext
-    return function(context)
-      local volume = 1.0 - (context.step % 4) / 4.0
-      local key = "c6"
-      if context.step % 3 == 0 then
-        key = "c5"
-        volume = volume * 0.6
+  unit = "1/4",
+  pattern = function(context)
+    if iwrap(context.step, 8) == 1 then
+      return { 1, 1, 1 }
+    else
+      if math.random() > 0.9 then
+        return { 1, 1 }
+      else 
+        return { 1 }
       end
-      return { key = key, volume = volume }
     end
+  end,
+  emit = function(context)
+    local key = "c6"
+    if iwrap(context.step, context.step_count) == 3 then
+      key = "c5"
+    end
+    return { key = key }
   end
 }

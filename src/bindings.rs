@@ -32,7 +32,7 @@ use crate::{
     event::{InstrumentId, NoteEvent},
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::BeatTimeBase,
-    Pulse, Scale,
+    Pulse, PulseIterItem, Scale,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -211,17 +211,64 @@ pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<Pulse> {
     unwrap::pattern_pulse_from_value(value)
 }
 
-/// Initialize table passed as context to emitter and pattern functions
-pub(crate) fn initialize_emitter_context(
+// -------------------------------------------------------------------------------------------------
+
+/// Set or update the time base of the given emitter context.
+pub(crate) fn initialize_context_time_base(
     table: &mut LuaOwnedTable,
-    step_count: usize,
     time_info: &BeatTimeBase,
 ) -> LuaResult<()> {
     let table = table.to_ref();
     table.raw_set("beats_per_min", time_info.beats_per_min)?;
     table.raw_set("beats_per_bar", time_info.beats_per_bar)?;
     table.raw_set("sample_rate", time_info.samples_per_sec)?;
-    table.raw_set("step", step_count + 1)?;
+    Ok(())
+}
+
+/// Set or update the step counter of the given emitter context.
+pub(crate) fn initialize_context_step_count(
+    table: &mut LuaOwnedTable,
+    pulse_step: usize,
+) -> LuaResult<()> {
+    let table = table.to_ref();
+    table.raw_set("step", pulse_step + 1)?;
+    Ok(())
+}
+
+/// Set or update the time base and step counter of the given emitter context.
+pub(crate) fn initialize_pattern_context(
+    table: &mut LuaOwnedTable,
+    time_info: &BeatTimeBase,
+    pulse_step: usize,
+) -> LuaResult<()> {
+    initialize_context_time_base(table, time_info)?;
+    initialize_context_step_count(table, pulse_step)?;
+    Ok(())
+}
+
+/// Set or update the pulse value of the given emitter context.
+pub(crate) fn initialize_context_pulse_value(
+    table: &mut LuaOwnedTable,
+    pulse: PulseIterItem,
+    pulse_count: usize,
+) -> LuaResult<()> {
+    let table = table.to_ref();
+    table.raw_set("step_value", pulse.value)?;
+    table.raw_set("step_time", pulse.step_time)?;
+    table.raw_set("step_count", pulse_count)?;
+    Ok(())
+}
+
+/// Set or update the time base, step counter and pattern context of the given emitter context.
+pub(crate) fn initialize_emitter_context(
+    table: &mut LuaOwnedTable,
+    time_info: &BeatTimeBase,
+    pulse_step: usize,
+    pulse: PulseIterItem,
+    pulse_count: usize,
+) -> LuaResult<()> {
+    initialize_pattern_context(table, time_info, pulse_step)?;
+    initialize_context_pulse_value(table, pulse, pulse_count)?;
     Ok(())
 }
 

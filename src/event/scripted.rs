@@ -3,8 +3,12 @@ use std::{cell::RefCell, rc::Rc};
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{initialize_emitter_context, new_note_events_from_lua, LuaTimeoutHook},
-    BeatTimeBase, Event, EventIter,
+    bindings::{
+        initialize_context_pulse_value, initialize_context_step_count,
+        initialize_context_time_base, initialize_emitter_context, new_note_events_from_lua,
+        LuaTimeoutHook,
+    },
+    BeatTimeBase, Event, EventIter, Pattern, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -28,7 +32,7 @@ pub struct ScriptedEventIter {
     function_context: LuaOwnedTable,
     function: LuaOwnedFunction,
     step_count: usize,
-    event: Option<Event>,
+    initial_event: Option<Event>,
 }
 
 impl ScriptedEventIter {
@@ -37,14 +41,22 @@ impl ScriptedEventIter {
         timeout_hook: &LuaTimeoutHook,
         function: LuaFunction<'_>,
         time_base: &BeatTimeBase,
+        pattern: Rc<RefCell<dyn Pattern>>,
     ) -> LuaResult<Self> {
-        // create a new function context
-        let step_count = 0;
-        let mut function_context = lua.create_table()?.into_owned();
-        initialize_emitter_context(&mut function_context, step_count, time_base)?;
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
         timeout_hook.reset();
+        // create a new function context
+        let step_count = 0;
+        let mut function_context = lua.create_table()?.into_owned();
+        let pattern = pattern.borrow();
+        initialize_emitter_context(
+            &mut function_context,
+            time_base,
+            step_count,
+            pattern.peek(),
+            pattern.len(),
+        )?;
         // immediately fetch/evaluate the first event and get its environment, so we can immediately
         // show errors from the function and can reset the environment later on to this state.
         let result = function.call::<_, LuaValue>(function_context.to_ref())?;
@@ -55,7 +67,7 @@ impl ScriptedEventIter {
             let function_generator = Some(function.into_owned());
             let function = inner_function.clone().into_owned();
             let result = function.call::<_, LuaValue>(function_context.to_ref())?;
-            let event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
+            let initial_event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
             Ok(Self {
                 timeout_hook,
                 function_environment,
@@ -63,14 +75,14 @@ impl ScriptedEventIter {
                 function_context,
                 function,
                 step_count,
-                event,
+                initial_event,
             })
         } else {
             // function returned an event. use this function.
             let function_environment = None;
             let function_generator = None;
             let function = function.into_owned();
-            let event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
+            let initial_event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
             Ok(Self {
                 timeout_hook,
                 function_environment,
@@ -78,7 +90,7 @@ impl ScriptedEventIter {
                 function_context,
                 function,
                 step_count,
-                event,
+                initial_event,
             })
         }
     }
@@ -89,9 +101,7 @@ impl ScriptedEventIter {
         // move step counter and update context
         if move_step {
             self.step_count += 1;
-            self.function_context
-                .to_ref()
-                .raw_set("step", self.step_count + 1)?;
+            initialize_context_step_count(&mut self.function_context, self.step_count)?;
         }
         // call function with context and evaluate result
         let result = self
@@ -105,29 +115,47 @@ impl Iterator for ScriptedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let event = self.event.clone();
-        let move_step = true;
-        self.event = match self.next_event(move_step) {
-            Ok(event) => Some(event),
-            Err(err) => {
-                self.event = None;
-                log::warn!(
-                    "Failed to run custom event emitter func '{}': {}",
-                    function_name(&self.function),
-                    err
-                );
-                None
+        if let Some(initial_event) = self.initial_event.take() {
+            // consume initial event on first run
+            Some(initial_event)
+        } else {
+            // else move on and fetch next event
+            let move_step = true;
+            match self.next_event(move_step) {
+                Ok(event) => Some(event),
+                Err(err) => {
+                    log::warn!(
+                        "Failed to run custom event emitter func '{}': {}",
+                        function_name(&self.function),
+                        err
+                    );
+                    None
+                }
             }
-        };
-        event
+        }
     }
 }
 
 impl EventIter for ScriptedEventIter {
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        // reset timeout
+        self.timeout_hook.reset();
         // update function context with the new time base
+        if let Err(err) = initialize_context_time_base(&mut self.function_context, time_base) {
+            log::warn!(
+                "Failed to update context for custom event iter function '{}': {}",
+                function_name(&self.function),
+                err
+            );
+        }
+    }
+
+    fn set_context(&mut self, pulse: PulseIterItem, pulse_count: usize) {
+        // reset timeout
+        self.timeout_hook.reset();
+        // update function context with the new pulse
         if let Err(err) =
-            initialize_emitter_context(&mut self.function_context, self.step_count, time_base)
+            initialize_context_pulse_value(&mut self.function_context, pulse, pulse_count)
         {
             log::warn!(
                 "Failed to update context for custom event iter function '{}': {}",
@@ -135,7 +163,6 @@ impl EventIter for ScriptedEventIter {
                 err
             );
         }
-        // TODO: rerun the generator with new context?
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
@@ -147,11 +174,7 @@ impl EventIter for ScriptedEventIter {
         self.timeout_hook.reset();
         // reset step counter
         self.step_count = 0;
-        // update step in context
-        if let Err(err) = self
-            .function_context
-            .to_ref()
-            .raw_set("step", self.step_count + 1)
+        if let Err(err) = initialize_context_step_count(&mut self.function_context, self.step_count)
         {
             log::warn!(
                 "Failed to update context for custom pattern function '{}': {}",
@@ -197,10 +220,10 @@ impl EventIter for ScriptedEventIter {
         }
         // and set new initial event
         let move_step = false;
-        self.event = match self.next_event(move_step) {
+        self.initial_event = None;
+        self.initial_event = match self.next_event(move_step) {
             Ok(event) => Some(event),
             Err(err) => {
-                self.event = None;
                 log::warn!(
                     "Failed to run custom event emitter func '{}': {}",
                     function_name(&self.function),

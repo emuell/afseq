@@ -19,7 +19,7 @@ pub mod event;
 pub use event::{Event, EventIter};
 
 pub mod pulse;
-pub use pulse::{Pulse, PulseIter, PulseStepTime, PulseValue};
+pub use pulse::{Pulse, PulseIter, PulseIterItem};
 
 pub mod pattern;
 pub use pattern::Pattern;

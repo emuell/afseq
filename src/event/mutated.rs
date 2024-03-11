@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter},
-    BeatTimeBase,
+    BeatTimeBase, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -79,6 +79,10 @@ impl Iterator for MutatedEventIter {
 
 impl EventIter for MutatedEventIter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
+    fn set_context(&mut self, _context: PulseIterItem, _pulse_count: usize) {
         // nothing to do
     }
 

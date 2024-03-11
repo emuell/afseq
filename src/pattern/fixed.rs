@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseStepTime, PulseValue};
+use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -8,8 +8,8 @@ use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseStepTime, PulseValue};
 #[derive(Clone, Debug)]
 pub struct FixedPattern {
     pulses: Vec<Pulse>,
+    pulse_index: usize,
     pulse_iter: Option<PulseIter>,
-    step: usize,
 }
 
 impl Default for FixedPattern {
@@ -29,22 +29,30 @@ impl FixedPattern {
             .into_iter()
             .map(|v| Pulse::from(v))
             .collect::<Vec<_>>();
+        let pulse_index = 0;
         let pulse_iter = pulses.first().map(|pulse| pulse.clone().into_iter());
-        let step = 0;
         FixedPattern {
             pulses,
+            pulse_index,
             pulse_iter,
-            step,
         }
     }
 }
 
 impl Pattern for FixedPattern {
     fn len(&self) -> usize {
-        self.pulses.len()
+        self.pulses.iter().fold(0, |sum, pulse| sum + pulse.len())
     }
 
-    fn run(&mut self) -> (PulseValue, PulseStepTime) {
+    fn peek(&self) -> PulseIterItem {
+        if let Some(mut pulse_iter) = self.pulse_iter.clone() {
+            pulse_iter.next().unwrap_or_default()
+        } else {
+            PulseIterItem::default()
+        }
+    }
+
+    fn run(&mut self) -> PulseIterItem {
         assert!(!self.is_empty(), "Can't run empty patterns");
         // if we have a pulse iterator, consume it
         if let Some(pulse_iter) = &mut self.pulse_iter {
@@ -53,16 +61,15 @@ impl Pattern for FixedPattern {
             }
         }
         // else move on to the next pulse
-        self.step += 1;
-        if self.step >= self.pulses.len() {
-            self.step = 0;
+        self.pulse_index += 1;
+        if self.pulse_index >= self.pulses.len() {
+            self.pulse_index = 0;
         }
-        self.pulse_iter = Some(self.pulses[self.step].clone().into_iter());
-        self.pulse_iter
-            .as_mut()
-            .unwrap()
-            .next()
-            .unwrap_or((0.0, 1.0))
+        // reset pulse iter and fetch first pulse from it
+        let mut pulse_iter = self.pulses[self.pulse_index].clone().into_iter();
+        let pulse = pulse_iter.next().unwrap_or(PulseIterItem::default());
+        self.pulse_iter = Some(pulse_iter);
+        pulse
     }
 
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
@@ -74,8 +81,12 @@ impl Pattern for FixedPattern {
     }
 
     fn reset(&mut self) {
-        self.step = 0;
-        self.pulse_iter = self.pulses.first().map(|pulse| pulse.clone().into_iter());
+        self.pulse_index = 0;
+        if self.pulses.is_empty() {
+            self.pulse_iter = None;
+        } else {
+            self.pulse_iter = Some(self.pulses[self.pulse_index].clone().into_iter());
+        }
     }
 }
 
@@ -117,7 +128,24 @@ mod test {
         let mut pattern = [1.0, 0.0, 1.0, 0.0].to_pattern();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
-            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
+            vec![
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                }
+            ]
         );
 
         pattern = [
@@ -135,7 +163,28 @@ mod test {
                 pattern.run(),
                 pattern.run()
             ],
-            vec![(1.0, 1.0), (0.0, 1.0), (1.0, 0.5), (1.0, 0.5), (0.0, 1.0)]
+            vec![
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 0.5,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 0.5,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                }
+            ]
         );
 
         pattern = [
@@ -155,12 +204,30 @@ mod test {
                 pattern.run()
             ],
             vec![
-                (1.0, 1.0),
-                (0.0, 1.0),
-                (0.0, 0.25),
-                (1.0, 0.25),
-                (1.0, 0.5),
-                (0.0, 1.0)
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 0.25,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 0.25,
+                },
+                PulseIterItem {
+                    value: 1.0,
+                    step_time: 0.5,
+                },
+                PulseIterItem {
+                    value: 0.0,
+                    step_time: 1.0,
+                }
             ]
         );
     }
