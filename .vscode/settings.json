@@ -8,5 +8,6 @@
     },
     "Lua.workspace.library": [
         "types/nerdo"
-    ]
+    ],
+    "Lua.hint.arrayIndex": "Disable"
 }
