@@ -44,6 +44,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
+---Single pulse value or a nested subdivion of pulses within a pattern.
+---@alias Pulse (0|1|number|boolean|nil)|(Pulse)[]
+
+----------------------------------------------------------------------------------------------------
+
 ---Construction options for a new emitter.
 ---@class EmitterOptions
 ---
@@ -63,11 +68,20 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field resolution number?
 ---
----Specify the rythmical pattern of the emitter. Each non zero pulse in the pattern will
----cause an event from the emitter property to be triggered in the emitters time unit.
+---Specify the rythmical pattern of the emitter. Each pulse with a value of 1 or true 
+---will cause an event from the `emitter` property to be triggered in the emitters 
+---time unit. 0 or nil values never trigger, and values inbetween do *maybe* trigger.
 ---
----When not defined, a constant pulse of `1` is triggered.
----Patterns are repeated endlessly by default.
+---To create deterministic random patterns, seed the random number generator before 
+---creating the emitter via `math.randomseed(some_seed)` 
+---
+---Patterns can contains subdivisions, sub tables of pulses, to "cram" multiple pulses
+---into a single pulse's time interval. This way more complex rhythmical patterns can
+---be created.  
+---
+---When no pattern is defined, a constant pulse of `1` is triggered by the emitter.
+---
+---Patterns are repeated endlessly.
 ---
 ---Just like the `emitter` property, patterns can either be a fixed array of values or a
 ---function or generator which produce values dynamically.
@@ -78,13 +92,15 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
----pattern = {1, {1, 1, 1}} -- sub divisions
+---pattern = { 1, 0, 0.5, 0.9 }, -- maybe trigger with probabilities
 ---
----pattern = function(_context)  -- function
+---pattern = {1, {1, 1, 1}} -- "cram" pulses via subdivisions
+---
+---pattern = function(_context)  -- dynamic function
 ---  return math.random(0, 1)
 ---end
 ---
----pattern = function (initial_context) --- generator
+---pattern = function (initial_context) --- dynamic generator
 ---  local pattern = table.create({0, 6, 10})
 ---  ---@param context EmitterContext
 ---  return function (context)
@@ -92,7 +108,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  end
 ---end,
 ---```
----@alias Pulse (0|1|boolean)|(Pulse)[]
 ---@field pattern Pulse[]|(fun(context: PatternContext):Pulse)|(fun(context: PatternContext):fun(context: PatternContext):Pulse)?
 ---
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the

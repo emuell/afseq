@@ -2,6 +2,9 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+use rand::{thread_rng, Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
+
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
     pattern::{fixed::FixedPattern, Pattern},
@@ -23,11 +26,17 @@ pub struct BeatTimeRhythm {
     event_iter_sample_time: SampleTime,
     event_iter_next_sample_time: f64,
     sample_offset: SampleTime,
+    rand: Xoshiro256PlusPlus,
 }
 
 impl BeatTimeRhythm {
     /// Create a new pattern based emitter which emits `value` every beat_time `step`.  
     pub fn new(time_base: BeatTimeBase, step: BeatTimeStep) -> Self {
+        Self::new_with_seed(time_base, step, thread_rng().gen())
+    }
+    /// Create a new pattern based emitter which emits `value` every beat_time `step`,
+    /// initializing the internal random number generator with the specified seed value.
+    pub fn new_with_seed(time_base: BeatTimeBase, step: BeatTimeStep, seed: [u8; 32]) -> Self {
         let offset = BeatTimeStep::Beats(0.0);
         let instrument = None;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
@@ -35,6 +44,7 @@ impl BeatTimeRhythm {
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
         let sample_offset = 0;
+        let rand = Xoshiro256PlusPlus::from_seed(seed);
         Self {
             time_base,
             step,
@@ -45,6 +55,7 @@ impl BeatTimeRhythm {
             event_iter_sample_time,
             event_iter_next_sample_time,
             sample_offset,
+            rand,
         }
     }
 
@@ -76,6 +87,7 @@ impl BeatTimeRhythm {
             event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
             event_iter_next_sample_time,
+            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -93,6 +105,7 @@ impl BeatTimeRhythm {
             instrument,
             pattern: Rc::clone(&self.pattern),
             event_iter: Rc::clone(&self.event_iter),
+            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -107,6 +120,7 @@ impl BeatTimeRhythm {
         Self {
             pattern,
             event_iter: Rc::clone(&self.event_iter),
+            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -121,6 +135,7 @@ impl BeatTimeRhythm {
         Self {
             pattern: Rc::clone(&self.pattern),
             event_iter,
+            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -160,10 +175,12 @@ impl Iterator for BeatTimeRhythm {
         if pattern.is_empty() {
             None
         } else {
-            let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
             let pulse = pattern.run();
+            let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
             let event_duration = (pulse.step_time * self.pattern_step_length()) as SampleTime;
-            let event = if pulse.value > 0.0 {
+            let trigger_event =
+                pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand.gen::<f32>());
+            let event = if trigger_event {
                 let mut event_iter = self.event_iter.borrow_mut();
                 event_iter.set_context(pulse, pattern.len());
                 Some((
