@@ -155,7 +155,7 @@ pub fn new_rhythm_from_file(
     let chunk = lua.load(std::path::PathBuf::from(file_name));
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(result, instrument)
+    rhythm_from_userdata(result, instrument).map_err(|err| err.into())
 }
 
 /// Evaluate a Lua string expression which creates and returns a rhythm.
@@ -174,7 +174,7 @@ pub fn new_rhythm_from_string(
     let chunk = lua.load(script).set_name(script_name);
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(result, instrument)
+    rhythm_from_userdata(result, instrument).map_err(|err| err.into())
 }
 
 /// Evaluate a precompiled Lua expression which creates and returns a rhythm.
@@ -193,7 +193,7 @@ pub fn new_rhythm_from_bytecode(
     let chunk: LuaChunk = lua.load(script).set_name(script_name);
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(result, instrument)
+    rhythm_from_userdata(result, instrument).map_err(|err| err.into())
 }
 
 // -------------------------------------------------------------------------------------------------

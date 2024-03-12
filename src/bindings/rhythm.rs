@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use anyhow::anyhow;
 use mlua::prelude::*;
 
 use crate::{
@@ -20,7 +19,7 @@ mod second_time;
 pub(crate) fn rhythm_from_userdata(
     result: LuaValue,
     instrument: Option<InstrumentId>,
-) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
+) -> LuaResult<Rc<RefCell<dyn Rhythm>>> {
     if let Some(user_data) = result.as_userdata() {
         if let Ok(beat_time_rhythm) = user_data.take::<BeatTimeRhythm>() {
             Ok(Rc::new(RefCell::new(
@@ -31,14 +30,23 @@ pub(crate) fn rhythm_from_userdata(
                 second_time_rhythm.with_instrument(instrument),
             )))
         } else {
-            Err(anyhow!("Expected script to return a Rhythm, got some other custom type",).into())
+            Err(LuaError::ToLuaConversionError {
+                from: "userdata",
+                to: "rhythm",
+                message: Some(
+                    "Expected script to return an emitter, got some other userdata".to_string(),
+                ),
+            })
         }
     } else {
-        Err(anyhow!(
-            "Expected script to return a Rhythm, got {}",
-            result.type_name()
-        )
-        .into())
+        Err(LuaError::ToLuaConversionError {
+            from: "userdata",
+            to: "rhythm",
+            message: Some(format!(
+                "Expected script to return a emitter, got {}",
+                result.type_name()
+            )),
+        })
     }
 }
 
