@@ -36,7 +36,7 @@ pub struct ScriptedPattern {
 }
 
 impl ScriptedPattern {
-    pub fn new(
+    pub(crate) fn new(
         lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
         function: LuaFunction<'_>,

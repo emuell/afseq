@@ -36,7 +36,7 @@ pub struct ScriptedEventIter {
 }
 
 impl ScriptedEventIter {
-    pub fn new(
+    pub(crate) fn new(
         lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
         function: LuaFunction<'_>,
