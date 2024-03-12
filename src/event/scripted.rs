@@ -32,7 +32,6 @@ pub struct ScriptedEventIter {
     function_context: LuaOwnedTable,
     function: LuaOwnedFunction,
     step_count: usize,
-    initial_event: Option<Event>,
 }
 
 impl ScriptedEventIter {
@@ -67,7 +66,8 @@ impl ScriptedEventIter {
             let function_generator = Some(function.into_owned());
             let function = inner_function.clone().into_owned();
             let result = function.call::<_, LuaValue>(function_context.to_ref())?;
-            let initial_event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
+            // evaluate and forget the result, just to show errors from the function, if any.
+            new_note_events_from_lua(result, None)?;
             Ok(Self {
                 timeout_hook,
                 function_environment,
@@ -75,14 +75,14 @@ impl ScriptedEventIter {
                 function_context,
                 function,
                 step_count,
-                initial_event,
             })
         } else {
             // function returned an event. use this function.
             let function_environment = None;
             let function_generator = None;
             let function = function.into_owned();
-            let initial_event = Some(Event::NoteEvents(new_note_events_from_lua(result, None)?));
+            // evaluate and forget the result, just to show errors from the function, if any.
+            new_note_events_from_lua(result, None)?;
             Ok(Self {
                 timeout_hook,
                 function_environment,
@@ -90,7 +90,6 @@ impl ScriptedEventIter {
                 function_context,
                 function,
                 step_count,
-                initial_event,
             })
         }
     }
@@ -115,22 +114,16 @@ impl Iterator for ScriptedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(initial_event) = self.initial_event.take() {
-            // consume initial event on first run
-            Some(initial_event)
-        } else {
-            // else move on and fetch next event
-            let move_step = true;
-            match self.next_event(move_step) {
-                Ok(event) => Some(event),
-                Err(err) => {
-                    log::warn!(
-                        "Failed to run custom event emitter func '{}': {}",
-                        function_name(&self.function),
-                        err
-                    );
-                    None
-                }
+        let move_step = true;
+        match self.next_event(move_step) {
+            Ok(event) => Some(event),
+            Err(err) => {
+                log::warn!(
+                    "Failed to run custom event emitter func '{}': {}",
+                    function_name(&self.function),
+                    err
+                );
+                None
             }
         }
     }
@@ -218,19 +211,5 @@ impl EventIter for ScriptedEventIter {
                 }
             };
         }
-        // and set new initial event
-        let move_step = false;
-        self.initial_event = None;
-        self.initial_event = match self.next_event(move_step) {
-            Ok(event) => Some(event),
-            Err(err) => {
-                log::warn!(
-                    "Failed to run custom event emitter func '{}': {}",
-                    function_name(&self.function),
-                    err
-                );
-                None
-            }
-        };
     }
 }
