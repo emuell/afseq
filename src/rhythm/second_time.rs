@@ -32,11 +32,12 @@ pub struct SecondTimeRhythm {
 impl SecondTimeRhythm {
     /// Create a new pattern based emitter which emits `value` every beat_time `step`.
     pub fn new(time_base: SecondTimeBase, step: SecondTimeStep) -> Self {
-        Self::new_with_seed(time_base, step, thread_rng().gen())
+        let seed = thread_rng().gen();
+        Self::new_with_seed(time_base, step, &seed)
     }
     /// Create a new pattern based emitter which emits `value` every beat_time `step`,
     /// initializing the internal random number generator with the specified seed value.
-    pub fn new_with_seed(time_base: SecondTimeBase, step: SecondTimeStep, seed: [u8; 32]) -> Self {
+    pub fn new_with_seed(time_base: SecondTimeBase, step: SecondTimeStep, seed: &[u8; 32]) -> Self {
         let offset = 0.0;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
         let instrument = None;
@@ -44,7 +45,7 @@ impl SecondTimeRhythm {
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset * time_base.samples_per_second() as f64;
         let sample_offset = 0;
-        let rand = Xoshiro256PlusPlus::from_seed(seed);
+        let rand = Xoshiro256PlusPlus::from_seed(*seed);
         Self {
             time_base,
             step,

@@ -7,6 +7,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+use rand::{Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
+
 use lazy_static::lazy_static;
 use mlua::{chunk, prelude::*};
 
@@ -45,7 +48,7 @@ use crate::{
 // When cloning and instance, it will use the existing hook, so ensure to call `reset` before
 // invoking new lua functions. The last instance that get's dropped will then remove the hook.
 #[derive(Debug)]
-pub struct LuaTimeoutHook {
+pub(crate) struct LuaTimeoutHook {
     active: Rc<RefCell<usize>>,
     start: Rc<RefCell<Instant>>,
 }
@@ -55,11 +58,11 @@ impl LuaTimeoutHook {
     // assumes scripts are running in a real-time alike context.
     const DEFAULT_TIMEOUT: Duration = Duration::from_millis(200);
 
-    pub fn new(lua: &Lua) -> Self {
+    fn new(lua: &Lua) -> Self {
         Self::new_with_timeout(lua, Self::DEFAULT_TIMEOUT)
     }
 
-    pub fn new_with_timeout(lua: &Lua, timeout: Duration) -> Self {
+    fn new_with_timeout(lua: &Lua, timeout: Duration) -> Self {
         let active = Rc::new(RefCell::new(1));
         let start = Rc::new(RefCell::new(Instant::now()));
         lua.set_hook(LuaHookTriggers::new().every_nth_instruction(timeout.as_millis() as u32), {
@@ -88,7 +91,7 @@ impl LuaTimeoutHook {
     }
 
     // reset timestamp of the hook when running e.g. a callback again
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         *self.start.borrow_mut() = Instant::now();
     }
 }
@@ -115,9 +118,32 @@ impl Drop for LuaTimeoutHook {
 
 // ---------------------------------------------------------------------------------------------
 
+/// Global sharedLua data, unique to each new Lua instance.
+#[derive(Debug, Clone)]
+pub(crate) struct LuaAppData {
+    /// Global random seed, set by math.randomseed() for each Lua instance and passed to
+    /// newly created rhythm impls.
+    pub(crate) rand_seed: [u8; 32],
+    /// Global random number generator, used for our math.random() impl.
+    pub(crate) rand_rgn: Xoshiro256PlusPlus,
+}
+
+impl LuaAppData {
+    fn new() -> Self {
+        let rand_seed = rand::thread_rng().gen();
+        let rand_rgn = Xoshiro256PlusPlus::from_seed(rand_seed);
+        Self {
+            rand_seed,
+            rand_rgn,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
 /// Create a new raw lua engine with preloaded packages, but no bindings. Also returns a timeout
 /// hook instance to limit duration of script calls.
-/// See also `register_bindings`
+/// Use [register_bindings] to register the bindings for a newly created engine.
 pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
     // create a new lua instance with the allowed std libraries
     let lua = Lua::new_with(
@@ -135,6 +161,9 @@ pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
         .unwrap_or_else(|err| log::warn!("Failed to initialize lua engine: {}", err));
     // install a timeout hook
     let timeout_hook = LuaTimeoutHook::new(&lua);
+    // create new app data
+    lua.set_app_data(LuaAppData::new());
+    // return the lua instance and timeout manager
     (lua, timeout_hook)
 }
 
@@ -275,12 +304,14 @@ pub(crate) fn initialize_emitter_context(
 // -------------------------------------------------------------------------------------------------
 
 /// Register afseq bindings with the given lua engine.
+/// Engine instance is expected to be one created via [new_engine].
 pub(crate) fn register_bindings(
     lua: &mut Lua,
     timeout_hook: &LuaTimeoutHook,
     time_base: BeatTimeBase,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_global_bindings(lua, timeout_hook, time_base)?;
+    register_math_bindings(lua)?;
     register_table_bindings(lua)?;
     register_pattern_module(lua)?;
     register_fun_module(lua)?;
@@ -361,13 +392,117 @@ fn register_global_bindings(
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
                     Err(_) => false,
                 };
+                let rand_seed = &lua
+                    .app_data_ref::<LuaAppData>()
+                    .expect("Failed to access Lua app data")
+                    .rand_seed;
                 if second_time_unit {
-                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, table)?
+                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, table, rand_seed)?
                         .into_lua(lua)
                 } else {
-                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, table)?.into_lua(lua)
+                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, table, rand_seed)?
+                        .into_lua(lua)
                 }
             }
+        })?,
+    )?;
+
+    Ok(())
+}
+
+fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
+    let math = lua.globals().get::<_, LuaTable>("math")?;
+
+    // function math.random([min], [max])
+    math.raw_set(
+        "random",
+        lua.create_function(|lua, args: LuaMultiValue| -> LuaResult<LuaNumber> {
+            let rand = &mut lua
+                .app_data_mut::<LuaAppData>()
+                .expect("Failed to access Lua app data")
+                .rand_rgn;
+            if args.is_empty() {
+                Ok(rand.gen::<LuaNumber>())
+            } else if args.len() == 1 {
+                let max = args.get(0).unwrap().as_integer();
+                if let Some(max) = max {
+                    if max >= 1 {
+                        let rand_int: LuaInteger = rand.gen_range(1..=max);
+                        Ok(rand_int as LuaNumber)
+                    } else {
+                        Err(bad_argument_error(
+                            "math.random",
+                            "max",
+                            1,
+                            "invalid interval: max must be >= 1",
+                        ))
+                    }
+                } else {
+                    Err(bad_argument_error(
+                        "math.random",
+                        "max",
+                        1,
+                        "expecting an integer value",
+                    ))
+                }
+            } else if args.len() == 2 {
+                let min = args.get(0).unwrap().as_integer();
+                let max = args.get(1).unwrap().as_integer();
+                if let Some(min) = min {
+                    if let Some(max) = max {
+                        if max >= min {
+                            let rand_int: LuaInteger = rand.gen_range(min..=max);
+                            Ok(rand_int as LuaNumber)
+                        } else {
+                            Err(bad_argument_error(
+                                "math.random",
+                                "max",
+                                1,
+                                "invalid interval: max must be >= min",
+                            ))
+                        }
+                    } else {
+                        Err(bad_argument_error(
+                            "math.random",
+                            "max",
+                            1,
+                            "expecting an integer value",
+                        ))
+                    }
+                } else {
+                    Err(bad_argument_error(
+                        "math.random",
+                        "min",
+                        1,
+                        "expecting an integer value",
+                    ))
+                }
+            } else {
+                Err(bad_argument_error(
+                    "math.random",
+                    "undefined",
+                    3,
+                    "wrong number of arguments",
+                ))
+            }
+        })?,
+    )?;
+
+    // function math.randomseed(seed)
+    math.raw_set(
+        "randomseed",
+        lua.create_function(|lua, arg: LuaNumber| -> LuaResult<()> {
+            let bytes = arg.to_le_bytes();
+            let mut new_seed = [0; 32];
+            for i in 0..32 {
+                new_seed[i] = bytes[i % 8];
+            }
+            let mut app_data = lua
+                .app_data_mut::<LuaAppData>()
+                .expect("Failed to access Lua app data");
+            app_data.rand_seed = new_seed;
+            app_data.rand_rgn = Xoshiro256PlusPlus::from_seed(new_seed);
+            Ok(())
         })?,
     )?;
 

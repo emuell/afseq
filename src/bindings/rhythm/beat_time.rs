@@ -18,6 +18,7 @@ impl BeatTimeRhythm {
         timeout_hook: &LuaTimeoutHook,
         time_base: &BeatTimeBase,
         table: LuaTable,
+        rand_seed: &[u8; 32],
     ) -> LuaResult<BeatTimeRhythm> {
         // resolution
         let mut resolution = 1.0;
@@ -48,7 +49,7 @@ impl BeatTimeRhythm {
             }
         }
         // create a new BeatTimeRhythm with the given time base and step
-        let mut rhythm = BeatTimeRhythm::new(*time_base, step);
+        let mut rhythm = BeatTimeRhythm::new_with_seed(*time_base, step, rand_seed);
         // offset
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")?;
