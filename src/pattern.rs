@@ -18,7 +18,7 @@ pub trait Pattern: Debug {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    /// Return number of steps this pattern has. The pattern repeats after this. When the size
+    /// Return number of pulses this pattern has. The pattern repeats after this. When the size
     /// is unknown, e.g. in external callbacks that generated pulses, 0 is returned, but
     /// self.is_empty will still be true.
     fn len(&self) -> usize;

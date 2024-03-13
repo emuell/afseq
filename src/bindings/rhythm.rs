@@ -148,7 +148,7 @@ mod test {
                     assert(context.beats_per_min == 120)
                     assert(context.beats_per_bar == 4)
                     assert(context.sample_rate == 44100)
-                    assert(context.step == step)
+                    assert(context.step_count == step)
                 end 
                 return emitter {
                     unit = "1/4",
@@ -265,7 +265,7 @@ mod test {
                     assert(context.beats_per_min == 130)
                     assert(context.beats_per_bar == 8)
                     assert(context.sample_rate == 48000)
-                    assert(context.step == step)
+                    assert(context.step_count == step)
                 end 
                 return emitter {
                     unit = "ms",

@@ -18,10 +18,11 @@ type EventMapFn = dyn FnMut(Event) -> Event + 'static;
 /// NB: This event iter can not be cloned. `clone_dyn` thus will cause a panic!
 pub struct MutatedEventIter {
     events: Vec<Event>,
+    event_index: usize,
+    trigger_next_event: bool,
     initial_events: Vec<Event>,
     map: Box<EventMapFn>,
     reset_map: Box<dyn Fn() -> Box<EventMapFn>>,
-    current: usize,
 }
 
 impl MutatedEventIter {
@@ -38,13 +39,15 @@ impl MutatedEventIter {
             initial_events[0] = Self::mutate(initial_events[0].clone(), &mut map);
         }
         let events = initial_events.clone();
-        let current = 0;
+        let event_index = 0;
+        let trigger_next_event = true;
         Self {
             events,
+            event_index,
+            trigger_next_event,
             initial_events,
             reset_map: Box::new(move || Box::new(initial_map.clone())),
             map,
-            current,
         }
     }
 
@@ -57,8 +60,8 @@ impl Debug for MutatedEventIter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("MutatedEventIter")
             .field("events", &self.events)
+            .field("event_index", &self.event_index)
             .field("initial_events", &self.initial_events)
-            .field("current", &self.current)
             .finish()
     }
 }
@@ -67,13 +70,16 @@ impl Iterator for MutatedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let current = self.events[self.current].clone();
-        self.events[self.current] = Self::mutate(current.clone(), &mut self.map);
-        self.current += 1;
-        if self.current >= self.events.len() {
-            self.current = 0;
+        if !self.trigger_next_event {
+            return None;
         }
-        Some(current)
+        let event = self.events[self.event_index].clone();
+        self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
+        self.event_index += 1;
+        if self.event_index >= self.events.len() {
+            self.event_index = 0;
+        }
+        Some(event)
     }
 }
 
@@ -82,8 +88,13 @@ impl EventIter for MutatedEventIter {
         // nothing to do
     }
 
-    fn set_context(&mut self, _context: PulseIterItem, _pulse_count: usize) {
-        // nothing to do
+    fn set_pulse(
+        &mut self,
+        _pulse: PulseIterItem,
+        _pattern_pulse_count: usize,
+        emit_event: bool,
+    ) {
+        self.trigger_next_event = emit_event;
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
@@ -92,8 +103,8 @@ impl EventIter for MutatedEventIter {
 
     fn reset(&mut self) {
         self.events = self.initial_events.clone();
+        self.event_index = 0;
         self.map = (self.reset_map)();
-        self.current = 0;
     }
 }
 

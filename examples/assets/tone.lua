@@ -14,7 +14,7 @@ return emitter {
     local SCALE_STEP_COUNT = 8
     local VOLUME_STEP_COUNT = 32
 
-    local note_step = 0
+    local note_step = 2
     local scale_index = 1
 
     local volume_step = 4

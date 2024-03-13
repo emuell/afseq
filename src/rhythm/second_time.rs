@@ -7,9 +7,10 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
+    gate::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay, SecondTimeBase, SecondTimeStep, TimeBase},
-    Rhythm, RhythmSampleIter, SampleTime,
+    Gate, Rhythm, RhythmSampleIter, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -22,6 +23,7 @@ pub struct SecondTimeRhythm {
     offset: SecondTimeStep,
     instrument: Option<InstrumentId>,
     pattern: Rc<RefCell<dyn Pattern>>,
+    gate: Rc<RefCell<dyn Gate>>,
     event_iter: Rc<RefCell<dyn EventIter>>,
     event_iter_sample_time: SampleTime,
     event_iter_next_sample_time: f64,
@@ -39,19 +41,21 @@ impl SecondTimeRhythm {
     /// initializing the internal random number generator with the specified seed value.
     pub fn new_with_seed(time_base: SecondTimeBase, step: SecondTimeStep, seed: &[u8; 32]) -> Self {
         let offset = 0.0;
+        let rand = Xoshiro256PlusPlus::from_seed(*seed);
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
+        let gate = Rc::new(RefCell::new(ProbabilityGate::new(rand.clone())));
         let instrument = None;
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset * time_base.samples_per_second() as f64;
         let sample_offset = 0;
-        let rand = Xoshiro256PlusPlus::from_seed(*seed);
         Self {
             time_base,
             step,
             offset,
             instrument,
             pattern,
+            gate,
             event_iter,
             event_iter_sample_time,
             event_iter_next_sample_time,
@@ -85,6 +89,7 @@ impl SecondTimeRhythm {
         Self {
             offset,
             pattern: Rc::clone(&self.pattern),
+            gate: Rc::clone(&self.gate),
             event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
             event_iter_next_sample_time,
@@ -99,6 +104,7 @@ impl SecondTimeRhythm {
         Self {
             instrument,
             pattern: Rc::clone(&self.pattern),
+            gate: Rc::clone(&self.gate),
             event_iter: Rc::clone(&self.event_iter),
             rand: self.rand.clone(),
             ..*self
@@ -114,6 +120,23 @@ impl SecondTimeRhythm {
     pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
         Self {
             pattern,
+            gate: Rc::clone(&self.gate),
+            event_iter: Rc::clone(&self.event_iter),
+            rand: self.rand.clone(),
+            ..*self
+        }
+    }
+
+    /// Use the given [`Gate`] instead of the default probability gate.  
+    pub fn with_gate<T: Gate + Sized + 'static>(&self, gate: T) -> Self {
+        self.with_gate_dyn(Rc::new(RefCell::new(gate)))
+    }
+
+    /// Use the given [`Gate`] instead of the default probability gate.  
+    pub fn with_gate_dyn(&self, gate: Rc<RefCell<dyn Gate>>) -> Self {
+        Self {
+            pattern: Rc::clone(&self.pattern),
+            gate,
             event_iter: Rc::clone(&self.event_iter),
             rand: self.rand.clone(),
             ..*self
@@ -129,6 +152,7 @@ impl SecondTimeRhythm {
     pub fn trigger_dyn(&self, event_iter: Rc<RefCell<dyn EventIter>>) -> Self {
         Self {
             pattern: Rc::clone(&self.pattern),
+            gate: Rc::clone(&self.gate),
             event_iter,
             rand: self.rand.clone(),
             ..*self
@@ -170,25 +194,22 @@ impl Iterator for SecondTimeRhythm {
         if pattern.is_empty() {
             None
         } else {
+            // generate a pulse from the pattern
             let pulse = pattern.run();
+            // pass pulse to gate
+            let emit_event = self.gate.borrow_mut().run(&pulse);
+            // generate an event from the event iter
+            let mut event_iter = self.event_iter.borrow_mut();
+            event_iter.set_pulse(pulse, pattern.len(), emit_event);
+            let event = self.event_with_default_instrument(event_iter.next());
+            // return event as sample time rhythm iter item
             let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-            let event_duration = (pulse.step_time * self.pattern_step_length()) as SampleTime;
-            let trigger_event =
-                pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand.gen::<f32>());
-            let event = if trigger_event {
-                let mut event_iter = self.event_iter.borrow_mut();
-                event_iter.set_context(pulse, pattern.len());
-                Some((
-                    sample_time,
-                    self.event_with_default_instrument(event_iter.next()),
-                    event_duration,
-                ))
-            } else {
-                Some((sample_time, None, event_duration))
-            };
+            let event_duration = (self.step
+                * self.time_base.samples_per_second() as f64
+                * pulse.step_time) as SampleTime;
             self.event_iter_next_sample_time +=
                 self.step * self.time_base.samples_per_second() as f64 * pulse.step_time;
-            event
+            Some((sample_time, event, event_duration))
         }
     }
 }
@@ -239,8 +260,9 @@ impl Rhythm for SecondTimeRhythm {
                     * time_base.samples_per_sec as f64;
         }
         self.time_base = SecondTimeBase::from(*time_base);
-        // update pattern end event iter
+        // update pattern, gate and event iter
         self.pattern.borrow_mut().set_time_base(time_base);
+        self.gate.borrow_mut().set_time_base(time_base);
         self.event_iter.borrow_mut().set_time_base(time_base);
     }
 

@@ -14,6 +14,7 @@ pub use super::{
         new_parameter_change_event, new_polyphonic_note_event, new_polyphonic_note_sequence_event,
         unique_instrument_id, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId,
     },
+    gate::{Gate, ProbabilityGate},
     note::Note,
     pattern::{euclidean, fixed::ToFixedPattern, Pattern},
     phrase::{Phrase, RhythmSlot},

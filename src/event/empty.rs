@@ -24,7 +24,7 @@ impl EventIter for EmptyEventIter {
         // nothing to do
     }
 
-    fn set_context(&mut self, _context: PulseIterItem, _pulse_count: usize) {
+    fn set_pulse(&mut self, _context: PulseIterItem, _pattern_pulse_count: usize, _emit_event: bool) {
         // nothing to do
     }
 

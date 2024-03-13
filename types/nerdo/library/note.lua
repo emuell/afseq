@@ -69,7 +69,7 @@ function Note.with_delay(self, panning) end
 
 ----------------------------------------------------------------------------------------------------
 
----@alias NoteValue NoteTable|string|number
+---@alias NoteValue NoteTable|string|number|nil
 
 --- Create a new monophonic or polyphonic note (a chord) from a number value, 
 --- a note string, chord string or array of note values.

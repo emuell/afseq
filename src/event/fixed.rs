@@ -11,13 +11,15 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct FixedEventIter {
     events: Vec<Event>,
-    current: usize,
+    event_index: usize,
+    emit_event: bool
 }
 
 impl FixedEventIter {
     pub fn new(events: Vec<Event>) -> Self {
-        let current = 0;
-        Self { events, current }
+        let event_index = 0;
+        let emit_event = true;
+        Self { events, event_index, emit_event }
     }
 
     // Get a copy of the event that we're triggering
@@ -30,13 +32,13 @@ impl Iterator for FixedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.events.is_empty() {
+        if !self.emit_event || self.events.is_empty() {
             return None;
         }
-        let event = self.events[self.current].clone();
-        self.current += 1;
-        if self.current >= self.events.len() {
-            self.current = 0;
+        let event = self.events[self.event_index].clone();
+        self.event_index += 1;
+        if self.event_index >= self.events.len() {
+            self.event_index = 0;
         }
         Some(event)
     }
@@ -47,8 +49,8 @@ impl EventIter for FixedEventIter {
         // nothing to do
     }
 
-    fn set_context(&mut self, _context: PulseIterItem, _pulse_count: usize) {
-        // nothing to do
+    fn set_pulse(&mut self, _context: PulseIterItem, _pattern_pulse_count: usize, emit_event: bool) {
+        self.emit_event = emit_event;
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
@@ -57,7 +59,8 @@ impl EventIter for FixedEventIter {
 
     fn reset(&mut self) {
         // reset step counter
-        self.current = 0;
+        self.event_index = 0;
+        self.emit_event = true;
     }
 }
 

@@ -24,6 +24,9 @@ pub use pulse::{Pulse, PulseIter, PulseIterItem};
 pub mod pattern;
 pub use pattern::Pattern;
 
+pub mod gate;
+pub use gate::Gate;
+
 pub mod rhythm;
 pub use rhythm::{Rhythm, RhythmSampleIter};
 

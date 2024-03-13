@@ -1,4 +1,4 @@
-//! Lua script bindings, to create rhythms dynamically.
+//! Lua script bindings for the entire crate.
 
 use std::{
     cell::RefCell,
@@ -257,10 +257,12 @@ pub(crate) fn initialize_context_time_base(
 /// Set or update the step counter of the given emitter context.
 pub(crate) fn initialize_context_step_count(
     table: &mut LuaOwnedTable,
-    pulse_step: usize,
+    step_count: usize,
+    step_time_count: f64,
 ) -> LuaResult<()> {
     let table = table.to_ref();
-    table.raw_set("step", pulse_step + 1)?;
+    table.raw_set("step_count", step_count + 1)?;
+    table.raw_set("step_time", step_time_count)?;
     Ok(())
 }
 
@@ -268,10 +270,11 @@ pub(crate) fn initialize_context_step_count(
 pub(crate) fn initialize_pattern_context(
     table: &mut LuaOwnedTable,
     time_info: &BeatTimeBase,
-    pulse_step: usize,
+    step_count: usize,
+    step_time_count: f64,
 ) -> LuaResult<()> {
     initialize_context_time_base(table, time_info)?;
-    initialize_context_step_count(table, pulse_step)?;
+    initialize_context_step_count(table, step_count, step_time_count)?;
     Ok(())
 }
 
@@ -279,12 +282,14 @@ pub(crate) fn initialize_pattern_context(
 pub(crate) fn initialize_context_pulse_value(
     table: &mut LuaOwnedTable,
     pulse: PulseIterItem,
-    pulse_count: usize,
+    pattern_pulse_count: usize,
+    trigger: bool,
 ) -> LuaResult<()> {
     let table = table.to_ref();
-    table.raw_set("step_value", pulse.value)?;
-    table.raw_set("step_time", pulse.step_time)?;
-    table.raw_set("step_count", pulse_count)?;
+    table.raw_set("trigger", trigger)?;
+    table.raw_set("pulse_value", pulse.value)?;
+    table.raw_set("pulse_time", pulse.step_time)?;
+    table.raw_set("pattern_pulse_count", pattern_pulse_count)?;
     Ok(())
 }
 
@@ -292,12 +297,14 @@ pub(crate) fn initialize_context_pulse_value(
 pub(crate) fn initialize_emitter_context(
     table: &mut LuaOwnedTable,
     time_info: &BeatTimeBase,
-    pulse_step: usize,
+    step_count: usize,
+    step_time_count: f64,
     pulse: PulseIterItem,
-    pulse_count: usize,
+    pattern_pulse_count: usize,
+    trigger: bool,
 ) -> LuaResult<()> {
-    initialize_pattern_context(table, time_info, pulse_step)?;
-    initialize_context_pulse_value(table, pulse, pulse_count)?;
+    initialize_pattern_context(table, time_info, step_count, step_time_count)?;
+    initialize_context_pulse_value(table, pulse, pattern_pulse_count, trigger)?;
     Ok(())
 }
 
