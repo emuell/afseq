@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter},
-    BeatTimeBase, PulseIterItem,
+    BeatTimeBase,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -19,7 +19,6 @@ type EventMapFn = dyn FnMut(Event) -> Event + 'static;
 pub struct MutatedEventIter {
     events: Vec<Event>,
     event_index: usize,
-    trigger_next_event: bool,
     initial_events: Vec<Event>,
     map: Box<EventMapFn>,
     reset_map: Box<dyn Fn() -> Box<EventMapFn>>,
@@ -40,11 +39,9 @@ impl MutatedEventIter {
         }
         let events = initial_events.clone();
         let event_index = 0;
-        let trigger_next_event = true;
         Self {
             events,
             event_index,
-            trigger_next_event,
             initial_events,
             reset_map: Box::new(move || Box::new(initial_map.clone())),
             map,
@@ -70,9 +67,6 @@ impl Iterator for MutatedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.trigger_next_event {
-            return None;
-        }
         let event = self.events[self.event_index].clone();
         self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
         self.event_index += 1;
@@ -86,15 +80,6 @@ impl Iterator for MutatedEventIter {
 impl EventIter for MutatedEventIter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
-    }
-
-    fn set_pulse(
-        &mut self,
-        _pulse: PulseIterItem,
-        _pattern_pulse_count: usize,
-        emit_event: bool,
-    ) {
-        self.trigger_next_event = emit_event;
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {

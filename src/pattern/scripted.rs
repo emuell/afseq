@@ -4,7 +4,7 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        initialize_context_step_count, initialize_context_time_base, initialize_pattern_context,
+        initialize_context_pulse_count, initialize_context_time_base, initialize_pattern_context,
         pattern_pulse_from_lua, LuaTimeoutHook,
     },
     BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
@@ -30,8 +30,8 @@ pub struct ScriptedPattern {
     function_generator: Option<LuaOwnedFunction>,
     function_context: LuaOwnedTable,
     function: LuaOwnedFunction,
-    step_count: usize,
-    step_time_count: f64,
+    pulse_count: usize,
+    pulse_time_count: f64,
     pulse: Pulse,
     pulse_iter: Option<PulseIter>,
     last_emitted_pulse: PulseIterItem,
@@ -45,14 +45,14 @@ impl ScriptedPattern {
         time_base: &BeatTimeBase,
     ) -> LuaResult<Self> {
         // create a new function context
-        let step_count = 0;
-        let step_time_count = 0.0;
+        let pulse_count = 0;
+        let pulse_time_count = 0.0;
         let mut function_context = lua.create_table()?.into_owned();
         initialize_pattern_context(
             &mut function_context,
             time_base,
-            step_count,
-            step_time_count,
+            pulse_count,
+            pulse_time_count,
         )?;
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
@@ -76,8 +76,8 @@ impl ScriptedPattern {
                 function_generator,
                 function_context,
                 function,
-                step_count,
-                step_time_count,
+                pulse_count,
+                pulse_time_count,
                 pulse,
                 pulse_iter,
                 last_emitted_pulse,
@@ -96,8 +96,8 @@ impl ScriptedPattern {
                 function_generator,
                 function_context,
                 function,
-                step_count,
-                step_time_count,
+                pulse_count,
+                pulse_time_count,
                 pulse,
                 pulse_iter,
                 last_emitted_pulse,
@@ -110,12 +110,12 @@ impl ScriptedPattern {
         self.timeout_hook.reset();
         // move step counter and update context
         if move_step {
-            self.step_count += 1;
-            self.step_time_count += self.last_emitted_pulse.step_time;
-            initialize_context_step_count(
+            self.pulse_count += 1;
+            self.pulse_time_count += self.last_emitted_pulse.step_time;
+            initialize_context_pulse_count(
                 &mut self.function_context,
-                self.step_count,
-                self.step_time_count,
+                self.pulse_count,
+                self.pulse_time_count,
             )?;
         }
         // call function with context and evaluate the result
@@ -196,13 +196,13 @@ impl Pattern for ScriptedPattern {
         // reset timeout
         self.timeout_hook.reset();
         // reset step counter
-        self.step_count = 0;
-        self.step_time_count = 0.0;
+        self.pulse_count = 0;
+        self.pulse_time_count = 0.0;
         // update step in context
-        if let Err(err) = initialize_context_step_count(
+        if let Err(err) = initialize_context_pulse_count(
             &mut self.function_context,
-            self.step_count,
-            self.step_time_count,
+            self.pulse_count,
+            self.pulse_time_count,
         ) {
             log::warn!(
                 "Failed to update context for custom pattern function '{}': {}",

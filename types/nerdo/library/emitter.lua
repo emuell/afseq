@@ -18,33 +18,25 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field sample_rate integer
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted* pulse.
----Unlike `step_count` this includes all pulses, so it also counts pulses which do not emit
----events. Starts from 1 when the emitter starts running or is reset.
----TODO: @field pulse_count integer
----Continues pulse time counter, incrementing with each new *skipped or emitted** pulse. 
+---Unlike `step_count` in emitter this includes all pulses, so it also counts pulses which do
+---not emit events. Starts from 1 when the emitter starts running or is reset.
+---@field pulse_count integer
+---Continues pulse time counter, incrementing with each new *skipped or emitted** pulse.
 ---Starts from 0 and increases with each new pulse by the pulse's step time duration.
----TODO: @field pulse_time number
----
----Continues step counter, incrementing with each new *emitted* pulse.
----Unlike `pulse_count` this does not include skipped, zero values pulses. 
----Starts from 1 when the emitter starts running or is reset.
----@field step_count integer
----Continues step time counter, incrementing with each new **emitted** pulse. 
----Starts from 0 and increases with each new pulse by the pulse's step time duration.
----@field step_time number
+---@field pulse_time_count number
 
 ----------------------------------------------------------------------------------------------------
 
 ---Context passed to 'emit' functions/generators.
 ---@class EmitterContext : PatternContext
 ---
----True, if a new event should be generated, else false. This will be true for pulses with
----a value of true or >=1, and false for pulses with a value of nil, false or 0.
----Pulse values > 0 and < 1 will maybe result in a trigger, by checking if math.random() returns
----a greater value than the actual pulse value.
----This field cal be ignored, if you want to use your own rules on when to trigger an event for
----a pulse and when not, but in general should not.
----@field trigger boolean
+---Continues step counter, incrementing with each new *emitted* pulse.
+---Unlike `pulse_count` this does not include skipped, zero values pulses.
+---Starts from 1 when the emitter starts running or is reset.
+---@field step_count integer
+---Continues step time counter, incrementing with each new **emitted** pulse.
+---Starts from 0 and increases with each new pulse by the pulse's step time duration.
+---@field step_time_count number
 ---
 ---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
 ---will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
@@ -58,10 +50,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---to be called, so they never end up here.
 ---Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
 ---@field pulse_value number
----
----Number of pulses in the pattern, a.k.a 'pattern_length'. When the pattern is a function or 
----genenator this will only count the number of subdivisions in the currently emitted pulse. 
----@field pattern_pulse_count integer
 
 ----------------------------------------------------------------------------------------------------
 
@@ -89,16 +77,16 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field resolution number?
 ---
----Specify the rythmical pattern of the emitter. Each pulse with a value of 1 or true 
----will cause an event from the `emitter` property to be triggered in the emitters 
+---Specify the rythmical pattern of the emitter. Each pulse with a value of 1 or true
+---will cause an event from the `emitter` property to be triggered in the emitters
 ---time unit. 0 or nil values never trigger, and values inbetween do *maybe* trigger.
 ---
----To create deterministic random patterns, seed the random number generator before 
----creating the emitter via `math.randomseed(some_seed)` 
+---To create deterministic random patterns, seed the random number generator before
+---creating the emitter via `math.randomseed(some_seed)`
 ---
 ---Patterns can contains subdivisions, sub tables of pulses, to "cram" multiple pulses
 ---into a single pulse's time interval. This way more complex rhythmical patterns can
----be created.  
+---be created.
 ---
 ---When no pattern is defined, a constant pulse of `1` is triggered by the emitter.
 ---

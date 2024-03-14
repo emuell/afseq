@@ -343,12 +343,17 @@ pub trait EventIter: Iterator<Item = Event> + Debug {
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// When run from a rhythm, this sets the pulse from the rhythms `Pattern` for the next
-    /// iteration step that is invoked via `next()`.
-    /// `pulse contains` the current value and timing information for the current step in the pattern.
-    /// `pattern_pulse_count` is the total number of pulses in the pattern.
-    /// `emit_event` indicates whether the iterator should trigger the next event in the sequence.
-    fn set_pulse(&mut self, pulse: PulseIterItem, pattern_pulse_count: usize, emit_event: bool);
+    /// Move iterator with the given pulse value forward.
+    /// `pulse` contains the current value and timing information for the current step in the pattern.
+    /// `emit_event` indicates whether the iterator should trigger the next event in the sequence as
+    /// evaluated by the rhythm's gate.
+    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Event> {
+        if emit_event {
+            self.next()
+        } else {
+            None
+        }
+    }
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible

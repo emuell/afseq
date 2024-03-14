@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     event::{Event, EventIter, NoteEvent, ParameterChangeEvent},
-    BeatTimeBase, PulseIterItem,
+    BeatTimeBase,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -12,14 +12,15 @@ use crate::{
 pub struct FixedEventIter {
     events: Vec<Event>,
     event_index: usize,
-    emit_event: bool
 }
 
 impl FixedEventIter {
     pub fn new(events: Vec<Event>) -> Self {
         let event_index = 0;
-        let emit_event = true;
-        Self { events, event_index, emit_event }
+        Self {
+            events,
+            event_index,
+        }
     }
 
     // Get a copy of the event that we're triggering
@@ -32,7 +33,7 @@ impl Iterator for FixedEventIter {
     type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.emit_event || self.events.is_empty() {
+        if self.events.is_empty() {
             return None;
         }
         let event = self.events[self.event_index].clone();
@@ -49,10 +50,6 @@ impl EventIter for FixedEventIter {
         // nothing to do
     }
 
-    fn set_pulse(&mut self, _context: PulseIterItem, _pattern_pulse_count: usize, emit_event: bool) {
-        self.emit_event = emit_event;
-    }
-
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
         Rc::new(RefCell::new(self.clone()))
     }
@@ -60,7 +57,6 @@ impl EventIter for FixedEventIter {
     fn reset(&mut self) {
         // reset step counter
         self.event_index = 0;
-        self.emit_event = true;
     }
 }
 

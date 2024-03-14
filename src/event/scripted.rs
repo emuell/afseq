@@ -4,9 +4,9 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        initialize_context_pulse_value, initialize_context_step_count,
-        initialize_context_time_base, initialize_emitter_context, new_note_events_from_lua,
-        LuaTimeoutHook,
+        initialize_context_pulse_count, initialize_context_pulse_value,
+        initialize_context_step_count, initialize_context_time_base, initialize_emitter_context,
+        new_note_events_from_lua, LuaTimeoutHook,
     },
     BeatTimeBase, Event, EventIter, Pattern, PulseIterItem,
 };
@@ -32,6 +32,8 @@ pub struct ScriptedEventIter {
     function_context: LuaOwnedTable,
     function: LuaOwnedFunction,
     current_pulse: PulseIterItem,
+    pulse_count: usize,
+    pulse_time_count: f64,
     step_count: usize,
     step_time_count: f64,
 }
@@ -50,17 +52,18 @@ impl ScriptedEventIter {
         // create a new function context
         let step_count = 0;
         let step_time_count = 0.0;
+        let pulse_count = 0;
+        let pulse_time_count = 0.0;
         let mut function_context = lua.create_table()?.into_owned();
         let pattern = pattern.borrow();
-        let trigger = true;
         initialize_emitter_context(
             &mut function_context,
             time_base,
+            pattern.peek(),
+            pulse_count,
+            pulse_time_count,
             step_count,
             step_time_count,
-            pattern.peek(),
-            pattern.len(),
-            trigger,
         )?;
         // immediately fetch/evaluate the first event and get its environment, so we can immediately
         // show errors from the function and can reset the environment later on to this state.
@@ -82,6 +85,8 @@ impl ScriptedEventIter {
                 function_context,
                 function,
                 current_pulse,
+                pulse_count,
+                pulse_time_count,
                 step_count,
                 step_time_count,
             })
@@ -99,9 +104,11 @@ impl ScriptedEventIter {
                 function_generator,
                 function_context,
                 function,
+                current_pulse,
+                pulse_count,
+                pulse_time_count,
                 step_count,
                 step_time_count,
-                current_pulse,
             })
         }
     }
@@ -109,8 +116,25 @@ impl ScriptedEventIter {
     fn next_event(&mut self, move_step: bool) -> LuaResult<Event> {
         // reset timeout
         self.timeout_hook.reset();
-        // move step counter and update context
+        // update function context with the pulse
+        if let Err(err) =
+            initialize_context_pulse_value(&mut self.function_context, self.current_pulse)
+        {
+            log::warn!(
+                "Failed to update context for custom event iter function '{}': {}",
+                function_name(&self.function),
+                err
+            );
+        }
+        // move step counters and update function context
         if move_step {
+            self.pulse_count += 1;
+            self.pulse_time_count += self.current_pulse.step_time;
+            initialize_context_pulse_count(
+                &mut self.function_context,
+                self.pulse_count,
+                self.pulse_time_count,
+            )?;
             self.step_count += 1;
             self.step_time_count += self.current_pulse.step_time;
             initialize_context_step_count(
@@ -160,23 +184,16 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn set_pulse(&mut self, pulse: PulseIterItem, pattern_pulse_count: usize, emit_event: bool) {
-        // reset timeout
-        self.timeout_hook.reset();
-        // memorize current pulse
+    fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Event> {
+        // memorize pulse for our next() impl
         self.current_pulse = pulse;
-        // update function context with the new pulse
-        if let Err(err) = initialize_context_pulse_value(
-            &mut self.function_context,
-            pulse,
-            pattern_pulse_count,
-            emit_event,
-        ) {
-            log::warn!(
-                "Failed to update context for custom event iter function '{}': {}",
-                function_name(&self.function),
-                err
-            );
+        // generate a new event or only update pulse counters for the next generated event
+        if emit_event {
+            self.next()
+        } else {
+            self.pulse_count += 1;
+            self.pulse_time_count += pulse.step_time;
+            None
         }
     }
 
@@ -194,6 +211,19 @@ impl EventIter for ScriptedEventIter {
             &mut self.function_context,
             self.step_count,
             self.step_time_count,
+        ) {
+            log::warn!(
+                "Failed to update context for custom pattern function '{}': {}",
+                function_name(&self.function),
+                err
+            );
+        }
+        self.pulse_count = 0;
+        self.pulse_time_count = 0.0;
+        if let Err(err) = initialize_context_pulse_count(
+            &mut self.function_context,
+            self.pulse_count,
+            self.pulse_time_count,
         ) {
             log::warn!(
                 "Failed to update context for custom pattern function '{}': {}",

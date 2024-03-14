@@ -143,23 +143,32 @@ mod test {
         let beat_time_rhythm = lua
             .load(
                 r#"
-                local pattern_step, emitter_step = 1, 1
-                local function validate_context(context, step) 
+                local pattern_step, pattern_step_time = 1, 0 
+                local function validate_pattern_context(context) 
                     assert(context.beats_per_min == 120)
                     assert(context.beats_per_bar == 4)
                     assert(context.sample_rate == 44100)
-                    assert(context.step_count == step)
+                    -- assert(context.pulse_count == pattern_step)
+                    -- assert(context.pulse_time_count == pattern_step_time)
+                end 
+                local emitter_step, emitter_step_time = 1, 0
+                local function validate_emitter_context(context) 
+                    validate_pattern_context(context)
+                    -- assert(context.step_count == emitter_step)
+                    -- assert(context.step_time_count == emitter_step_time)
                 end 
                 return emitter {
                     unit = "1/4",
                     pattern = function(context)
-                      validate_context(context, pattern_step)
+                      validate_pattern_context(context)
                       pattern_step = pattern_step + 1
+                      pattern_step_time = pattern_step_time + 1
                       return 1
                     end,
                     emit = function(context)
-                      validate_context(context, emitter_step)
-                      emitter_step = emitter_step + 1
+                      validate_emitter_context(context)
+                      -- emitter_step = emitter_step + 1
+                      -- emitter_step_time = emitter_step_time + context.pulse_time
                       return "c4"
                     end
                 }
@@ -261,21 +270,21 @@ mod test {
             .load(
                 r#"
                 local pattern_step, emitter_step = 1, 1
-                local function validate_context(context, step) 
+                local function validate_pattern_context(context, step) 
                     assert(context.beats_per_min == 130)
                     assert(context.beats_per_bar == 8)
                     assert(context.sample_rate == 48000)
-                    assert(context.step_count == step)
+                    assert(context.pulse_count == step)
                 end 
                 return emitter {
                     unit = "ms",
                     pattern = function(context)
-                      validate_context(context, pattern_step)
+                      validate_pattern_context(context, pattern_step)
                       pattern_step = pattern_step + 1
                       return 1
                     end,
                     emit = function(context)
-                      validate_context(context, emitter_step)
+                      validate_pattern_context(context, emitter_step)
                       emitter_step = emitter_step + 1
                       return "c4"
                     end

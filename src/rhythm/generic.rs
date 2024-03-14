@@ -218,8 +218,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Iterator
             let emit_event = self.gate.borrow_mut().run(&pulse);
             // generate an event from the event iter
             let mut event_iter = self.event_iter.borrow_mut();
-            event_iter.set_pulse(pulse, pattern.len(), emit_event);
-            let event = self.event_with_default_instrument(event_iter.next());
+            let event = self.event_with_default_instrument(event_iter.run(pulse, emit_event));
             // return event as sample timed rhythm iter item
             let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
             let event_duration =
