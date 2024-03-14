@@ -53,7 +53,9 @@ impl BeatTimeRhythm {
         // offset
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")?;
-            rhythm = rhythm.with_offset_in_step(offset);
+            let mut new_step = rhythm.step();
+            new_step.set_steps(offset);
+            rhythm = rhythm.with_offset(new_step);
         }
         // pattern
         let mut pattern = rhythm.pattern();

@@ -1,5 +1,4 @@
 use crate::{
-    rhythm::second_time::SecondTimeRhythm,
     time::{SampleTimeDisplay, TimeBase},
     SampleTime,
 };
@@ -29,10 +28,3 @@ impl SampleTimeDisplay for SecondTimeBase {
 
 /// Defines a number of seconds in SecondTimeBase.
 pub type SecondTimeStep = f64;
-
-/// Shortcuts for creating beat-time based patterns.
-impl SecondTimeBase {
-    pub fn every_nth_seconds(&self, step: SecondTimeStep) -> SecondTimeRhythm {
-        SecondTimeRhythm::new(*self, step)
-    }
-}

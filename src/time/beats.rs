@@ -1,5 +1,4 @@
 use crate::{
-    rhythm::beat_time::BeatTimeRhythm,
     time::{SampleTimeDisplay, TimeBase},
     SampleTime, SecondTimeBase,
 };
@@ -27,7 +26,9 @@ impl BeatTimeBase {
 
 impl From<BeatTimeBase> for SecondTimeBase {
     fn from(val: BeatTimeBase) -> Self {
-        SecondTimeBase { samples_per_sec: val.samples_per_sec }
+        SecondTimeBase {
+            samples_per_sec: val.samples_per_sec,
+        }
     }
 }
 
@@ -64,7 +65,7 @@ pub enum BeatTimeStep {
 }
 
 impl BeatTimeStep {
-    /// Get number of steps in the current time range.
+    /// Get number of steps in the current time resolution.
     pub fn steps(&self) -> f32 {
         match *self {
             BeatTimeStep::SixtyFourth(amount) => amount,
@@ -75,7 +76,7 @@ impl BeatTimeStep {
             BeatTimeStep::Bar(amount) => amount,
         }
     }
-    /// Set number of steps in the current time range.
+    /// Set number of steps in the current time resolution.
     pub fn set_steps(&mut self, step: f32) {
         match *self {
             BeatTimeStep::SixtyFourth(_) => *self = BeatTimeStep::SixtyFourth(step),
@@ -104,28 +105,8 @@ impl BeatTimeStep {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-
-macro_rules! generate_step_funcs {
-    ($name:ident, $type:expr) => {
-        paste::paste! {
-            pub fn [<every_nth_ $name>](
-                &self,
-                step: f32,
-            ) -> BeatTimeRhythm {
-                self.every_nth_step($type(step))
-            }
-        }
-    };
-}
-
-/// Shortcuts for creating beat-time based patterns.
-impl BeatTimeBase {
-    pub fn every_nth_step(&self, step: BeatTimeStep) -> BeatTimeRhythm {
-        BeatTimeRhythm::new(*self, step)
+impl Default for BeatTimeStep {
+    fn default() -> Self {
+        Self::Beats(0.0)
     }
-    generate_step_funcs!(sixteenth, BeatTimeStep::Sixteenth);
-    generate_step_funcs!(eighth, BeatTimeStep::Eighth);
-    generate_step_funcs!(beat, BeatTimeStep::Beats);
-    generate_step_funcs!(bar, BeatTimeStep::Bar);
 }

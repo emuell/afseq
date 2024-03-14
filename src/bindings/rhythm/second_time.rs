@@ -44,8 +44,7 @@ impl SecondTimeRhythm {
             }
         }
         // create a new SecondTimeRhythm with the given time base and step
-        let mut rhythm =
-            SecondTimeRhythm::new_with_seed(SecondTimeBase::from(*time_base), resolution, rand_seed);
+        let mut rhythm = SecondTimeRhythm::new_with_seed(*time_base, resolution, rand_seed);
         // offset
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")? as SecondTimeStep;

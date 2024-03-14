@@ -198,7 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ]),
     );
 
-    let fx_pattern = second_time
+    let fx_pattern = beat_time
         .every_nth_seconds(8.0)
         .with_instrument(FX)
         .trigger(new_polyphonic_note_sequence_event(vec![

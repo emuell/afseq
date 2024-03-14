@@ -9,28 +9,34 @@ use crate::{
     BeatTimeBase, SampleTime,
 };
 
+// -------------------------------------------------------------------------------------------------
+
 pub mod beat_time;
 pub mod second_time;
+mod generic;
 
 #[cfg(feature = "tidal")]
 pub mod tidal;
+
+#[cfg(doc)]
+use super::EventIter;
 
 // -------------------------------------------------------------------------------------------------
 
 /// A `RhythmSampleIter` is an iterator which emits optional [`Event`] in sample-rate resolution.
 ///
-/// It triggers events periodically, producing events at a specific sample time.
+/// It triggers events periodically, producing events at at specific sample times.
 /// An audio player can then use the sample time to schedule those events within the audio stream.
 ///
-/// RhythmIterator impls typically will use a [EventIter][`super::EventIter`] to produce one or
+/// RhythmSampleIter impls typically will use a [`EventIter`] to produce one or
 /// multiple note or parameter change events. The event iter impl is an iterator too, so the
 /// emitted content may dynamically change over time as well.
-/// 
+///
 /// Iter item tuple args are: `(sample_time, optional_event, event_duration_in_samples)`.
 pub trait RhythmSampleIter:
     Iterator<Item = (SampleTime, Option<Event>, SampleTime)> + Debug
 {
-    /// Create a sample time display printer, which serializes the given sample time to the Rhythm's
+    /// Create a sample time display printer, which serializes the given sample time to the emitter's
     /// time base as appropriated (in seconds or beats). May be useful for debugging purposes.
     fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay>;
 
@@ -48,10 +54,11 @@ pub trait RhythmSampleIter:
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `Rhythm` is a dyn clonable `RhythmSampleIter` with instrument and time base access.
+/// A `Rhythm` is a resettable, dyn clonable `RhythmSampleIter` with optional instrument and 
+/// time base setters.
 ///
-/// Rhythms can be reset and cloned (duplicated), so that they can be triggered multiple times using
-/// possibly different patterns and time bases.
+/// Rhythms can be reset and cloned (duplicated), so that they can be triggered multiple times
+/// using possibly different patterns and time bases.
 pub trait Rhythm: RhythmSampleIter {
     /// Length in samples of a single step in the rhythm's internal pattern.
     fn pattern_step_length(&self) -> f64;
@@ -60,8 +67,8 @@ pub trait Rhythm: RhythmSampleIter {
     fn pattern_length(&self) -> usize;
 
     /// Set or update the rhythm's internal beat or second time bases with a new time base.
-    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
+
     /// Set/unset a new default instrument value for all emitted note events which have no
     /// instrument value set.
     fn set_instrument(&mut self, instrument: Option<InstrumentId>);

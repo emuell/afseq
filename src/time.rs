@@ -8,14 +8,17 @@ pub use beats::{BeatTimeBase, BeatTimeStep};
 mod seconds;
 pub use seconds::{SecondTimeBase, SecondTimeStep};
 
+#[cfg(doc)]
+use crate::RhythmSampleIter;
+
 // -------------------------------------------------------------------------------------------------
 
-/// Sample time value type emitted by the [Rhythm](`crate::Rhythm`) trait.
+/// Sample time value type as emitted by [RhythmSampleIter].
 pub type SampleTime = u64;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Displays sample times as strings in various formats
+/// Displays sample times as strings in various time bases.
 pub trait SampleTimeDisplay: Debug {
     /// generate a string representation of the the given sample time
     fn display(&self, sample_time: SampleTime) -> String;
@@ -23,7 +26,7 @@ pub trait SampleTimeDisplay: Debug {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Basic time trait, providing samples <-> second rate conversion only.
+/// Basic time trait, providing sample <-> second rate conversion only.
 pub trait TimeBase: Debug {
     /// Sample rate for the time base.  
     fn samples_per_second(&self) -> u32;
@@ -35,5 +38,8 @@ pub trait TimeBase: Debug {
     /// Convert given second duration in samples, using this time bases' samples per second rate.
     fn seconds_to_samples(&self, seconds: f64) -> SampleTime {
         (seconds * self.samples_per_second() as f64).trunc() as SampleTime
+    }
+    fn seconds_to_samples_exact(&self, seconds: f64) -> f64 {
+        seconds * self.samples_per_second() as f64
     }
 }
