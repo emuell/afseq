@@ -1,12 +1,8 @@
-//! Combine multiple `Phrase` iterators into a single one, in order to play them sequentially.
-
-use std::{cell::RefCell, rc::Rc};
+//! Arrange multiple `Phrase`S into a single `Emitter`.
 
 use crate::{
-    event::{Event, InstrumentId},
-    phrase::RhythmIndex,
-    time::SampleTimeDisplay,
-    BeatTimeBase, Phrase, Rhythm, RhythmSampleIter, SampleTime,
+    event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
+    RhythmSampleIter, SampleTime,
 };
 
 #[cfg(doc)]
@@ -56,6 +52,26 @@ impl Sequence {
     /// Read-only borrowed access to our phrases.
     pub fn phrases(&self) -> &Vec<Phrase> {
         &self.phrases
+    }
+
+    /// Set the time base for all rhythms in our phrases.
+    pub fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        for phrase in self.phrases.iter_mut() {
+            phrase.set_time_base(time_base);
+        }
+    }
+
+    /// Reset all rhythms in our phrases to their initial state.
+    pub fn reset(&mut self) {
+        // reset sample offset
+        self.sample_offset = 0;
+        // reset our own iter state
+        self.sample_position = 0;
+        self.sample_position_in_phrase = 0;
+        // reset all our phrase iters
+        for phrase in self.phrases.iter_mut() {
+            phrase.reset()
+        }
     }
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
@@ -149,45 +165,6 @@ impl RhythmSampleIter for Sequence {
         sample_time: SampleTime,
     ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
         self.next_event_until_time(sample_time)
-    }
-}
-
-impl Rhythm for Sequence {
-    fn pattern_step_length(&self) -> f64 {
-        self.current_phrase().pattern_step_length()
-    }
-
-    fn pattern_length(&self) -> usize {
-        self.current_phrase().pattern_length()
-    }
-
-    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
-        for phrase in self.phrases.iter_mut() {
-            phrase.set_time_base(time_base);
-        }
-    }
-
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        // reset all our phrase iters
-        for phrase in self.phrases.iter_mut() {
-            phrase.set_instrument(instrument)
-        }
-    }
-
-    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
-        Rc::new(RefCell::new(self.clone()))
-    }
-
-    fn reset(&mut self) {
-        // reset sample offset
-        self.sample_offset = 0;
-        // reset our own iter state
-        self.sample_position = 0;
-        self.sample_position_in_phrase = 0;
-        // reset all our phrase iters
-        for phrase in self.phrases.iter_mut() {
-            phrase.reset()
-        }
     }
 }
 
