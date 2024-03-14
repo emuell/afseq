@@ -8,12 +8,9 @@ pub use beats::{BeatTimeBase, BeatTimeStep};
 mod seconds;
 pub use seconds::{SecondTimeBase, SecondTimeStep};
 
-#[cfg(doc)]
-use crate::RhythmSampleIter;
-
 // -------------------------------------------------------------------------------------------------
 
-/// Sample time value type as emitted by [RhythmSampleIter].
+/// Sample time value type as emitted by [RhythmIter](`crate::RhythmIter`).
 pub type SampleTime = u64;
 
 // -------------------------------------------------------------------------------------------------

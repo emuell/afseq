@@ -28,7 +28,7 @@ pub mod gate;
 pub use gate::Gate;
 
 pub mod rhythm;
-pub use rhythm::{Rhythm, RhythmSampleIter};
+pub use rhythm::{Rhythm, RhythmIter};
 
 pub mod phrase;
 pub use phrase::Phrase;

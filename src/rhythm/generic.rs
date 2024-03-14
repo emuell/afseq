@@ -10,7 +10,7 @@ use crate::{
     gate::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
-    Gate, Rhythm, RhythmSampleIter, SampleTime,
+    Gate, Rhythm, RhythmIter, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -202,12 +202,21 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     }
 }
 
-impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Iterator
+impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
     for GenericRhythm<Step, Offset>
 {
-    type Item = (SampleTime, Option<Event>, SampleTime);
+    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
+        Box::new(self.time_base)
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn sample_offset(&self) -> SampleTime {
+        self.sample_offset
+    }
+    fn set_sample_offset(&mut self, sample_offset: SampleTime) {
+        self.sample_offset = sample_offset
+    }
+
+    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)> {
         let mut pattern = self.pattern.borrow_mut();
         if pattern.is_empty() {
             None
@@ -228,23 +237,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Iterator
             Some((sample_time, event, event_duration))
         }
     }
-}
 
-impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmSampleIter
-    for GenericRhythm<Step, Offset>
-{
-    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
-        Box::new(self.time_base)
-    }
-
-    fn sample_offset(&self) -> SampleTime {
-        self.sample_offset
-    }
-    fn set_sample_offset(&mut self, sample_offset: SampleTime) {
-        self.sample_offset = sample_offset
-    }
-
-    fn next_until_time(
+    fn run_until_time(
         &mut self,
         sample_time: SampleTime,
     ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
@@ -253,7 +247,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmSampleIte
         // check if the next event is scheduled before the given target time
         let next_sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
         if next_sample_time < sample_time {
-            self.next()
+            self.run()
         } else {
             None
         }

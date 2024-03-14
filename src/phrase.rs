@@ -6,7 +6,7 @@ use crate::{
     event::{Event, InstrumentId},
     prelude::BeatTimeStep,
     time::SampleTimeDisplay,
-    BeatTimeBase, Rhythm, RhythmSampleIter, SampleTime,
+    BeatTimeBase, Rhythm, RhythmIter, SampleTime,
 };
 
 #[cfg(doc)]
@@ -106,7 +106,7 @@ impl Phrase {
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
     /// function for all emitted events to consume them.
-    pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
+    pub fn emit_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
         F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
@@ -163,7 +163,7 @@ impl Phrase {
                     RhythmSlot::Stop | RhythmSlot::Continue => *next_event = None,
                     RhythmSlot::Rhythm(rhythm) => {
                         if let Some((sample_time, event, event_duration)) =
-                            rhythm.borrow_mut().next_until_time(sample_time)
+                            rhythm.borrow_mut().run_until_time(sample_time)
                         {
                             *next_event = Some((rhythm_index, sample_time, event, event_duration));
                         } else {
@@ -211,21 +211,7 @@ impl Phrase {
     }
 }
 
-impl Iterator for Phrase {
-    type Item = (SampleTime, Option<Event>, SampleTime);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some((_, sample_time, event, event_duration)) =
-            self.next_event_until_time(SampleTime::MAX)
-        {
-            Some((sample_time, event, event_duration))
-        } else {
-            None
-        }
-    }
-}
-
-impl RhythmSampleIter for Phrase {
+impl RhythmIter for Phrase {
     fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
     }
@@ -237,7 +223,17 @@ impl RhythmSampleIter for Phrase {
         self.sample_offset = sample_offset
     }
 
-    fn next_until_time(
+    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)> {
+        if let Some((_, sample_time, event, event_duration)) =
+            self.next_event_until_time(SampleTime::MAX)
+        {
+            Some((sample_time, event, event_duration))
+        } else {
+            None
+        }
+    }
+
+    fn run_until_time(
         &mut self,
         sample_time: SampleTime,
     ) -> Option<(SampleTime, Option<Event>, SampleTime)> {

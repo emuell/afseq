@@ -2,7 +2,7 @@
 
 use crate::{
     event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
-    RhythmSampleIter, SampleTime,
+    RhythmIter, SampleTime,
 };
 
 #[cfg(doc)]
@@ -76,7 +76,7 @@ impl Sequence {
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
     /// function for all emitted events to consume them.
-    pub fn run_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
+    pub fn emit_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
     where
         F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
@@ -93,7 +93,7 @@ impl Sequence {
                 // run current phrase until it ends
                 let sample_position = self.sample_position;
                 self.current_phrase_mut()
-                    .run_until_time(sample_position + next_phrase_start, consumer);
+                    .emit_until_time(sample_position + next_phrase_start, consumer);
                 // select next phrase in the sequence
                 let previous_phrase = self.current_phrase_mut().clone();
                 self.phrase_index += 1;
@@ -112,7 +112,7 @@ impl Sequence {
                 // keep running the current phrase
                 let sample_position = self.sample_position;
                 self.current_phrase_mut()
-                    .run_until_time(sample_position + samples_to_run, consumer);
+                    .emit_until_time(sample_position + samples_to_run, consumer);
                 self.sample_position_in_phrase += samples_to_run;
                 self.sample_position += samples_to_run;
             }
@@ -131,7 +131,7 @@ impl Sequence {
         &mut self,
         sample_time: SampleTime,
     ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        let event = self.current_phrase_mut().next_until_time(sample_time);
+        let event = self.current_phrase_mut().run_until_time(sample_time);
         if let Some((sample_time, event, event_duration)) = event {
             Some((sample_time + self.sample_offset, event, event_duration))
         } else {
@@ -140,15 +140,7 @@ impl Sequence {
     }
 }
 
-impl Iterator for Sequence {
-    type Item = (SampleTime, Option<Event>, SampleTime);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_event_until_time(SampleTime::MAX)
-    }
-}
-
-impl RhythmSampleIter for Sequence {
+impl RhythmIter for Sequence {
     fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
         Box::new(self.time_base)
     }
@@ -160,7 +152,11 @@ impl RhythmSampleIter for Sequence {
         self.sample_offset = sample_offset
     }
 
-    fn next_until_time(
+    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)> {
+        self.next_event_until_time(SampleTime::MAX)
+    }
+
+    fn run_until_time(
         &mut self,
         sample_time: SampleTime,
     ) -> Option<(SampleTime, Option<Event>, SampleTime)> {

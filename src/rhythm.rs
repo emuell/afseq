@@ -12,8 +12,8 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 pub mod beat_time;
-pub mod second_time;
 mod generic;
+pub mod second_time;
 
 #[cfg(feature = "tidal")]
 pub mod tidal;
@@ -23,19 +23,17 @@ use super::EventIter;
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `RhythmSampleIter` is an iterator which emits optional [`Event`] in sample-rate resolution.
+/// A `RhythmIter` is an iterator which emits optional [`Event`] in sample-rate resolution.
 ///
 /// It triggers events periodically, producing events at at specific sample times.
 /// An audio player can then use the sample time to schedule those events within the audio stream.
 ///
-/// RhythmSampleIter impls typically will use a [`EventIter`] to produce one or
+/// RhythmIter impls typically will use a [`EventIter`] to produce one or
 /// multiple note or parameter change events. The event iter impl is an iterator too, so the
 /// emitted content may dynamically change over time as well.
 ///
 /// Iter item tuple args are: `(sample_time, optional_event, event_duration_in_samples)`.
-pub trait RhythmSampleIter:
-    Iterator<Item = (SampleTime, Option<Event>, SampleTime)> + Debug
-{
+pub trait RhythmIter: Debug {
     /// Create a sample time display printer, which serializes the given sample time to the emitter's
     /// time base as appropriated (in seconds or beats). May be useful for debugging purposes.
     fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay>;
@@ -45,8 +43,12 @@ pub trait RhythmSampleIter:
     /// Set a new custom sample offset value.
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
-    /// Sample time iter: returns self.next() up and until the given sample time
-    fn next_until_time(
+    /// Step iter: runs pattern iter to generate a new pulse and then generate an event from
+    /// the event iter.  
+    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)>;
+
+    /// Sample time iter: returns self.run() up and until the given sample time is reached.
+    fn run_until_time(
         &mut self,
         sample_time: SampleTime,
     ) -> Option<(SampleTime, Option<Event>, SampleTime)>;
@@ -54,12 +56,23 @@ pub trait RhythmSampleIter:
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `Rhythm` is a resettable, dyn clonable `RhythmSampleIter` with optional instrument and 
+/// Standard iterator impl for RhythmIter.
+impl Iterator for dyn RhythmIter {
+    type Item = (SampleTime, Option<Event>, SampleTime);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.run()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// A `Rhythm` is a resettable, dyn clonable `RhythmIter` with optional instrument and
 /// time base setters.
 ///
 /// Rhythms can be reset and cloned (duplicated), so that they can be triggered multiple times
 /// using possibly different patterns and time bases.
-pub trait Rhythm: RhythmSampleIter {
+pub trait Rhythm: RhythmIter {
     /// Length in samples of a single step in the rhythm's internal pattern.
     fn pattern_step_length(&self) -> f64;
     /// Get length in steps of the rhythm's internal pattern (cycle length in steps).

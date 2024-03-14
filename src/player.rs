@@ -17,7 +17,7 @@ use afplay::{
 use crate::{
     event::{unique_instrument_id, InstrumentId},
     time::TimeBase,
-    Event, Note, RhythmSampleIter, SampleTime, Sequence,
+    Event, Note, RhythmIter, SampleTime, Sequence,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ impl SamplePlayer {
     }
 
     fn seek_sequence_until_time(&mut self, sequence: &mut Sequence, sample_time: SampleTime) {
-        sequence.run_until_time(sample_time, &mut |_, _, _, _| {
+        sequence.emit_until_time(sample_time, &mut |_, _, _, _| {
             // ignore all events
         });
     }
@@ -297,7 +297,7 @@ impl SamplePlayer {
         sample_time: SampleTime,
     ) {
         let time_display = sequence.sample_time_display();
-        sequence.run_until_time(
+        sequence.emit_until_time(
             sample_time,
             &mut |rhythm_index, sample_time, event: Option<Event>, event_duration| {
                 // print
