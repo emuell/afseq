@@ -44,14 +44,6 @@ impl Pattern for FixedPattern {
         self.pulses.iter().fold(0, |sum, pulse| sum + pulse.len())
     }
 
-    fn peek(&self) -> PulseIterItem {
-        if let Some(mut pulse_iter) = self.pulse_iter.clone() {
-            pulse_iter.next().unwrap_or_default()
-        } else {
-            PulseIterItem::default()
-        }
-    }
-
     fn run(&mut self) -> PulseIterItem {
         assert!(!self.is_empty(), "Can't run empty patterns");
         // if we have a pulse iterator, consume it

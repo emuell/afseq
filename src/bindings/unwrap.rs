@@ -621,7 +621,6 @@ pub(crate) fn event_iter_from_value(
     timeout_hook: &LuaTimeoutHook,
     value: LuaValue,
     time_base: &BeatTimeBase,
-    pattern: Rc<RefCell<dyn Pattern>>,
 ) -> LuaResult<Rc<RefCell<dyn EventIter>>> {
     match value {
         LuaValue::UserData(userdata) => {
@@ -642,8 +641,8 @@ pub(crate) fn event_iter_from_value(
             }
         }
         LuaValue::Function(function) => {
-            let iter = ScriptedEventIter::new(lua, timeout_hook, function, time_base, pattern)?;
-            Ok(Rc::new(RefCell::new(iter)))
+            let event_iter = ScriptedEventIter::new(lua, timeout_hook, function, time_base)?;
+            Ok(Rc::new(RefCell::new(event_iter)))
         }
         LuaValue::Table(ref table) => {
             // convert an array alike table to a event sequence
@@ -657,14 +656,14 @@ pub(crate) fn event_iter_from_value(
             }
             // convert table to a single note event
             else {
-                let iter = note_event_from_value(value, None)?.to_event();
-                Ok(Rc::new(RefCell::new(iter)))
+                let event_iter = note_event_from_value(value, None)?.to_event();
+                Ok(Rc::new(RefCell::new(event_iter)))
             }
         }
         _ => {
             // try converting a note number or note/chord string to an event iter
-            let iter = note_events_from_value(value, None)?.to_event();
-            Ok(Rc::new(RefCell::new(iter)))
+            let event_iter = note_events_from_value(value, None)?.to_event();
+            Ok(Rc::new(RefCell::new(event_iter)))
         }
     }
 }

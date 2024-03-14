@@ -58,17 +58,16 @@ impl BeatTimeRhythm {
             rhythm = rhythm.with_offset(new_step);
         }
         // pattern
-        let mut pattern = rhythm.pattern();
         if table.contains_key("pattern")? {
             let value = table.get::<&str, LuaValue>("pattern")?;
-            pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
+            let pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(Rc::clone(&pattern));
         }
         // emit
         if table.contains_key("emit")? {
             let value = table.get::<&str, LuaValue>("emit")?;
-            let iter = event_iter_from_value(lua, timeout_hook, value, time_base, pattern)?;
-            rhythm = rhythm.trigger_dyn(iter);
+            let event_iter = event_iter_from_value(lua, timeout_hook, value, time_base)?;
+            rhythm = rhythm.trigger_dyn(event_iter);
         }
         Ok(rhythm)
     }

@@ -29,11 +29,13 @@ impl FixedEventIter {
     }
 }
 
-impl Iterator for FixedEventIter {
-    type Item = Event;
+impl EventIter for FixedEventIter {
+    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.events.is_empty() {
+    fn run(&mut self, _pulse: crate::PulseIterItem, emit_event: bool) -> Option<Event> {
+        if !emit_event || self.events.is_empty() {
             return None;
         }
         let event = self.events[self.event_index].clone();
@@ -42,12 +44,6 @@ impl Iterator for FixedEventIter {
             self.event_index = 0;
         }
         Some(event)
-    }
-}
-
-impl EventIter for FixedEventIter {
-    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
-        // nothing to do
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {

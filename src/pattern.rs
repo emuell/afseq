@@ -12,7 +12,7 @@ pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Interface for a pulse pattern generator as used by [Rhythm](`crate::Rhythm`).
+/// Interface for a pulse pattern iterator as used by [Rhythm](`crate::Rhythm`).
 pub trait Pattern: Debug {
     /// Returns if there is a valid pattern. If empty, it can't be run.
     fn is_empty(&self) -> bool {
@@ -23,8 +23,6 @@ pub trait Pattern: Debug {
     /// self.is_empty will still be true.
     fn len(&self) -> usize;
 
-    /// Returns the next pulse in the pattern without running it.
-    fn peek(&self) -> PulseIterItem;
     /// Run and move the pattern by a single step and return the to emitted pulse.
     fn run(&mut self) -> PulseIterItem;
 
@@ -40,4 +38,15 @@ pub trait Pattern: Debug {
     /// Reset the pattern genertor, so it emits the same values as if it was freshly initialized.
     /// This does to reset the pattern itself, but onlt the pattern playback position.
     fn reset(&mut self);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Standard Iterator impl for Pattern. Pattern iters do repeat endlessly.
+impl Iterator for dyn Pattern {
+    type Item = PulseIterItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.run())
+    }
 }

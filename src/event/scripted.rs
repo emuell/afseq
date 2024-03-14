@@ -4,34 +4,21 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        initialize_context_pulse_count, initialize_context_pulse_value,
-        initialize_context_step_count, initialize_context_time_base, initialize_emitter_context,
-        new_note_events_from_lua, LuaTimeoutHook,
+        callback::LuaFunctionCallback, initialize_context_pulse_count,
+        initialize_context_pulse_value, initialize_context_step_count,
+        initialize_context_time_base, initialize_emitter_context, new_note_events_from_lua,
+        timeout::LuaTimeoutHook,
     },
-    BeatTimeBase, Event, EventIter, Pattern, PulseIterItem,
+    BeatTimeBase, Event, EventIter, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-fn function_name(function: &LuaOwnedFunction) -> String {
-    function
-        .to_ref()
-        .info()
-        .name
-        .unwrap_or("annonymous function".to_string())
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// EventIter impl, which calls an existing lua script function to generate new events.
+/// eventiter impl, which calls an existing lua script function to generate new events.
 #[derive(Debug, Clone)]
 pub struct ScriptedEventIter {
     timeout_hook: LuaTimeoutHook,
-    function_environment: Option<LuaOwnedTable>,
-    function_generator: Option<LuaOwnedFunction>,
-    function_context: LuaOwnedTable,
-    function: LuaOwnedFunction,
-    current_pulse: PulseIterItem,
+    function: LuaFunctionCallback,
     pulse_count: usize,
     pulse_time_count: f64,
     step_count: usize,
@@ -44,139 +31,57 @@ impl ScriptedEventIter {
         timeout_hook: &LuaTimeoutHook,
         function: LuaFunction<'_>,
         time_base: &BeatTimeBase,
-        pattern: Rc<RefCell<dyn Pattern>>,
     ) -> LuaResult<Self> {
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
         timeout_hook.reset();
-        // create a new function context
+        // create a new function
+        let mut function = LuaFunctionCallback::new(lua, function)?;
+        // initialize emitter context for the function
         let step_count = 0;
         let step_time_count = 0.0;
         let pulse_count = 0;
         let pulse_time_count = 0.0;
-        let mut function_context = lua.create_table()?.into_owned();
-        let pattern = pattern.borrow();
+        let pulse = PulseIterItem::default();
         initialize_emitter_context(
-            &mut function_context,
+            function.context(),
             time_base,
-            pattern.peek(),
+            pulse,
             pulse_count,
             pulse_time_count,
             step_count,
             step_time_count,
         )?;
-        // immediately fetch/evaluate the first event and get its environment, so we can immediately
-        // show errors from the function and can reset the environment later on to this state.
-        let result = function.call::<_, LuaValue>(function_context.to_ref())?;
-        if let Some(inner_function) = result.as_function() {
-            // function returned a function -> is an iterator. use inner function instead.
-            let function_context = function_context.clone();
-            let function_environment = function.environment().map(|env| env.into_owned());
-            let function_generator = Some(function.clone().into_owned());
-            let result = inner_function.call::<_, LuaValue>(function_context.to_ref())?;
-            // evaluate and forget the result, just to show errors from the function, if any.
-            new_note_events_from_lua(result, None)?;
-            // then fetch a new fresh function from the generator
-            let function = function
-                .call::<_, LuaValue>(function_context.to_ref())?
-                .as_function()
-                .ok_or_else(|| {
-                    LuaError::runtime(
-                        "Generator function does not return a valid emitter function".to_string(),
-                    )
-                })?
-                .clone()
-                .into_owned();
-            let current_pulse = pattern.peek();
-            Ok(Self {
-                timeout_hook,
-                function_context,
-                function_environment,
-                function_generator,
-                function,
-                current_pulse,
-                pulse_count,
-                pulse_time_count,
-                step_count,
-                step_time_count,
-            })
-        } else {
-            // function returned an event. use this function.
-            let function_environment = None;
-            let function_generator = None;
-            let function = function.into_owned();
-            // evaluate and forget the result, just to show errors from the function, if any.
-            new_note_events_from_lua(result, None)?;
-            let current_pulse = PulseIterItem::default();
-            Ok(Self {
-                timeout_hook,
-                function_context,
-                function_environment,
-                function_generator,
-                function,
-                current_pulse,
-                pulse_count,
-                pulse_time_count,
-                step_count,
-                step_time_count,
-            })
-        }
+        Ok(Self {
+            timeout_hook,
+            function,
+            pulse_count,
+            pulse_time_count,
+            step_count,
+            step_time_count,
+        })
     }
 
-    fn next_event(&mut self, move_step: bool) -> LuaResult<Event> {
+    fn next_event(&mut self, pulse: PulseIterItem) -> LuaResult<Event> {
         // reset timeout
         self.timeout_hook.reset();
-        // update function context with the pulse
-        if let Err(err) =
-            initialize_context_pulse_value(&mut self.function_context, self.current_pulse)
-        {
-            log::warn!(
-                "Failed to update context for custom event iter function '{}': {}",
-                function_name(&self.function),
-                err
-            );
-        }
-        // move step counters and update function context
-        if move_step {
-            self.pulse_count += 1;
-            self.pulse_time_count += self.current_pulse.step_time;
-            initialize_context_pulse_count(
-                &mut self.function_context,
-                self.pulse_count,
-                self.pulse_time_count,
-            )?;
-            self.step_count += 1;
-            self.step_time_count += self.current_pulse.step_time;
-            initialize_context_step_count(
-                &mut self.function_context,
-                self.step_count,
-                self.step_time_count,
-            )?;
-        }
-        // call function with context and evaluate result
-        let result = self
-            .function
-            .call::<_, LuaValue>(self.function_context.to_ref())?;
-        Ok(Event::NoteEvents(new_note_events_from_lua(result, None)?))
-    }
-}
-
-impl Iterator for ScriptedEventIter {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let move_step = true;
-        match self.next_event(move_step) {
-            Ok(event) => Some(event),
-            Err(err) => {
-                log::warn!(
-                    "Failed to run custom event emitter func '{}': {}",
-                    function_name(&self.function),
-                    err
-                );
-                None
-            }
-        }
+        // update function context
+        initialize_context_pulse_value(self.function.context(), pulse)?;
+        initialize_context_pulse_count(
+            self.function.context(),
+            self.pulse_count,
+            self.pulse_time_count,
+        )?;
+        initialize_context_step_count(
+            self.function.context(),
+            self.step_count,
+            self.step_time_count,
+        )?;
+        // call function with the context and evaluate the result
+        Ok(Event::NoteEvents(new_note_events_from_lua(
+            self.function.call()?,
+            None,
+        )?))
     }
 }
 
@@ -185,21 +90,34 @@ impl EventIter for ScriptedEventIter {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new time base
-        if let Err(err) = initialize_context_time_base(&mut self.function_context, time_base) {
+        if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
             log::warn!(
                 "Failed to update context for custom event iter function '{}': {}",
-                function_name(&self.function),
+                self.function.name(),
                 err
             );
         }
     }
 
     fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Event> {
-        // memorize pulse for our next() impl
-        self.current_pulse = pulse;
-        // generate a new event or only update pulse counters for the next generated event
+        // generate a new event and move or only update pulse counters
         if emit_event {
-            self.next()
+            let event = match self.next_event(pulse) {
+                Ok(event) => Some(event),
+                Err(err) => {
+                    log::warn!(
+                        "Failed to run custom event emitter func '{}': {}",
+                        self.function.name(),
+                        err
+                    );
+                    None
+                }
+            };
+            self.pulse_count += 1;
+            self.pulse_time_count += pulse.step_time;
+            self.step_count += 1;
+            self.step_time_count += pulse.step_time;
+            event
         } else {
             self.pulse_count += 1;
             self.pulse_time_count += pulse.step_time;
@@ -217,65 +135,33 @@ impl EventIter for ScriptedEventIter {
         // reset step counter
         self.step_count = 0;
         self.step_time_count = 0.0;
-        if let Err(err) = initialize_context_step_count(
-            &mut self.function_context,
-            self.step_count,
-            self.step_time_count,
-        ) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                function_name(&self.function),
-                err
-            );
-        }
         self.pulse_count = 0;
         self.pulse_time_count = 0.0;
-        if let Err(err) = initialize_context_pulse_count(
-            &mut self.function_context,
-            self.pulse_count,
-            self.pulse_time_count,
-        ) {
+        if let Err(err) = initialize_context_step_count(
+            self.function.context(),
+            self.step_count,
+            self.step_time_count,
+        )
+        .and_then(|_| {
+            initialize_context_pulse_count(
+                self.function.context(),
+                self.pulse_count,
+                self.pulse_time_count,
+            )
+        }) {
             log::warn!(
                 "Failed to update context for custom pattern function '{}': {}",
-                function_name(&self.function),
+                self.function.name(),
                 err
             );
         }
-        // restore generator function environment
-        if let Some(function_generator) = &self.function_generator {
-            if let Some(env) = &self.function_environment {
-                if let Err(err) = function_generator.to_ref().set_environment(env.to_ref()) {
-                    log::warn!(
-                        "Failed to restore custom event emitter func environment '{}': {}",
-                        function_name(function_generator),
-                        err
-                    );
-                }
-            }
-            // then fetch a new fresh function from the generator
-            let result = function_generator
-                .to_ref()
-                .call::<_, LuaValue>(self.function_context.to_ref());
-            match result {
-                Err(err) => {
-                    log::warn!(
-                        "Failed to call custom event emitter generator function '{}': {}",
-                        function_name(function_generator),
-                        err
-                    );
-                }
-                Ok(value) => {
-                    if let Some(function) = value.as_function() {
-                        self.function = function.clone().into_owned();
-                    } else {
-                        log::warn!(
-                            "Failed to call custom event emitter generator function '{}': {}",
-                            function_name(function_generator),
-                            "Generator does not return a valid emitter function"
-                        );
-                    }
-                }
-            };
+        // restore function
+        if let Err(err) = self.function.reset() {
+            log::warn!(
+                "Failed to restore custom event emitter func environment '{}': {}",
+                self.function.name(),
+                err
+            );
         }
     }
 }

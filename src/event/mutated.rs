@@ -63,23 +63,23 @@ impl Debug for MutatedEventIter {
     }
 }
 
-impl Iterator for MutatedEventIter {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let event = self.events[self.event_index].clone();
-        self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
-        self.event_index += 1;
-        if self.event_index >= self.events.len() {
-            self.event_index = 0;
-        }
-        Some(event)
-    }
-}
-
 impl EventIter for MutatedEventIter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
+    }
+
+    fn run(&mut self, _pulse: crate::PulseIterItem, emit_event: bool) -> Option<Event> {
+        if emit_event {
+            let event = self.events[self.event_index].clone();
+            self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
+            self.event_index += 1;
+            if self.event_index >= self.events.len() {
+                self.event_index = 0;
+            }
+            Some(event)
+        } else {
+            None
+        }
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {

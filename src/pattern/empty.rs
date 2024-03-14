@@ -23,13 +23,6 @@ impl Pattern for EmptyPattern {
         0
     }
 
-    fn peek(&self) -> PulseIterItem {
-        PulseIterItem {
-            value: 0.0,
-            step_time: 1.0,
-        }
-    }
-
     fn run(&mut self) -> PulseIterItem {
         panic!("Empty patterns should not be run");
     }

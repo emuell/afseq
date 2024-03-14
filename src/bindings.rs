@@ -1,11 +1,6 @@
 //! Lua script bindings for the entire crate.
 
-use std::{
-    cell::RefCell,
-    env,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{cell::RefCell, env, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -14,6 +9,11 @@ use lazy_static::lazy_static;
 use mlua::{chunk, prelude::*};
 
 // ---------------------------------------------------------------------------------------------
+
+pub(crate) mod callback;
+
+pub(crate) mod timeout;
+use timeout::LuaTimeoutHook;
 
 mod rhythm;
 use rhythm::rhythm_from_userdata;
@@ -37,84 +37,6 @@ use crate::{
     time::BeatTimeBase,
     Pulse, PulseIterItem, Scale,
 };
-
-// -------------------------------------------------------------------------------------------------
-
-// Limits script execution time and aborts execution when a script runs too long. This way e.g.
-// never ending loops are stopped automatically with a timeout error.
-//
-// While constructed, it checks every few instructions if a timeout duration has been reached
-// and then aborts the script by firing an error.
-// When cloning and instance, it will use the existing hook, so ensure to call `reset` before
-// invoking new lua functions. The last instance that get's dropped will then remove the hook.
-#[derive(Debug)]
-pub(crate) struct LuaTimeoutHook {
-    active: Rc<RefCell<usize>>,
-    start: Rc<RefCell<Instant>>,
-}
-
-impl LuaTimeoutHook {
-    // default number of ms a script may run before a timeout error is fired.
-    // assumes scripts are running in a real-time alike context.
-    const DEFAULT_TIMEOUT: Duration = Duration::from_millis(200);
-
-    fn new(lua: &Lua) -> Self {
-        Self::new_with_timeout(lua, Self::DEFAULT_TIMEOUT)
-    }
-
-    fn new_with_timeout(lua: &Lua, timeout: Duration) -> Self {
-        let active = Rc::new(RefCell::new(1));
-        let start = Rc::new(RefCell::new(Instant::now()));
-        lua.set_hook(LuaHookTriggers::new().every_nth_instruction(timeout.as_millis() as u32), {
-            let active = Rc::clone(&active);
-            let start = Rc::clone(&start);
-            move |lua, _debug| {
-                if *active.borrow() > 0 {
-                    if start.borrow().elapsed() > timeout {
-                        *start.borrow_mut() = Instant::now();
-                        Err(LuaError::RuntimeError(
-                            String::from("Script timeout. ")
-                                + &format!("Execution took longer than {} ms to complete.\n", timeout.as_millis())
-                                + "Please avoid overhead and check for never ending loops in your script. "
-                                + "Also note that the script is running in real-time thread!",
-                        ))
-                    } else {
-                        Ok(())
-                    }
-                } else {
-                    lua.remove_hook();
-                    Ok(())
-                }
-            }
-        });
-        Self { active, start }
-    }
-
-    // reset timestamp of the hook when running e.g. a callback again
-    pub(crate) fn reset(&mut self) {
-        *self.start.borrow_mut() = Instant::now();
-    }
-}
-
-impl Clone for LuaTimeoutHook {
-    fn clone(&self) -> Self {
-        // increase active isntances refcount
-        *self.active.borrow_mut() += 1;
-        // return a direct clone otherwise
-        Self {
-            active: Rc::clone(&self.active),
-            start: Rc::clone(&self.start),
-        }
-    }
-}
-
-impl Drop for LuaTimeoutHook {
-    fn drop(&mut self) {
-        // decrease active instance refcount.
-        *self.active.borrow_mut() -= 1;
-        // when reaching 0, this will remove the hook in the hook itself
-    }
-}
 
 // ---------------------------------------------------------------------------------------------
 

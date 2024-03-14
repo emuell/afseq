@@ -336,9 +336,9 @@ impl Display for Event {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A resettable [`Event`] iterator, which will be used in [Rhythm](`super::Rhythm`) trait impls
-/// to emit events.
-pub trait EventIter: Iterator<Item = Event> + Debug {
+/// A resettable [`Event`] iterator, triggered via [`Pulse`](`crate::Pulse`)S.
+/// Used by [Rhythm](`crate::Rhythm`) to emit events from pulse patterns.
+pub trait EventIter: Debug {
     /// Update the iterator's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
@@ -347,13 +347,7 @@ pub trait EventIter: Iterator<Item = Event> + Debug {
     /// `pulse` contains the current value and timing information for the current step in the pattern.
     /// `emit_event` indicates whether the iterator should trigger the next event in the sequence as
     /// evaluated by the rhythm's gate.
-    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Event> {
-        if emit_event {
-            self.next()
-        } else {
-            None
-        }
-    }
+    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Event>;
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible
@@ -362,4 +356,20 @@ pub trait EventIter: Iterator<Item = Event> + Debug {
 
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Standard Iterator impl for EventIter. Runs the EventIter with a 1 valued Pulse.
+impl Iterator for dyn EventIter {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let pulse = PulseIterItem {
+            value: 1.0,
+            step_time: 1.0,
+        };
+        let emit_event = true;
+        self.run(pulse, emit_event)
+    }
 }

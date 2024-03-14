@@ -11,17 +11,13 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct EmptyEventIter {}
 
-impl Iterator for EmptyEventIter {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        None
-    }
-}
-
 impl EventIter for EmptyEventIter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
+    }
+
+    fn run(&mut self, _pulse: crate::PulseIterItem, _emit_event: bool) -> Option<Event> {
+        None
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
