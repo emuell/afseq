@@ -72,17 +72,27 @@ impl ScriptedEventIter {
             // function returned a function -> is an iterator. use inner function instead.
             let function_context = function_context.clone();
             let function_environment = function.environment().map(|env| env.into_owned());
-            let function_generator = Some(function.into_owned());
-            let function = inner_function.clone().into_owned();
-            let result = function.call::<_, LuaValue>(function_context.to_ref())?;
+            let function_generator = Some(function.clone().into_owned());
+            let result = inner_function.call::<_, LuaValue>(function_context.to_ref())?;
             // evaluate and forget the result, just to show errors from the function, if any.
             new_note_events_from_lua(result, None)?;
-            let current_pulse = PulseIterItem::default();
+            // then fetch a new fresh function from the generator
+            let function = function
+                .call::<_, LuaValue>(function_context.to_ref())?
+                .as_function()
+                .ok_or_else(|| {
+                    LuaError::runtime(
+                        "Generator function does not return a valid emitter function".to_string(),
+                    )
+                })?
+                .clone()
+                .into_owned();
+            let current_pulse = pattern.peek();
             Ok(Self {
                 timeout_hook,
+                function_context,
                 function_environment,
                 function_generator,
-                function_context,
                 function,
                 current_pulse,
                 pulse_count,
@@ -100,9 +110,9 @@ impl ScriptedEventIter {
             let current_pulse = PulseIterItem::default();
             Ok(Self {
                 timeout_hook,
+                function_context,
                 function_environment,
                 function_generator,
-                function_context,
                 function,
                 current_pulse,
                 pulse_count,

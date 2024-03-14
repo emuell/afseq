@@ -14,7 +14,7 @@ return emitter {
     local SCALE_STEP_COUNT = 8
     local VOLUME_STEP_COUNT = 32
 
-    local note_step = 2
+    local note_step = 1
     local scale_index = 1
 
     local volume_step = 4
@@ -27,7 +27,6 @@ return emitter {
           :totable()
       -- move note step
       local note = notes[math.floor(note_step % #notes) + 1]
-      note_step = note_step + 1
       -- move scale step
       scale_index = (math.floor(math.floor(note_step / #notes) / SCALE_STEP_COUNT) % #scales) + 1
       -- move volume step
@@ -39,6 +38,7 @@ return emitter {
       if volume_step >= VOLUME_STEP_COUNT or volume_step == 0 then
         volume_direction = -volume_direction
       end
+      note_step = note_step + 1
       -- return final note
       if note == 0 then
         return {}
