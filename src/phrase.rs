@@ -6,31 +6,21 @@ use crate::{
     event::{Event, InstrumentId},
     prelude::BeatTimeStep,
     time::SampleTimeDisplay,
-    BeatTimeBase, Rhythm, RhythmIter, SampleTime,
+    BeatTimeBase, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
 };
-
-#[cfg(doc)]
-use crate::Sequence;
-
-// -------------------------------------------------------------------------------------------------
-
-/// Rhythm index in `RhythmEvent`.
-pub type RhythmIndex = usize;
-/// Event as emitted by Phrase, tagged with a sample time, event duration and rhythm index.
-pub type RhythmEvent = (RhythmIndex, SampleTime, Option<Event>, SampleTime);
 
 // -------------------------------------------------------------------------------------------------
 
 /// A single slot in a [`Phrase`] vector.
 #[derive(Clone, Debug)]
 pub enum RhythmSlot {
-    /// Stop previous playing rhythm and/or simply play nothing.
-    /// This can be useful to create empty placeholder slots in e.g. a [`Sequence`].
+    /// Stop previous playing rhythm and/or simply play nothing. This can be useful to
+    /// create empty placeholder slots in e.g. a [Sequence][`crate::Sequence`].
     Stop,
-    /// Continue playing a previously played rhythm in a [`Sequence`].
+    /// Continue playing a previously played rhythm in a [Sequence][`crate::Sequence`].
     Continue,
-    /// Play a shared rhytm in this slot.
-    /// NB: This is a shared reference, in order to resolve 'Continue' modes in sequences.
+    /// Play a shared rhytm in this slot. NB: This is a shared reference, in order to
+    /// resolve 'Continue' modes in a [Sequence](`crate::Sequence`).
     Rhythm(Rc<RefCell<dyn Rhythm>>),
 }
 
@@ -53,6 +43,13 @@ impl From<Rc<RefCell<dyn Rhythm>>> for RhythmSlot {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Rhythm index in `PhraseIterItem`.
+pub type RhythmIndex = usize;
+/// Event as emitted by the Phrase, tagged with an additional rhythm index.
+pub type PhraseIterItem = (RhythmIndex, RhythmIterItem);
+
+// -------------------------------------------------------------------------------------------------
+
 /// Combines multiple [`Rhythm`] into a new one, allowing to form more complex rhythms that are
 /// meant to run together. Further it allows to run/evaluate rhythms until a specific sample time
 /// is reached.
@@ -60,13 +57,14 @@ impl From<Rc<RefCell<dyn Rhythm>>> for RhythmSlot {
 /// An example phrase is a drum-kit pattern where each instrument's pattern is defined separately
 /// and then is combined into a single "big" pattern to play the entire kit together.
 ///
-/// The `run_until_time` function is also used by [`Sequence`] to play a phrase with a player engine.
+/// The `run_until_time` function is also used by [Sequence][`crate::Sequence`] to play a phrase 
+/// with a player engine.
 #[derive(Clone, Debug)]
 pub struct Phrase {
     time_base: BeatTimeBase,
     length: BeatTimeStep,
     rhythm_slots: Vec<RhythmSlot>,
-    next_events: Vec<Option<RhythmEvent>>,
+    next_events: Vec<Option<PhraseIterItem>>,
     sample_offset: SampleTime,
 }
 
@@ -94,7 +92,7 @@ impl Phrase {
     }
 
     /// Read-only access to our phrase length.
-    /// This is applied in [`Sequence`] only.
+    /// This is applied in [Sequence][`crate::Sequence`] only.
     pub fn length(&self) -> BeatTimeStep {
         self.length
     }
@@ -111,11 +109,9 @@ impl Phrase {
         F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
         // emit next events until we've reached the desired sample_time
-        while let Some((rhythm_index, sample_time, event, event_duration)) =
-            self.next_event_until_time(run_until_time)
-        {
-            assert!(sample_time < run_until_time);
-            consumer(rhythm_index, sample_time, event, event_duration);
+        while let Some((rhythm_index, event)) = self.next_event_until_time(run_until_time) {
+            assert!(event.sample_time < run_until_time);
+            consumer(rhythm_index, event.sample_time, event.event, event.duration);
         }
     }
 
@@ -149,7 +145,7 @@ impl Phrase {
         }
     }
 
-    fn next_event_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmEvent> {
+    fn next_event_until_time(&mut self, sample_time: SampleTime) -> Option<PhraseIterItem> {
         // fetch next events in all rhythms
         for (rhythm_index, (rhythm_slot, next_event)) in self
             .rhythm_slots
@@ -162,10 +158,8 @@ impl Phrase {
                     // NB: Continue mode is resolved by the Sequence - if not, it should behave like Stop
                     RhythmSlot::Stop | RhythmSlot::Continue => *next_event = None,
                     RhythmSlot::Rhythm(rhythm) => {
-                        if let Some((sample_time, event, event_duration)) =
-                            rhythm.borrow_mut().run_until_time(sample_time)
-                        {
-                            *next_event = Some((rhythm_index, sample_time, event, event_duration));
+                        if let Some(event) = rhythm.borrow_mut().run_until_time(sample_time) {
+                            *next_event = Some((rhythm_index, event));
                         } else {
                             *next_event = None;
                         }
@@ -175,9 +169,9 @@ impl Phrase {
         }
         // select the next from all pre-fetched events with the smallest sample time
         let next_due = self.next_events.iter_mut().reduce(|min, next| {
-            if let Some((_, min_sample_time, _, _)) = min {
-                if let Some((_, next_sample_time, _, _)) = next {
-                    match min_sample_time.cmp(&next_sample_time) {
+            if let Some((_, min_event)) = min {
+                if let Some((_, next_event)) = next {
+                    match min_event.sample_time.cmp(&next_event.sample_time) {
                         Ordering::Less | Ordering::Equal => min,
                         Ordering::Greater => next,
                     }
@@ -189,16 +183,10 @@ impl Phrase {
             }
         });
         if let Some(next_due) = next_due {
-            if let Some((rhythm_index, event_sample_time, event, event_duration)) = next_due.clone()
-            {
-                if event_sample_time < sample_time {
+            if let Some((rhythm_index, event)) = next_due.clone() {
+                if event.sample_time < sample_time {
                     *next_due = None; // consume
-                    Some((
-                        rhythm_index,
-                        self.sample_offset + event_sample_time,
-                        event,
-                        event_duration,
-                    ))
+                    Some((rhythm_index, event.with_offset(self.sample_offset)))
                 } else {
                     None // not yet due
                 }
@@ -208,6 +196,15 @@ impl Phrase {
         } else {
             None
         }
+    }
+}
+
+/// Custom iterator impl for phrases:
+/// returning a tuple of the rhythm index and the rhythm event.
+impl Iterator for Phrase {
+    type Item = PhraseIterItem;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_event_until_time(SampleTime::MAX)
     }
 }
 
@@ -223,24 +220,9 @@ impl RhythmIter for Phrase {
         self.sample_offset = sample_offset
     }
 
-    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        if let Some((_, sample_time, event, event_duration)) =
-            self.next_event_until_time(SampleTime::MAX)
-        {
-            Some((sample_time, event, event_duration))
-        } else {
-            None
-        }
-    }
-
-    fn run_until_time(
-        &mut self,
-        sample_time: SampleTime,
-    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        if let Some((_, sample_time, event, event_duration)) =
-            self.next_event_until_time(sample_time)
-        {
-            Some((sample_time, event, event_duration))
+    fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
+        if let Some((_, event)) = self.next_event_until_time(sample_time) {
+            Some(event)
         } else {
             None
         }

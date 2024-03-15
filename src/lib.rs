@@ -4,7 +4,7 @@
 #![warn(clippy::clone_on_ref_ptr)]
 
 pub mod time;
-pub use time::{BeatTimeBase, SampleTime, SecondTimeBase};
+pub use time::{BeatTimeBase, SampleTime, SecondTimeBase, TimeBase};
 
 pub mod note;
 pub use note::Note;
@@ -28,7 +28,7 @@ pub mod gate;
 pub use gate::Gate;
 
 pub mod rhythm;
-pub use rhythm::{Rhythm, RhythmIter};
+pub use rhythm::{Rhythm, RhythmIter, RhythmIterItem};
 
 pub mod phrase;
 pub use phrase::Phrase;

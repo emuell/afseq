@@ -55,7 +55,13 @@ pub(crate) fn rhythm_from_userdata(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{bindings::*, event::Event, note::Note, time::BeatTimeStep};
+    use crate::{
+        bindings::*,
+        event::Event,
+        note::Note,
+        rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, RhythmIterItem},
+        time::BeatTimeStep,
+    };
 
     #[test]
     fn beat_time() {
@@ -126,17 +132,17 @@ mod test {
         let event = beat_time_rhythm.next();
         assert_eq!(
             event,
-            Some((
-                44100,
-                Some(Event::NoteEvents(vec![Some(NoteEvent {
+            Some(RhythmIterItem {
+                sample_time: 44100,
+                event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C6,
                     volume: 1.0,
                     panning: 0.0,
                     delay: 0.0
                 })])),
-                11025
-            ))
+                duration: 11025
+            })
         );
 
         // BeatTimeRhythm function Context
@@ -199,22 +205,22 @@ mod test {
         let event = beat_time_rhythm.next();
         assert_eq!(
             event,
-            Some((
-                0,
-                Some(Event::NoteEvents(vec![Some(NoteEvent {
+            Some(RhythmIterItem {
+                sample_time: 0,
+                event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C4,
                     volume: 1.0,
                     panning: 0.0,
                     delay: 0.0
                 })])),
-                11025,
-            ))
+                duration: 11025,
+            })
         );
-        assert!(beat_time_rhythm.next().unwrap().1.is_none());
+        assert!(beat_time_rhythm.next().unwrap().event.is_none());
         for _ in 0..10 {
-            assert!(beat_time_rhythm.next().unwrap().1.is_some());
-            assert!(beat_time_rhythm.next().unwrap().1.is_none());
+            assert!(beat_time_rhythm.next().unwrap().event.is_some());
+            assert!(beat_time_rhythm.next().unwrap().event.is_none());
         }
     }
 
@@ -310,17 +316,17 @@ mod test {
         let event = second_time_rhythm.unwrap().next();
         assert_eq!(
             event,
-            Some((
-                0,
-                Some(Event::NoteEvents(vec![Some(NoteEvent {
+            Some(RhythmIterItem {
+                sample_time: 0,
+                event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C4,
                     volume: 1.0,
                     panning: 0.0,
                     delay: 0.0
                 })],),),
-                48
-            ))
+                duration: 48
+            })
         );
     }
 }

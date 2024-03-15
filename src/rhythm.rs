@@ -12,27 +12,45 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 pub mod beat_time;
-mod generic;
+pub(crate) mod generic;
 pub mod second_time;
 
 #[cfg(feature = "tidal")]
 pub mod tidal;
 
-#[cfg(doc)]
-use super::EventIter;
+// -------------------------------------------------------------------------------------------------
+
+/// Iter item as produced by RhythmIter
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RhythmIterItem {
+    pub sample_time: SampleTime,
+    pub event: Option<Event>,
+    pub duration: SampleTime,
+}
+
+impl RhythmIterItem {
+    /// Create a new `RhythmIterItem` with the given sample offset
+    /// added to the iter items sample time.
+    pub fn with_offset(self, offset: SampleTime) -> Self {
+        Self {
+            sample_time: self.sample_time + offset,
+            ..self
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `RhythmIter` is an iterator which emits optional [`Event`] in sample-rate resolution.
+/// A `RhythmIter` is an iterator which emits sample time tagged optional [Event](`crate::Event`)
+/// items.
 ///
-/// It triggers events periodically, producing events at at specific sample times.
-/// An audio player can then use the sample time to schedule those events within the audio stream.
+/// It triggers events periodically, producing events at specific sample times with specific
+/// pulse durations. An audio player can use the sample time to schedule those events within the
+/// audio stream.
 ///
-/// RhythmIter impls typically will use a [`EventIter`] to produce one or
-/// multiple note or parameter change events. The event iter impl is an iterator too, so the
-/// emitted content may dynamically change over time as well.
-///
-/// Iter item tuple args are: `(sample_time, optional_event, event_duration_in_samples)`.
+/// `RhythmIter` impls typically will use a [EventIter](`crate::EventIter`) to produce one or
+/// multiple notes, or a sigle parameter change event. The event iter impl is an iterator too,
+/// so the emitted event content may dynamically change over time as well.
 pub trait RhythmIter: Debug {
     /// Create a sample time display printer, which serializes the given sample time to the emitter's
     /// time base as appropriated (in seconds or beats). May be useful for debugging purposes.
@@ -43,22 +61,20 @@ pub trait RhythmIter: Debug {
     /// Set a new custom sample offset value.
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
-    /// Step iter: runs pattern iter to generate a new pulse and then generate an event from
-    /// the event iter.  
-    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)>;
-
-    /// Sample time iter: returns self.run() up and until the given sample time is reached.
-    fn run_until_time(
-        &mut self,
-        sample_time: SampleTime,
-    ) -> Option<(SampleTime, Option<Event>, SampleTime)>;
+    /// Step iter: runs pattern to generate a new pulse, then generates an event from the event iter.  
+    fn run(&mut self) -> Option<RhythmIterItem> {
+        self.run_until_time(SampleTime::MAX)
+    }
+    /// Sample time iter: runs pattern to generate a new pulse if the pulse's sample time is smaller
+    /// that the given sample time. Then generates an event from the event iter and returns it.  
+    fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem>;
 }
 
 // -------------------------------------------------------------------------------------------------
 
 /// Standard iterator impl for RhythmIter.
 impl Iterator for dyn RhythmIter {
-    type Item = (SampleTime, Option<Event>, SampleTime);
+    type Item = RhythmIterItem;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.run()

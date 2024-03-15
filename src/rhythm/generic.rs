@@ -10,7 +10,7 @@ use crate::{
     gate::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
-    Gate, Rhythm, RhythmIter, SampleTime,
+    Gate, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -202,6 +202,16 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     }
 }
 
+impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Iterator
+    for GenericRhythm<Step, Offset>
+{
+    type Item = RhythmIterItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.run()
+    }
+}
+
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
     for GenericRhythm<Step, Offset>
 {
@@ -216,41 +226,39 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         self.sample_offset = sample_offset
     }
 
-    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        let mut pattern = self.pattern.borrow_mut();
-        if pattern.is_empty() {
-            None
-        } else {
-            // generate a pulse from the pattern
-            let pulse = pattern.run();
-            // pass pulse to gate
-            let emit_event = self.gate.borrow_mut().run(&pulse);
-            // generate an event from the event iter
-            let mut event_iter = self.event_iter.borrow_mut();
-            let event = self.event_with_default_instrument(event_iter.run(pulse, emit_event));
-            // return event as sample timed rhythm iter item
-            let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-            let event_duration =
-                (self.step.to_samples(&self.time_base) * pulse.step_time) as SampleTime;
-            self.event_iter_next_sample_time +=
-                self.step.to_samples(&self.time_base) * pulse.step_time;
-            Some((sample_time, event, event_duration))
-        }
-    }
-
-    fn run_until_time(
-        &mut self,
-        sample_time: SampleTime,
-    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        // memorize target sample time for self.set_time_base updates
-        self.event_iter_sample_time = sample_time;
+    fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
         // check if the next event is scheduled before the given target time
+        self.event_iter_sample_time = sample_time;
         let next_sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-        if next_sample_time < sample_time {
-            self.run()
-        } else {
-            None
+        if next_sample_time >= sample_time {
+            // next event is not yet due
+            return None;
         }
+        // generate a pulse from the pattern and pass the pulse to the gate
+        let (pulse, emit_event) = {
+            let mut pattern = self.pattern.borrow_mut();
+            if pattern.is_empty() {
+                // no pattern, no events to emit
+                return None;
+            }
+            let pulse = pattern.run();
+            let emit_event = self.gate.borrow_mut().run(&pulse);
+            (pulse, emit_event)
+        };
+        // generate an event from the event iter
+        let event = {
+            let mut event_iter = self.event_iter.borrow_mut();
+            self.event_with_default_instrument(event_iter.run(pulse, emit_event))
+        };
+        // return event as sample timed rhythm iter item
+        let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
+        self.event_iter_next_sample_time += self.step.to_samples(&self.time_base) * pulse.step_time;
+        let duration = (self.step.to_samples(&self.time_base) * pulse.step_time) as SampleTime;
+        Some(RhythmIterItem {
+            sample_time,
+            event,
+            duration,
+        })
     }
 }
 

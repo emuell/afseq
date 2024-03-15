@@ -1,8 +1,10 @@
 //! Arrange multiple `Phrase`S into a single `Emitter`.
 
 use crate::{
-    event::Event, phrase::RhythmIndex, time::SampleTimeDisplay, BeatTimeBase, Phrase, Rhythm,
-    RhythmIter, SampleTime,
+    event::Event,
+    phrase::{PhraseIterItem, RhythmIndex},
+    time::SampleTimeDisplay,
+    BeatTimeBase, Phrase, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
 };
 
 #[cfg(doc)]
@@ -126,17 +128,17 @@ impl Sequence {
     fn current_phrase_mut(&mut self) -> &mut Phrase {
         &mut self.phrases[self.phrase_index]
     }
+}
 
-    fn next_event_until_time(
-        &mut self,
-        sample_time: SampleTime,
-    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        let event = self.current_phrase_mut().run_until_time(sample_time);
-        if let Some((sample_time, event, event_duration)) = event {
-            Some((sample_time + self.sample_offset, event, event_duration))
-        } else {
-            None
-        }
+/// Custom iterator impl for sequences:
+/// returning a tuple of the current phrase's rhythm index and the rhythm event.
+impl Iterator for Sequence {
+    type Item = PhraseIterItem;
+    
+    fn next(&mut self) -> Option<Self::Item> {
+        self.current_phrase_mut()
+            .next()
+            .map(|(index, event)| (index, event.with_offset(self.sample_offset)))
     }
 }
 
@@ -152,15 +154,11 @@ impl RhythmIter for Sequence {
         self.sample_offset = sample_offset
     }
 
-    fn run(&mut self) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        self.next_event_until_time(SampleTime::MAX)
-    }
-
-    fn run_until_time(
-        &mut self,
-        sample_time: SampleTime,
-    ) -> Option<(SampleTime, Option<Event>, SampleTime)> {
-        self.next_event_until_time(sample_time)
+    fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
+        // fetch next event from the current phrase and add sample offset to the event
+        self.current_phrase_mut()
+            .run_until_time(sample_time)
+            .map(|event| event.with_offset(self.sample_offset))
     }
 }
 
