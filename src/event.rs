@@ -10,7 +10,7 @@ use core::{
     fmt::Display,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 pub mod empty;
 pub mod fixed;
@@ -342,6 +342,9 @@ pub trait EventIter: Debug {
     /// Update the iterator's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
+
+    /// Set optional, application specific external context data for the event iter.
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Move iterator with the given pulse value forward.
     /// `pulse` contains the current value and timing information for the current step in the pattern.

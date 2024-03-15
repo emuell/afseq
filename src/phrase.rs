@@ -1,6 +1,6 @@
 //! Stack multiple `Rhythm`S into a single one.
 
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{Event, InstrumentId},
@@ -57,7 +57,7 @@ pub type PhraseIterItem = (RhythmIndex, RhythmIterItem);
 /// An example phrase is a drum-kit pattern where each instrument's pattern is defined separately
 /// and then is combined into a single "big" pattern to play the entire kit together.
 ///
-/// The `run_until_time` function is also used by [Sequence][`crate::Sequence`] to play a phrase 
+/// The `run_until_time` function is also used by [Sequence][`crate::Sequence`] to play a phrase
 /// with a player engine.
 #[derive(Clone, Debug)]
 pub struct Phrase {
@@ -252,6 +252,14 @@ impl Rhythm for Phrase {
         for rhythm_slot in self.rhythm_slots.iter_mut() {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
                 rhythm.borrow_mut().set_instrument(instrument)
+            }
+        }
+    }
+
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        for rhythm_slot in self.rhythm_slots.iter_mut() {
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.borrow_mut().set_external_context(data)
             }
         }
     }

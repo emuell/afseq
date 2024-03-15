@@ -1,6 +1,6 @@
 //! Generic `Rhythm` implementation with custom time step and offset types.
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
 
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -290,6 +290,11 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
 
     fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
         self.instrument = instrument;
+    }
+
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        self.pattern.borrow_mut().set_external_context(data);
+        self.event_iter.borrow_mut().set_external_context(data);
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {

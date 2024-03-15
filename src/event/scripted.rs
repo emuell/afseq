@@ -1,13 +1,13 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaFunctionCallback, initialize_context_pulse_count,
-        initialize_context_pulse_value, initialize_context_step_count,
-        initialize_context_time_base, initialize_emitter_context, new_note_events_from_lua,
-        timeout::LuaTimeoutHook,
+        callback::LuaFunctionCallback, initialize_context_external_data,
+        initialize_context_pulse_count, initialize_context_pulse_value,
+        initialize_context_step_count, initialize_context_time_base, initialize_emitter_context,
+        new_note_events_from_lua, timeout::LuaTimeoutHook,
     },
     BeatTimeBase, Event, EventIter, PulseIterItem,
 };
@@ -93,6 +93,17 @@ impl EventIter for ScriptedEventIter {
         if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
             log::warn!(
                 "Failed to update context for custom event iter function '{}': {}",
+                self.function.name(),
+                err
+            );
+        }
+    }
+
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        // update function context from the new time base
+        if let Err(err) = initialize_context_external_data(self.function.context(), data) {
+            log::warn!(
+                "Failed to update context for custom pattern function '{}': {}",
                 self.function.name(),
                 err
             );

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter},
@@ -65,6 +65,10 @@ impl Debug for MutatedEventIter {
 
 impl EventIter for MutatedEventIter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
+    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
         // nothing to do
     }
 

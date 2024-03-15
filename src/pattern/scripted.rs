@@ -1,12 +1,12 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaFunctionCallback, initialize_context_pulse_count,
-        initialize_context_time_base, initialize_pattern_context, pattern_pulse_from_lua,
-        timeout::LuaTimeoutHook,
+        callback::LuaFunctionCallback, initialize_context_external_data,
+        initialize_context_pulse_count, initialize_context_time_base, initialize_pattern_context,
+        pattern_pulse_from_lua, timeout::LuaTimeoutHook,
     },
     BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
 };
@@ -79,6 +79,28 @@ impl Pattern for ScriptedPattern {
         }
     }
 
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        // update function context from the new time base
+        if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
+            log::warn!(
+                "Failed to update context for custom pattern function '{}': {}",
+                self.function.name(),
+                err
+            );
+        }
+    }
+
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        // update function context from the new time base
+        if let Err(err) = initialize_context_external_data(self.function.context(), data) {
+            log::warn!(
+                "Failed to update context for custom pattern function '{}': {}",
+                self.function.name(),
+                err
+            );
+        }
+    }
+
     fn run(&mut self) -> PulseIterItem {
         // if we have a pulse iterator, consume it
         if let Some(pulse_iter) = &mut self.pulse_iter {
@@ -112,17 +134,6 @@ impl Pattern for ScriptedPattern {
         self.pulse_time_count += pulse_item.step_time;
         // return the next pulse item
         pulse_item
-    }
-
-    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
-        // update function context from the new time base
-        if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                self.function.name(),
-                err
-            );
-        }
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {

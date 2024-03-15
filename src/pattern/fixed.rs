@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem};
 
@@ -44,6 +44,14 @@ impl Pattern for FixedPattern {
         self.pulses.iter().fold(0, |sum, pulse| sum + pulse.len())
     }
 
+    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
+    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+        // nothing to do
+    }
+
     fn run(&mut self) -> PulseIterItem {
         assert!(!self.is_empty(), "Can't run empty patterns");
         // if we have a pulse iterator, consume it
@@ -62,10 +70,6 @@ impl Pattern for FixedPattern {
         let pulse = pulse_iter.next().unwrap_or(PulseIterItem::default());
         self.pulse_iter = Some(pulse_iter);
         pulse
-    }
-
-    fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
-        // nothing to do
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {

@@ -1,6 +1,6 @@
 //! Rhythmical pattern as sequence of pulses in a `Rhythm`.
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{BeatTimeBase, PulseIterItem};
 
@@ -29,6 +29,9 @@ pub trait Pattern: Debug {
     /// Set or update the pattern's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
+
+    /// Set optional, application specific external context data for the pattern.
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible

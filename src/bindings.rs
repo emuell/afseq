@@ -1,6 +1,6 @@
 //! Lua script bindings for the entire crate.
 
-use std::{cell::RefCell, env, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, env, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -173,6 +173,20 @@ pub(crate) fn initialize_context_time_base(
     table.raw_set("beats_per_min", time_base.beats_per_min)?;
     table.raw_set("beats_per_bar", time_base.beats_per_bar)?;
     table.raw_set("sample_rate", time_base.samples_per_sec)?;
+    Ok(())
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Set or update external app data of the given emitter context.
+pub(crate) fn initialize_context_external_data(
+    table: &mut LuaOwnedTable,
+    data: &[(Cow<str>, f64)]
+) -> LuaResult<()> {
+    let table = table.to_ref();
+    for (key, value) in data {
+        table.raw_set(key as &str, *value)?;
+    }
     Ok(())
 }
 

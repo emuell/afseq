@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{BeatTimeBase, Pattern, PulseIterItem};
 
@@ -23,12 +23,16 @@ impl Pattern for EmptyPattern {
         0
     }
 
-    fn run(&mut self) -> PulseIterItem {
-        panic!("Empty patterns should not be run");
-    }
-
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
+    }
+
+    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+        // nothing to do
+    }
+
+    fn run(&mut self) -> PulseIterItem {
+        panic!("Empty patterns should not be run");
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {
