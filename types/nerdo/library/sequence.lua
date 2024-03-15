@@ -11,7 +11,6 @@
 Sequence = {}
 
 ---Create a copy of all or some notes in the sequence with transposed note values.
----@param self Sequence
 ---@param step integer|integer[]
 ---@return Sequence
 ---### examples:
@@ -19,10 +18,9 @@ Sequence = {}
 ---sequence("c4", "d#5"):transpose(12)
 ---sequence(note("c'maj"), note("c'maj")):transpose({0, 5})
 ---```
-function Sequence.transpose(self, step) end
+function Sequence:transpose(step) end
 
 ---Create a copy of all or some notes in the sequence with amplified volume values.
----@param self Sequence
 ---@param factor number|number[] 
 ---@return Sequence
 ---### examples:
@@ -30,10 +28,9 @@ function Sequence.transpose(self, step) end
 ---sequence({"c4 0.5", "g4"}):amplify(0.5)
 ---sequence("c'maj 0.5"):amplify({2.0, 1.0, 0.3})
 ---```
-function Sequence.amplify(self, factor) end
+function Sequence:amplify(factor) end
 
 ---Create a copy of all or some notes in the sequence with new volume values.
----@param self Sequence
 ---@param volume number|number[] 
 ---@return Sequence
 ---### examples:
@@ -42,19 +39,17 @@ function Sequence.amplify(self, factor) end
 ---sequence("c'maj"):with_volume(0.5)
 ---sequence("c'maj"):with_volume({0.1, 0.2, 0.3})
 ---```
-function Sequence.with_volume(self, volume) end
+function Sequence:with_volume(volume) end
 
 ---Create a copy of all or some notes in the sequence with new panning values.
----@param self Sequence
 ---@param panning number|number[] 
----@return Sequence
-function Sequence.with_delay(self, panning) end
+---@return Note
+function Sequence:with_panning(panning) end
 
 ---Create a copy of all or some notes in the sequence with new delay values.
----@param self Sequence
----@param panning number|number[] 
+---@param delay number|number[] 
 ---@return Sequence
-function Sequence.with_delay(self, panning) end
+function Sequence:with_delay(delay) end
 
 ----------------------------------------------------------------------------------------------------
 
