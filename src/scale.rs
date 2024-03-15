@@ -296,6 +296,47 @@ pub enum TransposeStrictness {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Note iterator for notes in a `Scale`.
+#[derive(Debug, Clone)]
+pub struct ScaleNoteIter {
+    root: u8,
+    octave: u8,
+    steps: Vec<usize>,
+    step_index: usize,
+}
+
+impl ScaleNoteIter {
+    fn new(root: u8, octave: u8, steps: Vec<usize>) -> Self {
+        let step_index = 0;
+        Self {
+            root,
+            octave,
+            steps,
+            step_index,
+        }
+    }
+}
+
+impl Iterator for ScaleNoteIter {
+    type Item = Note;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let key = self.root as usize + 12 * self.octave as usize + self.steps[self.step_index];
+        self.step_index += 1;
+        if self.step_index >= self.steps.len() {
+            self.octave += 1;
+            self.step_index = 0;
+        }
+        if key <= 127 {
+            Some(Note::from(key as u8))
+        } else {
+            None
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// A musical scale / mode.
 #[derive(Debug, Clone)]
 pub struct Scale {
@@ -356,14 +397,43 @@ impl Scale {
         self.mode.steps()
     }
 
+    /// Generate a chord from a given degree with the given number of notes.
+    /// `degree` must be in range `[1..=7]`.
+    /// `count` must be in range `[1..=5]`.
+    ///
+    /// # Example:
+    ///
+    /// ```rust
+    /// use afseq::{Note, Scale};
+    /// let scale = Scale::try_from((Note::C4, "major")).unwrap();
+    /// let cmaj = scale.chord_from_degree(1, 3);
+    /// let gmaj7 = scale.chord_from_degree(5, 4);
+    /// ```
+    pub fn chord_from_degree(&self, degree: usize, count: usize) -> Vec<Note> {
+        assert!((1..=7).contains(&degree));
+        assert!((1..=5).contains(&count));
+        self.notes_iter()
+            .skip(degree - 1)
+            .enumerate()
+            .filter(|(index, _)| index % 2 == 0)
+            .take(count)
+            .map(|(_, note)| note)
+            .collect()
+    }
+
+    /// Iterator with ascending list of notes in the scale
+    pub fn notes_iter(&self) -> ScaleNoteIter {
+        ScaleNoteIter::new(self.key, self.octave, self.steps())
+    }
+
     /// Generate an ascending list of notes in the scale, using the Note passed in the
-    /// constructor as root note.
+    /// constructor as root note. Note that unlike note_iter, this will clamp notes
+    /// outside of the valid range to 0x7F
     pub fn notes(&self) -> Vec<Note> {
         self.steps()
-            .iter()
-            .copied()
+            .into_iter()
             .map(|d| d + (self.key as usize) + (12 * self.octave as usize))
-            .map(|v| Note::from(v.clamp(0, 0x7f) as u8))
+            .map(|n| Note::from(n.min(0x7f) as u8))
             .collect()
     }
 
@@ -512,7 +582,7 @@ mod test {
     #[test]
     fn scale_from_string() {
         // debug: print all scale names
-        /* 
+        /*
         let names = Scale::mode_names()
             .into_iter()
             .map(|e| format!("\"{}\"", e))
@@ -586,5 +656,15 @@ mod test {
             ),
             Note::D4
         );
+    }
+
+    #[test]
+    fn chord() -> Result<(), String> {
+        let scale = Scale::new(Note::C4, Mode::try_from("major")?);
+        let cmaj = scale.chord_from_degree(1, 3);
+        let gmaj7 = scale.chord_from_degree(5, 4);
+        assert!(cmaj == vec![Note::C4, Note::E4, Note::G4]);
+        assert!(gmaj7 == vec![Note::G4, Note::B4, Note::D5, Note::F5]);
+        Ok(())
     }
 }
