@@ -133,7 +133,7 @@ mod test {
         assert_eq!(
             event,
             Some(RhythmIterItem {
-                sample_time: 44100,
+                time: 44100,
                 event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C6,
@@ -206,7 +206,7 @@ mod test {
         assert_eq!(
             event,
             Some(RhythmIterItem {
-                sample_time: 0,
+                time: 0,
                 event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C4,
@@ -317,7 +317,7 @@ mod test {
         assert_eq!(
             event,
             Some(RhythmIterItem {
-                sample_time: 0,
+                time: 0,
                 event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C4,

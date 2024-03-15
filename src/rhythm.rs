@@ -11,19 +11,20 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
-pub mod beat_time;
 pub(crate) mod generic;
+
+pub mod beat_time;
 pub mod second_time;
 
 #[cfg(feature = "tidal")]
-pub mod tidal;
+mod tidal;
 
 // -------------------------------------------------------------------------------------------------
 
 /// Iter item as produced by RhythmIter
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RhythmIterItem {
-    pub sample_time: SampleTime,
+    pub time: SampleTime,
     pub event: Option<Event>,
     pub duration: SampleTime,
 }
@@ -33,7 +34,7 @@ impl RhythmIterItem {
     /// added to the iter items sample time.
     pub fn with_offset(self, offset: SampleTime) -> Self {
         Self {
-            sample_time: self.sample_time + offset,
+            time: self.time + offset,
             ..self
         }
     }

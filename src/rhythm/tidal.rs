@@ -1,5 +1,6 @@
 //! PEST parser for tidal mini-notations, based on the TidalCycles mini-notation. WIP!
 
+#[cfg(test)]
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 
@@ -11,7 +12,8 @@ pub struct ExprParser;
 
 // --------------------------------------------------------------------------------------------------
 
-pub fn parse_mini(pair: Pair<Rule>, level: usize) {
+#[cfg(test)]
+fn parse_mini(pair: Pair<Rule>, level: usize) {
     match pair.as_rule() {
         // container
         Rule::mini => {
@@ -72,7 +74,8 @@ pub fn parse_mini(pair: Pair<Rule>, level: usize) {
     }
 }
 
-pub fn parse(input: &str) {
+#[cfg(test)]
+fn parse(input: &str) {
     let mut parsed = ExprParser::parse(Rule::mini, input).unwrap();
     let level = 0;
     parse_mini(parsed.next().unwrap(), level);

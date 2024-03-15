@@ -110,8 +110,8 @@ impl Phrase {
     {
         // emit next events until we've reached the desired sample_time
         while let Some((rhythm_index, event)) = self.next_event_until_time(run_until_time) {
-            assert!(event.sample_time < run_until_time);
-            consumer(rhythm_index, event.sample_time, event.event, event.duration);
+            assert!(event.time < run_until_time);
+            consumer(rhythm_index, event.time, event.event, event.duration);
         }
     }
 
@@ -171,7 +171,7 @@ impl Phrase {
         let next_due = self.next_events.iter_mut().reduce(|min, next| {
             if let Some((_, min_event)) = min {
                 if let Some((_, next_event)) = next {
-                    match min_event.sample_time.cmp(&next_event.sample_time) {
+                    match min_event.time.cmp(&next_event.time) {
                         Ordering::Less | Ordering::Equal => min,
                         Ordering::Greater => next,
                     }
@@ -184,7 +184,7 @@ impl Phrase {
         });
         if let Some(next_due) = next_due {
             if let Some((rhythm_index, event)) = next_due.clone() {
-                if event.sample_time < sample_time {
+                if event.time < sample_time {
                     *next_due = None; // consume
                     Some((rhythm_index, event.with_offset(self.sample_offset)))
                 } else {

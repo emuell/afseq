@@ -251,11 +251,11 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             self.event_with_default_instrument(event_iter.run(pulse, emit_event))
         };
         // return event as sample timed rhythm iter item
-        let sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-        self.event_iter_next_sample_time += self.step.to_samples(&self.time_base) * pulse.step_time;
+        let time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
         let duration = (self.step.to_samples(&self.time_base) * pulse.step_time) as SampleTime;
+        self.event_iter_next_sample_time += self.step.to_samples(&self.time_base) * pulse.step_time;
         Some(RhythmIterItem {
-            sample_time,
+            time,
             event,
             duration,
         })
