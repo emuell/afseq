@@ -6,8 +6,20 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
+---RENOISE SPECIFIC: Trigger context passed to `pattern` functions/generators.
+---@class TriggerContext
+---
+---Note value that triggered, started the emitter, if any.
+---@field trigger_note integer?
+---Note volume that triggered, started the emitter, if any.
+---@field trigger_volume number?
+---Note slice offset value that triggered, started the emitter, if any.
+---@field trigger_offset integer?
+
+----------------------------------------------------------------------------------------------------
+
 ---Context passed to `pattern` functions/generators.
----@class PatternContext
+---@class PatternContext : TriggerContext
 -----Transport playback running.
 -----TODO: @field playing boolean
 -----Project's tempo in beats per minutes.
