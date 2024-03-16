@@ -10,7 +10,8 @@ use mlua::{chunk, prelude::*};
 
 // ---------------------------------------------------------------------------------------------
 
-pub(crate) mod callback;
+pub mod callback;
+use callback::handle_lua_callback_error;
 
 pub(crate) mod timeout;
 use timeout::LuaTimeoutHook;
@@ -80,7 +81,7 @@ pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
         .to_string();
     lua.load(chunk!(package.path = $cwd.."/assets/lib/?.lua;"..package.path))
         .exec()
-        .unwrap_or_else(|err| log::warn!("Failed to initialize lua engine: {}", err));
+        .unwrap_or_else(|err| handle_lua_callback_error("set_package_path", err));
     // install a timeout hook
     let timeout_hook = LuaTimeoutHook::new(&lua);
     // create new app data
@@ -181,7 +182,7 @@ pub(crate) fn initialize_context_time_base(
 /// Set or update external app data of the given emitter context.
 pub(crate) fn initialize_context_external_data(
     table: &mut LuaOwnedTable,
-    data: &[(Cow<str>, f64)]
+    data: &[(Cow<str>, f64)],
 ) -> LuaResult<()> {
     let table = table.to_ref();
     for (key, value) in data {

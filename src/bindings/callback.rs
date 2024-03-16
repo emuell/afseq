@@ -1,11 +1,62 @@
 use mlua::prelude::*;
 
+use lazy_static::lazy_static;
+use std::sync::RwLock;
+
+// -------------------------------------------------------------------------------------------------
+
+lazy_static! {
+    static ref LUA_CALLBACK_ERRORS: RwLock<Vec<LuaError>> = RwLock::new(Vec::new());
+}
+
+/// Returns true if there are any Lua callback errors.
+pub fn has_lua_callback_errors() -> bool {
+    !LUA_CALLBACK_ERRORS
+        .read()
+        .expect("Failed to lock Lua callback error vector")
+        .is_empty()
+}
+
+/// Returns all Lua callback errors, if any. Check with `has_lua_callback_errors()` to avoid
+/// possible vec clone overhead.
+pub fn lua_callback_errors() -> Vec<LuaError> {
+    LUA_CALLBACK_ERRORS
+        .read()
+        .expect("Failed to lock Lua callback error vector")
+        .clone()
+}
+
+/// Clears all Lua callback errors.
+pub fn clear_lua_callback_errors() {
+    LUA_CALLBACK_ERRORS
+        .write()
+        .expect("Failed to lock Lua callback error vector")
+        .clear();
+}
+
+/// Report a Lua callback errors. The error will be logged and usually cleared after
+/// the next callback call.
+pub(crate) fn handle_lua_callback_error(function_name: &str, err: LuaError) {
+    LUA_CALLBACK_ERRORS
+        .write()
+        .expect("Failed to lock Lua callback error vector")
+        .push(err.clone());
+    log::warn!(
+        "Lua callback '{}' failed to evaluate:\n{}",
+        function_name,
+        err
+    );
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Lazily evaluates a lua function, the first time it's called, to either use it as a generator,
 /// a function which returns a function, or directly as it is.
 ///
 /// When calling the function the signature of the function is `fn(context): LuaResult`;
+/// 
+/// Errors from callbacks should be handled by calling `handle_callback_error` so external clients
+/// can deal with them later, as apropriate.
 ///
 /// The passed context is created as an empty table with the function, and should be filled up
 /// with values in the client who uses the function.

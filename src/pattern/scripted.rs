@@ -4,9 +4,10 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaFunctionCallback, initialize_context_external_data,
-        initialize_context_pulse_count, initialize_context_time_base, initialize_pattern_context,
-        pattern_pulse_from_lua, timeout::LuaTimeoutHook,
+        callback::{handle_lua_callback_error, LuaFunctionCallback},
+        initialize_context_external_data, initialize_context_pulse_count,
+        initialize_context_time_base, initialize_pattern_context, pattern_pulse_from_lua,
+        timeout::LuaTimeoutHook,
     },
     BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
 };
@@ -82,22 +83,14 @@ impl Pattern for ScriptedPattern {
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
         if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
         if let Err(err) = initialize_context_external_data(self.function.context(), data) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
     }
 
@@ -116,11 +109,7 @@ impl Pattern for ScriptedPattern {
         // call function with context and evaluate the result
         let pulse = match self.next_pulse() {
             Err(err) => {
-                log::warn!(
-                    "Failed to call custom pattern function '{}': {}",
-                    self.function.name(),
-                    err
-                );
+                handle_lua_callback_error(&self.function.name(), err);
                 Pulse::from(0.0)
             }
             Ok(pulse) => pulse,
@@ -152,19 +141,11 @@ impl Pattern for ScriptedPattern {
             self.pulse_count,
             self.pulse_time_count,
         ) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
         // reset function
         if let Err(err) = self.function.reset() {
-            log::warn!(
-                "Failed to call custom pattern emitter generator function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
         // reset pulse and pulse iter
         self.pulse = None;

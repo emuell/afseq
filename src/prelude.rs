@@ -8,7 +8,7 @@
 //! ```
 
 pub use super::{
-    // all types to create event iters, gates and patterns
+    // all public types to create event iters, gates and patterns
     event::{
         fixed::ToFixedEventIter, fixed::ToFixedEventIterSequence, mutated::ToMutatedEventIter,
         new_empty_note, new_empty_note_event, new_note, new_note_event, new_note_event_sequence,
@@ -20,7 +20,7 @@ pub use super::{
     phrase::RhythmSlot,
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
     time::{BeatTimeStep, SecondTimeStep},
-    // all basic types
+    // all public basic types
     BeatTimeBase,
     Chord,
     Event,
@@ -43,13 +43,16 @@ pub use super::{
 };
 
 #[cfg(feature = "scripting")]
-// all scripting types
+// all public scripting types
 pub use super::{
-    bindings::{self},
+    bindings::{
+        callback::{clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors},
+        new_rhythm_from_bytecode, new_rhythm_from_file, new_rhythm_from_string,
+    },
     event::scripted::ScriptedEventIter,
     pattern::scripted::ScriptedPattern,
 };
 
 #[cfg(feature = "player")]
-// all player types
+// all public player types
 pub use super::player::{NewNoteAction, SamplePlaybackContext, SamplePlayer, SamplePool};

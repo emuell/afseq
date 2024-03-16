@@ -4,10 +4,11 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaFunctionCallback, initialize_context_external_data,
-        initialize_context_pulse_count, initialize_context_pulse_value,
-        initialize_context_step_count, initialize_context_time_base, initialize_emitter_context,
-        new_note_events_from_lua, timeout::LuaTimeoutHook,
+        callback::{handle_lua_callback_error, LuaFunctionCallback},
+        initialize_context_external_data, initialize_context_pulse_count,
+        initialize_context_pulse_value, initialize_context_step_count,
+        initialize_context_time_base, initialize_emitter_context, new_note_events_from_lua,
+        timeout::LuaTimeoutHook,
     },
     BeatTimeBase, Event, EventIter, PulseIterItem,
 };
@@ -91,22 +92,14 @@ impl EventIter for ScriptedEventIter {
         self.timeout_hook.reset();
         // update function context with the new time base
         if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
-            log::warn!(
-                "Failed to update context for custom event iter function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
         if let Err(err) = initialize_context_external_data(self.function.context(), data) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
     }
 
@@ -116,11 +109,7 @@ impl EventIter for ScriptedEventIter {
             let event = match self.next_event(pulse) {
                 Ok(event) => Some(event),
                 Err(err) => {
-                    log::warn!(
-                        "Failed to run custom event emitter func '{}': {}",
-                        self.function.name(),
-                        err
-                    );
+                    handle_lua_callback_error(&self.function.name(), err);
                     None
                 }
             };
@@ -160,19 +149,11 @@ impl EventIter for ScriptedEventIter {
                 self.pulse_time_count,
             )
         }) {
-            log::warn!(
-                "Failed to update context for custom pattern function '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
         // restore function
         if let Err(err) = self.function.reset() {
-            log::warn!(
-                "Failed to restore custom event emitter func environment '{}': {}",
-                self.function.name(),
-                err
-            );
+            handle_lua_callback_error(&self.function.name(), err);
         }
     }
 }
