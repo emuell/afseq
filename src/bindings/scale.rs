@@ -36,6 +36,9 @@ impl LuaUserData for Scale {
                     };
                     if let Some(value) = args.get(0).unwrap().as_integer() {
                         degree = value as usize;
+                        if !(1..=7).contains(&degree) {
+                            return degree_error();
+                        }
                     } else if let Some(value) = args.get(0).unwrap().as_str() {
                         match value.to_lowercase().as_str() {
                             "i" => degree = 1,
