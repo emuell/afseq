@@ -1,17 +1,25 @@
 //! Lua script bindings for the entire crate.
 
-use std::{borrow::Cow, cell::RefCell, env, rc::Rc};
+use std::{cell::RefCell, env, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use lazy_static::lazy_static;
-use mlua::{chunk, prelude::*};
+
+use mlua::chunk;
+use mlua::prelude::*;
+
+use crate::{
+    event::{InstrumentId, NoteEvent},
+    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
+    time::BeatTimeBase,
+    Pulse, Scale,
+};
 
 // ---------------------------------------------------------------------------------------------
 
 pub mod callback;
-use callback::handle_lua_callback_error;
 
 pub(crate) mod timeout;
 use timeout::LuaTimeoutHook;
@@ -29,15 +37,6 @@ use sequence::SequenceUserData;
 
 mod unwrap;
 use unwrap::*;
-
-// ---------------------------------------------------------------------------------------------
-
-use crate::{
-    event::{InstrumentId, NoteEvent},
-    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
-    time::BeatTimeBase,
-    Pulse, PulseIterItem, Scale,
-};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -67,7 +66,7 @@ impl LuaAppData {
 /// Create a new raw lua engine with preloaded packages, but no bindings. Also returns a timeout
 /// hook instance to limit duration of script calls.
 /// Use [register_bindings] to register the bindings for a newly created engine.
-pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
+pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
     // create a new lua instance with the allowed std libraries
     let lua = Lua::new_with(
         LuaStdLib::STRING | LuaStdLib::TABLE | LuaStdLib::MATH | LuaStdLib::PACKAGE,
@@ -80,14 +79,13 @@ pub(crate) fn new_engine() -> (Lua, LuaTimeoutHook) {
         .to_string_lossy()
         .to_string();
     lua.load(chunk!(package.path = $cwd.."/assets/lib/?.lua;"..package.path))
-        .exec()
-        .unwrap_or_else(|err| handle_lua_callback_error("set_package_path", err));
+        .exec()?;
     // install a timeout hook
     let timeout_hook = LuaTimeoutHook::new(&lua);
     // create new app data
     lua.set_app_data(LuaAppData::new());
     // return the lua instance and timeout manager
-    (lua, timeout_hook)
+    Ok((lua, timeout_hook))
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -99,7 +97,8 @@ pub fn new_rhythm_from_file(
     file_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
-    let (mut lua, mut timeout_hook) = new_engine();
+    let (mut lua, mut timeout_hook) =
+        new_engine().map_err(Into::<Box<dyn std::error::Error>>::into)?;
     register_bindings(&mut lua, &timeout_hook, time_base)?;
     // restart the timeout hook
     timeout_hook.reset();
@@ -118,7 +117,8 @@ pub fn new_rhythm_from_string(
     script_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
-    let (mut lua, mut timeout_hook) = new_engine();
+    let (mut lua, mut timeout_hook) =
+        new_engine().map_err(Into::<Box<dyn std::error::Error>>::into)?;
     register_bindings(&mut lua, &timeout_hook, time_base)?;
     // restart the timeout hook
     timeout_hook.reset();
@@ -137,7 +137,8 @@ pub fn new_rhythm_from_bytecode(
     script_name: &str,
 ) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
-    let (mut lua, mut timeout_hook) = new_engine();
+    let (mut lua, mut timeout_hook) =
+        new_engine().map_err(Into::<Box<dyn std::error::Error>>::into)?;
     register_bindings(&mut lua, &timeout_hook, time_base)?;
     // restart the timeout hook
     timeout_hook.reset();
@@ -165,104 +166,13 @@ pub(crate) fn pattern_pulse_from_lua(value: LuaValue) -> LuaResult<Pulse> {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Set or update the time base of the given emitter context.
-pub(crate) fn initialize_context_time_base(
-    table: &mut LuaOwnedTable,
-    time_base: &BeatTimeBase,
-) -> LuaResult<()> {
-    let table = table.to_ref();
-    table.raw_set("beats_per_min", time_base.beats_per_min)?;
-    table.raw_set("beats_per_bar", time_base.beats_per_bar)?;
-    table.raw_set("sample_rate", time_base.samples_per_sec)?;
-    Ok(())
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Set or update external app data of the given emitter context.
-pub(crate) fn initialize_context_external_data(
-    table: &mut LuaOwnedTable,
-    data: &[(Cow<str>, f64)],
-) -> LuaResult<()> {
-    let table = table.to_ref();
-    for (key, value) in data {
-        table.raw_set(key as &str, *value)?;
-    }
-    Ok(())
-}
-
-/// Set or update the pulse counter of the given emitter context.
-pub(crate) fn initialize_context_pulse_count(
-    table: &mut LuaOwnedTable,
-    pulse_count: usize,
-    pulse_time_count: f64,
-) -> LuaResult<()> {
-    let table = table.to_ref();
-    table.raw_set("pulse_count", pulse_count + 1)?;
-    table.raw_set("pulse_time_count", pulse_time_count)?;
-    Ok(())
-}
-
-/// Set or update the time base and step counter of the given emitter context.
-pub(crate) fn initialize_pattern_context(
-    table: &mut LuaOwnedTable,
-    time_base: &BeatTimeBase,
-    pulse_count: usize,
-    pulse_time_count: f64,
-) -> LuaResult<()> {
-    initialize_context_time_base(table, time_base)?;
-    initialize_context_pulse_count(table, pulse_count, pulse_time_count)?;
-    Ok(())
-}
-
-/// Set or update the step counter of the given emitter context.
-pub(crate) fn initialize_context_step_count(
-    table: &mut LuaOwnedTable,
-    step_count: usize,
-    step_time_count: f64,
-) -> LuaResult<()> {
-    let table = table.to_ref();
-    table.raw_set("step_count", step_count + 1)?;
-    table.raw_set("step_time_count", step_time_count)?;
-    Ok(())
-}
-
-/// Set or update the pulse value of the given emitter context.
-pub(crate) fn initialize_context_pulse_value(
-    table: &mut LuaOwnedTable,
-    pulse: PulseIterItem,
-) -> LuaResult<()> {
-    let table = table.to_ref();
-    table.raw_set("pulse_value", pulse.value)?;
-    table.raw_set("pulse_time", pulse.step_time)?;
-    Ok(())
-}
-
-/// Set or update the time base, step counter and pattern context of the given emitter context.
-pub(crate) fn initialize_emitter_context(
-    table: &mut LuaOwnedTable,
-    time_base: &BeatTimeBase,
-    pulse: PulseIterItem,
-    pulse_count: usize,
-    pulse_time_count: f64,
-    step_count: usize,
-    step_time_count: f64,
-) -> LuaResult<()> {
-    initialize_pattern_context(table, time_base, pulse_count, pulse_time_count)?;
-    initialize_context_step_count(table, step_count, step_time_count)?;
-    initialize_context_pulse_value(table, pulse)?;
-    Ok(())
-}
-
-// -------------------------------------------------------------------------------------------------
-
 /// Register afseq bindings with the given lua engine.
 /// Engine instance is expected to be one created via [new_engine].
 pub(crate) fn register_bindings(
     lua: &mut Lua,
     timeout_hook: &LuaTimeoutHook,
     time_base: BeatTimeBase,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> LuaResult<()> {
     register_global_bindings(lua, timeout_hook, time_base)?;
     register_math_bindings(lua)?;
     register_table_bindings(lua)?;
@@ -555,9 +465,9 @@ mod test {
     use super::*;
 
     #[test]
-    fn extensions() {
+    fn extensions() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -630,5 +540,6 @@ mod test {
             )
             .exec()
             .is_ok());
+        Ok(())
     }
 }

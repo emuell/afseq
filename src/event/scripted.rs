@@ -5,9 +5,7 @@ use mlua::prelude::*;
 use crate::{
     bindings::{
         callback::{handle_lua_callback_error, LuaFunctionCallback},
-        initialize_context_external_data, initialize_context_pulse_count,
-        initialize_context_pulse_value, initialize_context_step_count,
-        initialize_context_time_base, initialize_emitter_context, new_note_events_from_lua,
+        new_note_events_from_lua,
         timeout::LuaTimeoutHook,
     },
     BeatTimeBase, Event, EventIter, PulseIterItem,
@@ -44,8 +42,7 @@ impl ScriptedEventIter {
         let pulse_count = 0;
         let pulse_time_count = 0.0;
         let pulse = PulseIterItem::default();
-        initialize_emitter_context(
-            function.context(),
+        function.set_emitter_context(
             time_base,
             pulse,
             pulse_count,
@@ -67,17 +64,11 @@ impl ScriptedEventIter {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
-        initialize_context_pulse_value(self.function.context(), pulse)?;
-        initialize_context_pulse_count(
-            self.function.context(),
-            self.pulse_count,
-            self.pulse_time_count,
-        )?;
-        initialize_context_step_count(
-            self.function.context(),
-            self.step_count,
-            self.step_time_count,
-        )?;
+        self.function.set_context_pulse_value(pulse)?;
+        self.function
+            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)?;
+        self.function
+            .set_context_step_count(self.step_count, self.step_time_count)?;
         // call function with the context and evaluate the result
         Ok(Event::NoteEvents(new_note_events_from_lua(
             self.function.call()?,
@@ -91,15 +82,15 @@ impl EventIter for ScriptedEventIter {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new time base
-        if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
-            handle_lua_callback_error(&self.function.name(), err);
+        if let Err(err) = self.function.set_context_time_base(time_base) {
+            handle_lua_callback_error(&self.function, err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
-        if let Err(err) = initialize_context_external_data(self.function.context(), data) {
-            handle_lua_callback_error(&self.function.name(), err);
+        if let Err(err) = self.function.set_context_external_data(data) {
+            handle_lua_callback_error(&self.function, err);
         }
     }
 
@@ -109,7 +100,7 @@ impl EventIter for ScriptedEventIter {
             let event = match self.next_event(pulse) {
                 Ok(event) => Some(event),
                 Err(err) => {
-                    handle_lua_callback_error(&self.function.name(), err);
+                    handle_lua_callback_error(&self.function, err);
                     None
                 }
             };
@@ -135,25 +126,24 @@ impl EventIter for ScriptedEventIter {
         // reset step counter
         self.step_count = 0;
         self.step_time_count = 0.0;
+        if let Err(err) = self
+            .function
+            .set_context_step_count(self.step_count, self.step_time_count)
+        {
+            handle_lua_callback_error(&self.function, err);
+        }
+        // reset pulse counter
         self.pulse_count = 0;
         self.pulse_time_count = 0.0;
-        if let Err(err) = initialize_context_step_count(
-            self.function.context(),
-            self.step_count,
-            self.step_time_count,
-        )
-        .and_then(|_| {
-            initialize_context_pulse_count(
-                self.function.context(),
-                self.pulse_count,
-                self.pulse_time_count,
-            )
-        }) {
-            handle_lua_callback_error(&self.function.name(), err);
+        if let Err(err) = self
+            .function
+            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
+        {
+            handle_lua_callback_error(&self.function, err);
         }
         // restore function
         if let Err(err) = self.function.reset() {
-            handle_lua_callback_error(&self.function.name(), err);
+            handle_lua_callback_error(&self.function, err);
         }
     }
 }

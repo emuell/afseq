@@ -61,12 +61,13 @@ mod test {
         note::Note,
         rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, RhythmIterItem},
         time::BeatTimeStep,
+        PulseIterItem,
     };
 
     #[test]
-    fn beat_time() {
+    fn beat_time() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -222,12 +223,13 @@ mod test {
             assert!(beat_time_rhythm.next().unwrap().event.is_some());
             assert!(beat_time_rhythm.next().unwrap().event.is_none());
         }
+        Ok(())
     }
 
     #[test]
-    fn second_time() {
+    fn second_time() -> LuaResult<()> {
         // create a new lua and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -328,5 +330,6 @@ mod test {
                 duration: 48
             })
         );
+        Ok(())
     }
 }

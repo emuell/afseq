@@ -137,9 +137,9 @@ mod test {
     }
 
     #[test]
-    fn sequence() -> Result<(), Box<dyn std::error::Error>> {
+    fn sequence() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -227,9 +227,9 @@ mod test {
     }
 
     #[test]
-    fn sequence_methods() -> Result<(), Box<dyn std::error::Error>> {
+    fn sequence_methods() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -251,7 +251,10 @@ mod test {
             )?
             .notes,
             vec![
-                vec![new_note(("c4", InstrumentId::from(1), 0.2, 0.3, 0.4)), new_note("d4"),],
+                vec![
+                    new_note(("c4", InstrumentId::from(1), 0.2, 0.3, 0.4)),
+                    new_note("d4"),
+                ],
                 vec![None],
                 vec![new_note("e4")],
             ]

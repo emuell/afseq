@@ -93,9 +93,9 @@ mod test {
     use crate::bindings::*;
 
     #[test]
-    fn scale() {
+    fn scale() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -147,5 +147,6 @@ mod test {
                 .collect::<Vec<i32>>(),
             vec![60, 63, 65, 67, 70]
         );
+        Ok(())
     }
 }

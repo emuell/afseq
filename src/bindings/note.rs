@@ -132,9 +132,9 @@ mod test {
     }
 
     #[test]
-    fn note() -> Result<(), Box<dyn std::error::Error>> {
+    fn note() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -227,9 +227,9 @@ mod test {
     }
 
     #[test]
-    fn note_chord() -> Result<(), Box<dyn std::error::Error>> {
+    fn note_chord() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
@@ -276,9 +276,9 @@ mod test {
     }
 
     #[test]
-    fn note_methods() -> Result<(), Box<dyn std::error::Error>> {
+    fn note_methods() -> LuaResult<()> {
         // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine();
+        let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,

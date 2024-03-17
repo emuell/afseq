@@ -1,7 +1,11 @@
+use std::borrow::Cow;
+
 use mlua::prelude::*;
 
 use lazy_static::lazy_static;
 use std::sync::RwLock;
+
+use crate::{time::BeatTimeBase, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -36,14 +40,14 @@ pub fn clear_lua_callback_errors() {
 
 /// Report a Lua callback errors. The error will be logged and usually cleared after
 /// the next callback call.
-pub(crate) fn handle_lua_callback_error(function_name: &str, err: LuaError) {
+pub(crate) fn handle_lua_callback_error(callback: &LuaFunctionCallback, err: LuaError) {
     LUA_CALLBACK_ERRORS
         .write()
         .expect("Failed to lock Lua callback error vector")
         .push(err.clone());
     log::warn!(
         "Lua callback '{}' failed to evaluate:\n{}",
-        function_name,
+        callback.name(),
         err
     );
 }
@@ -54,12 +58,11 @@ pub(crate) fn handle_lua_callback_error(function_name: &str, err: LuaError) {
 /// a function which returns a function, or directly as it is.
 ///
 /// When calling the function the signature of the function is `fn(context): LuaResult`;
-/// 
-/// Errors from callbacks should be handled by calling `handle_callback_error` so external clients
-/// can deal with them later, as apropriate.
-///
 /// The passed context is created as an empty table with the function, and should be filled up
 /// with values in the client who uses the function.
+///
+/// Errors from callbacks should be handled by calling `handle_callback_error` so external clients
+/// can deal with them later, as apropriate.
 ///
 /// By memorizing the original generator function and environment, it also can be reset to its
 /// initial state by calling the original generator function again to fetch a new freshly
@@ -93,10 +96,82 @@ impl LuaFunctionCallback {
         })
     }
 
-    /// Mut access to the function context that is passed as one and only argument to the
-    ///  wrapped function, when evaluating it.
-    pub fn context(&mut self) -> &mut LuaOwnedTable {
-        &mut self.context
+    /// Set or update external app data of the function context.
+    pub fn set_context_external_data(&mut self, data: &[(Cow<str>, f64)]) -> LuaResult<()> {
+        let table = self.context.to_ref();
+        for (key, value) in data {
+            table.raw_set(key as &str, *value)?;
+        }
+        Ok(())
+    }
+
+    /// Set or update the time base of the function context.
+    pub fn set_context_time_base(&mut self, time_base: &BeatTimeBase) -> LuaResult<()> {
+        let table = self.context.to_ref();
+        table.raw_set("beats_per_min", time_base.beats_per_min)?;
+        table.raw_set("beats_per_bar", time_base.beats_per_bar)?;
+        table.raw_set("sample_rate", time_base.samples_per_sec)?;
+        Ok(())
+    }
+
+    /// Set or update the pulse counter of the function context.
+    pub fn set_context_pulse_count(
+        &mut self,
+        pulse_count: usize,
+        pulse_time_count: f64,
+    ) -> LuaResult<()> {
+        let table = self.context.to_ref();
+        table.raw_set("pulse_count", pulse_count + 1)?;
+        table.raw_set("pulse_time_count", pulse_time_count)?;
+        Ok(())
+    }
+
+    /// Set or update the step counter of the function context.
+    pub fn set_context_step_count(
+        &mut self,
+        step_count: usize,
+        step_time_count: f64,
+    ) -> LuaResult<()> {
+        let table = self.context.to_ref();
+        table.raw_set("step_count", step_count + 1)?;
+        table.raw_set("step_time_count", step_time_count)?;
+        Ok(())
+    }
+
+    /// Set or update the pulse value of the function context.
+    pub fn set_context_pulse_value(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
+        let table = self.context.to_ref();
+        table.raw_set("pulse_value", pulse.value)?;
+        table.raw_set("pulse_time", pulse.step_time)?;
+        Ok(())
+    }
+
+    /// Set or update the time base and step counter of the function context.
+    pub fn set_pattern_context(
+        &mut self,
+        time_base: &BeatTimeBase,
+        pulse_count: usize,
+        pulse_time_count: f64,
+    ) -> LuaResult<()> {
+        self.set_context_time_base(time_base)?;
+        self.set_context_pulse_count(pulse_count, pulse_time_count)?;
+        Ok(())
+    }
+
+    /// Set or update the time base, step counter and pattern context of the function context.
+    pub fn set_emitter_context(
+        &mut self,
+        time_base: &BeatTimeBase,
+        pulse: PulseIterItem,
+        pulse_count: usize,
+        pulse_time_count: f64,
+        step_count: usize,
+        step_time_count: f64,
+    ) -> LuaResult<()> {
+        self.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
+        self.set_context_step_count(step_count, step_time_count)?;
+        self.set_context_pulse_value(pulse)?;
+        Ok(())
     }
 
     /// Name of the inner function. Usually will be an annonymous function.

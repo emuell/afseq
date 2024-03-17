@@ -5,8 +5,7 @@ use mlua::prelude::*;
 use crate::{
     bindings::{
         callback::{handle_lua_callback_error, LuaFunctionCallback},
-        initialize_context_external_data, initialize_context_pulse_count,
-        initialize_context_time_base, initialize_pattern_context, pattern_pulse_from_lua,
+        pattern_pulse_from_lua,
         timeout::LuaTimeoutHook,
     },
     BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
@@ -40,7 +39,7 @@ impl ScriptedPattern {
         // initialize function context
         let pulse_count = 0;
         let pulse_time_count = 0.0;
-        initialize_pattern_context(function.context(), time_base, pulse_count, pulse_time_count)?;
+        function.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
         let pulse = None;
         let pulse_iter = None;
         Ok(Self {
@@ -57,11 +56,8 @@ impl ScriptedPattern {
         // reset timeout
         self.timeout_hook.reset();
         // update context
-        initialize_context_pulse_count(
-            self.function.context(),
-            self.pulse_count,
-            self.pulse_time_count,
-        )?;
+        self.function
+            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)?;
         // call function with context and evaluate the result
         pattern_pulse_from_lua(self.function.call()?)
     }
@@ -82,15 +78,15 @@ impl Pattern for ScriptedPattern {
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
-        if let Err(err) = initialize_context_time_base(self.function.context(), time_base) {
-            handle_lua_callback_error(&self.function.name(), err);
+        if let Err(err) = self.function.set_context_time_base(time_base) {
+            handle_lua_callback_error(&self.function, err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
-        if let Err(err) = initialize_context_external_data(self.function.context(), data) {
-            handle_lua_callback_error(&self.function.name(), err);
+        if let Err(err) = self.function.set_context_external_data(data) {
+            handle_lua_callback_error(&self.function, err);
         }
     }
 
@@ -109,7 +105,7 @@ impl Pattern for ScriptedPattern {
         // call function with context and evaluate the result
         let pulse = match self.next_pulse() {
             Err(err) => {
-                handle_lua_callback_error(&self.function.name(), err);
+                handle_lua_callback_error(&self.function, err);
                 Pulse::from(0.0)
             }
             Ok(pulse) => pulse,
@@ -136,16 +132,15 @@ impl Pattern for ScriptedPattern {
         self.pulse_count = 0;
         self.pulse_time_count = 0.0;
         // update step in context
-        if let Err(err) = initialize_context_pulse_count(
-            self.function.context(),
-            self.pulse_count,
-            self.pulse_time_count,
-        ) {
-            handle_lua_callback_error(&self.function.name(), err);
+        if let Err(err) = self
+            .function
+            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
+        {
+            handle_lua_callback_error(&self.function, err);
         }
         // reset function
         if let Err(err) = self.function.reset() {
-            handle_lua_callback_error(&self.function.name(), err);
+            handle_lua_callback_error(&self.function, err);
         }
         // reset pulse and pulse iter
         self.pulse = None;
