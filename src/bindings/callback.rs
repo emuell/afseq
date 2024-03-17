@@ -10,15 +10,16 @@ use crate::{time::BeatTimeBase, PulseIterItem};
 // -------------------------------------------------------------------------------------------------
 
 lazy_static! {
-    static ref LUA_CALLBACK_ERRORS: RwLock<Vec<LuaError>> = RwLock::new(Vec::new());
+    static ref LUA_CALLBACK_ERRORS: RwLock<Vec<LuaError>> = Vec::new().into();
 }
 
-/// Returns true if there are any Lua callback errors.
-pub fn has_lua_callback_errors() -> bool {
-    !LUA_CALLBACK_ERRORS
+/// Returns true if there are any Lua callback errors and returns the !first! one.
+pub fn has_lua_callback_errors() -> Option<LuaError> {
+    LUA_CALLBACK_ERRORS
         .read()
         .expect("Failed to lock Lua callback error vector")
-        .is_empty()
+        .first()
+        .cloned()
 }
 
 /// Returns all Lua callback errors, if any. Check with `has_lua_callback_errors()` to avoid
@@ -38,20 +39,6 @@ pub fn clear_lua_callback_errors() {
         .clear();
 }
 
-/// Report a Lua callback errors. The error will be logged and usually cleared after
-/// the next callback call.
-pub(crate) fn handle_lua_callback_error(callback: &LuaFunctionCallback, err: LuaError) {
-    LUA_CALLBACK_ERRORS
-        .write()
-        .expect("Failed to lock Lua callback error vector")
-        .push(err.clone());
-    log::warn!(
-        "Lua callback '{}' failed to evaluate:\n{}",
-        callback.name(),
-        err
-    );
-}
-
 // -------------------------------------------------------------------------------------------------
 
 /// Lazily evaluates a lua function, the first time it's called, to either use it as a generator,
@@ -61,7 +48,7 @@ pub(crate) fn handle_lua_callback_error(callback: &LuaFunctionCallback, err: Lua
 /// The passed context is created as an empty table with the function, and should be filled up
 /// with values in the client who uses the function.
 ///
-/// Errors from callbacks should be handled by calling `handle_callback_error` so external clients
+/// Errors from callbacks should be handled by calling `self.handle_error` so external clients
 /// can deal with them later, as apropriate.
 ///
 /// By memorizing the original generator function and environment, it also can be reset to its
@@ -208,6 +195,20 @@ impl LuaFunctionCallback {
             }
         }
         self.function.call(self.context.to_ref())
+    }
+
+    /// Report a Lua callback errors. The error will be logged and usually cleared after
+    /// the next callback call.
+    pub fn handle_error(&self, err: LuaError) {
+        LUA_CALLBACK_ERRORS
+            .write()
+            .expect("Failed to lock Lua callback error vector")
+            .push(err.clone());
+        log::warn!(
+            "Lua callback '{}' failed to evaluate:\n{}",
+            self.name(),
+            err
+        );
     }
 
     /// Reset the function's environment and get a new fresh function from a generator,

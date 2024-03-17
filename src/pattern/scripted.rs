@@ -3,11 +3,7 @@ use std::{borrow::Cow, cell::RefCell, rc::Rc};
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{
-        callback::{handle_lua_callback_error, LuaFunctionCallback},
-        pattern_pulse_from_lua,
-        timeout::LuaTimeoutHook,
-    },
+    bindings::{callback::LuaFunctionCallback, pattern_pulse_from_lua, timeout::LuaTimeoutHook},
     BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
 };
 
@@ -79,14 +75,14 @@ impl Pattern for ScriptedPattern {
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
         if let Err(err) = self.function.set_context_time_base(time_base) {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
         if let Err(err) = self.function.set_context_external_data(data) {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
     }
 
@@ -105,7 +101,7 @@ impl Pattern for ScriptedPattern {
         // call function with context and evaluate the result
         let pulse = match self.next_pulse() {
             Err(err) => {
-                handle_lua_callback_error(&self.function, err);
+                self.function.handle_error(err);
                 Pulse::from(0.0)
             }
             Ok(pulse) => pulse,
@@ -136,11 +132,11 @@ impl Pattern for ScriptedPattern {
             .function
             .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
         {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
         // reset function
         if let Err(err) = self.function.reset() {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
         // reset pulse and pulse iter
         self.pulse = None;

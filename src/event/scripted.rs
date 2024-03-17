@@ -3,11 +3,7 @@ use std::{borrow::Cow, cell::RefCell, rc::Rc};
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{
-        callback::{handle_lua_callback_error, LuaFunctionCallback},
-        new_note_events_from_lua,
-        timeout::LuaTimeoutHook,
-    },
+    bindings::{callback::LuaFunctionCallback, new_note_events_from_lua, timeout::LuaTimeoutHook},
     BeatTimeBase, Event, EventIter, PulseIterItem,
 };
 
@@ -83,14 +79,14 @@ impl EventIter for ScriptedEventIter {
         self.timeout_hook.reset();
         // update function context with the new time base
         if let Err(err) = self.function.set_context_time_base(time_base) {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
         if let Err(err) = self.function.set_context_external_data(data) {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
     }
 
@@ -100,7 +96,7 @@ impl EventIter for ScriptedEventIter {
             let event = match self.next_event(pulse) {
                 Ok(event) => Some(event),
                 Err(err) => {
-                    handle_lua_callback_error(&self.function, err);
+                    self.function.handle_error(err);
                     None
                 }
             };
@@ -130,7 +126,7 @@ impl EventIter for ScriptedEventIter {
             .function
             .set_context_step_count(self.step_count, self.step_time_count)
         {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
         // reset pulse counter
         self.pulse_count = 0;
@@ -139,11 +135,11 @@ impl EventIter for ScriptedEventIter {
             .function
             .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
         {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
         // restore function
         if let Err(err) = self.function.reset() {
-            handle_lua_callback_error(&self.function, err);
+            self.function.handle_error(err);
         }
     }
 }
