@@ -2,8 +2,10 @@
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
+use rand::{thread_rng, Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
+
 use crate::{BeatTimeBase, PulseIterItem};
-use rand::Rng;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -30,46 +32,21 @@ pub trait Gate: Debug {
 
 /// Probability gate implementation. Returns false for 0 pulse values and true for values of 1.
 /// Values inbetween 0 and 1 do *maybe* trigger, using the pulse value as probability.
-///  
-/// The given rand::Rgn template class parameter / instance is used for generating random numbers
-/// for probability checks.
-#[derive(Debug)]
-pub struct ProbabilityGate<R: Rng + Debug + Clone + 'static> {
-    rand_gen: R,
-    initial_rand_gen: Option<R>,
+#[derive(Debug, Clone)]
+pub struct ProbabilityGate {
+    rand_gen: Xoshiro256PlusPlus,
+    seed: Option<[u8; 32]>,
 }
 
-impl<R: Rng + Debug + Clone> ProbabilityGate<R> {
-    pub fn new(rand_gen: R, is_seeded: bool) -> Self {
-        // memorize the random number generator for reset(), but onlt when it's seeded
-        let initial_rand_gen = if is_seeded {
-            Some(rand_gen.clone())
-        } else {
-            None
-        };
-        Self {
-            rand_gen,
-            initial_rand_gen,
-        }
+impl ProbabilityGate {
+    pub fn new(seed: Option<[u8; 32]>) -> Self {
+        let rand_seed = seed.unwrap_or_else(|| thread_rng().gen());
+        let rand_gen = Xoshiro256PlusPlus::from_seed(rand_seed);
+        Self { rand_gen, seed }
     }
 }
 
-impl<R: Rng + Debug + Clone> Clone for ProbabilityGate<R> {
-    fn clone(&self) -> Self {
-        let mut clone = Self {
-            rand_gen: self.rand_gen.clone(),
-            initial_rand_gen: self.initial_rand_gen.clone(),
-        };
-        if clone.initial_rand_gen.is_none() {
-            // when our random number generator is not seeded, 
-            // enusure the clone uses a new rand state
-            clone.rand_gen.next_u64();
-        }
-        clone
-    }
-}
-
-impl<R: Rng + Debug + Clone> Gate for ProbabilityGate<R> {
+impl Gate for ProbabilityGate {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
@@ -83,9 +60,13 @@ impl<R: Rng + Debug + Clone> Gate for ProbabilityGate<R> {
     }
 
     fn reset(&mut self) {
-        // reset random number generator to its initial state when the gate is seeded
-        if let Some(ref mut initial_rand_get) = self.initial_rand_gen {
-            self.rand_gen = initial_rand_get.clone();
+        // reset random number generator to its initial state when the gate is seeded               
+        if let Some(seed) = self.seed {
+            self.rand_gen = Xoshiro256PlusPlus::from_seed(seed);
+        }
+        // else create a new random number generator from a random seed
+        else {
+            self.rand_gen = Xoshiro256PlusPlus::from_seed(thread_rng().gen());
         }
     }
 }

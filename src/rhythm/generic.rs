@@ -2,9 +2,6 @@
 
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
 
-use rand::{thread_rng, Rng, SeedableRng};
-use rand_xoshiro::Xoshiro256PlusPlus;
-
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
     gate::ProbabilityGate,
@@ -50,13 +47,10 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     /// Create a new pattern based emitter which emits `value` every beat_time `step`,
     /// and an optional seed for the random number generator.
     pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<[u8; 32]>) -> Self {
-        let rand_is_seeded = seed.is_some();
-        let rand =
-            Xoshiro256PlusPlus::from_seed(seed.unwrap_or_else(|| thread_rng().gen()));
         let offset = Offset::default_offset();
         let instrument = None;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
-        let gate = Rc::new(RefCell::new(ProbabilityGate::new(rand, rand_is_seeded)));
+        let gate = Rc::new(RefCell::new(ProbabilityGate::new(seed)));
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
