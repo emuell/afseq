@@ -45,15 +45,15 @@ use unwrap::*;
 pub(crate) struct LuaAppData {
     /// Global random seed, set by math.randomseed() for each Lua instance and passed to
     /// newly created rhythm impls.
-    pub(crate) rand_seed: [u8; 32],
+    pub(crate) rand_seed: Option<[u8; 32]>,
     /// Global random number generator, used for our math.random() impl.
     pub(crate) rand_rgn: Xoshiro256PlusPlus,
 }
 
 impl LuaAppData {
     fn new() -> Self {
-        let rand_seed = rand::thread_rng().gen();
-        let rand_rgn = Xoshiro256PlusPlus::from_seed(rand_seed);
+        let rand_seed = None;
+        let rand_rgn = Xoshiro256PlusPlus::from_seed(rand::thread_rng().gen());
         Self {
             rand_seed,
             rand_rgn,
@@ -262,10 +262,10 @@ fn register_global_bindings(
                         .rand_seed
                 };
                 if second_time_unit {
-                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, table, &rand_seed)?
+                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, table, rand_seed)?
                         .into_lua(lua)
                 } else {
-                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, table, &rand_seed)?
+                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, table, rand_seed)?
                         .into_lua(lua)
                 }
             }
@@ -365,7 +365,7 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
             let mut app_data = lua
                 .app_data_mut::<LuaAppData>()
                 .expect("Failed to access Lua app data");
-            app_data.rand_seed = new_seed;
+            app_data.rand_seed = Some(new_seed);
             app_data.rand_rgn = Xoshiro256PlusPlus::from_seed(new_seed);
             Ok(())
         })?,

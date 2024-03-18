@@ -45,7 +45,7 @@ macro_rules! generate_step_funcs {
 /// Shortcuts for creating beat-time based patterns.
 impl BeatTimeBase {
     pub fn every_nth_step(&self, step: BeatTimeStep) -> BeatTimeRhythm {
-        BeatTimeRhythm::new(*self, step)
+        BeatTimeRhythm::new(*self, step, None)
     }
     generate_step_funcs!(sixteenth, BeatTimeStep::Sixteenth);
     generate_step_funcs!(eighth, BeatTimeStep::Eighth);

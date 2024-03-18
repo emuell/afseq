@@ -44,23 +44,19 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     event_iter_sample_time: SampleTime,
     event_iter_next_sample_time: f64,
     sample_offset: SampleTime,
-    rand: Xoshiro256PlusPlus,
 }
 
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<Step, Offset> {
-    /// Create a new pattern based emitter which emits `value` every beat_time `step`.  
-    pub fn new(time_base: BeatTimeBase, step: Step) -> Self {
-        let seed = thread_rng().gen();
-        Self::new_with_seed(time_base, step, &seed)
-    }
     /// Create a new pattern based emitter which emits `value` every beat_time `step`,
-    /// initializing the internal random number generator with the specified seed value.
-    pub fn new_with_seed(time_base: BeatTimeBase, step: Step, seed: &[u8; 32]) -> Self {
+    /// and an optional seed for the random number generator.
+    pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<[u8; 32]>) -> Self {
+        let rand_is_seeded = seed.is_some();
+        let rand =
+            Xoshiro256PlusPlus::from_seed(seed.unwrap_or_else(|| thread_rng().gen()));
         let offset = Offset::default_offset();
-        let rand = Xoshiro256PlusPlus::from_seed(*seed);
         let instrument = None;
         let pattern = Rc::new(RefCell::new(FixedPattern::default()));
-        let gate = Rc::new(RefCell::new(ProbabilityGate::new(rand.clone())));
+        let gate = Rc::new(RefCell::new(ProbabilityGate::new(rand, rand_is_seeded)));
         let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
@@ -76,7 +72,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             event_iter_sample_time,
             event_iter_next_sample_time,
             sample_offset,
-            rand,
         }
     }
 
@@ -109,7 +104,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
             event_iter_next_sample_time,
-            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -122,7 +116,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             pattern: Rc::clone(&self.pattern),
             gate: Rc::clone(&self.gate),
             event_iter: Rc::clone(&self.event_iter),
-            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -138,7 +131,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             pattern,
             gate: Rc::clone(&self.gate),
             event_iter: Rc::clone(&self.event_iter),
-            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -150,7 +142,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             pattern: Rc::clone(&self.pattern),
             gate: Rc::clone(&self.gate),
             event_iter: Rc::clone(&self.event_iter),
-            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -166,7 +157,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             pattern: Rc::clone(&self.pattern),
             gate,
             event_iter: Rc::clone(&self.event_iter),
-            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -182,7 +172,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             pattern: Rc::clone(&self.pattern),
             gate: Rc::clone(&self.gate),
             event_iter,
-            rand: self.rand.clone(),
             ..*self
         }
     }
@@ -313,6 +302,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         Rc::new(RefCell::new(Self {
             pattern: self.pattern.borrow().duplicate(),
             event_iter: self.event_iter.borrow().duplicate(),
+            gate: self.gate.borrow().duplicate(),
             ..self.clone()
         }))
     }
@@ -325,5 +315,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         self.event_iter_sample_time = 0;
         self.event_iter_next_sample_time = self.offset.to_samples(&self.time_base);
         self.pattern.borrow_mut().reset();
+        self.gate.borrow_mut().reset();
     }
 }
