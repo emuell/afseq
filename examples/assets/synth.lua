@@ -3,7 +3,7 @@ local scale = scale("c4", "minor")
 return emitter {
   unit = "bars",
   resolution = 4,
-  offset = 16,
+  offset = 4,
   pattern = {1, 1, 1, 1},
   repeats = 3,
   emit = sequence(

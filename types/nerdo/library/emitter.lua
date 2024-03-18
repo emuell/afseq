@@ -89,6 +89,16 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field resolution number?
 ---
+---Optional offset in `unit * resolution` time units. By default 0.
+---When set, the emitter's event output will be delayed by the given offset value.
+---### examples:
+---```lua
+---unit = "1/4",
+---resolution = 4,
+---offset = 4 -- start emitting after 4*4 beats
+---```  
+---@field offset number?
+---
 ---Specify the rythmical pattern of the emitter. Each pulse with a value of 1 or true
 ---will cause an event from the `emitter` property to be triggered in the emitters
 ---time unit. 0 or nil values never trigger, and values inbetween do *maybe* trigger.

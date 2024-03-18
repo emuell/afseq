@@ -48,7 +48,16 @@ impl SecondTimeRhythm {
         // offset
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")? as SecondTimeStep;
-            rhythm = rhythm.with_offset(offset);
+            if offset >= 0.0 {
+                rhythm = rhythm.with_offset(offset * resolution);
+            } else {
+                return Err(bad_argument_error(
+                    "emit",
+                    "offset",
+                    1,
+                    "Offset must be a number >= 0",
+                ));
+            }
         }
         // pattern
         if table.contains_key("pattern")? {

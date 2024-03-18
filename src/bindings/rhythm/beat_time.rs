@@ -45,7 +45,7 @@ impl BeatTimeRhythm {
                 "1/32" => step = BeatTimeStep::ThirtySecond(resolution),
                 "1/64" => step = BeatTimeStep::SixtyFourth(resolution),
                 _ => return Err(bad_argument_error("emit", "unit", 1, 
-                "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
+                "expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
         // create a new BeatTimeRhythm with the given time base and step
@@ -53,9 +53,18 @@ impl BeatTimeRhythm {
         // offset
         if table.contains_key("offset")? {
             let offset = table.get::<&str, f32>("offset")?;
-            let mut new_step = rhythm.step();
-            new_step.set_steps(offset);
-            rhythm = rhythm.with_offset(new_step);
+            if offset >= 0.0 {
+                let mut new_step = rhythm.step();
+                new_step.set_steps(offset * resolution);
+                rhythm = rhythm.with_offset(new_step);
+            } else {
+                return Err(bad_argument_error(
+                    "emit",
+                    "offset",
+                    1,
+                    "offset must be >= 0",
+                ));
+            }
         }
         // pattern
         if table.contains_key("pattern")? {
