@@ -62,7 +62,8 @@ pub trait RhythmIter: Debug {
     /// Set a new custom sample offset value.
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
-    /// Step iter: runs pattern to generate a new pulse, then generates an event from the event iter.  
+    /// Step iter: runs pattern to generate a new pulse, then generates an event from the event iter.
+    /// Returns `None` when the pattern finished playing.
     fn run(&mut self) -> Option<RhythmIterItem> {
         self.run_until_time(SampleTime::MAX)
     }

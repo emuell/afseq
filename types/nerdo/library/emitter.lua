@@ -102,8 +102,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---When no pattern is defined, a constant pulse of `1` is triggered by the emitter.
 ---
----Patterns are repeated endlessly.
----
 ---Just like the `emitter` property, patterns can either be a fixed array of values or a
 ---function or generator which produce values dynamically.
 ---
@@ -131,11 +129,29 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field pattern Pulse[]|(fun(context: PatternContext):Pulse)|(fun(context: PatternContext):fun(context: PatternContext):Pulse)?
 ---
+---If and how many times a pattern should repeat. When 0 or false, the pattern does not repeat 
+---and plays back only once. When true, the pattern repeats endlessly, which is the default.
+---When count is a number > 0, this specifies the number of times the pattern repeats until it
+---stops.
+---
+---Note: When `pattern` is a function or generator, the repeat count is the number of 
+---*function calls*. When the pattern is a pulse array, this is the number of times the whole
+---pattern gets repeated.
+---
+---### examples:
+---```lua
+---repeat = 0 -- one-shot
+---repeat = false -- also a one-shot
+---repeat = 3 -- play the pattern 4 times
+---repeat = true -- play & repeat forever
+---```
+---@field repeats (integer|boolean)?
+---
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>
----In order to dynamically generate notes, you can pass a function or a generator function, instead
----of a fixed note array or sequence.
+---In order to dynamically generate notes, you can pass a function or a generator function, 
+---instead of a fixed note array or sequence.
 ---### examples:
 ---```lua
 ---emit = {"c4", "g4"}, -- a sequence of c4, g4

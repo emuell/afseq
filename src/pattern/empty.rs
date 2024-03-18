@@ -31,8 +31,12 @@ impl Pattern for EmptyPattern {
         // nothing to do
     }
 
-    fn run(&mut self) -> PulseIterItem {
-        panic!("Empty patterns should not be run");
+    fn set_repeat_count(&mut self, _count: Option<usize>) {
+        // nothing to do
+    }
+
+    fn run(&mut self) -> Option<PulseIterItem> {
+        None
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {

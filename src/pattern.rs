@@ -24,7 +24,8 @@ pub trait Pattern: Debug {
     fn len(&self) -> usize;
 
     /// Run and move the pattern by a single step and return the to emitted pulse.
-    fn run(&mut self) -> PulseIterItem;
+    /// When None, the pattern finished playback.
+    fn run(&mut self) -> Option<PulseIterItem>;
 
     /// Set or update the pattern's internal beat or second time base with the new time base.
     /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
@@ -32,6 +33,10 @@ pub trait Pattern: Debug {
 
     /// Set optional, application specific external context data for the pattern.
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+
+    /// Set how many times the pattern should be repeated. If 0, the pattern will be run once.
+    /// When None, which is the default, the pattern will be repeated indefinitely. 
+    fn set_repeat_count(&mut self, count: Option<usize>);
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible
@@ -45,11 +50,11 @@ pub trait Pattern: Debug {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Standard Iterator impl for Pattern. Pattern iters do repeat endlessly.
+/// Standard Iterator impl for Pattern.
 impl Iterator for dyn Pattern {
     type Item = PulseIterItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.run())
+        self.run()
     }
 }

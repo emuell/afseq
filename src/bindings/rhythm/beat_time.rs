@@ -63,6 +63,12 @@ impl BeatTimeRhythm {
             let pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(Rc::clone(&pattern));
         }
+        // repeat
+        if table.contains_key("repeats")? {
+            let value = table.get::<&str, LuaValue>("repeats")?;
+            let repeat = pattern_repeat_count_from_value(value)?;
+            rhythm = rhythm.with_repeat(repeat);
+        }
         // emit
         if table.contains_key("emit")? {
             let value = table.get::<&str, LuaValue>("emit")?;

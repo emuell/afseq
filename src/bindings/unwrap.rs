@@ -585,6 +585,26 @@ pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<Pulse> {
 
 // -------------------------------------------------------------------------------------------------
 
+pub(crate) fn pattern_repeat_count_from_value(value: LuaValue) -> LuaResult<Option<usize>> {
+    if let Some(boolean) = value.as_boolean() {
+        if boolean {
+            Ok(None)
+        } else {
+            Ok(Some(0))
+        }
+    } else if let Some(number) = value.as_usize() {
+        Ok(Some(number))
+    } else {
+        Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "repeats",
+            message: Some("must be a boolean or integer value > 0".to_string()),
+        })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 pub(crate) fn pattern_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,

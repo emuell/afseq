@@ -110,22 +110,22 @@ mod test {
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
             vec![
-                PulseIterItem {
+                Some(PulseIterItem {
                     value: 1.0,
                     step_time: 1.0,
-                },
-                PulseIterItem {
+                }),
+                Some(PulseIterItem {
                     value: 0.0,
                     step_time: 1.0,
-                },
-                PulseIterItem {
+                }),
+                Some(PulseIterItem {
                     value: 1.0,
                     step_time: 1.0,
-                },
-                PulseIterItem {
+                }),
+                Some(PulseIterItem {
                     value: 0.0,
                     step_time: 1.0,
-                }
+                })
             ]
         );
         drop(pattern);
@@ -273,22 +273,22 @@ mod test {
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
             vec![
-                PulseIterItem {
+                Some(PulseIterItem {
                     value: 1.0,
                     step_time: 1.0,
-                },
-                PulseIterItem {
+                }),
+                Some(PulseIterItem {
                     value: 0.0,
                     step_time: 1.0,
-                },
-                PulseIterItem {
+                }),
+                Some(PulseIterItem {
                     value: 1.0,
                     step_time: 1.0,
-                },
-                PulseIterItem {
+                }),
+                Some(PulseIterItem {
                     value: 0.0,
                     step_time: 1.0,
-                }
+                })
             ]
         );
         drop(pattern);

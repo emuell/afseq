@@ -143,6 +143,18 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         }
     }
 
+    /// Repeat the pattern up to `count` times. When None, it repeats forever.
+    pub fn with_repeat(&self, count: Option<usize>) -> Self {
+        self.pattern.borrow_mut().set_repeat_count(count);
+        Self {
+            pattern: Rc::clone(&self.pattern),
+            gate: Rc::clone(&self.gate),
+            event_iter: Rc::clone(&self.event_iter),
+            rand: self.rand.clone(),
+            ..*self
+        }
+    }
+
     /// Use the given [`Gate`] instead of the default probability gate.  
     pub fn with_gate<T: Gate + Sized + 'static>(&self, gate: T) -> Self {
         self.with_gate_dyn(Rc::new(RefCell::new(gate)))
@@ -237,13 +249,13 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         // generate a pulse from the pattern and pass the pulse to the gate
         let (pulse, emit_event) = {
             let mut pattern = self.pattern.borrow_mut();
-            if pattern.is_empty() {
-                // no pattern, no events to emit
+            if let Some(pulse) = pattern.run() {
+                let emit_event = self.gate.borrow_mut().run(&pulse);
+                (pulse, emit_event)
+            } else {
+                // pattern playback finished
                 return None;
             }
-            let pulse = pattern.run();
-            let emit_event = self.gate.borrow_mut().run(&pulse);
-            (pulse, emit_event)
         };
         // generate an event from the event iter
         let event = {

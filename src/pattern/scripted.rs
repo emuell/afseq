@@ -14,6 +14,8 @@ use crate::{
 pub struct ScriptedPattern {
     timeout_hook: LuaTimeoutHook,
     function: LuaFunctionCallback,
+    repeat_count: Option<usize>,
+    repeats: usize,
     pulse_count: usize,
     pulse_time_count: f64,
     pulse: Option<Pulse>,
@@ -35,12 +37,16 @@ impl ScriptedPattern {
         // initialize function context
         let pulse_count = 0;
         let pulse_time_count = 0.0;
+        let repeat_count = None;
+        let repeats = 0;
         function.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
         let pulse = None;
         let pulse_iter = None;
         Ok(Self {
             timeout_hook,
             function,
+            repeat_count,
+            repeats,
             pulse_count,
             pulse_time_count,
             pulse,
@@ -72,30 +78,23 @@ impl Pattern for ScriptedPattern {
         }
     }
 
-    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
-        // update function context from the new time base
-        if let Err(err) = self.function.set_context_time_base(time_base) {
-            self.function.handle_error(err);
-        }
-    }
-
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
-        // update function context from the new time base
-        if let Err(err) = self.function.set_context_external_data(data) {
-            self.function.handle_error(err);
-        }
-    }
-
-    fn run(&mut self) -> PulseIterItem {
+    fn run(&mut self) -> Option<PulseIterItem> {
         // if we have a pulse iterator, consume it
         if let Some(pulse_iter) = &mut self.pulse_iter {
             if let Some(pulse) = pulse_iter.next() {
                 // move step for the next iter call
                 self.pulse_count += 1;
                 self.pulse_time_count += pulse.step_time;
-                return pulse;
+                return Some(pulse);
             } else {
                 self.pulse_iter = None;
+            }
+        }
+        // apply pattern repeat count, unless this is the first run
+        if self.pulse_count > 0 {
+            self.repeats += 1;
+            if self.repeat_count.is_some_and(|count| self.repeats > count) {
+                return None;
             }
         }
         // call function with context and evaluate the result
@@ -114,7 +113,25 @@ impl Pattern for ScriptedPattern {
         self.pulse_count += 1;
         self.pulse_time_count += pulse_item.step_time;
         // return the next pulse item
-        pulse_item
+        Some(pulse_item)
+    }
+
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        // update function context from the new time base
+        if let Err(err) = self.function.set_context_time_base(time_base) {
+            self.function.handle_error(err);
+        }
+    }
+
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        // update function context from the new time base
+        if let Err(err) = self.function.set_context_external_data(data) {
+            self.function.handle_error(err);
+        }
+    }
+
+    fn set_repeat_count(&mut self, count: Option<usize>) {
+        self.repeat_count = count;
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {
@@ -124,6 +141,8 @@ impl Pattern for ScriptedPattern {
     fn reset(&mut self) {
         // reset timeout
         self.timeout_hook.reset();
+        // reset repeat counter
+        self.repeats = 0;
         // reset step counter
         self.pulse_count = 0;
         self.pulse_time_count = 0.0;
