@@ -33,7 +33,7 @@ pub trait Gate: Debug {
 ///  
 /// The given rand::Rgn template class parameter / instance is used for generating random numbers
 /// for probability checks.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ProbabilityGate<R: Rng + Debug + Clone + 'static> {
     rand_gen: R,
     initial_rand_gen: Option<R>,
@@ -51,6 +51,21 @@ impl<R: Rng + Debug + Clone> ProbabilityGate<R> {
             rand_gen,
             initial_rand_gen,
         }
+    }
+}
+
+impl<R: Rng + Debug + Clone> Clone for ProbabilityGate<R> {
+    fn clone(&self) -> Self {
+        let mut clone = Self {
+            rand_gen: self.rand_gen.clone(),
+            initial_rand_gen: self.initial_rand_gen.clone(),
+        };
+        if clone.initial_rand_gen.is_none() {
+            // when our random number generator is not seeded, 
+            // enusure the clone uses a new rand state
+            clone.rand_gen.next_u64();
+        }
+        clone
     }
 }
 
