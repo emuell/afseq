@@ -2,7 +2,9 @@
 
 use std::{
     borrow::{Borrow, Cow},
+    cell::RefCell,
     fmt::Debug,
+    rc::Rc,
 };
 
 #[cfg(test)]
@@ -298,8 +300,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         self.event_iter.set_external_context(data);
     }
 
-    fn duplicate(&self) -> Box<dyn Rhythm> {
-        Box::new(self.clone())
+    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
+        Rc::new(RefCell::new(self.clone()))
     }
 
     fn reset(&mut self) {
