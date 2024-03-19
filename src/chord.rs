@@ -228,7 +228,7 @@ impl TryFrom<&str> for Chord {
     type Error = String;
 
     /// Try converting the given string to a chord string in the form:
-    /// $note'$chord where $note is a root key or note string and $chord is a key of CHORD_TABLE
+    /// $note'$chord where $note is a root key or note string and $chord is a key of `CHORD_TABLE`
     fn try_from(s: &str) -> Result<Self, String> {
         let mut splits = s.split('\'');
         if let Some(note_part) = splits.next() {
@@ -243,7 +243,7 @@ impl TryFrom<&str> for Chord {
                     "Invalid chord identifier. Valid chords are: {}",
                     chord_names()
                 ))?;
-                return Ok(Self::new(note, intervals.to_vec()));
+                return Ok(Self::new(note, intervals.clone()));
             }
         }
         Err("Invalid chord string. ".to_string()

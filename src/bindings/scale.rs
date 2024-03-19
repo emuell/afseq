@@ -8,12 +8,8 @@ use crate::prelude::*;
 impl LuaUserData for Scale {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
         fields.add_field_method_get("notes", |lua, this| -> LuaResult<LuaTable> {
-            lua.create_sequence_from(
-                this.notes()
-                    .iter()
-                    .map(|n| LuaValue::Integer(*n as u8 as LuaInteger)),
-            )
-        })
+            lua.create_sequence_from(this.notes().iter().map(|n| LuaInteger::from(*n as u8)))
+        });
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
@@ -34,8 +30,8 @@ impl LuaUserData for Scale {
                                       (e.g. 3, 5, or 'iii' or 'V')",
                         ))
                     };
-                    if let Some(value) = args.get(0).unwrap().as_integer() {
-                        degree = value as usize;
+                    if let Some(value) = args.get(0).unwrap().as_usize() {
+                        degree = value;
                         if !(1..=7).contains(&degree) {
                             return degree_error();
                         }
@@ -65,8 +61,8 @@ impl LuaUserData for Scale {
                             "number of notes must be an integer in range [1, 5]",
                         ))
                     };
-                    if let Some(value) = args.get(1).unwrap().as_integer() {
-                        count = value as usize;
+                    if let Some(value) = args.get(1).unwrap().as_usize() {
+                        count = value;
                         if !(1..=5).contains(&count) {
                             return count_error();
                         }
@@ -76,12 +72,12 @@ impl LuaUserData for Scale {
                 }
                 let notes = this
                     .chord_from_degree(degree, count)
-                    .into_iter()
-                    .map(|n| n as u8 as LuaInteger)
+                    .iter()
+                    .map(|n| LuaInteger::from(*n as u8))
                     .collect::<Vec<_>>();
                 lua.create_sequence_from(notes)
             },
-        )
+        );
     }
 }
 
@@ -99,7 +95,7 @@ mod test {
         register_bindings(
             &mut lua,
             &timeout_hook,
-            BeatTimeBase {
+            &BeatTimeBase {
                 beats_per_min: 160.0,
                 beats_per_bar: 6,
                 samples_per_sec: 96000,

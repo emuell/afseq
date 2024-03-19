@@ -13,7 +13,6 @@ use crate::{BeatTimeBase, PulseIterItem};
 /// [Pulse](PulseIterItem) value.
 pub trait Gate: Debug {
     /// Set or update the gate's internal beat or second time base with the new time base.
-    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Returns true if the event should be triggered, else false.
@@ -60,7 +59,7 @@ impl Gate for ProbabilityGate {
     }
 
     fn reset(&mut self) {
-        // reset random number generator to its initial state when the gate is seeded               
+        // reset random number generator to its initial state when the gate is seeded
         if let Some(seed) = self.seed {
             self.rand_gen = Xoshiro256PlusPlus::from_seed(seed);
         }

@@ -10,7 +10,7 @@ pub use seconds::{SecondTimeBase, SecondTimeStep};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Sample time value type as emitted by [RhythmIter](`crate::RhythmIter`).
+/// Sample time value type as emitted by [`RhythmIter`](crate::RhythmIter).
 pub type SampleTime = u64;
 
 // -------------------------------------------------------------------------------------------------

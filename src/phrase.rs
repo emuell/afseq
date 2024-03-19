@@ -24,7 +24,7 @@ pub enum RhythmSlot {
     Rhythm(Rc<RefCell<dyn Rhythm>>),
 }
 
-/// Convert an unboxed Rhythm to a RhythmSlot
+/// Convert an unboxed [`Rhythm`] to a [`RhythmSlot`]
 impl<R> From<R> for RhythmSlot
 where
     R: Rhythm + 'static,
@@ -34,7 +34,7 @@ where
     }
 }
 
-/// Convert a shared Rhythm to a RhythmSlot
+/// Convert a shared [`Rhythm`] to a [`RhythmSlot`]
 impl From<Rc<RefCell<dyn Rhythm>>> for RhythmSlot {
     fn from(rhythm: Rc<RefCell<dyn Rhythm>>) -> RhythmSlot {
         RhythmSlot::Rhythm(rhythm)
@@ -70,7 +70,7 @@ pub struct Phrase {
 
 impl Phrase {
     /// Create a new phrase from a vector of [`RhythmSlot`] and the given length.
-    /// RhythmSlot has `Into` implementastions, so you can also pass a vector of
+    /// NB: `RhythmSlot` has `Into` implementations, so you can also pass a vector of
     /// boxed or raw rhythm instance here.
     pub fn new<R: Into<RhythmSlot>>(
         time_base: BeatTimeBase,
@@ -110,13 +110,13 @@ impl Phrase {
     {
         // emit next events until we've reached the desired sample_time
         while let Some((rhythm_index, event)) = self.next_event_until_time(run_until_time) {
-            assert!(event.time < run_until_time);
+            debug_assert!(event.time < run_until_time);
             consumer(rhythm_index, event.time, event.event, event.duration);
         }
     }
 
     /// reset playback status and shift events to the given sample position.
-    /// Further take over rhythms from the passed previously playing phrase for RhythmSlot::Continue slots.   
+    /// Further take over rhythms from the passed previously playing phrase for `RhythmSlot::Continue` slots.   
     pub fn reset_with_offset(&mut self, sample_offset: SampleTime, previous_phrase: &Phrase) {
         // reset rhythm iters, unless they are in continue mode. in contine mode, copy the slot
         // from the previously playing phrase and adjust sample offsets to fit.
@@ -217,7 +217,7 @@ impl RhythmIter for Phrase {
         self.sample_offset
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
-        self.sample_offset = sample_offset
+        self.sample_offset = sample_offset;
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
@@ -241,25 +241,25 @@ impl Rhythm for Phrase {
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
-        for rhythm_slot in self.rhythm_slots.iter_mut() {
+        for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_time_base(time_base)
+                rhythm.borrow_mut().set_time_base(time_base);
             }
         }
     }
 
     fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        for rhythm_slot in self.rhythm_slots.iter_mut() {
+        for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_instrument(instrument)
+                rhythm.borrow_mut().set_instrument(instrument);
             }
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
-        for rhythm_slot in self.rhythm_slots.iter_mut() {
+        for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_external_context(data)
+                rhythm.borrow_mut().set_external_context(data);
             }
         }
     }
@@ -274,9 +274,9 @@ impl Rhythm for Phrase {
         // reset iterator state
         self.next_events.fill(None);
         // reset all rhythms in our slots as well
-        for rhythm_slot in self.rhythm_slots.iter_mut() {
+        for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().reset()
+                rhythm.borrow_mut().reset();
             }
         }
     }

@@ -21,7 +21,7 @@ mod tidal;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Iter item as produced by RhythmIter
+/// Iter item as produced by [`RhythmIter`]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RhythmIterItem {
     pub time: SampleTime,
@@ -32,6 +32,7 @@ pub struct RhythmIterItem {
 impl RhythmIterItem {
     /// Create a new `RhythmIterItem` with the given sample offset
     /// added to the iter items sample time.
+    #[must_use]
     pub fn with_offset(self, offset: SampleTime) -> Self {
         Self {
             time: self.time + offset,
@@ -42,14 +43,14 @@ impl RhythmIterItem {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `RhythmIter` is an iterator which emits sample time tagged optional [Event](`crate::Event`)
+/// A `RhythmIter` is an iterator which emits sample time tagged optional [`Event`](crate::Event)
 /// items.
 ///
 /// It triggers events periodically, producing events at specific sample times with specific
 /// pulse durations. An audio player can use the sample time to schedule those events within the
 /// audio stream.
 ///
-/// `RhythmIter` impls typically will use a [EventIter](`crate::EventIter`) to produce one or
+/// `RhythmIter` impls typically will use a [`EventIter`](crate::EventIter) to produce one or
 /// multiple notes, or a sigle parameter change event. The event iter impl is an iterator too,
 /// so the emitted event content may dynamically change over time as well.
 pub trait RhythmIter: Debug {
@@ -74,7 +75,7 @@ pub trait RhythmIter: Debug {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Standard iterator impl for RhythmIter.
+/// Standard iterator impl for [`RhythmIter`].
 impl Iterator for dyn RhythmIter {
     type Item = RhythmIterItem;
 
@@ -94,7 +95,7 @@ pub trait Rhythm: RhythmIter {
     /// Length in samples of a single step in the rhythm's internal pattern.
     fn pattern_step_length(&self) -> f64;
     /// Get length in steps of the rhythm's internal pattern (cycle length in steps).
-    /// A rhythm pattern repeats after self.pattern_step_length() * self.pattern_length() samples.
+    /// A rhythm pattern repeats after `self.pattern_step_length() * self.pattern_length()` samples.
     fn pattern_length(&self) -> usize;
 
     /// Set or update the rhythm's internal beat or second time bases with a new time base.

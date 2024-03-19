@@ -11,7 +11,7 @@
 /// By using pulses with sub divisions, one can create any kind of complex rhythms without
 /// increasing the step resolution.
 ///
-/// # Examples:
+/// ### Example
 ///
 /// ```rust
 /// use afseq::Pulse;
@@ -113,7 +113,7 @@ impl From<Vec<Pulse>> for Pulse {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Iterator item of PulseIter.
+/// Iterator item of [`PulseIter`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PulseIterItem {
     /// Pulse value in a pattern in range \[0 - 1\] where 0 means don't trigger anything, and 1
@@ -136,7 +136,7 @@ impl Default for PulseIterItem {
 
 // -------------------------------------------------------------------------------------------------
 
-/// An iterator over a pulse, recursively flattening all subdivisions.
+/// Iterator for [`Pulse`], recursively flattening all subdivisions.
 #[derive(Clone, Debug)]
 pub struct PulseIter {
     pulse_values: Vec<PulseIterItem>,
@@ -144,7 +144,7 @@ pub struct PulseIter {
 }
 
 impl PulseIter {
-    pub fn new(pulse: Pulse) -> Self {
+    pub fn new(pulse: &Pulse) -> Self {
         let pulse_values = pulse.flattened();
         let pulse_step = 0;
         Self {
@@ -185,6 +185,6 @@ impl IntoIterator for Pulse {
     type IntoIter = PulseIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        PulseIter::new(self)
+        PulseIter::new(&self)
     }
 }

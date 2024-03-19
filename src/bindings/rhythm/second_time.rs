@@ -2,7 +2,14 @@ use std::rc::Rc;
 
 use mlua::prelude::*;
 
-use super::super::{unwrap::*, LuaTimeoutHook};
+use super::super::{
+    unwrap::{
+        bad_argument_error, event_iter_from_value, pattern_from_value,
+        pattern_repeat_count_from_value,
+    },
+    LuaTimeoutHook,
+};
+
 use crate::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
@@ -17,7 +24,7 @@ impl SecondTimeRhythm {
         lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
         time_base: &BeatTimeBase,
-        table: LuaTable,
+        table: &LuaTable,
         rand_seed: Option<[u8; 32]>,
     ) -> LuaResult<SecondTimeRhythm> {
         // resolution
@@ -62,19 +69,19 @@ impl SecondTimeRhythm {
         // pattern
         if table.contains_key("pattern")? {
             let value = table.get::<&str, LuaValue>("pattern")?;
-            let pattern = pattern_from_value(lua, timeout_hook, value, time_base)?;
+            let pattern = pattern_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(Rc::clone(&pattern));
         }
         // repeat
         if table.contains_key("repeats")? {
             let value = table.get::<&str, LuaValue>("repeats")?;
-            let repeat = pattern_repeat_count_from_value(value)?;
+            let repeat = pattern_repeat_count_from_value(&value)?;
             rhythm = rhythm.with_repeat(repeat);
         }
         // emit
         if table.contains_key("emit")? {
             let value: LuaValue<'_> = table.get::<&str, LuaValue>("emit")?;
-            let event_iter = event_iter_from_value(lua, timeout_hook, value, time_base)?;
+            let event_iter = event_iter_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.trigger_dyn(event_iter);
         }
         Ok(rhythm)

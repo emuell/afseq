@@ -26,5 +26,5 @@ impl SampleTimeDisplay for SecondTimeBase {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Defines a number of seconds in SecondTimeBase.
+/// Defines a number of seconds in [`SecondTimeBase`].
 pub type SecondTimeStep = f64;

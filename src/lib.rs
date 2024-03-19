@@ -1,7 +1,26 @@
 //! An experimental functional musical sequence generator.
 //! Part of the [afplay](https://github.com/emuell/afplay) crates.
 
+// -------------------------------------------------------------------------------------------------
+
+// Clippy lints
+
 #![warn(clippy::clone_on_ref_ptr)]
+
+// Useful, but also anoying: enable and check every now and then
+// #![warn(clippy::pedantic)]
+
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_lossless)]
+
+// -------------------------------------------------------------------------------------------------
+
+// Exports
 
 pub mod time;
 pub use time::{BeatTimeBase, SampleTime, SecondTimeBase, TimeBase};

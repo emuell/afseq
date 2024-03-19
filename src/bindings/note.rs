@@ -1,6 +1,10 @@
 use mlua::prelude::*;
 
-use super::unwrap::*;
+use super::unwrap::{
+    delay_array_from_value, note_events_from_value, panning_array_from_value, sequence_from_value,
+    transpose_steps_array_from_value, volume_array_from_value,
+};
+
 use crate::{event::NoteEvent, note::Note};
 
 // ---------------------------------------------------------------------------------------------
@@ -24,20 +28,20 @@ impl NoteUserData {
                 .cloned()?;
             if let Some(sequence) = sequence_from_value(&arg.clone()) {
                 let mut notes = vec![];
-                for (index, arg) in sequence.into_iter().enumerate() {
+                for (index, arg) in sequence.iter().enumerate() {
                     // flatten sequence events into a single array
                     notes.append(&mut note_events_from_value(arg, Some(index))?);
                 }
                 Ok(NoteUserData { notes })
             } else {
                 Ok(NoteUserData {
-                    notes: note_events_from_value(arg, None)?,
+                    notes: note_events_from_value(&arg, None)?,
                 })
             }
         // multiple values, maybe of different type
         } else {
             let mut notes = vec![];
-            for (index, arg) in args.into_iter().enumerate() {
+            for (index, arg) in args.iter().enumerate() {
                 notes.append(&mut note_events_from_value(arg, Some(index))?);
             }
             Ok(NoteUserData { notes })
@@ -57,7 +61,7 @@ impl LuaUserData for NoteUserData {
                 }
             }
             Ok(sequence)
-        })
+        });
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
@@ -66,7 +70,7 @@ impl LuaUserData for NoteUserData {
             for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 if let Some(note) = note {
                     if note.note.is_note_on() {
-                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
+                        let transposed_note = (u8::from(note.note) as i32 + step).clamp(0, 0x7f);
                         note.note = Note::from(transposed_note as u8);
                     }
                 }
@@ -121,6 +125,21 @@ mod test {
     use super::*;
     use crate::{bindings::*, event::new_note};
 
+    fn new_test_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
+        let (mut lua, mut timeout_hook) = new_engine()?;
+        register_bindings(
+            &mut lua,
+            &timeout_hook,
+            &BeatTimeBase {
+                beats_per_min: 120.0,
+                beats_per_bar: 4,
+                samples_per_sec: 44100,
+            },
+        )?;
+        timeout_hook.reset();
+        Ok((lua, timeout_hook))
+    }
+
     fn evaluate_note_userdata(lua: &Lua, expression: &str) -> LuaResult<NoteUserData> {
         Ok(lua
             .load(expression)
@@ -133,20 +152,7 @@ mod test {
 
     #[test]
     fn note() -> LuaResult<()> {
-        // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine()?;
-        register_bindings(
-            &mut lua,
-            &timeout_hook,
-            BeatTimeBase {
-                beats_per_min: 120.0,
-                beats_per_bar: 4,
-                samples_per_sec: 44100,
-            },
-        )?;
-
-        // reset timeout
-        timeout_hook.reset();
+        let (lua, _) = new_test_engine()?;
 
         // Empty Note
         let note_event = evaluate_note_userdata(&lua, r#"note("---")"#)?;
@@ -223,25 +229,27 @@ mod test {
                 None
             ]
         );
+
+        // nested notes
+        assert_eq!(
+            evaluate_note_userdata(
+                &lua,
+                r#"note(note("c4 #100 v0.2 p0.3 d0.4", "", "e4").notes)"#
+            )?
+            .notes,
+            vec![
+                new_note(("c4", InstrumentId::from(100), 0.2, 0.3, 0.4)),
+                None,
+                new_note("e4"),
+            ]
+        );
+
         Ok(())
     }
 
     #[test]
     fn note_chord() -> LuaResult<()> {
-        // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine()?;
-        register_bindings(
-            &mut lua,
-            &timeout_hook,
-            BeatTimeBase {
-                beats_per_min: 120.0,
-                beats_per_bar: 4,
-                samples_per_sec: 44100,
-            },
-        )?;
-
-        // reset timeout
-        timeout_hook.reset();
+        let (lua, _) = new_test_engine()?;
 
         // Note chord
         assert!(evaluate_note_userdata(&lua, r#"note("c12'maj")"#).is_err());
@@ -276,35 +284,8 @@ mod test {
     }
 
     #[test]
-    fn note_methods() -> LuaResult<()> {
-        // create a new engine and register bindings
-        let (mut lua, mut timeout_hook) = new_engine()?;
-        register_bindings(
-            &mut lua,
-            &timeout_hook,
-            BeatTimeBase {
-                beats_per_min: 120.0,
-                beats_per_bar: 4,
-                samples_per_sec: 44100,
-            },
-        )?;
-
-        // reset timeout
-        timeout_hook.reset();
-
-        // notes
-        assert_eq!(
-            evaluate_note_userdata(
-                &lua,
-                r#"note(note("c4 #100 v0.2 p0.3 d0.4", "", "e4").notes)"#
-            )?
-            .notes,
-            vec![
-                new_note(("c4", InstrumentId::from(100), 0.2, 0.3, 0.4)),
-                None,
-                new_note("e4"),
-            ]
-        );
+    fn note_transpose() -> LuaResult<()> {
+        let (lua, _) = new_test_engine()?;
 
         // transpose
         assert_eq!(
@@ -319,6 +300,13 @@ mod test {
             evaluate_note_userdata(&lua, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
             vec![new_note(0x0_u8), new_note(0x7f_u8),]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn note_volume() -> LuaResult<()> {
+        let (lua, _) = new_test_engine()?;
 
         // with_volume
         assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume(1.0)"#).is_ok());
@@ -389,6 +377,12 @@ mod test {
                 new_note(("e4", None, 0.5)),
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn note_panning() -> LuaResult<()> {
+        let (lua, _) = new_test_engine()?;
 
         // with_panning
         assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning(1.0)"#).is_ok());
@@ -414,6 +408,12 @@ mod test {
                 new_note(("e4", None, 1.0, 0.0)),
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn note_delay() -> LuaResult<()> {
+        let (lua, _) = new_test_engine()?;
 
         // with_delay
         assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay(1.0)"#).is_ok());

@@ -22,7 +22,7 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
-/// Preload time of the player's run_until function. Should be big enough to ensure that events
+/// Preload time of the player's `run_until` function. Should be big enough to ensure that events
 /// are scheduled ahead of playback time, but small enough to avoid latency.
 /// NB: real audio/event latency is twice the amount of the preload!
 #[cfg(debug_assertions)]
@@ -33,14 +33,13 @@ const PLAYBACK_PRELOAD_SECONDS: f64 = 0.5;
 // -------------------------------------------------------------------------------------------------
 
 /// Preloads a set of sample files and stores them as
-/// [`afplay::PreloadedFileSource`](afplay::source::file::preloaded::PreloadedFileSource) for later
-/// use.
+/// [`PreloadedFileSource`] for later use.
 ///
 /// When files are accessed, the stored file sources are cloned, which avoids loading and decoding
-/// the files again. Cloned FileSources are using a shared Buffer, so cloning is very cheap.
+/// the files again. Cloned [`PreloadedFileSource`] are using a shared Buffer, so cloning is very cheap.
 ///
-/// Uses a RefCell to maintain the internal list of samples, so the pool can be accessed as non mut
-/// ref via a RWLock by the player. Only one thread may load new samples though and multiple other
+/// Uses a `RefCell` to maintain the internal list of samples, so the pool can be accessed as non mut
+/// ref via a `RwLock` by the player. Only one thread may load new samples though and multiple other
 /// threads may access them.
 #[derive(Default)]
 pub struct SamplePool {
@@ -48,30 +47,42 @@ pub struct SamplePool {
 }
 
 impl SamplePool {
-    /// Create a new pool
+    /// Create a new empty sample pool.
     pub fn new() -> Self {
         Self {
             pool: RwLock::new(HashMap::new()),
         }
     }
 
-    /// Fetch a clone of a preloaded sample with the given plaback options.
+    /// Fetch a clone of a preloaded sample with the given playback options.
+    /// 
+    /// ### Errors
+    /// Returns an error if the instrument id is unknown.
+    /// 
+    /// ### Panics
+    /// Panics if the sample pool can not be accessed
     pub fn get_sample(
         &self,
         id: InstrumentId,
         playback_options: FilePlaybackOptions,
         playback_sample_rate: u32,
-    ) -> Option<PreloadedFileSource> {
+    ) -> Result<PreloadedFileSource, Error> {
         let pool = self.pool.read().expect("Failed to access sample pool");
-        pool.get(&id).map(|sample| {
-            sample
-                .clone(playback_options, playback_sample_rate)
-                .expect("Failed to clone sample file")
-        })
+        if let Some(sample) = pool.get(&id) {
+            sample.clone(playback_options, playback_sample_rate)
+        } else {
+            Err(Error::MediaFileNotFound)
+        }
     }
 
-    /// Load a sample file into a PreloadedFileSource and return its id.
-    /// A copy of this sample can then later on be fetched with `get_sample` with the returned id.  
+    /// Load a sample file into a [`PreloadedFileSource`] and return its id.
+    /// A copy of this sample can then later on be fetched with `get_sample` with the returned id.
+    /// 
+    /// ### Errors
+    /// Returns an error if the sample file could not be loaded.
+    /// 
+    /// ### Panics
+    /// Panics if the sample pool can not be accessed
     pub fn load_sample(&self, file_path: &str) -> Result<InstrumentId, Error> {
         let sample =
             PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
@@ -98,8 +109,8 @@ pub enum NewNoteAction {
 /// Context, passed along serialized when triggering new notes from the sample player.   
 #[derive(Clone)]
 pub struct SamplePlaybackContext {
-    pub rhythm_index: isize,
-    pub voice_index: isize,
+    pub rhythm_index: Option<usize>,
+    pub voice_index: Option<usize>,
 }
 
 impl SamplePlaybackContext {
@@ -110,8 +121,8 @@ impl SamplePlaybackContext {
             }
         }
         SamplePlaybackContext {
-            rhythm_index: -1,
-            voice_index: -1,
+            rhythm_index: None,
+            voice_index: None,
         }
     }
 }
@@ -135,6 +146,11 @@ pub struct SamplePlayer {
 }
 
 impl SamplePlayer {
+    /// Create a new sample player.
+    ///
+    /// # Errors
+    ///
+    /// returns an error if the player could not be created.
     pub fn new(
         sample_pool: Arc<RwLock<SamplePool>>,
         playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>,
@@ -193,7 +209,7 @@ impl SamplePlayer {
     }
     // set a new new note action behaviour.
     pub fn set_new_note_action(&mut self, action: NewNoteAction) {
-        self.new_note_action = action
+        self.new_note_action = action;
     }
 
     /// Run/play the given sequence until it stops.
@@ -284,6 +300,7 @@ impl SamplePlayer {
         self.emitted_beats = 0;
     }
 
+    #[allow(clippy::unused_self)]
     fn seek_sequence_until_time(&mut self, sequence: &mut Sequence, sample_time: SampleTime) {
         sequence.emit_until_time(sample_time, &mut |_, _, _, _| {
             // ignore all events
@@ -344,15 +361,15 @@ impl SamplePlayer {
                                         .sample_pool
                                         .read()
                                         .expect("Failed to access sample pool");
-                                    if let Some(mut sample) = sample_pool.get_sample(
+                                    if let Ok(mut sample) = sample_pool.get_sample(
                                         instrument,
                                         playback_options,
                                         playback_sample_rate,
                                     ) {
                                         sample.set_volume(note_event.volume);
                                         let context = Arc::new(SamplePlaybackContext {
-                                            rhythm_index: rhythm_index as isize,
-                                            voice_index: voice_index as isize,
+                                            rhythm_index: Some(rhythm_index),
+                                            voice_index: Some(voice_index),
                                         });
                                         let sample_delay = (note_event.delay
                                             * event_duration as f32)
@@ -367,6 +384,9 @@ impl SamplePlayer {
                                             .expect("Failed to play file source");
                                         playing_notes_in_rhythm
                                             .insert(voice_index, (playback_id, note_event.note));
+                                    }
+                                    else {
+                                        log::error!(target: "Player", "Failed to get sample with id {}", instrument);
                                     }
                                 }
                             }

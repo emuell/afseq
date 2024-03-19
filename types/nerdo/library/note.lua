@@ -84,7 +84,7 @@ function Note:with_delay(panning) end
 ---```
 ---@param ... NoteValue
 ---@return Note
---- #### Examples
+--- ### examples:
 --- ```lua
 --- note(60) -- middle C
 --- note("c4") -- middle C

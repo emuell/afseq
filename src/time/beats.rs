@@ -67,6 +67,7 @@ pub enum BeatTimeStep {
 impl BeatTimeStep {
     /// Get number of steps in the current time resolution.
     pub fn steps(&self) -> f32 {
+        #[allow(clippy::match_same_arms)]
         match *self {
             BeatTimeStep::SixtyFourth(amount) => amount,
             BeatTimeStep::ThirtySecond(amount) => amount,

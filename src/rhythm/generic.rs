@@ -25,8 +25,8 @@ pub trait GenericRhythmTimeStep: Debug + Clone + Copy + 'static {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Generic `Rhythm` impl which uses a [Pattern] to generate pulse events, filtered by a [Gate]
-/// which then drives an [EventIter].
+/// Generic `Rhythm` impl which uses a [`Pattern`] to generate pulse events, filtered by a [`Gate`]
+/// which then drives an [`EventIter`][`crate::EventIter`].
 ///
 /// Internal time units are generics, and will usually be beats or seconds.
 #[derive(Clone, Debug)]
@@ -44,7 +44,7 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
 }
 
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<Step, Offset> {
-    /// Create a new pattern based emitter which emits `value` every beat_time `step`,
+    /// Create a new pattern based emitter which emits `value` every `beat_time` `step`,
     /// and an optional seed for the random number generator.
     pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<[u8; 32]>) -> Self {
         let offset = Offset::default_offset();
@@ -218,7 +218,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         self.sample_offset
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
-        self.sample_offset = sample_offset
+        self.sample_offset = sample_offset;
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {

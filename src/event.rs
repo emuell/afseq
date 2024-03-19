@@ -20,11 +20,11 @@ pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Id to refer to a specific instrument/patch/sample in a NoteEvent.
+/// Id to refer to a specific instrument/patch/sample in a [`NoteEvent`].
 #[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
 pub struct InstrumentId(usize);
 
-/// Id to refer to a specific parameter in a ParameterChangeEvent.
+/// Id to refer to a specific parameter in a [`ParameterChangeEvent`].
 #[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
 pub struct ParameterId(usize);
 
@@ -204,7 +204,7 @@ pub fn new_polyphonic_note_sequence<E: Into<NoteEvent>>(
             if let Some(event) = event {
                 event_sequence.push(Some(event.into()));
             } else {
-                event_sequence.push(None)
+                event_sequence.push(None);
             }
         }
         polyphonic_event_sequence.push(event_sequence);
@@ -340,7 +340,6 @@ impl Display for Event {
 /// Used by [Rhythm](`crate::Rhythm`) to emit events from pulse patterns.
 pub trait EventIter: Debug {
     /// Update the iterator's internal beat or second time base with the new time base.
-    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Set optional, application specific external context data for the event iter.
@@ -363,7 +362,7 @@ pub trait EventIter: Debug {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Standard Iterator impl for EventIter. Runs the EventIter with a 1 valued Pulse.
+/// Standard Iterator impl for [`EventIter`]. Runs the iter with a 1 valued [`PulseIterItem`].
 impl Iterator for dyn EventIter {
     type Item = Event;
 

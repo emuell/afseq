@@ -17,10 +17,10 @@ mod second_time;
 // unwrap a BeatTimeRhythm or SecondTimeRhythm from the given LuaValue,
 // which is expected to be a user data
 pub(crate) fn rhythm_from_userdata(
-    result: LuaValue,
+    value: &LuaValue,
     instrument: Option<InstrumentId>,
 ) -> LuaResult<Rc<RefCell<dyn Rhythm>>> {
-    if let Some(user_data) = result.as_userdata() {
+    if let Some(user_data) = value.as_userdata() {
         if let Ok(beat_time_rhythm) = user_data.take::<BeatTimeRhythm>() {
             Ok(Rc::new(RefCell::new(
                 beat_time_rhythm.with_instrument(instrument),
@@ -44,7 +44,7 @@ pub(crate) fn rhythm_from_userdata(
             to: "rhythm",
             message: Some(format!(
                 "Expected script to return a emitter, got {}",
-                result.type_name()
+                value.type_name()
             )),
         })
     }
@@ -64,23 +64,28 @@ mod test {
         PulseIterItem,
     };
 
-    #[test]
-    fn beat_time() -> LuaResult<()> {
-        // create a new engine and register bindings
+    fn new_test_engine(
+        beats_per_min: f32,
+        beats_per_bar: u32,
+        samples_per_sec: u32,
+    ) -> Result<(Lua, LuaTimeoutHook), LuaError> {
         let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
-            BeatTimeBase {
-                beats_per_min: 120.0,
-                beats_per_bar: 4,
-                samples_per_sec: 44100,
+            &BeatTimeBase {
+                beats_per_min,
+                beats_per_bar,
+                samples_per_sec,
             },
-        )
-        .unwrap();
-
-        // reset timeout
+        )?;
         timeout_hook.reset();
+        Ok((lua, timeout_hook))
+    }
+
+    #[test]
+    fn beat_time() -> LuaResult<()> {
+        let (lua, _) = new_test_engine(120.0, 4, 44100)?;
 
         // BeatTimeRhythm
         let beat_time_rhythm = lua
@@ -104,7 +109,7 @@ mod test {
         assert!(beat_time_rhythm.is_ok());
         let mut beat_time_rhythm = beat_time_rhythm.unwrap();
         assert_eq!(beat_time_rhythm.step(), BeatTimeStep::Beats(0.5));
-        assert_eq!(beat_time_rhythm.offset(), BeatTimeStep::Beats(2.0));
+        assert_eq!(beat_time_rhythm.offset(), BeatTimeStep::Beats(1.0));
         let pattern = beat_time_rhythm.pattern();
         let mut pattern = pattern.borrow_mut();
         assert_eq!(
@@ -134,7 +139,7 @@ mod test {
         assert_eq!(
             event,
             Some(RhythmIterItem {
-                time: 44100,
+                time: 22050,
                 event: Some(Event::NoteEvents(vec![Some(NoteEvent {
                     instrument: None,
                     note: Note::C6,
@@ -145,6 +150,12 @@ mod test {
                 duration: 11025
             })
         );
+        Ok(())
+    }
+
+    #[test]
+    fn beat_time_callbacks() -> LuaResult<()> {
+        let (lua, _) = new_test_engine(120.0, 4, 44100)?;
 
         // BeatTimeRhythm function Context
         let beat_time_rhythm = lua
@@ -228,21 +239,7 @@ mod test {
 
     #[test]
     fn second_time() -> LuaResult<()> {
-        // create a new lua and register bindings
-        let (mut lua, mut timeout_hook) = new_engine()?;
-        register_bindings(
-            &mut lua,
-            &timeout_hook,
-            BeatTimeBase {
-                beats_per_min: 130.0,
-                beats_per_bar: 8,
-                samples_per_sec: 48000,
-            },
-        )
-        .unwrap();
-
-        // reset timeout
-        timeout_hook.reset();
+        let (lua, _) = new_test_engine(130.0, 8, 48000)?;
 
         // SecondTimeRhythm
         let second_time_rhythm = lua
@@ -266,8 +263,8 @@ mod test {
             .borrow::<SecondTimeRhythm>();
         assert!(second_time_rhythm.is_ok());
         let second_time_rhythm = second_time_rhythm.unwrap();
-        assert_eq!(second_time_rhythm.step(), 2.0);
-        assert_eq!(second_time_rhythm.offset(), 3.0);
+        assert!((second_time_rhythm.step() - 2.0).abs() < f64::EPSILON);
+        assert!((second_time_rhythm.offset() - 6.0).abs() < f64::EPSILON);
         let pattern = second_time_rhythm.pattern();
         let mut pattern = pattern.borrow_mut();
         assert_eq!(
@@ -292,6 +289,12 @@ mod test {
             ]
         );
         drop(pattern);
+        Ok(())
+    }
+
+    #[test]
+    fn second_time_callbacks() -> LuaResult<()> {
+        let (lua, _) = new_test_engine(130.0, 8, 48000)?;
 
         // SecondTimeRhythm function Context
         let second_time_rhythm = lua

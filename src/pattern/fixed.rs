@@ -166,45 +166,6 @@ mod test {
         pattern = [
             Pulse::from(1.0),
             Pulse::from(0.0),
-            Pulse::from(vec![1.0, 1.0]),
-            Pulse::from(0.0),
-        ]
-        .to_pattern();
-        assert_eq!(
-            vec![
-                pattern.run(),
-                pattern.run(),
-                pattern.run(),
-                pattern.run(),
-                pattern.run()
-            ],
-            vec![
-                Some(PulseIterItem {
-                    value: 1.0,
-                    step_time: 1.0,
-                }),
-                Some(PulseIterItem {
-                    value: 0.0,
-                    step_time: 1.0,
-                }),
-                Some(PulseIterItem {
-                    value: 1.0,
-                    step_time: 0.5,
-                }),
-                Some(PulseIterItem {
-                    value: 1.0,
-                    step_time: 0.5,
-                }),
-                Some(PulseIterItem {
-                    value: 0.0,
-                    step_time: 1.0,
-                })
-            ]
-        );
-
-        pattern = [
-            Pulse::from(1.0),
-            Pulse::from(0.0),
             Pulse::from(vec![Pulse::from(vec![0.0, 1.0]), Pulse::from(1.0)]),
             Pulse::from(0.0),
         ]

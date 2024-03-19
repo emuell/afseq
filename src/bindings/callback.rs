@@ -14,6 +14,9 @@ lazy_static! {
 }
 
 /// Returns true if there are any Lua callback errors and returns the !first! one.
+/// 
+/// ### Panics
+/// Panics if accessing the global lua callback error vector failed.
 pub fn has_lua_callback_errors() -> Option<LuaError> {
     LUA_CALLBACK_ERRORS
         .read()
@@ -24,6 +27,9 @@ pub fn has_lua_callback_errors() -> Option<LuaError> {
 
 /// Returns all Lua callback errors, if any. Check with `has_lua_callback_errors()` to avoid
 /// possible vec clone overhead.
+/// 
+/// ### Panics
+/// Panics if accessing the global lua callback error vector failed.
 pub fn lua_callback_errors() -> Vec<LuaError> {
     LUA_CALLBACK_ERRORS
         .read()
@@ -32,6 +38,9 @@ pub fn lua_callback_errors() -> Vec<LuaError> {
 }
 
 /// Clears all Lua callback errors.
+/// 
+/// ### Panics
+/// Panics if accessing the global lua callback error vector failed.
 pub fn clear_lua_callback_errors() {
     LUA_CALLBACK_ERRORS
         .write()
@@ -70,7 +79,7 @@ impl LuaFunctionCallback {
     pub fn new(lua: &Lua, function: LuaFunction<'_>) -> LuaResult<Self> {
         // create an empty context and memorize the function without calling it
         let context = lua.create_table()?.into_owned();
-        let environment = function.environment().map(|env| env.into_owned());
+        let environment = function.environment().map(LuaTable::into_owned);
         let generator = None;
         let function = function.into_owned();
         let initialized = false;
@@ -170,7 +179,7 @@ impl LuaFunctionCallback {
             .unwrap_or("annonymous function".to_string())
     }
 
-    /// Call the function with our context as argument and return the result as LuaValue.
+    /// Call the function with our context as argument and return the result as `LuaValue`.
     /// Fetches inner functions from generators, if this is the first call.
     pub fn call(&mut self) -> LuaResult<LuaValue> {
         if !self.initialized {
@@ -183,7 +192,7 @@ impl LuaFunctionCallback {
                     .function
                     .to_ref()
                     .environment()
-                    .map(|env| env.into_owned());
+                    .map(LuaTable::into_owned);
                 let function_generator = Some(self.function.clone());
                 self.environment = function_environment;
                 self.generator = function_generator;
@@ -199,16 +208,16 @@ impl LuaFunctionCallback {
 
     /// Report a Lua callback errors. The error will be logged and usually cleared after
     /// the next callback call.
-    pub fn handle_error(&self, err: LuaError) {
-        LUA_CALLBACK_ERRORS
-            .write()
-            .expect("Failed to lock Lua callback error vector")
-            .push(err.clone());
+    pub fn handle_error(&self, err: &LuaError) {
         log::warn!(
             "Lua callback '{}' failed to evaluate:\n{}",
             self.name(),
             err
         );
+        LUA_CALLBACK_ERRORS
+            .write()
+            .expect("Failed to lock Lua callback error vector")
+            .push(err.clone());
     }
 
     /// Reset the function's environment and get a new fresh function from a generator,

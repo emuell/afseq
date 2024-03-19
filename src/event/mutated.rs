@@ -59,7 +59,7 @@ impl Debug for MutatedEventIter {
             .field("events", &self.events)
             .field("event_index", &self.event_index)
             .field("initial_events", &self.initial_events)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

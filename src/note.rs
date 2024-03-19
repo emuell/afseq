@@ -176,6 +176,7 @@ impl Note {
     }
 
     /// return a new transposed note with the given offset.
+    #[must_use]
     pub fn transpose(&self, offset: i32) -> Self {
         Note::from((*self as i32 + offset).clamp(0, 0x7f) as u8)
     }
@@ -284,28 +285,24 @@ impl TryFrom<&str> for Note {
 }
 
 impl From<u8> for Note {
-    #[inline(always)]
     fn from(n: u8) -> Note {
         unsafe { mem::transmute(n & 0x7f) }
     }
 }
 
 impl From<Note> for u8 {
-    #[inline(always)]
     fn from(note: Note) -> u8 {
         note as u8
     }
 }
 
 impl From<i8> for Note {
-    #[inline(always)]
     fn from(n: i8) -> Note {
         unsafe { mem::transmute(n & 0x7f) }
     }
 }
 
 impl From<Note> for i8 {
-    #[inline(always)]
     fn from(note: Note) -> Self {
         note as i8
     }

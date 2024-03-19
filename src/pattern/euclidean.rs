@@ -7,6 +7,7 @@ pub fn euclidean(pulses: u32, steps: u32, offset: i32) -> Vec<bool> {
     type Group = Vec<bool>;
     type Groups = Vec<Group>;
 
+    #[allow(clippy::similar_names)]
     fn generate(mut fgs: Groups, mut lgs: Groups) -> Groups {
         if lgs.len() < 2 {
             fgs.append(&mut lgs.clone());

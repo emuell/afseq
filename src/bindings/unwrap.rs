@@ -65,7 +65,10 @@ impl<'lua> IntoLua<'lua> for NoteEvent {
         let table = lua.create_table()?;
         table.set("key", self.note.into_lua(lua)?)?;
         if let Some(instrument) = self.instrument {
-            table.set("instrument", usize::from(instrument) as i64)?;
+            table.set(
+                "instrument",
+                LuaInteger::try_from(usize::from(instrument)).unwrap_or(LuaInteger::MAX),
+            )?;
         }
         table.set("volume", self.volume as f64)?;
         table.set("panning", self.panning as f64)?;
@@ -96,12 +99,7 @@ pub(crate) fn sequence_from_table<'lua>(
         .sequence_values::<LuaValue>()
         .collect::<Vec<_>>();
     if !sequence.is_empty() {
-        return Some(
-            sequence
-                .into_iter()
-                .map(|value: LuaResult<LuaValue<'lua>>| value.unwrap())
-                .collect(),
-        );
+        return Some(sequence.into_iter().map(Result::unwrap).collect());
     }
     None
 }
@@ -127,9 +125,9 @@ where
             .collect::<LuaResult<Vec<f32>>>()?;
     } else {
         let value = f32::from_lua(value, lua)?;
-        values = (0..array_len).map(|_| value).collect::<Vec<f32>>()
+        values = (0..array_len).map(|_| value).collect::<Vec<f32>>();
     }
-    for value in values.iter() {
+    for value in &values {
         if !range.contains(value) {
             return Err(bad_argument_error(
                 None,
@@ -155,7 +153,7 @@ pub(crate) fn transpose_steps_array_from_value(
             .collect::<LuaResult<Vec<i32>>>()?;
     } else {
         let step = i32::from_lua(step, lua)?;
-        steps = (0..array_len).map(|_| step).collect::<Vec<i32>>()
+        steps = (0..array_len).map(|_| step).collect::<Vec<i32>>();
     }
     Ok(steps)
 }
@@ -197,7 +195,9 @@ where
 {
     if table.contains_key::<&str>(name)? {
         if let Ok(value) = table.get::<&str, f32>(name) {
-            if !range.contains(&value) {
+            if range.contains(&value) {
+                Ok(value)
+            } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "string",
                     to: "number",
@@ -206,8 +206,6 @@ where
                         name, range, value
                     )),
                 })
-            } else {
-                Ok(value)
             }
         } else {
             Err(LuaError::FromLuaConversionError {
@@ -251,8 +249,10 @@ fn float_value_from_string<Range>(
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
-    let mut value = default;
-    if !str.is_empty() {
+    if str.is_empty() {
+        Ok(default)
+    } else {
+        let value;
         if let Ok(int) = str.parse::<i32>() {
             value = int as f32;
         } else if let Ok(float) = str.parse::<f32>() {
@@ -264,46 +264,45 @@ where
                 message: Some(format!("'{}' property '{}' is not a number", name, str)),
             });
         }
-        if !range.contains(&value) {
-            return Err(LuaError::FromLuaConversionError {
+        if range.contains(&value) {
+            Ok(value)
+        } else {
+            Err(LuaError::FromLuaConversionError {
                 from: "string",
                 to: "number",
                 message: Some(format!(
                     "'{}' property must be in range {:?} but is '{}'",
                     name, range, value
                 )),
-            });
+            })
         }
     }
-    Ok(value)
 }
 
 pub(crate) fn instrument_value_from_string(str: &str) -> LuaResult<Option<InstrumentId>> {
-    if !str.is_empty() {
-        if let Ok(value) = str.parse::<LuaInteger>() {
-            if value < 0 {
-                return Err(LuaError::FromLuaConversionError {
-                    from: "string",
-                    to: "number",
-                    message: Some(format!(
-                        "'{}' property must be >= 0 but is '{}'",
-                        "instrument", value
-                    )),
-                });
-            }
-            Ok(Some(InstrumentId::from(value as usize)))
-        } else {
-            Err(LuaError::FromLuaConversionError {
+    if str.is_empty() {
+        Ok(None)
+    } else if let Ok(value) = str.parse::<LuaInteger>() {
+        if value < 0 {
+            return Err(LuaError::FromLuaConversionError {
                 from: "string",
                 to: "number",
                 message: Some(format!(
-                    "'{}' property '{}' is not a number",
-                    "instrument", str
+                    "'{}' property must be >= 0 but is '{}'",
+                    "instrument", value
                 )),
-            })
+            });
         }
+        Ok(Some(InstrumentId::from(value as usize)))
     } else {
-        Ok(None)
+        Err(LuaError::FromLuaConversionError {
+            from: "string",
+            to: "number",
+            message: Some(format!(
+                "'{}' property '{}' is not a number",
+                "instrument", str
+            )),
+        })
     }
 }
 
@@ -328,7 +327,15 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
 // ---------------------------------------------------------------------------------------------
 
 pub(crate) fn note_event_from_number(note_value: LuaInteger) -> LuaResult<Option<NoteEvent>> {
-    Ok(new_note(note_value as u8))
+    if (0..=0x7f).contains(&note_value) {
+        Ok(new_note(note_value.clamp(0, 0x7f) as u8))
+    } else {
+        Err(LuaError::FromLuaConversionError {
+            from: "number",
+            to: "note",
+            message: Some("note numbers must be >= 0 and <= 0x7f".to_string()),
+        })
+    }
 }
 
 pub(crate) fn note_event_from_string(str: &str) -> LuaResult<Option<NoteEvent>> {
@@ -368,15 +375,15 @@ pub(crate) fn note_event_from_string(str: &str) -> LuaResult<Option<NoteEvent>> 
     }
 }
 
-pub(crate) fn note_event_from_table_map(table: LuaTable) -> LuaResult<Option<NoteEvent>> {
+pub(crate) fn note_event_from_table_map(table: &LuaTable) -> LuaResult<Option<NoteEvent>> {
     if table.is_empty() {
         return Ok(None);
     }
     if table.contains_key("key")? {
-        let instrument = instrument_value_from_table(&table)?;
-        let volume = volume_value_from_table(&table)?;
-        let panning = panning_value_from_table(&table)?;
-        let delay = delay_value_from_table(&table)?;
+        let instrument = instrument_value_from_table(table)?;
+        let volume = volume_value_from_table(table)?;
+        let panning = panning_value_from_table(table)?;
+        let delay = delay_value_from_table(table)?;
         // { key = 60, [volume = 1.0, panning = 0.0, delay = 0.0] }
         if let Ok(note_value) = table.get::<&str, i32>("key") {
             Ok(new_note((
@@ -414,12 +421,12 @@ pub(crate) fn note_event_from_table_map(table: LuaTable) -> LuaResult<Option<Not
 }
 
 pub(crate) fn note_event_from_value(
-    arg: LuaValue,
+    arg: &LuaValue,
     arg_index: Option<usize>,
 ) -> LuaResult<Option<NoteEvent>> {
     match arg {
         LuaValue::Nil => Ok(None),
-        LuaValue::Integer(note_value) => note_event_from_number(note_value),
+        LuaValue::Integer(note_value) => note_event_from_number(*note_value),
         LuaValue::String(str) => note_event_from_string(&str.to_string_lossy()),
         LuaValue::Table(table) => note_event_from_table_map(table),
         _ => {
@@ -437,7 +444,7 @@ pub(crate) fn note_event_from_value(
 }
 
 pub(crate) fn note_events_from_value(
-    arg: LuaValue,
+    arg: &LuaValue,
     arg_index: Option<usize>,
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     match arg {
@@ -472,17 +479,14 @@ pub(crate) fn note_events_from_value(
             // array like { "C4", "C5" }
             if let Some(sequence) = sequence_from_table(&table.clone()) {
                 let mut note_events = vec![];
-                for (arg_index, arg) in sequence.into_iter().enumerate() {
+                for (arg_index, arg) in sequence.iter().enumerate() {
                     // flatten sequence events into a single array
                     note_events.append(&mut note_events_from_value(arg, Some(arg_index))?);
                 }
                 Ok(note_events)
             // { key = xxx } map
             } else {
-                Ok(vec![note_event_from_value(
-                    mlua::Value::Table(table),
-                    arg_index,
-                )?])
+                Ok(vec![note_event_from_value(arg, arg_index)?])
             }
         }
         LuaValue::String(str) => {
@@ -545,12 +549,12 @@ pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Opti
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<Pulse> {
+pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
     match value {
         LuaValue::Nil => Ok(Pulse::Pulse(0.0)),
-        LuaValue::Boolean(bool) => Ok(Pulse::from(bool)),
-        LuaValue::Integer(integer) => Ok(Pulse::from(integer as u32)),
-        LuaValue::Number(number) => Ok(Pulse::from(number as f32)),
+        LuaValue::Boolean(bool) => Ok(Pulse::from(*bool)),
+        LuaValue::Integer(integer) => Ok(Pulse::from(*integer as u32)),
+        LuaValue::Number(number) => Ok(Pulse::from(*number as f32)),
         LuaValue::String(str) => {
             let str = str.to_string_lossy();
             if let Ok(number) = str.parse::<f32>() {
@@ -571,7 +575,7 @@ pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<Pulse> {
             let sub_div = table
                 .clone()
                 .sequence_values()
-                .map(|result| pattern_pulse_from_value(result?))
+                .map(|result| pattern_pulse_from_value(&result?))
                 .collect::<LuaResult<Vec<Pulse>>>()?;
             Ok(Pulse::from(sub_div))
         }
@@ -585,7 +589,7 @@ pub fn pattern_pulse_from_value(value: LuaValue) -> LuaResult<Pulse> {
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn pattern_repeat_count_from_value(value: LuaValue) -> LuaResult<Option<usize>> {
+pub(crate) fn pattern_repeat_count_from_value(value: &LuaValue) -> LuaResult<Option<usize>> {
     if let Some(boolean) = value.as_boolean() {
         if boolean {
             Ok(None)
@@ -608,19 +612,19 @@ pub(crate) fn pattern_repeat_count_from_value(value: LuaValue) -> LuaResult<Opti
 pub(crate) fn pattern_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
-    value: LuaValue,
+    value: &LuaValue,
     time_base: &BeatTimeBase,
 ) -> LuaResult<Rc<RefCell<dyn Pattern>>> {
     match value {
         LuaValue::Function(func) => {
-            let pattern = ScriptedPattern::new(lua, timeout_hook, func, time_base)?;
+            let pattern = ScriptedPattern::new(lua, timeout_hook, func.clone(), time_base)?;
             Ok(Rc::new(RefCell::new(pattern)))
         }
         LuaValue::Table(table) => {
             let pulses = table
                 .clone()
                 .sequence_values::<LuaValue>()
-                .map(|result| pattern_pulse_from_value(result?))
+                .map(|result| pattern_pulse_from_value(&result?))
                 .collect::<LuaResult<Vec<Pulse>>>()?;
             Ok(Rc::new(RefCell::new(pulses.to_pattern())))
         }
@@ -639,7 +643,7 @@ pub(crate) fn pattern_from_value(
 pub(crate) fn event_iter_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
-    value: LuaValue,
+    value: &LuaValue,
     time_base: &BeatTimeBase,
 ) -> LuaResult<Rc<RefCell<dyn EventIter>>> {
     match value {
@@ -661,14 +665,15 @@ pub(crate) fn event_iter_from_value(
             }
         }
         LuaValue::Function(function) => {
-            let event_iter = ScriptedEventIter::new(lua, timeout_hook, function, time_base)?;
+            let event_iter =
+                ScriptedEventIter::new(lua, timeout_hook, function.clone(), time_base)?;
             Ok(Rc::new(RefCell::new(event_iter)))
         }
         LuaValue::Table(ref table) => {
             // convert an array alike table to a event sequence
             if let Some(sequence) = sequence_from_table(&table.clone()) {
                 let mut note_event_sequence = vec![];
-                for (arg_index, arg) in sequence.into_iter().enumerate() {
+                for (arg_index, arg) in sequence.iter().enumerate() {
                     note_event_sequence.push(note_events_from_value(arg, Some(arg_index))?);
                 }
                 let iter = note_event_sequence.to_event_sequence();

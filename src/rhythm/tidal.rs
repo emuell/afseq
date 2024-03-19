@@ -1,4 +1,4 @@
-//! PEST parser for tidal mini-notations, based on the TidalCycles mini-notation. WIP!
+//! PEST parser for tidal mini-notations, based on the Tidal-Cycles mini-notation. WIP!
 
 #[cfg(test)]
 use pest::{iterators::Pair, Parser};

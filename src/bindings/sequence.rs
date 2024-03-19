@@ -1,6 +1,10 @@
 use mlua::prelude::*;
 
-use super::unwrap::*;
+use super::unwrap::{
+    delay_array_from_value, note_events_from_value, panning_array_from_value, sequence_from_value,
+    transpose_steps_array_from_value, volume_array_from_value,
+};
+
 use crate::prelude::*;
 
 // ---------------------------------------------------------------------------------------------
@@ -24,20 +28,20 @@ impl SequenceUserData {
                 .cloned()?;
             if let Some(sequence) = sequence_from_value(&arg.clone()) {
                 let mut notes = vec![];
-                for (index, arg) in sequence.into_iter().enumerate() {
+                for (index, arg) in sequence.iter().enumerate() {
                     // add each sequence item as separate sequence event
                     notes.push(note_events_from_value(arg, Some(index))?);
                 }
                 Ok(SequenceUserData { notes })
             } else {
                 Ok(SequenceUserData {
-                    notes: vec![note_events_from_value(arg, None)?],
+                    notes: vec![note_events_from_value(&arg, None)?],
                 })
             }
         // multiple values, maybe of different type
         } else {
             let mut notes = vec![];
-            for (index, arg) in args.into_iter().enumerate() {
+            for (index, arg) in args.iter().enumerate() {
                 notes.push(note_events_from_value(arg, Some(index))?);
             }
             Ok(SequenceUserData { notes })
@@ -61,7 +65,7 @@ impl LuaUserData for SequenceUserData {
                 sequence.set(index + 1, notes)?;
             }
             Ok(sequence)
-        })
+        });
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
@@ -70,7 +74,7 @@ impl LuaUserData for SequenceUserData {
             for (notes, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 for note in notes.iter_mut().flatten() {
                     if note.note.is_note_on() {
-                        let transposed_note = (u8::from(note.note) as i32 + step).max(0).min(0x7f);
+                        let transposed_note = (u8::from(note.note) as i32 + step).clamp(0, 0x7f);
                         note.note = Note::from(transposed_note as u8);
                     }
                 }
@@ -143,7 +147,7 @@ mod test {
         register_bindings(
             &mut lua,
             &timeout_hook,
-            BeatTimeBase {
+            &BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
                 samples_per_sec: 44100,
@@ -233,7 +237,7 @@ mod test {
         register_bindings(
             &mut lua,
             &timeout_hook,
-            BeatTimeBase {
+            &BeatTimeBase {
                 beats_per_min: 120.0,
                 beats_per_bar: 4,
                 samples_per_sec: 44100,

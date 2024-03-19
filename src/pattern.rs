@@ -20,7 +20,7 @@ pub trait Pattern: Debug {
     }
     /// Return number of pulses this pattern has. The pattern repeats after this. When the size
     /// is unknown, e.g. in external callbacks that generated pulses, 0 is returned, but
-    /// self.is_empty will still be true.
+    /// `self.is_empty` will still be true.
     fn len(&self) -> usize;
 
     /// Run and move the pattern by a single step and return the to emitted pulse.
@@ -28,7 +28,6 @@ pub trait Pattern: Debug {
     fn run(&mut self) -> Option<PulseIterItem>;
 
     /// Set or update the pattern's internal beat or second time base with the new time base.
-    /// Note: SampleTimeBase can be derived from BeatTimeBase via `SecondTimeBase::from(beat_time)`
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Set optional, application specific external context data for the pattern.

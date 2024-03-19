@@ -401,7 +401,7 @@ impl Scale {
     /// `degree` must be in range `[1..=7]`.
     /// `count` must be in range `[1..=5]`.
     ///
-    /// # Example:
+    /// ### Example
     ///
     /// ```rust
     /// use afseq::{Note, Scale};
@@ -409,6 +409,10 @@ impl Scale {
     /// let cmaj = scale.chord_from_degree(1, 3);
     /// let gmaj7 = scale.chord_from_degree(5, 4);
     /// ```
+    /// 
+    /// ### Panics
+    /// 
+    /// Panics if `degree` or `count` is out of range.
     pub fn chord_from_degree(&self, degree: usize, count: usize) -> Vec<Note> {
         assert!((1..=7).contains(&degree));
         assert!((1..=5).contains(&count));
@@ -427,7 +431,7 @@ impl Scale {
     }
 
     /// Generate an ascending list of notes in the scale, using the Note passed in the
-    /// constructor as root note. Note that unlike note_iter, this will clamp notes
+    /// constructor as root note. Note that unlike `note_iter`, this will clamp notes
     /// outside of the valid range to 0x7F
     pub fn notes(&self) -> Vec<Note> {
         self.steps()

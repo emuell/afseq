@@ -61,7 +61,7 @@ impl ScriptedPattern {
         self.function
             .set_context_pulse_count(self.pulse_count, self.pulse_time_count)?;
         // call function with context and evaluate the result
-        pattern_pulse_from_lua(self.function.call()?)
+        pattern_pulse_from_lua(&self.function.call()?)
     }
 }
 
@@ -86,10 +86,10 @@ impl Pattern for ScriptedPattern {
                 self.pulse_count += 1;
                 self.pulse_time_count += pulse.step_time;
                 return Some(pulse);
-            } else {
-                self.pulse_iter = None;
             }
         }
+        // pulse iter is exhausted now
+        self.pulse_iter = None;
         // apply pattern repeat count, unless this is the first run
         if self.pulse_count > 0 {
             self.repeats += 1;
@@ -100,7 +100,7 @@ impl Pattern for ScriptedPattern {
         // call function with context and evaluate the result
         let pulse = match self.next_pulse() {
             Err(err) => {
-                self.function.handle_error(err);
+                self.function.handle_error(&err);
                 Pulse::from(0.0)
             }
             Ok(pulse) => pulse,
@@ -119,14 +119,14 @@ impl Pattern for ScriptedPattern {
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
         if let Err(err) = self.function.set_context_time_base(time_base) {
-            self.function.handle_error(err);
+            self.function.handle_error(&err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
         if let Err(err) = self.function.set_context_external_data(data) {
-            self.function.handle_error(err);
+            self.function.handle_error(&err);
         }
     }
 
@@ -151,11 +151,11 @@ impl Pattern for ScriptedPattern {
             .function
             .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
         {
-            self.function.handle_error(err);
+            self.function.handle_error(&err);
         }
         // reset function
         if let Err(err) = self.function.reset() {
-            self.function.handle_error(err);
+            self.function.handle_error(&err);
         }
         // reset pulse and pulse iter
         self.pulse = None;

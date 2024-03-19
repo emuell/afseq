@@ -45,7 +45,7 @@ impl Sequence {
     /// returns maximum rhythm count in all phrases.
     pub fn rhythm_slot_count(&self) -> usize {
         let mut count = 0;
-        for phrase in self.phrases.iter() {
+        for phrase in &self.phrases {
             count = count.max(phrase.rhythm_slots().len());
         }
         count
@@ -58,7 +58,7 @@ impl Sequence {
 
     /// Set the time base for all rhythms in our phrases.
     pub fn set_time_base(&mut self, time_base: &BeatTimeBase) {
-        for phrase in self.phrases.iter_mut() {
+        for phrase in &mut self.phrases {
             phrase.set_time_base(time_base);
         }
     }
@@ -71,8 +71,8 @@ impl Sequence {
         self.sample_position = 0;
         self.sample_position_in_phrase = 0;
         // reset all our phrase iters
-        for phrase in self.phrases.iter_mut() {
-            phrase.reset()
+        for phrase in &mut self.phrases {
+            phrase.reset();
         }
     }
 
@@ -134,7 +134,7 @@ impl Sequence {
 /// returning a tuple of the current phrase's rhythm index and the rhythm event.
 impl Iterator for Sequence {
     type Item = PhraseIterItem;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         self.current_phrase_mut()
             .next()
@@ -151,7 +151,7 @@ impl RhythmIter for Sequence {
         self.sample_offset
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
-        self.sample_offset = sample_offset
+        self.sample_offset = sample_offset;
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
