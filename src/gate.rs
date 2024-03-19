@@ -1,6 +1,6 @@
 //! Defines if an `Event` should be triggered or not for a given `Pulse`.
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::fmt::Debug;
 
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -19,9 +19,9 @@ pub trait Gate: Debug {
     fn run(&mut self, pulse: &PulseIterItem) -> bool;
 
     /// Create a new cloned instance of this gate. This actualy is a clone(), wrapped into
-    /// a `Rc<RefCell<dyn Gate>>`, but called 'duplicate' to avoid conflicts with possible
+    /// a `Box<dyn Gate>`, but called 'duplicate' to avoid conflicts with possible
     /// Clone impls.
-    fn duplicate(&self) -> Rc<RefCell<dyn Gate>>;
+    fn duplicate(&self) -> Box<dyn Gate>;
 
     /// Resets the gate's internal state.
     fn reset(&mut self);
@@ -54,8 +54,8 @@ impl Gate for ProbabilityGate {
         pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand_gen.gen_range(0.0..1.0))
     }
 
-    fn duplicate(&self) -> Rc<RefCell<dyn Gate>> {
-        Rc::new(RefCell::new(self.clone()))
+    fn duplicate(&self) -> Box<dyn Gate> {
+        Box::new(self.clone())
     }
 
     fn reset(&mut self) {

@@ -91,9 +91,9 @@ pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
 // -------------------------------------------------------------------------------------------------
 
 /// Evaluate a lua script file which creates and returns a rhythm.
-/// 
+///
 /// ### Errors
-/// Will return `Err` if `file_name` does not exist, failed to load or the lua file at the given 
+/// Will return `Err` if `file_name` does not exist, failed to load or the lua file at the given
 /// path fails to evaulate to a valid rhythm.
 pub fn new_rhythm_from_file(
     time_base: BeatTimeBase,
@@ -114,7 +114,7 @@ pub fn new_rhythm_from_file(
 }
 
 /// Evaluate a Lua string expression which creates and returns a rhythm.
-/// 
+///
 /// ### Errors
 /// Will return `Err` if the lua string contents fail to evaluate to a valid rhythm.
 pub fn new_rhythm_from_string(
@@ -137,7 +137,7 @@ pub fn new_rhythm_from_string(
 }
 
 /// Evaluate a precompiled Lua expression which creates and returns a rhythm.
-/// 
+///
 /// ### Errors
 /// Will return `Err` if the bytecode contents fail to evaluate to a valid rhythm.
 pub fn new_rhythm_from_bytecode(

@@ -1,6 +1,6 @@
 //! Rhythmical pattern as sequence of pulses in a `Rhythm`.
 
-use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug};
 
 use crate::{BeatTimeBase, PulseIterItem};
 
@@ -34,13 +34,13 @@ pub trait Pattern: Debug {
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Set how many times the pattern should be repeated. If 0, the pattern will be run once.
-    /// When None, which is the default, the pattern will be repeated indefinitely. 
+    /// When None, which is the default, the pattern will be repeated indefinitely.
     fn set_repeat_count(&mut self, count: Option<usize>);
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
-    /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible
+    /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
     /// Clone impls.
-    fn duplicate(&self) -> Rc<RefCell<dyn Pattern>>;
+    fn duplicate(&self) -> Box<dyn Pattern>;
 
     /// Reset the pattern genertor, so it emits the same values as if it was freshly initialized.
     /// This does to reset the pattern itself, but onlt the pattern playback position.

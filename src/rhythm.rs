@@ -1,7 +1,7 @@
 //! Periodically emit `Events` via an `EventIter` with a given time base on a
 //! rhythmical pattern defined via a `Pattern`.
 
-use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
     event::{Event, InstrumentId},
@@ -109,8 +109,8 @@ pub trait Rhythm: RhythmIter {
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Create a new cloned instance of this rhythm. This actualy is a clone(), wrapped into
-    /// a `Rc<RefCell<dyn Rhythm>>`, but called 'duplicate' to avoid conflicts with possible Clone impls.
-    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>>;
+    /// a `Box<dyn Rhythm>`, but called 'duplicate' to avoid conflicts with possible Clone impls.
+    fn duplicate(&self) -> Box<dyn Rhythm>;
     /// Resets/rewinds the rhythm to its initial state.
     fn reset(&mut self);
 }

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use std::borrow::Cow;
 
 use crate::{
     event::{Event, EventIter},
@@ -24,8 +24,8 @@ impl EventIter for EmptyEventIter {
         None
     }
 
-    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
-        Rc::new(RefCell::new(self.clone()))
+    fn duplicate(&self) -> Box<dyn EventIter> {
+        Box::new(self.clone())
     }
 
     fn reset(&mut self) {

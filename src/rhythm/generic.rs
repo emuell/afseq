@@ -1,6 +1,12 @@
 //! Generic `Rhythm` implementation with custom time step and offset types.
 
-use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt::Debug,
+};
+
+#[cfg(test)]
+use std::borrow::BorrowMut;
 
 use crate::{
     event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
@@ -29,15 +35,15 @@ pub trait GenericRhythmTimeStep: Debug + Clone + Copy + 'static {
 /// which then drives an [`EventIter`][`crate::EventIter`].
 ///
 /// Internal time units are generics, and will usually be beats or seconds.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> {
     time_base: BeatTimeBase,
     step: Step,
     offset: Offset,
     instrument: Option<InstrumentId>,
-    pattern: Rc<RefCell<dyn Pattern>>,
-    gate: Rc<RefCell<dyn Gate>>,
-    event_iter: Rc<RefCell<dyn EventIter>>,
+    pattern: Box<dyn Pattern>,
+    gate: Box<dyn Gate>,
+    event_iter: Box<dyn EventIter>,
     event_iter_sample_time: SampleTime,
     event_iter_next_sample_time: f64,
     sample_offset: SampleTime,
@@ -49,9 +55,9 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<[u8; 32]>) -> Self {
         let offset = Offset::default_offset();
         let instrument = None;
-        let pattern = Rc::new(RefCell::new(FixedPattern::default()));
-        let gate = Rc::new(RefCell::new(ProbabilityGate::new(seed)));
-        let event_iter = Rc::new(RefCell::new(EmptyEventIter {}));
+        let pattern = Box::<FixedPattern>::default();
+        let gate = Box::new(ProbabilityGate::new(seed));
+        let event_iter = Box::new(EmptyEventIter {});
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
         let sample_offset = 0;
@@ -82,92 +88,82 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         self.offset
     }
     /// Get current pattern.
-    pub fn pattern(&self) -> Rc<RefCell<dyn Pattern>> {
-        Rc::clone(&self.pattern)
+    pub fn pattern(&self) -> &dyn Pattern {
+        self.pattern.borrow()
+    }
+    /// Get mut access the current pattern (only allowed in tests).
+    #[cfg(test)]
+    pub(crate) fn pattern_mut(&mut self) -> &mut dyn Pattern {
+        self.pattern.borrow_mut()
     }
 
-    /// Apply the given step offset to all events.
-    pub fn with_offset<O: Into<Option<Offset>>>(&self, offset: O) -> Self {
+    /// Return a new rhythm instance which applies the given step offset to all events.
+    #[must_use]
+    pub fn with_offset<O: Into<Option<Offset>>>(self, offset: O) -> Self {
         let offset = offset.into().unwrap_or(Offset::default_offset());
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&self.time_base);
         Self {
             offset,
-            pattern: Rc::clone(&self.pattern),
-            gate: Rc::clone(&self.gate),
-            event_iter: Rc::clone(&self.event_iter),
             event_iter_sample_time,
             event_iter_next_sample_time,
-            ..*self
+            ..self
         }
     }
 
-    /// Use the given instrument for all note events which have no instrument set
-    pub fn with_instrument<I: Into<Option<InstrumentId>>>(&self, instrument: I) -> Self {
+    /// Return a new rhythm instance which uses the given instrument for all note events
+    /// which have no instrument set.
+    #[must_use]
+    pub fn with_instrument<I: Into<Option<InstrumentId>>>(self, instrument: I) -> Self {
         let instrument = instrument.into();
-        Self {
-            instrument,
-            pattern: Rc::clone(&self.pattern),
-            gate: Rc::clone(&self.gate),
-            event_iter: Rc::clone(&self.event_iter),
-            ..*self
-        }
+        Self { instrument, ..self }
     }
 
-    /// Trigger events with the given [`Pattern`].  
-    pub fn with_pattern<T: Pattern + Sized + 'static>(&self, pattern: T) -> Self {
-        self.with_pattern_dyn(Rc::new(RefCell::new(pattern)))
+    /// Return a new rhythm instance which trigger events with the given [`Pattern`].  
+    #[must_use]
+    pub fn with_pattern<T: Pattern + Sized + 'static>(self, pattern: T) -> Self {
+        self.with_pattern_dyn(Box::new(pattern))
     }
 
-    /// Trigger events with the given [`Pattern`].  
-    pub fn with_pattern_dyn(&self, pattern: Rc<RefCell<dyn Pattern>>) -> Self {
-        Self {
-            pattern,
-            gate: Rc::clone(&self.gate),
-            event_iter: Rc::clone(&self.event_iter),
-            ..*self
-        }
+    /// Return a new rhythm instance which triggers events with the given dyn [`Pattern`].  
+    #[must_use]
+    pub fn with_pattern_dyn(self, pattern: Box<dyn Pattern>) -> Self {
+        Self { pattern, ..self }
     }
 
-    /// Repeat the pattern up to `count` times. When None, it repeats forever.
-    pub fn with_repeat(&self, count: Option<usize>) -> Self {
-        self.pattern.borrow_mut().set_repeat_count(count);
-        Self {
-            pattern: Rc::clone(&self.pattern),
-            gate: Rc::clone(&self.gate),
-            event_iter: Rc::clone(&self.event_iter),
-            ..*self
-        }
+    /// Return a new rhythm instance which repeats the pattern up to `count` times.
+    /// When None, it repeats forever.
+    #[must_use]
+    pub fn with_repeat(self, count: Option<usize>) -> Self {
+        let mut new = self;
+        new.pattern.set_repeat_count(count);
+        new
     }
 
-    /// Use the given [`Gate`] instead of the default probability gate.  
-    pub fn with_gate<T: Gate + Sized + 'static>(&self, gate: T) -> Self {
-        self.with_gate_dyn(Rc::new(RefCell::new(gate)))
+    /// Return a new rhythm instance which uses the given [`Gate`] instead of the default
+    /// probability gate.  
+    #[must_use]
+    pub fn with_gate<T: Gate + Sized + 'static>(self, gate: T) -> Self {
+        self.with_gate_dyn(Box::new(gate))
     }
 
-    /// Use the given [`Gate`] instead of the default probability gate.  
-    pub fn with_gate_dyn(&self, gate: Rc<RefCell<dyn Gate>>) -> Self {
-        Self {
-            pattern: Rc::clone(&self.pattern),
-            gate,
-            event_iter: Rc::clone(&self.event_iter),
-            ..*self
-        }
+    /// Return a new rhythm instance which uses the given dyn [`Gate`] instead of the default
+    /// probability gate.  
+    #[must_use]
+    pub fn with_gate_dyn(self, gate: Box<dyn Gate>) -> Self {
+        Self { gate, ..self }
     }
 
-    /// Use the given [`EventIter`] to trigger events.
-    pub fn trigger<Iter: EventIter + 'static>(&self, iter: Iter) -> Self {
-        self.trigger_dyn(Rc::new(RefCell::new(iter)))
+    /// Return a new rhythm instance which uses the given [`EventIter`] to trigger events.
+    #[must_use]
+    pub fn trigger<Iter: EventIter + 'static>(self, iter: Iter) -> Self {
+        self.trigger_dyn(Box::new(iter))
     }
 
-    /// Use the given dyn [`EventIter`] to trigger events.
-    pub fn trigger_dyn(&self, event_iter: Rc<RefCell<dyn EventIter>>) -> Self {
-        Self {
-            pattern: Rc::clone(&self.pattern),
-            gate: Rc::clone(&self.gate),
-            event_iter,
-            ..*self
-        }
+    /// Return a new rhythm instance which uses the given dyn [`EventIter`] to trigger events.
+    #[must_use]
+    pub fn trigger_dyn(self, event_iter: Box<dyn EventIter>) -> Self {
+        Self { event_iter, ..self }
     }
 
     /// Set default instrument to event if none is set, else return the event as it is
@@ -193,6 +189,19 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             }
         } else {
             event
+        }
+    }
+}
+
+impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Clone
+    for GenericRhythm<Step, Offset>
+{
+    fn clone(&self) -> Self {
+        Self {
+            pattern: self.pattern.duplicate(),
+            event_iter: self.event_iter.duplicate(),
+            gate: self.gate.duplicate(),
+            ..*self
         }
     }
 }
@@ -231,9 +240,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         }
         // generate a pulse from the pattern and pass the pulse to the gate
         let (pulse, emit_event) = {
-            let mut pattern = self.pattern.borrow_mut();
-            if let Some(pulse) = pattern.run() {
-                let emit_event = self.gate.borrow_mut().run(&pulse);
+            if let Some(pulse) = self.pattern.run() {
+                let emit_event = self.gate.run(&pulse);
                 (pulse, emit_event)
             } else {
                 // pattern playback finished
@@ -241,10 +249,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             }
         };
         // generate an event from the event iter
-        let event = {
-            let mut event_iter = self.event_iter.borrow_mut();
-            self.event_with_default_instrument(event_iter.run(pulse, emit_event))
-        };
+        let mut event = self.event_iter.run(pulse, emit_event);
+        event = self.event_with_default_instrument(event);
         // return event as sample timed rhythm iter item
         let time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
         let duration = (self.step.to_samples(&self.time_base) * pulse.step_time) as SampleTime;
@@ -265,7 +271,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
     }
 
     fn pattern_length(&self) -> usize {
-        self.pattern.borrow().len()
+        self.pattern.len()
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
@@ -278,9 +284,9 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         }
         self.time_base = *time_base;
         // update pattern, gate and event iter
-        self.pattern.borrow_mut().set_time_base(time_base);
-        self.gate.borrow_mut().set_time_base(time_base);
-        self.event_iter.borrow_mut().set_time_base(time_base);
+        self.pattern.set_time_base(time_base);
+        self.gate.set_time_base(time_base);
+        self.event_iter.set_time_base(time_base);
     }
 
     fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
@@ -288,27 +294,22 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
-        self.pattern.borrow_mut().set_external_context(data);
-        self.event_iter.borrow_mut().set_external_context(data);
+        self.pattern.set_external_context(data);
+        self.event_iter.set_external_context(data);
     }
 
-    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
-        Rc::new(RefCell::new(Self {
-            pattern: self.pattern.borrow().duplicate(),
-            event_iter: self.event_iter.borrow().duplicate(),
-            gate: self.gate.borrow().duplicate(),
-            ..self.clone()
-        }))
+    fn duplicate(&self) -> Box<dyn Rhythm> {
+        Box::new(self.clone())
     }
 
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;
         // reset iterator state
-        self.event_iter.borrow_mut().reset();
+        self.event_iter.reset();
         self.event_iter_sample_time = 0;
         self.event_iter_next_sample_time = self.offset.to_samples(&self.time_base);
-        self.pattern.borrow_mut().reset();
-        self.gate.borrow_mut().reset();
+        self.pattern.reset();
+        self.gate.reset();
     }
 }

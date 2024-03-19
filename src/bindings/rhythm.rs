@@ -110,8 +110,7 @@ mod test {
         let mut beat_time_rhythm = beat_time_rhythm.unwrap();
         assert_eq!(beat_time_rhythm.step(), BeatTimeStep::Beats(0.5));
         assert_eq!(beat_time_rhythm.offset(), BeatTimeStep::Beats(1.0));
-        let pattern = beat_time_rhythm.pattern();
-        let mut pattern = pattern.borrow_mut();
+        let pattern = beat_time_rhythm.pattern_mut();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
             vec![
@@ -133,7 +132,6 @@ mod test {
                 })
             ]
         );
-        drop(pattern);
 
         let event = beat_time_rhythm.next();
         assert_eq!(
@@ -260,13 +258,12 @@ mod test {
         let second_time_rhythm = second_time_rhythm
             .as_userdata()
             .unwrap()
-            .borrow::<SecondTimeRhythm>();
+            .borrow_mut::<SecondTimeRhythm>();
         assert!(second_time_rhythm.is_ok());
-        let second_time_rhythm = second_time_rhythm.unwrap();
+        let mut second_time_rhythm = second_time_rhythm.unwrap();
         assert!((second_time_rhythm.step() - 2.0).abs() < f64::EPSILON);
         assert!((second_time_rhythm.offset() - 6.0).abs() < f64::EPSILON);
-        let pattern = second_time_rhythm.pattern();
-        let mut pattern = pattern.borrow_mut();
+        let pattern = second_time_rhythm.pattern_mut();
         assert_eq!(
             vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
             vec![
@@ -288,7 +285,6 @@ mod test {
                 })
             ]
         );
-        drop(pattern);
         Ok(())
     }
 

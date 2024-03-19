@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter},
@@ -86,7 +86,7 @@ impl EventIter for MutatedEventIter {
         }
     }
 
-    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>> {
+    fn duplicate(&self) -> Box<dyn EventIter> {
         panic!("Mutated event iters can't be cloned")
     }
 

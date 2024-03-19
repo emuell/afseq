@@ -37,10 +37,6 @@ const PLAYBACK_PRELOAD_SECONDS: f64 = 0.5;
 ///
 /// When files are accessed, the stored file sources are cloned, which avoids loading and decoding
 /// the files again. Cloned [`PreloadedFileSource`] are using a shared Buffer, so cloning is very cheap.
-///
-/// Uses a `RefCell` to maintain the internal list of samples, so the pool can be accessed as non mut
-/// ref via a `RwLock` by the player. Only one thread may load new samples though and multiple other
-/// threads may access them.
 #[derive(Default)]
 pub struct SamplePool {
     pool: RwLock<HashMap<InstrumentId, PreloadedFileSource>>,
@@ -55,10 +51,10 @@ impl SamplePool {
     }
 
     /// Fetch a clone of a preloaded sample with the given playback options.
-    /// 
+    ///
     /// ### Errors
     /// Returns an error if the instrument id is unknown.
-    /// 
+    ///
     /// ### Panics
     /// Panics if the sample pool can not be accessed
     pub fn get_sample(
@@ -77,10 +73,10 @@ impl SamplePool {
 
     /// Load a sample file into a [`PreloadedFileSource`] and return its id.
     /// A copy of this sample can then later on be fetched with `get_sample` with the returned id.
-    /// 
+    ///
     /// ### Errors
     /// Returns an error if the sample file could not be loaded.
-    /// 
+    ///
     /// ### Panics
     /// Panics if the sample pool can not be accessed
     pub fn load_sample(&self, file_path: &str) -> Result<InstrumentId, Error> {

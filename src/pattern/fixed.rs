@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use std::borrow::Cow;
 
 use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem};
 
@@ -90,8 +90,8 @@ impl Pattern for FixedPattern {
         self.repeat_count = count;
     }
 
-    fn duplicate(&self) -> Rc<RefCell<dyn Pattern>> {
-        Rc::new(RefCell::new(self.clone()))
+    fn duplicate(&self) -> Box<dyn Pattern> {
+        Box::new(self.clone())
     }
 
     fn reset(&mut self) {

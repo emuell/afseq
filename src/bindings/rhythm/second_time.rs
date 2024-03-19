@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use mlua::prelude::*;
 
 use super::super::{
@@ -70,7 +68,7 @@ impl SecondTimeRhythm {
         if table.contains_key("pattern")? {
             let value = table.get::<&str, LuaValue>("pattern")?;
             let pattern = pattern_from_value(lua, timeout_hook, &value, time_base)?;
-            rhythm = rhythm.with_pattern_dyn(Rc::clone(&pattern));
+            rhythm = rhythm.with_pattern_dyn(pattern);
         }
         // repeat
         if table.contains_key("repeats")? {

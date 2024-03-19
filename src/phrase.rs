@@ -264,8 +264,8 @@ impl Rhythm for Phrase {
         }
     }
 
-    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {
-        Rc::new(RefCell::new(self.clone()))
+    fn duplicate(&self) -> Box<dyn Rhythm> {
+        Box::new(self.clone())
     }
 
     fn reset(&mut self) {

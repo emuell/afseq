@@ -5,12 +5,12 @@ use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use derive_more::{Deref, Display, From, Into};
 
-use core::{
+use std::{
+    borrow::Cow,
     fmt::Debug,
     fmt::Display,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 pub mod empty;
 pub mod fixed;
@@ -352,9 +352,9 @@ pub trait EventIter: Debug {
     fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Event>;
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
-    /// a `Rc<RefCell<dyn EventIter>>`, but called 'duplicate' to avoid conflicts with possible
+    /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
     /// Clone impls.
-    fn duplicate(&self) -> Rc<RefCell<dyn EventIter>>;
+    fn duplicate(&self) -> Box<dyn EventIter>;
 
     /// Reset/rewind the iterator to its initial state.
     fn reset(&mut self);
