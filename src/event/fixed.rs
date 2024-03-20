@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     event::{Event, EventIter, NoteEvent, ParameterChangeEvent},
-    BeatTimeBase,
+    BeatTimeBase, Note,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -29,6 +29,11 @@ impl FixedEventIter {
     }
 }
 
+impl Default for FixedEventIter {
+    fn default() -> Self {
+        Self::new(vec![Event::NoteEvents(vec![Some((Note::C4).into())])])
+    }
+}
 impl EventIter for FixedEventIter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
