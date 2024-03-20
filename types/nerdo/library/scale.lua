@@ -7,7 +7,7 @@
 ----------------------------------------------------------------------------------------------------
 
 ---@class Scale
----Scale note values in ascending order of the mode, starting from the scale's key note.
+---Scale note values as integers, in ascending order of the mode, starting from the scale's key note.
 ---@field notes integer[]
 Scale = {}
 
@@ -45,3 +45,13 @@ function scale(key, intervals) end
 ---note(cmin:chord(5)):transposed({12, 0, 0}) --> Gm 1st inversion
 ---```
 function Scale:chord(degree, note_count) end
+
+---Fit given note value(s) by moving it to the nearest note in the scale.
+---@param ... NoteValue
+---@return integer[]
+---### example:
+---```lua
+---local cmin = scale("c4", "minor")
+---cmin:fit("c4", "d4", "f4") -> 48, 50, 53 (cmin)
+---```
+function Scale:fit(...) end
