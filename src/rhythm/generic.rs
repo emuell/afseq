@@ -11,7 +11,7 @@ use std::{
 use std::borrow::BorrowMut;
 
 use crate::{
-    event::{empty::EmptyEventIter, Event, EventIter, InstrumentId},
+    event::{fixed::FixedEventIter, Event, EventIter, InstrumentId},
     gate::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
@@ -59,7 +59,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         let instrument = None;
         let pattern = Box::<FixedPattern>::default();
         let gate = Box::new(ProbabilityGate::new(seed));
-        let event_iter = Box::new(EmptyEventIter {});
+        let event_iter = Box::<FixedEventIter>::default();
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
         let sample_offset = 0;
