@@ -14,8 +14,8 @@ use crate::{
 pub struct ScriptedPattern {
     timeout_hook: LuaTimeoutHook,
     function: LuaFunctionCallback,
-    repeat_count: Option<usize>,
-    repeats: usize,
+    repeat_count_option: Option<usize>,
+    repeat_count: usize,
     pulse_count: usize,
     pulse_time_count: f64,
     pulse: Option<Pulse>,
@@ -37,16 +37,16 @@ impl ScriptedPattern {
         // initialize function context
         let pulse_count = 0;
         let pulse_time_count = 0.0;
-        let repeat_count = None;
-        let repeats = 0;
+        let repeat_count_option = None;
+        let repeat_count = 0;
         function.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
         let pulse = None;
         let pulse_iter = None;
         Ok(Self {
             timeout_hook,
             function,
+            repeat_count_option,
             repeat_count,
-            repeats,
             pulse_count,
             pulse_time_count,
             pulse,
@@ -92,8 +92,11 @@ impl Pattern for ScriptedPattern {
         self.pulse_iter = None;
         // apply pattern repeat count, unless this is the first run
         if self.pulse_count > 0 {
-            self.repeats += 1;
-            if self.repeat_count.is_some_and(|count| self.repeats > count) {
+            self.repeat_count += 1;
+            if self
+                .repeat_count_option
+                .is_some_and(|option| self.repeat_count > option)
+            {
                 return None;
             }
         }
@@ -131,7 +134,7 @@ impl Pattern for ScriptedPattern {
     }
 
     fn set_repeat_count(&mut self, count: Option<usize>) {
-        self.repeat_count = count;
+        self.repeat_count_option = count;
     }
 
     fn duplicate(&self) -> Box<dyn Pattern> {
@@ -142,7 +145,7 @@ impl Pattern for ScriptedPattern {
         // reset timeout
         self.timeout_hook.reset();
         // reset repeat counter
-        self.repeats = 0;
+        self.repeat_count = 0;
         // reset step counter
         self.pulse_count = 0;
         self.pulse_time_count = 0.0;

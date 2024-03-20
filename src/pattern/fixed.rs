@@ -10,8 +10,8 @@ pub struct FixedPattern {
     pulses: Vec<Pulse>,
     pulse_index: usize,
     pulse_iter: Option<PulseIter>,
-    repeat_count: Option<usize>,
-    repeats: usize,
+    repeat_count_option: Option<usize>,
+    repeat_count: usize,
 }
 
 impl Default for FixedPattern {
@@ -33,14 +33,14 @@ impl FixedPattern {
             .collect::<Vec<_>>();
         let pulse_index = 0;
         let pulse_iter = pulses.first().map(|pulse| pulse.clone().into_iter());
-        let repeat_count = None;
-        let repeats = 0;
+        let repeat_count_option = None;
+        let repeat_count = 0;
         FixedPattern {
             pulses,
             pulse_index,
             pulse_iter,
+            repeat_count_option,
             repeat_count,
-            repeats,
         }
     }
 }
@@ -59,15 +59,21 @@ impl Pattern for FixedPattern {
             }
         }
         // check if we finished playback
-        if self.repeat_count.is_some_and(|count| self.repeats > count) {
+        if self
+            .repeat_count_option
+            .is_some_and(|option| self.repeat_count > option)
+        {
             return None;
         }
         // else move on to the next pulse
         self.pulse_index += 1;
         if self.pulse_index >= self.pulses.len() {
             self.pulse_index = 0;
-            self.repeats += 1;
-            if self.repeat_count.is_some_and(|count| self.repeats > count) {
+            self.repeat_count += 1;
+            if self
+                .repeat_count_option
+                .is_some_and(|option| self.repeat_count > option)
+            {
                 return None;
             }
         }
@@ -87,7 +93,7 @@ impl Pattern for FixedPattern {
     }
 
     fn set_repeat_count(&mut self, count: Option<usize>) {
-        self.repeat_count = count;
+        self.repeat_count_option = count;
     }
 
     fn duplicate(&self) -> Box<dyn Pattern> {
@@ -95,7 +101,7 @@ impl Pattern for FixedPattern {
     }
 
     fn reset(&mut self) {
-        self.repeats = 0;
+        self.repeat_count = 0;
         self.pulse_index = 0;
         if self.pulses.is_empty() {
             self.pulse_iter = None;
