@@ -2,7 +2,10 @@ use mlua::prelude::*;
 
 use crate::prelude::*;
 
-use super::{bad_argument_error, unwrap::note_event_from_value};
+use super::{
+    bad_argument_error,
+    unwrap::{note_degree_from_value, note_event_from_value},
+};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -21,34 +24,7 @@ impl LuaUserData for Scale {
                 // parse degree
                 let mut degree = 1;
                 if !args.is_empty() {
-                    let degree_error = || {
-                        Err(bad_argument_error(
-                            "Scale:chord",
-                            "degree",
-                            1,
-                            "degree must be an integer or roman number string in range [1, 7] \
-                                      (e.g. 3, 5, or 'iii' or 'V')",
-                        ))
-                    };
-                    if let Some(value) = args.get(0).unwrap().as_usize() {
-                        degree = value;
-                        if !(1..=7).contains(&degree) {
-                            return degree_error();
-                        }
-                    } else if let Some(value) = args.get(0).unwrap().as_str() {
-                        match value.to_lowercase().as_str() {
-                            "i" => degree = 1,
-                            "ii" => degree = 2,
-                            "iii" => degree = 3,
-                            "iv" => degree = 4,
-                            "v" => degree = 5,
-                            "vi" => degree = 6,
-                            "vii" => degree = 7,
-                            _ => return degree_error(),
-                        }
-                    } else {
-                        return degree_error();
-                    }
+                    degree = note_degree_from_value(args.get(0).unwrap(), 1)?;
                 }
                 // parse count
                 let mut count = 3;
@@ -76,6 +52,21 @@ impl LuaUserData for Scale {
                     .map(|n| LuaInteger::from(*n as u8))
                     .collect::<Vec<_>>();
                 lua.create_sequence_from(notes)
+            },
+        );
+
+        methods.add_method(
+            "degree",
+            |_lua, this, args: LuaMultiValue| -> LuaResult<LuaMultiValue> {
+                let args = args.into_vec();
+                let mut ret = Vec::new();
+                for (arg_index, arg) in args.iter().enumerate() {
+                    let degree = note_degree_from_value(arg, arg_index)?;
+                    if let Some(note) = this.notes_iter().nth(degree - 1) {
+                        ret.push(LuaValue::Integer(u8::from(note) as LuaInteger));
+                    }
+                }
+                Ok(LuaMultiValue::from_vec(ret))
             },
         );
 
@@ -193,6 +184,40 @@ mod test {
             .map(|v| v.as_i32().unwrap())
             .collect::<Vec<i32>>(),
             vec![48, 51, 55, 58, 62]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn scale_degree() -> LuaResult<()> {
+        let lua = new_test_engine()?;
+
+        assert!(lua
+            .load(
+                r#" local cmin = scale("c4", "minor")
+                return cmin:degree("x")"#
+            )
+            .eval::<LuaMultiValue>()
+            .is_err());
+        assert!(lua
+            .load(
+                r#"local cmin = scale("c4", "minor")
+                return cmin:degree(8)"#
+            )
+            .eval::<LuaMultiValue>()
+            .is_err());
+
+        assert_eq!(
+            lua.load(
+                r#"local cmin = scale("c4", "minor")
+                return cmin:degree("i", "iii", "v")"#
+            )
+            .eval::<LuaMultiValue>()?
+            .iter()
+            .map(|v| v.as_i32().unwrap())
+            .collect::<Vec<i32>>(),
+            vec![48, 51, 55]
         );
 
         Ok(())

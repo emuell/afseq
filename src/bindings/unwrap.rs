@@ -326,6 +326,38 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
 
 // ---------------------------------------------------------------------------------------------
 
+pub(crate) fn note_degree_from_value(arg: &LuaValue, arg_index: usize) -> LuaResult<usize> {
+    let degree_error = || {
+        Err(bad_argument_error(
+            "Scale:chord",
+            "degree",
+            arg_index,
+            "degree must be an integer or roman number string in range [1, 7] \
+              (e.g. 3, 5, or 'iii' or 'V')",
+        ))
+    };
+    if let Some(value) = arg.as_usize() {
+        if !(1..=7).contains(&value) {
+            degree_error()
+        } else {
+            Ok(value)
+        }
+    } else if let Some(value) = arg.as_str() {
+        match value.to_lowercase().as_str() {
+            "i" => Ok(1),
+            "ii" => Ok(2),
+            "iii" => Ok(3),
+            "iv" => Ok(4),
+            "v" => Ok(5),
+            "vi" => Ok(6),
+            "vii" => Ok(7),
+            _ => return degree_error(),
+        }
+    } else {
+        degree_error()
+    }
+}
+
 pub(crate) fn note_event_from_number(note_value: LuaInteger) -> LuaResult<Option<NoteEvent>> {
     if (0..=0x7f).contains(&note_value) {
         Ok(new_note(note_value.clamp(0, 0x7f) as u8))
