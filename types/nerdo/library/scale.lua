@@ -56,25 +56,25 @@ function Scale:fit(...) end
 ----------------------------------------------------------------------------------------------------
 
 ---Available scales.
----@alias ScaleMode "chromatic"|"major"|"minor"|"natural major"|"natural minor"|"pentatonic major"|"pentatonic minor"|"pentatonic egyptian"|"blues major"|"blues minor"|"whole tone"|"augmented"|"prometheus"|"tritone"|"harmonic major"|"harmonic minor"|"melodic minor"|"all minor"|"dorian"|"phrygian"|"phrygian dominant"|"lydian"|"lydian augmented"|"mixolydian"|"locrian"|"locrian major"|"super locrian"|"neapolitan major"|"neapolitan minor"|"romanian minor"|"spanish gypsy"|"hungarian gypsy"|"enigmatic"|"overtone"|"diminished half"|"diminished whole"|"spanish eight-tone"|"nine-tone"
+---@alias ScaleMode "chromatic"|"major"|"minor"|"natural major"|"natural minor"|"pentatonic major"|"pentatonic minor"|"pentatonic egyptian"|"blues major"|"blues minor"|"whole tone"|"augmented"|"prometheus"|"tritone"|"harmonic major"|"harmonic minor"|"melodic minor"|"all minor"|"dorian"|"phrygian"|"phrygian dominant"|"lydian"|"lydian augmented"|"mixolydian"|"locrian"|"locrian major"|"super locrian"|"neapolitan major"|"neapolitan minor"|"romanian minor"|"spanish gypsy"|"hungarian gypsy"|"enigmatic"|"overtone"|"diminished half"|"diminished whole"|"spanish eight-tone"|"nine-tone"|string
 
 ---Create a new scale from the given key notes and a mode name.
 ---
 ---Scale names can also be shortened by using the following synonyms:
----- "8" -> "Eight"
----- "9" -> "Nine"
----- "aug" | "aug." -> "augmented"
----- "dim" | "dim." -> "diminished"
----- "dom" | "dom." -> "Dominant"
----- "egypt" | "eg." -> "egyptian"
----- "harm" | "harm." -> "harmonic"
----- "hungary" | "hung." -> "hungarian"
+---- "8-tone" -> "eight-tone"
+---- "9-tone" -> "nine-tone"
+---- "aug" -> "augmented"
+---- "dim" -> "diminished"
+---- "dom" -> "Dominant"
+---- "egypt"  -> "egyptian"
+---- "harm"  -> "harmonic"
+---- "hungary" -> "hungarian"
 ---- "roman" -> "romanian"
 ---- "min" -> "minor"
 ---- "maj" -> "major"
----- "nat" | "nat." -> "natural"
----- "penta" | "pent." -> "pentatonic"
----- "span" | "span." -> "spanish",
+---- "nat" -> "natural"
+---- "penta" -> "pentatonic"
+---- "span" -> "spanish",
 ---
 ---@param key string|number e.g. "c4" or 48
 ---@param mode ScaleMode

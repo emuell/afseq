@@ -71,31 +71,28 @@ impl Mode {
     }
 
     fn resolve_synonyms(scale: &str) -> String {
-        let s = scale
+        scale
             .split(' ')
             .filter(|v| !v.is_empty())
             .map(|v| match v.to_ascii_lowercase().as_str() {
-                "8" => "Eight",
-                "9" => "Nine",
-                "8tone" => "Eight-Tone",
-                "9tone" => "Nine-Tone",
-                "aug" | "aug." => "augmented",
-                "dim" | "dim." => "diminished",
-                "dom" | "dom." => "Dominant",
-                "egypt" | "eg." => "egyptian",
-                "harm" | "harm." => "harmonic",
-                "hungary" | "hung." => "hungarian",
+                "8-tone" => "eight-tone",
+                "9-tone" => "nine-tone",
+                "aug"  => "augmented",
+                "dim" => "diminished",
+                "dom" => "Dominant",
+                "egypt" => "egyptian",
+                "harm" => "harmonic",
+                "hungary" => "hungarian",
                 "roman" => "romanian",
                 "min" => "minor",
                 "maj" => "major",
-                "nat" | "nat." => "natural",
-                "penta" | "pent." => "pentatonic",
-                "span" | "span." => "spanish",
+                "nat" => "natural",
+                "penta" => "pentatonic",
+                "span" => "spanish",
                 _ => v,
             })
             .collect::<Vec<_>>()
-            .join(" ");
-        s
+            .join(" ")
     }
 }
 
@@ -273,7 +270,7 @@ const SCALE_MODES: [Mode; 36] = [
     },
     Mode {
         name: "spanish eight-tone",
-        alt_names: "eigth-tone",
+        alt_names: "eight-tone",
         degrees: [1, 2, 0, 3, 4, 5, 6, 0, 7, 0, 8, 0],
     },
     Mode {
@@ -409,9 +406,9 @@ impl Scale {
     /// let cmaj = scale.chord_from_degree(1, 3);
     /// let gmaj7 = scale.chord_from_degree(5, 4);
     /// ```
-    /// 
+    ///
     /// ### Panics
-    /// 
+    ///
     /// Panics if `degree` or `count` is out of range.
     pub fn chord_from_degree(&self, degree: usize, count: usize) -> Vec<Note> {
         assert!((1..=7).contains(&degree));
