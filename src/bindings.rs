@@ -222,17 +222,25 @@ fn register_global_bindings(
                 } else if let Some(table) = mode_or_intervals.as_table() {
                     let intervals = table
                         .clone()
-                        .sequence_values::<usize>()
-                        .collect::<LuaResult<Vec<usize>>>()?;
+                        .sequence_values::<i32>()
+                        .collect::<LuaResult<Vec<i32>>>()
+                        .map_err(|err| {
+                            bad_argument_error(
+                                "scale",
+                                "interval",
+                                2,
+                                &format!("Invalid interval values: {}", err),
+                            )
+                        })?;
                     Ok(Scale::try_from((note, &intervals)).map_err(|err| {
-                        bad_argument_error("scale", "intervals", 1, err.to_string().as_str())
+                        bad_argument_error("scale", "intervals", 1, &err.to_string())
                     })?)
                 } else {
                     Err(bad_argument_error(
                         "scale",
                         "mode|interval",
-                        1,
-                        "Expecting either a mode string or interval table",
+                        2,
+                        "Expecting either a mode string or an interval array",
                     ))
                 }
             },
@@ -245,6 +253,16 @@ fn register_global_bindings(
         lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<NoteUserData> {
             NoteUserData::from(args)
         })?,
+    )?;
+
+    // function chord(note, mode)
+    globals.raw_set(
+        "chord",
+        lua.create_function(
+            |_lua, (note, mode_or_intervals): (LuaValue, LuaValue)| -> LuaResult<NoteUserData> {
+                NoteUserData::from_chord(&note, &mode_or_intervals)
+            },
+        )?,
     )?;
 
     // function sequence(args...)

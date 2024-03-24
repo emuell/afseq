@@ -33,23 +33,26 @@ impl TryFrom<&str> for Mode {
     }
 }
 
-impl TryFrom<&Vec<usize>> for Mode {
+impl TryFrom<&Vec<i32>> for Mode {
     type Error = String;
 
     /// Try converting the given interval list to a custom scale
-    fn try_from(intervals: &Vec<usize>) -> Result<Self, String> {
+    fn try_from(intervals: &Vec<i32>) -> Result<Self, String> {
         if intervals.is_empty() {
-            return Err("Interval list can ot be empty".to_string());
+            return Err("Interval list can not be empty".to_string());
+        }
+        if intervals.len() > 11 {
+            return Err("Interval list can only contain up to 11 elements".to_string());
         }
         if intervals.windows(2).any(|f| f[0] > f[1]) {
             return Err("Interval list must be sorted in ascending order".to_string());
         }
         let mut degrees = [0; 12];
-        for (degree_count, i) in intervals.iter().copied().enumerate() {
-            if i >= 12 {
-                return Err("Intervals must be in range [0..11]".to_string());
+        for (degree_count, i) in intervals.iter().enumerate() {
+            if !(0..12).contains(i) {
+                return Err("intervals must be in range [0..11]".to_string());
             }
-            degrees[i] = degree_count + 1;
+            degrees[*i as usize] = degree_count + 1;
         }
         Ok(Self {
             name: "custom scale",
@@ -77,7 +80,7 @@ impl Mode {
             .map(|v| match v.to_ascii_lowercase().as_str() {
                 "8-tone" => "eight-tone",
                 "9-tone" => "nine-tone",
-                "aug"  => "augmented",
+                "aug" => "augmented",
                 "dim" => "diminished",
                 "dom" => "Dominant",
                 "egypt" => "egyptian",
@@ -354,10 +357,10 @@ impl TryFrom<(Note, &str)> for Scale {
     }
 }
 
-impl TryFrom<(Note, &Vec<usize>)> for Scale {
+impl TryFrom<(Note, &Vec<i32>)> for Scale {
     type Error = String;
 
-    fn try_from((note, intervals): (Note, &Vec<usize>)) -> Result<Self, String> {
+    fn try_from((note, intervals): (Note, &Vec<i32>)) -> Result<Self, String> {
         Ok(Self {
             key: note.key(),
             octave: note.octave(),

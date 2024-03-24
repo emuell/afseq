@@ -63,6 +63,7 @@ lazy_static! {
             ("maj", Vec::from(MAJOR)),
             ("M", Vec::from(MAJOR)),
             ("Δ", Vec::from(MAJOR)),
+            ("augmented", Vec::from(AUG)),
             ("aug", Vec::from(AUG)),
             ("+", Vec::from(AUG)),
             ("six", Vec::from(SIX)),
@@ -251,6 +252,59 @@ impl TryFrom<&str> for Chord {
     }
 }
 
+impl<N> TryFrom<(N, &str)> for Chord
+where
+    N: Into<Note>,
+{
+    type Error = String;
+
+    /// Try converting the given string to a note and mode tuple.
+    fn try_from((note, mode): (N, &str)) -> Result<Self, String> {
+        let intervals = CHORD_TABLE.get(mode).ok_or(format!(
+            "Invalid chord identifier. Valid chords are: {}",
+            chord_names()
+        ))?;
+        Ok(Self::new(note, intervals.clone()))
+    }
+}
+
+impl<N> TryFrom<(N, &[i32])> for Chord
+where
+    N: Into<Note>,
+{
+    type Error = String;
+
+    /// Try converting the given string to a note and interval slice tuple.
+    fn try_from((note, intervals): (N, &[i32])) -> Result<Self, String> {
+        if intervals.is_empty() {
+            return Err("interval list can not be empty".to_string());
+        }
+        for i in intervals {
+            if !(0..=0x7f).contains(i) {
+                return Err("intervals must be in range [0..0x7f]".to_string());
+            }
+        }
+        let intervals = intervals
+            .iter()
+            .copied()
+            .map(|i| i.clamp(0, 0x7f) as u8)
+            .collect::<Vec<_>>();
+        Ok(Self::new(note, intervals))
+    }
+}
+
+impl<N> TryFrom<(N, &Vec<i32>)> for Chord
+where
+    N: Into<Note>,
+{
+    type Error = String;
+
+    /// Try converting the given string to a note and interval tuple.
+    fn try_from((note, intervals): (N, &Vec<i32>)) -> Result<Self, String> {
+        TryFrom::try_from((note, intervals.as_slice()))
+    }
+}
+
 // --------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -258,7 +312,37 @@ mod test {
     use crate::{Chord, Note};
 
     #[test]
-    fn chord_string_conversion() -> Result<(), String> {
+    fn chord() -> Result<(), String> {
+        assert!(Chord::try_from((Note::C4, "")).is_err());
+        assert!(Chord::try_from((Note::C4, "qwe")).is_err());
+        assert_eq!(
+            Chord::try_from((Note::C4, "maj"))?,
+            Chord::new(Note::C4, vec![0, 4, 7])
+        );
+        assert_eq!(
+            Chord::try_from((Note::C4, "maj"))?,
+            Chord::new(Note::C4, vec![0, 4, 7])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn chord_intervals() -> Result<(), String> {
+        assert!(Chord::try_from((Note::C4, &vec![])).is_err());
+        assert!(Chord::try_from((Note::C4, &vec![-1])).is_err());
+        assert_eq!(
+            Chord::try_from((Note::C4, &vec![0, 4, 7]))?,
+            Chord::new(Note::C4, vec![0, 4, 7])
+        );
+        assert_eq!(
+            Chord::try_from((Note::C4, &vec![0, 4, 7]))?,
+            Chord::new(Note::C4, vec![0, 4, 7])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn chord_string() -> Result<(), String> {
         assert!(Chord::try_from("c").is_err());
         assert!(Chord::try_from("c4").is_err());
         assert!(Chord::try_from("x4'maj").is_err());

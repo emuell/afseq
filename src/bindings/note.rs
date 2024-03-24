@@ -1,6 +1,7 @@
 use mlua::prelude::*;
 
 use super::unwrap::{
+    bad_argument_error, chord_events_from_intervals, chord_events_from_mode,
     delay_array_from_value, note_events_from_value, panning_array_from_value, sequence_from_value,
     transpose_steps_array_from_value, volume_array_from_value,
 };
@@ -45,6 +46,27 @@ impl NoteUserData {
                 notes.append(&mut note_events_from_value(arg, Some(index))?);
             }
             Ok(NoteUserData { notes })
+        }
+    }
+
+    pub fn from_chord(note: &LuaValue, mode_or_intervals: &LuaValue) -> LuaResult<Self> {
+        if let Some(mode) = mode_or_intervals.as_string() {
+            let notes = chord_events_from_mode(note, &mode.to_string_lossy())?;
+            Ok(Self { notes })
+        } else if let Some(table) = mode_or_intervals.as_table() {
+            let intervals = table
+                .clone()
+                .sequence_values::<i32>()
+                .collect::<LuaResult<Vec<i32>>>()?;
+            let notes = chord_events_from_intervals(note, &intervals)?;
+            Ok(Self { notes })
+        } else {
+            Err(bad_argument_error(
+                "chord",
+                "mode",
+                1,
+                "Expecting a mode string or an interval array as second argument",
+            ))
         }
     }
 }

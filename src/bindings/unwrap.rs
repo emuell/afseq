@@ -534,6 +534,8 @@ pub(crate) fn note_events_from_value(
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Option<NoteEvent>>> {
     let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
     let chord_part = white_space_splits.next().unwrap_or("");
@@ -577,6 +579,72 @@ pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Opti
             ))
         })
         .collect::<Vec<_>>())
+}
+
+pub(crate) fn chord_events_from_mode(
+    note: &LuaValue,
+    mode: &str,
+) -> LuaResult<Vec<Option<NoteEvent>>> {
+    let note_event = note_event_from_value(note, Some(1))?;
+    if let Some(note_event) = note_event {
+        let chord = Chord::try_from((note_event.note, mode)).map_err(|err| {
+            LuaError::FromLuaConversionError {
+                from: "string",
+                to: "chord",
+                message: Some(format!("invalid chord mode '{}': {}", mode, err)),
+            }
+        })?;
+        Ok(chord
+            .intervals()
+            .iter()
+            .copied()
+            .map(|i| {
+                Some(NoteEvent {
+                    note: Note::from((chord.note() as u8).saturating_add(i)),
+                    ..note_event.clone()
+                })
+            })
+            .collect::<Vec<_>>())
+    } else {
+        Err(LuaError::FromLuaConversionError {
+            from: note.type_name(),
+            to: "note",
+            message: Some("invalid note in chord: note value is undefined".to_string()),
+        })
+    }
+}
+
+pub(crate) fn chord_events_from_intervals(
+    note: &LuaValue,
+    intervals: &Vec<i32>,
+) -> LuaResult<Vec<Option<NoteEvent>>> {
+    let note_event = note_event_from_value(note, Some(1))?;
+    if let Some(note_event) = note_event {
+        let chord = Chord::try_from((note_event.note, intervals.as_slice())).map_err(|err| {
+            LuaError::FromLuaConversionError {
+                from: "string",
+                to: "chord",
+                message: Some(format!("invalid chord interval values': {}", err)),
+            }
+        })?;
+        Ok(chord
+            .intervals()
+            .iter()
+            .copied()
+            .map(|i| {
+                Some(NoteEvent {
+                    note: Note::from((chord.note() as u8).saturating_add(i)),
+                    ..note_event.clone()
+                })
+            })
+            .collect::<Vec<_>>())
+    } else {
+        Err(LuaError::FromLuaConversionError {
+            from: note.type_name(),
+            to: "note",
+            message: Some("invalid note in chord: note value is undefined".to_string()),
+        })
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
