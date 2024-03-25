@@ -126,11 +126,9 @@ impl LuaFunctionCallback {
     pub fn set_context_step_count(
         &mut self,
         step_count: usize,
-        step_time_count: f64,
     ) -> LuaResult<()> {
         let table = self.context.to_ref();
         table.raw_set("step_count", step_count + 1)?;
-        table.raw_set("step_time_count", step_time_count)?;
         Ok(())
     }
 
@@ -158,14 +156,13 @@ impl LuaFunctionCallback {
     pub fn set_emitter_context(
         &mut self,
         time_base: &BeatTimeBase,
+        step_count: usize,
         pulse: PulseIterItem,
         pulse_count: usize,
         pulse_time_count: f64,
-        step_count: usize,
-        step_time_count: f64,
     ) -> LuaResult<()> {
         self.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
-        self.set_context_step_count(step_count, step_time_count)?;
+        self.set_context_step_count(step_count)?;
         self.set_context_pulse_value(pulse)?;
         Ok(())
     }

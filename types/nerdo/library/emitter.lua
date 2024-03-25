@@ -6,7 +6,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----RENOISE SPECIFIC: Trigger context passed to `pattern` functions/generators.
+---RENOISE SPECIFIC: Optional trigger context passed to `pattern` and 'emit' functions/generators.
 ---@class TriggerContext
 ---
 ---Note value that triggered, started the emitter, if any.
@@ -29,11 +29,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 -----Project's sample rate in samples per second.
 ---@field sample_rate integer
 ---
----Continues pulse counter, incrementing with each new **skipped or emitted* pulse.
+---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
 ---Unlike `step_count` in emitter this includes all pulses, so it also counts pulses which do
 ---not emit events. Starts from 1 when the emitter starts running or is reset.
 ---@field pulse_count integer
----Continues pulse time counter, incrementing with each new *skipped or emitted** pulse.
+---Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
 ---Starts from 0 and increases with each new pulse by the pulse's step time duration.
 ---@field pulse_time_count number
 
@@ -41,14 +41,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ---Context passed to 'emit' functions/generators.
 ---@class EmitterContext : PatternContext
----
----Continues step counter, incrementing with each new *emitted* pulse.
----Unlike `pulse_count` this does not include skipped, zero values pulses.
----Starts from 1 when the emitter starts running or is reset.
----@field step_count integer
----Continues step time counter, incrementing with each new **emitted** pulse.
----Starts from 0 and increases with each new pulse by the pulse's step time duration.
----@field step_time_count number
 ---
 ---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
 ---will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
@@ -62,6 +54,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---to be called, so they never end up here.
 ---Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
 ---@field pulse_value number
+---
+---Continues step counter, incrementing with each new *emitted* pulse.
+---Unlike `pulse_count` this does not include skipped, zero values pulses so it basically counts
+---how often the emit function already got called.
+---Starts from 1 when the emitter starts running or is reset.
+---@field step_count integer
 
 ----------------------------------------------------------------------------------------------------
 

@@ -190,14 +190,12 @@ mod test {
                         assert(context.pulse_count == pulse_count)
                         assert(context.pulse_time_count == pulse_time_count)
                         assert(context.step_count == step_count)
-                        assert(context.step_time_count == step_time_count)
                       end
                       return function(context)
                         validate_context(context)
                         pulse_count = pulse_count + 2
                         pulse_time_count = pulse_time_count + 1
                         step_count = step_count + 1
-                        step_time_count = step_time_count + 0.5
                         return "c4"
                       end
                     end

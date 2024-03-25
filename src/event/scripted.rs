@@ -14,10 +14,9 @@ use crate::{
 pub struct ScriptedEventIter {
     timeout_hook: LuaTimeoutHook,
     function: LuaFunctionCallback,
+    step_count: usize,
     pulse_count: usize,
     pulse_time_count: f64,
-    step_count: usize,
-    step_time_count: f64,
 }
 
 impl ScriptedEventIter {
@@ -34,25 +33,22 @@ impl ScriptedEventIter {
         let mut function = LuaFunctionCallback::new(lua, function)?;
         // initialize emitter context for the function
         let step_count = 0;
-        let step_time_count = 0.0;
         let pulse_count = 0;
         let pulse_time_count = 0.0;
         let pulse = PulseIterItem::default();
         function.set_emitter_context(
             time_base,
+            step_count,
             pulse,
             pulse_count,
             pulse_time_count,
-            step_count,
-            step_time_count,
         )?;
         Ok(Self {
             timeout_hook,
             function,
+            step_count,
             pulse_count,
             pulse_time_count,
-            step_count,
-            step_time_count,
         })
     }
 
@@ -63,8 +59,7 @@ impl ScriptedEventIter {
         self.function.set_context_pulse_value(pulse)?;
         self.function
             .set_context_pulse_count(self.pulse_count, self.pulse_time_count)?;
-        self.function
-            .set_context_step_count(self.step_count, self.step_time_count)?;
+        self.function.set_context_step_count(self.step_count)?;
         // call function with the context and evaluate the result
         Ok(Event::NoteEvents(new_note_events_from_lua(
             &self.function.call()?,
@@ -100,10 +95,9 @@ impl EventIter for ScriptedEventIter {
                     None
                 }
             };
+            self.step_count += 1;
             self.pulse_count += 1;
             self.pulse_time_count += pulse.step_time;
-            self.step_count += 1;
-            self.step_time_count += pulse.step_time;
             event
         } else {
             self.pulse_count += 1;
@@ -121,11 +115,7 @@ impl EventIter for ScriptedEventIter {
         self.timeout_hook.reset();
         // reset step counter
         self.step_count = 0;
-        self.step_time_count = 0.0;
-        if let Err(err) = self
-            .function
-            .set_context_step_count(self.step_count, self.step_time_count)
-        {
+        if let Err(err) = self.function.set_context_step_count(self.step_count) {
             self.function.handle_error(&err);
         }
         // reset pulse counter
