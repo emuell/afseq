@@ -9,7 +9,7 @@
 ---@class NoteTable
 ---@field key string|number Note Key
 ---@field instrument number? Instrument/Sample/Patch >= 0
----@field volume number? Volume in range [0.0 - 4.0]
+---@field volume number? Volume in range [0.0 - 1.0]
 ---@field panning number? Panning factor in range [-1.0 - 1.0] where 0 is center
 ---@field delay number? Delay factor in range [0.0 - 1.0]
 NoteTable = {}
@@ -25,24 +25,24 @@ Note = {}
 ---@return Note
 ---### examples:
 ---```lua
----note("c4"):transpose(12)
----note("c'maj"):transpose(5)
----note("c'maj"):transpose({0, 0, 5})
+---note("c4"):transposed(12)
+---note("c'maj"):transposed(5)
+---note("c'maj"):transposed({0, 0, 5})
 ---```
-function Note:transpose(step) end
+function Note:transposed(step) end
 
 ---Create a copy of the note or chord with amplified volume values.
----@param factor number|number[] 
+---@param factor number|number[] amplify factor > 0
 ---@return Note
 ---### examples:
 ---```lua
----note({"c4 0.5", "g4"}):amplify(0.5)
----note("c'maj 0.5"):amplify({2.0, 1.0, 0.3})
+---note({"c4 0.5", "g4"}):amplified(0.5)
+---note("c'maj 0.5"):amplified({2.0, 1.0, 0.3})
 ---```
-function Note:amplify(factor) end
+function Note:amplified(factor) end
 
 ---Create a copy of the note or chord with new volume values.
----@param volume number|number[] 
+---@param volume number|number[] new volume in range [0 - 1]
 ---@return Note
 ---### examples:
 ---```lua

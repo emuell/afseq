@@ -177,7 +177,7 @@ impl Note {
 
     /// return a new transposed note with the given offset.
     #[must_use]
-    pub fn transpose(&self, offset: i32) -> Self {
+    pub fn transposed(&self, offset: i32) -> Self {
         Note::from((*self as i32 + offset).clamp(0, 0x7f) as u8)
     }
 }

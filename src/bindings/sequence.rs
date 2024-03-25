@@ -1,8 +1,9 @@
 use mlua::prelude::*;
 
 use super::unwrap::{
-    delay_array_from_value, note_events_from_value, panning_array_from_value, sequence_from_value,
-    transpose_steps_array_from_value, volume_array_from_value,
+    amplify_array_from_value, delay_array_from_value, note_events_from_value,
+    panning_array_from_value, sequence_from_value, transpose_steps_array_from_value,
+    volume_array_from_value,
 };
 
 use crate::prelude::*;
@@ -69,7 +70,7 @@ impl LuaUserData for SequenceUserData {
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
+        methods.add_method_mut("transposed", |lua, this, volume: LuaValue| {
             let steps = transpose_steps_array_from_value(lua, volume, this.notes.len())?;
             for (notes, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 for note in notes.iter_mut().flatten() {
@@ -82,20 +83,31 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
-            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
+        methods.add_method_mut("amplified", |lua, this, value: LuaValue| {
+            let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
+                if volume < 0.0 {
+                    return Err(LuaError::RuntimeError(
+                        "Note amplify volume must be >= 0.0".to_string(),
+                    ));
+                }
                 for note in notes.iter_mut().flatten() {
-                    note.volume = volume;
+                    note.volume = (note.volume * volume).clamp(0.0, 1.0);
                 }
             }
             Ok(this.clone())
         });
-        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
+
+        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
+                if !(0.0..=1.0).contains(&volume) {
+                    return Err(LuaError::RuntimeError(
+                        "Note volume must be in range [0.0 - 1.0]".to_string(),
+                    ));
+                }
                 for note in notes.iter_mut().flatten() {
-                    note.volume *= volume;
+                    note.volume = volume;
                 }
             }
             Ok(this.clone())
@@ -104,6 +116,11 @@ impl LuaUserData for SequenceUserData {
         methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (notes, panning) in this.notes.iter_mut().zip(pannings) {
+                if !(-1.0..=1.0).contains(&panning) {
+                    return Err(LuaError::RuntimeError(
+                        "Note panning must be in range [-1.0 - 1.0]".to_string(),
+                    ));
+                }
                 for note in notes.iter_mut().flatten() {
                     note.panning = panning;
                 }
@@ -114,6 +131,11 @@ impl LuaUserData for SequenceUserData {
         methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (notes, delay) in this.notes.iter_mut().zip(delays) {
+                if !(0.0..=1.0).contains(&delay) {
+                    return Err(LuaError::RuntimeError(
+                        "Note delay must be in range [-1.0 - 1.0]".to_string(),
+                    ));
+                }
                 for note in notes.iter_mut().flatten() {
                     note.delay = delay;
                 }
@@ -267,12 +289,12 @@ mod test {
         // with_xxx
         assert!(evaluate_sequence_userdata(
             &lua, //
-            r#"sequence("c", "d", "f"):transpose(1)"#
+            r#"sequence("c", "d", "f"):transposed(1)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua, //
-            r#"sequence("c'maj"):with_volume(2.0)"#
+            r#"sequence("c'maj"):with_volume(0.2)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
@@ -287,12 +309,12 @@ mod test {
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua, //
-            r#"sequence("c", "d", "f"):transpose({1, 2})"#
+            r#"sequence("c", "d", "f"):transposed({1, 2})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua,
-            r#"sequence("c", "d", "f"):with_volume({2.0, 1.0})"#
+            r#"sequence("c", "d", "f"):with_volume({0.5, 1.0})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(

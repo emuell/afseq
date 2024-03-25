@@ -170,7 +170,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             new_note((bass_notes[0], None, 0.5)),
             new_note((bass_notes[2], None, 0.5)),
             new_note((bass_notes[3], None, 0.5)),
-            new_note((bass_notes[6].transpose(-12), None, 0.5)),
+            new_note((bass_notes[6].transposed(-12), None, 0.5)),
         ]));
 
     let synth_pattern = beat_time.every_nth_bar(4.0).with_instrument(SYNTH).trigger(

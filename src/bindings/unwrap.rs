@@ -184,12 +184,20 @@ pub(crate) fn transpose_steps_array_from_value(
     Ok(steps)
 }
 
-pub(crate) fn volume_array_from_value(
+pub(crate) fn amplify_array_from_value(
     lua: &Lua,
     value: LuaValue,
     array_len: usize,
 ) -> LuaResult<Vec<f32>> {
     float_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX, 1.0)
+}
+
+pub(crate) fn volume_array_from_value(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+) -> LuaResult<Vec<f32>> {
+    float_array_from_value(lua, value, array_len, "volume", 0.0..=1.0, 1.0)
 }
 
 pub(crate) fn panning_array_from_value(
@@ -255,7 +263,7 @@ pub(crate) fn instrument_value_from_table(table: &LuaTable) -> LuaResult<Option<
 }
 
 pub(crate) fn volume_value_from_table(table: &LuaTable) -> LuaResult<f32> {
-    float_value_from_table(table, "volume", 0.0..=f32::MAX, 1.0)
+    float_value_from_table(table, "volume", 0.0..=1.0, 1.0)
 }
 
 pub(crate) fn panning_value_from_table(table: &LuaTable) -> LuaResult<f32> {
@@ -333,7 +341,7 @@ pub(crate) fn instrument_value_from_string(str: &str) -> LuaResult<Option<Instru
 }
 
 pub(crate) fn volume_value_from_string(str: &str) -> LuaResult<f32> {
-    float_value_from_string(str, "volume", 0.0..=f32::MAX, 1.0)
+    float_value_from_string(str, "volume", 0.0..=1.0, 1.0)
 }
 
 pub(crate) fn panning_value_from_string(str: &str) -> LuaResult<f32> {

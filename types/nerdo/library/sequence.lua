@@ -10,27 +10,27 @@
 ---@field notes NoteTable[][]
 Sequence = {}
 
----Create a copy of all or some notes in the sequence with transposed note values.
+---Create a copy of all notes in the sequence with transposed note values.
 ---@param step integer|integer[]
 ---@return Sequence
 ---### examples:
 ---```lua
----sequence("c4", "d#5"):transpose(12)
----sequence(note("c'maj"), note("c'maj")):transpose({0, 5})
+---sequence("c4", "d#5"):transposed(12)
+---sequence(note("c'maj"), note("c'maj")):transposed({0, 5})
 ---```
-function Sequence:transpose(step) end
+function Sequence:transposed(step) end
 
----Create a copy of all or some notes in the sequence with amplified volume values.
+---Create a copy of all notes in the sequence with amplified volume values.
 ---@param factor number|number[] 
 ---@return Sequence
 ---### examples:
 ---```lua
----sequence({"c4 0.5", "g4"}):amplify(0.5)
----sequence("c'maj 0.5"):amplify({2.0, 1.0, 0.3})
+---sequence({"c4 0.5", "g4"}):amplified(0.5)
+---sequence("c'maj 0.5"):amplified({2.0, 1.0, 0.3})
 ---```
-function Sequence:amplify(factor) end
+function Sequence:amplified(factor) end
 
----Create a copy of all or some notes in the sequence with new volume values.
+---Create a copy of all notes in the sequence with new volume values.
 ---@param volume number|number[] 
 ---@return Sequence
 ---### examples:
@@ -41,12 +41,12 @@ function Sequence:amplify(factor) end
 ---```
 function Sequence:with_volume(volume) end
 
----Create a copy of all or some notes in the sequence with new panning values.
+---Create a copy of all notes in the sequence with new panning values.
 ---@param panning number|number[] 
 ---@return Note
 function Sequence:with_panning(panning) end
 
----Create a copy of all or some notes in the sequence with new delay values.
+---Create a copy of all notes in the sequence with new delay values.
 ---@param delay number|number[] 
 ---@return Sequence
 function Sequence:with_delay(delay) end

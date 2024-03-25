@@ -1,9 +1,10 @@
 use mlua::prelude::*;
 
 use super::unwrap::{
-    bad_argument_error, chord_events_from_intervals, chord_events_from_mode,
-    delay_array_from_value, note_events_from_value, panning_array_from_value, sequence_from_value,
-    transpose_steps_array_from_value, volume_array_from_value,
+    amplify_array_from_value, bad_argument_error, chord_events_from_intervals,
+    chord_events_from_mode, delay_array_from_value, note_events_from_value,
+    panning_array_from_value, sequence_from_value, transpose_steps_array_from_value,
+    volume_array_from_value,
 };
 
 use crate::{event::NoteEvent, note::Note};
@@ -87,7 +88,7 @@ impl LuaUserData for NoteUserData {
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transpose", |lua, this, value: LuaValue| {
+        methods.add_method_mut("transposed", |lua, this, value: LuaValue| {
             let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
             for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 if let Some(note) = note {
@@ -100,27 +101,44 @@ impl LuaUserData for NoteUserData {
             Ok(this.clone())
         });
 
+        methods.add_method_mut("amplified", |lua, this, value: LuaValue| {
+            let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
+            for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
+                if volume < 0.0 {
+                    return Err(LuaError::RuntimeError(
+                        "Note amplify volume must be >= 0.0".to_string(),
+                    ));
+                }
+                if let Some(note) = note {
+                    note.volume = (note.volume * volume).clamp(0.0, 1.0);
+                }
+            }
+            Ok(this.clone())
+        });
+
         methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
+                if !(0.0..=1.0).contains(&volume) {
+                    return Err(LuaError::RuntimeError(
+                        "Note volume must be in range [0.0 - 1.0]".to_string(),
+                    ));
+                }
                 if let Some(note) = note {
                     note.volume = volume;
                 }
             }
             Ok(this.clone())
         });
-        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
-            let volumes = volume_array_from_value(lua, value, this.notes.len())?;
-            for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
-                if let Some(note) = note {
-                    note.volume *= volume;
-                }
-            }
-            Ok(this.clone())
-        });
+
         methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (note, panning) in this.notes.iter_mut().zip(pannings.into_iter()) {
+                if !(-1.0..=1.0).contains(&panning) {
+                    return Err(LuaError::RuntimeError(
+                        "Note panning must be in range [-1.0 - 1.0]".to_string(),
+                    ));
+                }
                 if let Some(note) = note {
                     note.panning = panning;
                 }
@@ -131,6 +149,11 @@ impl LuaUserData for NoteUserData {
         methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (note, delay) in this.notes.iter_mut().zip(delays.into_iter()) {
+                if !(0.0..=1.0).contains(&delay) {
+                    return Err(LuaError::RuntimeError(
+                        "Note delay must be in range [-1.0 - 1.0]".to_string(),
+                    ));
+                }
                 if let Some(note) = note {
                     note.delay = delay;
                 }
@@ -235,8 +258,8 @@ mod test {
         assert!(evaluate_note_userdata(&lua, r#"note({key = "C#1", volume = -1})"#).is_err());
         let note_event = evaluate_note_userdata(&lua, r#"note({key = "c8"})"#)?;
         assert_eq!(note_event.notes, vec![new_note("c8")]);
-        let note_event = evaluate_note_userdata(&lua, r#"note({key = "G8", volume = 2})"#)?;
-        assert_eq!(note_event.notes, vec![new_note(("g8", None, 2.0))]);
+        let note_event = evaluate_note_userdata(&lua, r#"note({key = "G8", volume = 0.5})"#)?;
+        assert_eq!(note_event.notes, vec![new_note(("g8", None, 0.5))]);
 
         // Note table or array
         let poly_note_event = evaluate_note_userdata(
@@ -309,17 +332,17 @@ mod test {
     fn note_transpose() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
 
-        // transpose
+        // transposed
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transpose(12)"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transposed(12)"#)?.notes,
             vec![new_note("c5"), new_note("d5"), new_note("e5"),]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transpose({2, 4})"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transposed({2, 4})"#)?.notes,
             vec![new_note("d_4"), new_note("f#4"), new_note("e_4"),]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "c4"):transposed({-1000, 1000})"#)?.notes,
             vec![new_note(0x0_u8), new_note(0x7f_u8),]
         );
 
@@ -340,37 +363,37 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume(2.0)"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume(0.2)"#
             )?
             .notes,
             vec![
-                new_note(("c4", None, 2.0)),
-                new_note(("d4", None, 2.0)),
-                new_note(("e4", None, 2.0)),
+                new_note(("c4", None, 0.2)),
+                new_note(("d4", None, 0.2)),
+                new_note(("e4", None, 0.2)),
             ]
         );
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume({2.0, 4.0})"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume({0.0, 0.0})"#
             )?
             .notes,
             vec![
-                new_note(("c4", None, 2.0)),
-                new_note(("d4", None, 4.0)),
+                new_note(("c4", None, 0.0)),
+                new_note(("d4", None, 0.0)),
                 new_note(("e4", None, 0.5)),
             ]
         );
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume({2.0, 2.0, 2.0, 2.0})"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume({0.1, 0.2, 0.3})"#
             )?
             .notes,
             vec![
-                new_note(("c4", None, 2.0)),
-                new_note(("d4", None, 2.0)),
-                new_note(("e4", None, 2.0)),
+                new_note(("c4", None, 0.1)),
+                new_note(("d4", None, 0.2)),
+                new_note(("e4", None, 0.3)),
             ]
         );
 
@@ -378,7 +401,7 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):amplify(2.0)"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):amplified(200.0)"#
             )?
             .notes,
             vec![
@@ -390,12 +413,12 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):amplify({2.0, 4.0})"#
+                r#"note("c4 v0.25", "d4 v0.25", "e4 v0.5"):amplified({2.0, 4.0})"#
             )?
             .notes,
             vec![
-                new_note(("c4", None, 1.0)),
-                new_note(("d4", None, 2.0)),
+                new_note(("c4", None, 0.5)),
+                new_note(("d4", None, 1.0)),
                 new_note(("e4", None, 0.5)),
             ]
         );

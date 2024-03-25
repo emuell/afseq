@@ -115,6 +115,7 @@ where
     fn from((note, instrument, volume): (N, I, f32)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
+        let volume = volume.clamp(0.0, 1.0);
         Self {
             note,
             instrument,
@@ -133,6 +134,8 @@ where
     fn from((note, instrument, volume, panning): (N, I, f32, f32)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
+        let volume = volume.clamp(0.0, 1.0);
+        let panning = panning.clamp(-1.0, 1.0);
         Self {
             note,
             instrument,
@@ -151,6 +154,9 @@ where
     fn from((note, instrument, volume, panning, delay): (N, I, f32, f32, f32)) -> Self {
         let note = note.try_into().expect("Failed to convert note");
         let instrument = instrument.into();
+        let volume = volume.clamp(0.0, 1.0);
+        let panning = panning.clamp(-1.0, 1.0);
+        let delay = delay.clamp(0.0, 1.0);
         Self {
             note,
             instrument,
