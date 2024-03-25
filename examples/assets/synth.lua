@@ -8,8 +8,8 @@ return emitter {
   repeats = 3,
   emit = sequence(
     note(cmin:chord("i", 3)),
-    note(cmin:chord("v", 4)):transpose(-12),
+    note(cmin:chord("v", 4)):transposed(-12),
     note(cmin:chord("i", 3)),
-    note(cmin:chord("v", 4)):transpose({-12, -12, 0, -12})
-  ):amplify({ 0.6, 0.5, 0.6, 0.5 })
+    note(cmin:chord("v", 4)):transposed({-12, -12, 0, -12})
+  ):amplified({ 0.6, 0.5, 0.6, 0.5 })
 }
