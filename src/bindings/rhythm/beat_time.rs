@@ -41,7 +41,7 @@ impl BeatTimeRhythm {
         // step
         let mut step = BeatTimeStep::Beats(resolution);
         if table.contains_key("unit")? {
-            let unit = table.get::<&str, String>("unit")?;
+            let unit = table.get::<_, String>("unit")?;
             match unit.as_str() {
                 "bars" | "1/1" => step = BeatTimeStep::Bar(resolution),
                 "beats" | "1/4" => step = BeatTimeStep::Beats(resolution),
@@ -57,7 +57,7 @@ impl BeatTimeRhythm {
         let mut rhythm = BeatTimeRhythm::new(*time_base, step, rand_seed);
         // offset
         if table.contains_key("offset")? {
-            let offset = table.get::<&str, f32>("offset")?;
+            let offset = table.get::<_, f32>("offset")?;
             if offset >= 0.0 {
                 let mut new_step = rhythm.step();
                 new_step.set_steps(offset * resolution);
@@ -73,19 +73,19 @@ impl BeatTimeRhythm {
         }
         // pattern
         if table.contains_key("pattern")? {
-            let value = table.get::<&str, LuaValue>("pattern")?;
+            let value = table.get::<_, LuaValue>("pattern")?;
             let pattern = pattern_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(pattern);
         }
         // repeat
         if table.contains_key("repeats")? {
-            let value = table.get::<&str, LuaValue>("repeats")?;
+            let value = table.get::<_, LuaValue>("repeats")?;
             let repeat = pattern_repeat_count_from_value(&value)?;
             rhythm = rhythm.with_repeat(repeat);
         }
         // emit
         if table.contains_key("emit")? {
-            let value = table.get::<&str, LuaValue>("emit")?;
+            let value = table.get::<_, LuaValue>("emit")?;
             let event_iter = event_iter_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.trigger_dyn(event_iter);
         }

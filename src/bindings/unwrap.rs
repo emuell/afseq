@@ -12,16 +12,16 @@ use crate::{
 // ---------------------------------------------------------------------------------------------
 
 // Error helpers
-pub(crate) fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option<&'static str>>>(
+pub(crate) fn bad_argument_error<'a, 'b, S1: Into<Option<&'a str>>, S2: Into<Option<&'b str>>>(
     func: S1,
-    arg: S2,
-    pos: usize,
+    arg_name: S2,
+    arg_index: usize,
     message: &str,
 ) -> LuaError {
     LuaError::BadArgument {
         to: func.into().map(String::from),
-        name: arg.into().map(String::from),
-        pos,
+        name: arg_name.into().map(String::from),
+        pos: arg_index,
         cause: Arc::new(LuaError::RuntimeError(message.to_string())),
     }
 }
@@ -157,9 +157,9 @@ where
         if !range.contains(value) {
             return Err(bad_argument_error(
                 None,
-                "volume",
+                name,
                 1,
-                format!("{} must be in range {:?} but is '{}'", name, range, value).as_str(),
+                format!("{} must be in range [{:?}] but is '{}'", name, range, value).as_str(),
             ));
         }
     }
@@ -227,38 +227,49 @@ fn float_value_from_table<Range>(
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
-    if table.contains_key::<&str>(name)? {
-        if let Ok(value) = table.get::<&str, f32>(name) {
-            if range.contains(&value) {
-                Ok(value)
-            } else {
-                Err(LuaError::FromLuaConversionError {
-                    from: "string",
-                    to: "number",
-                    message: Some(format!(
-                        "'{}' property must be in range {:?} but is '{}'",
-                        name, range, value
-                    )),
-                })
-            }
+    let value = table.get::<_, LuaValue>(name)?;
+    if value.is_nil() {
+        Ok(default)
+    } else if let Some(value) = value
+        .as_number()
+        .or(value.as_integer().map(|i| i as LuaNumber))
+    {
+        if range.contains(&(value as f32)) {
+            Ok(value as f32)
         } else {
-            Err(LuaError::FromLuaConversionError {
-                from: name,
-                to: "number",
-                message: Some(format!("'{}' property is missing but required", name)),
-            })
+            Err(LuaError::RuntimeError(format!(
+                "{} property must be in range [{:?}] but is '{}'",
+                name, range, value
+            )))
         }
     } else {
-        Ok(default)
+        Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "number",
+            message: Some(format!("'{}' property must be a number", name)),
+        })
     }
 }
 
 pub(crate) fn instrument_value_from_table(table: &LuaTable) -> LuaResult<Option<InstrumentId>> {
-    if table.contains_key::<&str>("instrument")? {
-        let value = table.get::<&str, usize>("instrument")?;
-        Ok(Some(InstrumentId::from(value)))
-    } else {
+    let value = table.get::<_, LuaValue>("instrument")?;
+    if value.is_nil() {
         Ok(None)
+    } else if let Some(value) = value.as_integer() {
+        if value >= 0 {
+            Ok(Some(InstrumentId::from(value as usize)))
+        } else {
+            Err(LuaError::RuntimeError(format!(
+                "'instrument' property must be > 0 but is '{}'",
+                value
+            )))
+        }
+    } else {
+        Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "number",
+            message: Some("'instrument' property must be an integer".to_string()),
+        })
     }
 }
 
@@ -295,20 +306,16 @@ where
             return Err(LuaError::FromLuaConversionError {
                 from: "string",
                 to: "number",
-                message: Some(format!("'{}' property '{}' is not a number", name, str)),
+                message: Some(format!("{} property '{}' is not a number", name, str)),
             });
         }
         if range.contains(&value) {
             Ok(value)
         } else {
-            Err(LuaError::FromLuaConversionError {
-                from: "string",
-                to: "number",
-                message: Some(format!(
-                    "'{}' property must be in range {:?} but is '{}'",
-                    name, range, value
-                )),
-            })
+            Err(LuaError::RuntimeError(format!(
+                "{} property must be in range [{:?}] but is '{}'",
+                name, range, value
+            )))
         }
     }
 }
@@ -318,24 +325,17 @@ pub(crate) fn instrument_value_from_string(str: &str) -> LuaResult<Option<Instru
         Ok(None)
     } else if let Ok(value) = str.parse::<LuaInteger>() {
         if value < 0 {
-            return Err(LuaError::FromLuaConversionError {
-                from: "string",
-                to: "number",
-                message: Some(format!(
-                    "'{}' property must be >= 0 but is '{}'",
-                    "instrument", value
-                )),
-            });
+            return Err(LuaError::RuntimeError(format!(
+                "instrument property must be >= 0 but is '{}'",
+                value
+            )));
         }
         Ok(Some(InstrumentId::from(value as usize)))
     } else {
         Err(LuaError::FromLuaConversionError {
             from: "string",
             to: "number",
-            message: Some(format!(
-                "'{}' property '{}' is not a number",
-                "instrument", str
-            )),
+            message: Some(format!("instrument property '{}' is not a number", str)),
         })
     }
 }
@@ -363,7 +363,7 @@ pub(crate) fn is_empty_note_string(s: &str) -> bool {
 pub(crate) fn note_degree_from_value(arg: &LuaValue, arg_index: usize) -> LuaResult<usize> {
     let degree_error = || {
         Err(bad_argument_error(
-            "Scale:chord",
+            "chord",
             "degree",
             arg_index,
             "degree must be an integer or roman number string in range [1, 7] \
@@ -396,11 +396,10 @@ pub(crate) fn note_event_from_number(note_value: LuaInteger) -> LuaResult<Option
     if (0..=0x7f).contains(&note_value) {
         Ok(new_note(note_value.clamp(0, 0x7f) as u8))
     } else {
-        Err(LuaError::FromLuaConversionError {
-            from: "number",
-            to: "note",
-            message: Some("note numbers must be >= 0 and <= 0x7f".to_string()),
-        })
+        Err(LuaError::RuntimeError(format!(
+            "note property must be in range [0..=0x7f] but is: '{}'",
+            note_value
+        )))
     }
 }
 
@@ -410,11 +409,8 @@ pub(crate) fn note_event_from_string(str: &str) -> LuaResult<Option<NoteEvent>> 
     if is_empty_note_string(note_part) {
         Ok(None)
     } else {
-        let note = Note::try_from(note_part).map_err(|err| LuaError::FromLuaConversionError {
-            from: "string",
-            to: "note",
-            message: Some(err.to_string()),
-        })?;
+        let note =
+            Note::try_from(note_part).map_err(|err| LuaError::RuntimeError(err.to_string()))?;
         let mut instrument = None;
         let mut volume = 1.0;
         let mut panning = 0.0;
@@ -429,12 +425,10 @@ pub(crate) fn note_event_from_string(str: &str) -> LuaResult<Option<NoteEvent>> 
             } else if let Some(delay_str) = split.strip_prefix('d') {
                 delay = delay_value_from_string(delay_str)?;
             } else {
-                return Err(LuaError::FromLuaConversionError {
-                    from: "string",
-                    to: "note",
-                    message: Some(format!("Invalid note string segment: '{}'. ", split) +
-                        "Expecting a '#' (instrument),'v' (volume), 'p' (panning) of 'd' (delay) prefix here."),
-                });
+                return Err(LuaError::RuntimeError(
+                    format!("invalid note string segment: '{}'. ", split) +
+                        "expecting only number values with '#' (instrument),'v' (volume), 'p' (panning) or 'd' (delay) prefixes here."),
+                );
             }
         }
         Ok(new_note((note, instrument, volume, panning, delay)))
@@ -445,13 +439,18 @@ pub(crate) fn note_event_from_table_map(table: &LuaTable) -> LuaResult<Option<No
     if table.is_empty() {
         return Ok(None);
     }
-    if table.contains_key("key")? {
+    let key = table.get::<_, LuaValue>("key")?;
+    if key.is_nil() {
+        Err(LuaError::RuntimeError(
+            "missing 'key' property in note table".to_string(),
+        ))
+    } else {
         let instrument = instrument_value_from_table(table)?;
         let volume = volume_value_from_table(table)?;
         let panning = panning_value_from_table(table)?;
         let delay = delay_value_from_table(table)?;
         // { key = 60, [volume = 1.0, panning = 0.0, delay = 0.0] }
-        if let Ok(note_value) = table.get::<&str, i32>("key") {
+        if let Some(note_value) = key.as_i32() {
             Ok(new_note((
                 Note::from(note_value as u8),
                 instrument,
@@ -461,28 +460,17 @@ pub(crate) fn note_event_from_table_map(table: &LuaTable) -> LuaResult<Option<No
             )))
         }
         // { key = "C4", [instrument = 1, volume = 1.0, panning = 0.0, delay = 0.0] }
-        else if let Ok(note_str) = table.get::<&str, String>("key") {
-            let note = Note::try_from(note_str.as_str()).map_err(|err| {
-                LuaError::FromLuaConversionError {
-                    from: "string",
-                    to: "note",
-                    message: Some(err.to_string()),
-                }
-            })?;
+        else if let Some(note_str) = key.as_str() {
+            let note =
+                Note::try_from(note_str).map_err(|err| LuaError::RuntimeError(err.to_string()))?;
             Ok(new_note((note, instrument, volume, panning, delay)))
         } else {
             Err(LuaError::FromLuaConversionError {
-                from: "table",
+                from: key.type_name(),
                 to: "note",
-                message: Some("invalid 'key' property for note".to_string()),
+                message: Some("invalid 'key' property in note table".to_string()),
             })
         }
-    } else {
-        Err(LuaError::FromLuaConversionError {
-            from: "table",
-            to: "note",
-            message: Some("missing 'key' property for note".to_string()),
-        })
     }
 }
 
@@ -498,7 +486,7 @@ pub(crate) fn note_event_from_value(
         _ => {
             return Err(LuaError::FromLuaConversionError {
                 from: arg.type_name(),
-                to: "Note",
+                to: "note",
                 message: if let Some(index) = arg_index {
                     Some(format!("arg #{} is not a valid note property", index + 1).to_string())
                 } else {
@@ -530,13 +518,13 @@ pub(crate) fn note_events_from_value(
                     message: if let Some(index) = arg_index {
                         Some(
                             format!(
-                                "user data at #{} can't be converted to note list",
+                                "user data at #{} can't be converted to a note array",
                                 index + 1
                             )
                             .to_string(),
                         )
                     } else {
-                        Some("given user data can't be converted to note list".to_string())
+                        Some("user data can't be converted to note array".to_string())
                     },
                 })
             }
@@ -573,11 +561,8 @@ pub(crate) fn note_events_from_value(
 pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Option<NoteEvent>>> {
     let mut white_space_splits = chord_string.split(' ').filter(|v| !v.is_empty());
     let chord_part = white_space_splits.next().unwrap_or("");
-    let chord = Chord::try_from(chord_part).map_err(|err| LuaError::FromLuaConversionError {
-        from: "string",
-        to: "chord",
-        message: Some(format!("invalid chord '{}': {}", chord_part, err)),
-    })?;
+    let chord =
+        Chord::try_from(chord_part).map_err(|err| LuaError::RuntimeError(err.to_string()))?;
     let mut instrument = None;
     let mut volume = 1.0;
     let mut panning = 0.0;
@@ -592,12 +577,10 @@ pub(crate) fn chord_events_from_string(chord_string: &str) -> LuaResult<Vec<Opti
         } else if let Some(delay_str) = split.strip_prefix('d') {
             delay = delay_value_from_string(delay_str)?;
         } else {
-            return Err(LuaError::FromLuaConversionError {
-                from: "string",
-                to: "note",
-                message: Some(format!("Invalid note string segment: '{}'. ", split) +
-                    "Expecting a '#' (instrument),'v' (volume), 'p' (panning) of 'd' (delay) prefix here."),
-            });
+            return Err(LuaError::RuntimeError(
+                    format!("invalid note string segment: '{}'. ", split) +
+                        "expecting only number values with '#' (instrument),'v' (volume), 'p' (panning) or 'd' (delay) prefixes here."),
+                );
         }
     }
     Ok(chord
@@ -621,13 +604,8 @@ pub(crate) fn chord_events_from_mode(
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     let note_event = note_event_from_value(note, Some(1))?;
     if let Some(note_event) = note_event {
-        let chord = Chord::try_from((note_event.note, mode)).map_err(|err| {
-            LuaError::FromLuaConversionError {
-                from: "string",
-                to: "chord",
-                message: Some(format!("invalid chord mode '{}': {}", mode, err)),
-            }
-        })?;
+        let chord = Chord::try_from((note_event.note, mode))
+            .map_err(|err| LuaError::RuntimeError(err.to_string()))?;
         Ok(chord
             .intervals()
             .iter()
@@ -654,13 +632,8 @@ pub(crate) fn chord_events_from_intervals(
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     let note_event = note_event_from_value(note, Some(1))?;
     if let Some(note_event) = note_event {
-        let chord = Chord::try_from((note_event.note, intervals.as_slice())).map_err(|err| {
-            LuaError::FromLuaConversionError {
-                from: "string",
-                to: "chord",
-                message: Some(format!("invalid chord interval values': {}", err)),
-            }
-        })?;
+        let chord = Chord::try_from((note_event.note, intervals.as_slice()))
+            .map_err(|err| LuaError::RuntimeError(err.to_string()))?;
         Ok(chord
             .intervals()
             .iter()
@@ -765,9 +738,7 @@ pub(crate) fn pattern_from_value(
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
             to: "pattern",
-            message: Some(
-                "Expected either an array or a function as pattern generator".to_string(),
-            ),
+            message: Some("pattern must either be an array or a function".to_string()),
         }),
     }
 }
@@ -792,9 +763,7 @@ pub(crate) fn event_iter_from_value(
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
                     to: "note",
-                    message: Some(
-                        "given user data can't be converted to note event list".to_string(),
-                    ),
+                    message: Some("given user data can't be converted to a note array".to_string()),
                 })
             }
         }

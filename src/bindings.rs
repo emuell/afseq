@@ -212,7 +212,7 @@ fn register_global_bindings(
                             "mode",
                             1,
                             format!(
-                                "{}. Valid modes are: {}",
+                                "{}, valid modes are: {}",
                                 err,
                                 Scale::mode_names().join(", ")
                             )
@@ -229,7 +229,7 @@ fn register_global_bindings(
                                 "scale",
                                 "interval",
                                 2,
-                                &format!("Invalid interval values: {}", err),
+                                &format!("invalid interval values: {}", err),
                             )
                         })?;
                     Ok(Scale::try_from((note, &intervals)).map_err(|err| {
@@ -240,7 +240,7 @@ fn register_global_bindings(
                         "scale",
                         "mode|interval",
                         2,
-                        "Expecting either a mode string or an interval array",
+                        "expecting a mode string or an interval array as second argument",
                     ))
                 }
             },

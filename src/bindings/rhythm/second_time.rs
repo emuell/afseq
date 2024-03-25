@@ -28,7 +28,7 @@ impl SecondTimeRhythm {
         // resolution
         let mut resolution = 1.0;
         if table.contains_key("resolution")? {
-            resolution = table.get::<&str, f64>("resolution")?;
+            resolution = table.get::<_, f64>("resolution")?;
             if resolution <= 0.0 {
                 return Err(bad_argument_error(
                     "emit",
@@ -40,19 +40,19 @@ impl SecondTimeRhythm {
         }
         // unit
         if table.contains_key("unit")? {
-            let unit = table.get::<&str, String>("unit")?;
+            let unit = table.get::<_, String>("unit")?;
             match unit.as_str() {
                 "seconds" => (),
                 "ms" => resolution /= 1000.0,
                 _ => return Err(bad_argument_error("emit", "unit", 1, 
-                "Invalid unit parameter. Expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
+                "expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
         // create a new SecondTimeRhythm with the given time base and step
         let mut rhythm = SecondTimeRhythm::new(*time_base, resolution, rand_seed);
         // offset
         if table.contains_key("offset")? {
-            let offset = table.get::<&str, f32>("offset")? as SecondTimeStep;
+            let offset = table.get::<_, f32>("offset")? as SecondTimeStep;
             if offset >= 0.0 {
                 rhythm = rhythm.with_offset(offset * resolution);
             } else {
@@ -60,25 +60,25 @@ impl SecondTimeRhythm {
                     "emit",
                     "offset",
                     1,
-                    "Offset must be a number >= 0",
+                    "offset must be a number >= 0",
                 ));
             }
         }
         // pattern
         if table.contains_key("pattern")? {
-            let value = table.get::<&str, LuaValue>("pattern")?;
+            let value = table.get::<_, LuaValue>("pattern")?;
             let pattern = pattern_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(pattern);
         }
         // repeat
         if table.contains_key("repeats")? {
-            let value = table.get::<&str, LuaValue>("repeats")?;
+            let value = table.get::<_, LuaValue>("repeats")?;
             let repeat = pattern_repeat_count_from_value(&value)?;
             rhythm = rhythm.with_repeat(repeat);
         }
         // emit
         if table.contains_key("emit")? {
-            let value: LuaValue<'_> = table.get::<&str, LuaValue>("emit")?;
+            let value: LuaValue<'_> = table.get::<_, LuaValue>("emit")?;
             let event_iter = event_iter_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.trigger_dyn(event_iter);
         }

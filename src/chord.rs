@@ -236,19 +236,20 @@ impl TryFrom<&str> for Chord {
             if let Some(chord_part) = splits.next() {
                 if splits.next().is_some() {
                     return Err(
-                        "Invalid chord string (found more than one ' separator)".to_string()
+                        "invalid chord string (found more than one ' character)".to_string()
                     );
                 }
                 let note = Note::try_from(note_part)?;
                 let intervals = CHORD_TABLE.get(chord_part).ok_or(format!(
-                    "Invalid chord identifier. Valid chords are: {}",
+                    "invalid mode, valid modes are: {}",
                     chord_names()
                 ))?;
                 return Ok(Self::new(note, intervals.clone()));
             }
         }
-        Err("Invalid chord string. ".to_string()
-            + "Expecting a note and chord identifier separated by ' e.g. \"c4'maj\"")
+        Err("invalid chord string: \
+          expecting a note and chord mode, separated by a ' character e.g. \"c4'maj\""
+            .to_string())
     }
 }
 
@@ -261,7 +262,7 @@ where
     /// Try converting the given string to a note and mode tuple.
     fn try_from((note, mode): (N, &str)) -> Result<Self, String> {
         let intervals = CHORD_TABLE.get(mode).ok_or(format!(
-            "Invalid chord identifier. Valid chords are: {}",
+            "Invalid chord mode, valid chords are: {}",
             chord_names()
         ))?;
         Ok(Self::new(note, intervals.clone()))
@@ -281,7 +282,10 @@ where
         }
         for i in intervals {
             if !(0..=0x7f).contains(i) {
-                return Err("intervals must be in range [0..0x7f]".to_string());
+                return Err(format!(
+                    "interval must be in range [0..0x7f] but is '{}'",
+                    i
+                ));
             }
         }
         let intervals = intervals

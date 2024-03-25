@@ -66,7 +66,7 @@ impl NoteUserData {
                 "chord",
                 "mode",
                 1,
-                "Expecting a mode string or an interval array as second argument",
+                "expecting a mode string or an interval array as second argument",
             ))
         }
     }
@@ -105,8 +105,11 @@ impl LuaUserData for NoteUserData {
             let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if volume < 0.0 {
-                    return Err(LuaError::RuntimeError(
-                        "Note amplify volume must be >= 0.0".to_string(),
+                    return Err(bad_argument_error(
+                        "amplified",
+                        "volume",
+                        1,
+                        "amplify value must be >= 0.0",
                     ));
                 }
                 if let Some(note) = note {
@@ -120,8 +123,11 @@ impl LuaUserData for NoteUserData {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if !(0.0..=1.0).contains(&volume) {
-                    return Err(LuaError::RuntimeError(
-                        "Note volume must be in range [0.0 - 1.0]".to_string(),
+                    return Err(bad_argument_error(
+                        "with_volume",
+                        "volume",
+                        1,
+                        "volume must be in range [0.0..=1.0]",
                     ));
                 }
                 if let Some(note) = note {
@@ -135,8 +141,11 @@ impl LuaUserData for NoteUserData {
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (note, panning) in this.notes.iter_mut().zip(pannings.into_iter()) {
                 if !(-1.0..=1.0).contains(&panning) {
-                    return Err(LuaError::RuntimeError(
-                        "Note panning must be in range [-1.0 - 1.0]".to_string(),
+                    return Err(bad_argument_error(
+                        "with_panning",
+                        "panning",
+                        1,
+                        "panning must be in range [-1.0..=1.0]",
                     ));
                 }
                 if let Some(note) = note {
@@ -150,8 +159,11 @@ impl LuaUserData for NoteUserData {
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (note, delay) in this.notes.iter_mut().zip(delays.into_iter()) {
                 if !(0.0..=1.0).contains(&delay) {
-                    return Err(LuaError::RuntimeError(
-                        "Note delay must be in range [-1.0 - 1.0]".to_string(),
+                    return Err(bad_argument_error(
+                        "with_delay",
+                        "delay",
+                        1,
+                        "delay must be in range [-1.0..=1.0]",
                     ));
                 }
                 if let Some(note) = note {

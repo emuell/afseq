@@ -225,7 +225,7 @@ impl TryFrom<&str> for Note {
         fn octave_value_at(s: &str, index: usize) -> Result<i32, String> {
             let str = &s[index..];
             str.parse::<i32>()
-                .map_err(|e| format!("Invalid note str '{}': {}", s, e))
+                .map_err(|e| format!("invalid note str '{}': {}", s, e))
         }
         fn note_value_at(s: &str, index: usize) -> Result<i8, String> {
             if let Some(c) = s.chars().nth(index) {
@@ -239,7 +239,7 @@ impl TryFrom<&str> for Note {
                     'b' | 'B' => 11,
                     _ => {
                         return Err(format!(
-                            "Invalid note str '{}' - note character '{}' is invalid.",
+                            "invalid note str '{}' - note character '{}' is invalid.",
                             s, c
                         ))
                     }
@@ -252,7 +252,7 @@ impl TryFrom<&str> for Note {
                     Ok(note)
                 }
             } else {
-                Err(format!("Invalid note str '{}' - string is too short.", s))
+                Err(format!("invalid note str '{}' - string is too short.", s))
             }
         }
 
@@ -276,7 +276,7 @@ impl TryFrom<&str> for Note {
         };
         if !(0..=10).contains(&octave) {
             return Err(format!(
-                "Invalid note str '{}' - octave '{}' is out of range.",
+                "invalid note str '{}' - octave '{}' is out of range.",
                 s, octave
             ));
         }

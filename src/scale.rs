@@ -39,26 +39,25 @@ impl TryFrom<&Vec<i32>> for Mode {
     /// Try converting the given interval list to a custom scale
     fn try_from(intervals: &Vec<i32>) -> Result<Self, String> {
         if intervals.is_empty() {
-            return Err("Interval list can not be empty".to_string());
-        }
-        if intervals.len() > 11 {
-            return Err("Interval list can only contain up to 11 elements".to_string());
-        }
-        if intervals.windows(2).any(|f| f[0] > f[1]) {
-            return Err("Interval list must be sorted in ascending order".to_string());
-        }
-        let mut degrees = [0; 12];
-        for (degree_count, i) in intervals.iter().enumerate() {
-            if !(0..12).contains(i) {
-                return Err("intervals must be in range [0..11]".to_string());
+            Err("interval list can not be empty".to_string())
+        } else if intervals.len() > 11 {
+            Err("interval list may contain up to 11 elements only".to_string())
+        } else if intervals.windows(2).any(|f| f[0] > f[1]) {
+            Err("interval list must be sorted in ascending order".to_string())
+        } else {
+            let mut degrees = [0; 12];
+            for (degree_count, i) in intervals.iter().enumerate() {
+                if !(0..12).contains(i) {
+                    return Err(format!("intervals must be in range [0..12] but one is '{}'", i));
+                }
+                degrees[*i as usize] = degree_count + 1;
             }
-            degrees[*i as usize] = degree_count + 1;
+            Ok(Self {
+                name: "custom scale",
+                alt_names: "",
+                degrees,
+            })
         }
-        Ok(Self {
-            name: "custom scale",
-            alt_names: "",
-            degrees,
-        })
     }
 }
 

@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 
 use super::unwrap::{
-    amplify_array_from_value, delay_array_from_value, note_events_from_value,
+    amplify_array_from_value, bad_argument_error, delay_array_from_value, note_events_from_value,
     panning_array_from_value, sequence_from_value, transpose_steps_array_from_value,
     volume_array_from_value,
 };
@@ -87,8 +87,11 @@ impl LuaUserData for SequenceUserData {
             let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
                 if volume < 0.0 {
-                    return Err(LuaError::RuntimeError(
-                        "Note amplify volume must be >= 0.0".to_string(),
+                    return Err(bad_argument_error(
+                        "amplified",
+                        "volume",
+                        1,
+                        "amplify value must be >= 0.0",
                     ));
                 }
                 for note in notes.iter_mut().flatten() {
@@ -102,8 +105,11 @@ impl LuaUserData for SequenceUserData {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
                 if !(0.0..=1.0).contains(&volume) {
-                    return Err(LuaError::RuntimeError(
-                        "Note volume must be in range [0.0 - 1.0]".to_string(),
+                    return Err(bad_argument_error(
+                        "with_volume",
+                        "volume",
+                        1,
+                        "volume must be in range [0.0..=1.0]",
                     ));
                 }
                 for note in notes.iter_mut().flatten() {
@@ -117,8 +123,11 @@ impl LuaUserData for SequenceUserData {
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (notes, panning) in this.notes.iter_mut().zip(pannings) {
                 if !(-1.0..=1.0).contains(&panning) {
-                    return Err(LuaError::RuntimeError(
-                        "Note panning must be in range [-1.0 - 1.0]".to_string(),
+                    return Err(bad_argument_error(
+                        "with_panning",
+                        "panning",
+                        1,
+                        "panning must be in range [-1.0..=1.0]",
                     ));
                 }
                 for note in notes.iter_mut().flatten() {
@@ -132,8 +141,11 @@ impl LuaUserData for SequenceUserData {
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (notes, delay) in this.notes.iter_mut().zip(delays) {
                 if !(0.0..=1.0).contains(&delay) {
-                    return Err(LuaError::RuntimeError(
-                        "Note delay must be in range [-1.0 - 1.0]".to_string(),
+                    return Err(bad_argument_error(
+                        "with_delay",
+                        "delay",
+                        1,
+                        "delay must be in range [-1.0..=1.0]",
                     ));
                 }
                 for note in notes.iter_mut().flatten() {

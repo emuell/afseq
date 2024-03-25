@@ -31,10 +31,10 @@ impl LuaUserData for Scale {
                 if args.len() >= 2 {
                     let count_error = || {
                         Err(bad_argument_error(
-                            "Scale:chord",
-                            "number_of_notes",
+                            "chord",
+                            "num_notes",
                             1,
-                            "number of notes must be an integer in range [1, 5]",
+                            "number of notes must be an integer in range [1..=5]",
                         ))
                     };
                     if let Some(value) = args.get(1).unwrap().as_usize() {
