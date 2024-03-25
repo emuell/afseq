@@ -26,6 +26,32 @@ pub(crate) fn bad_argument_error<S1: Into<Option<&'static str>>, S2: Into<Option
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+// Check for known table properties
+pub(crate) fn validate_table_properties(
+    table: &LuaTable<'_>,
+    properties: &[&str],
+) -> LuaResult<()> {
+    for (key, _) in table.clone().pairs::<LuaValue, LuaValue>().flatten() {
+        if let Some(key) = key.as_str() {
+            if !properties.contains(&key) {
+                return Err(LuaError::RuntimeError(format!(
+                    "invalid/unknown table property: '{}'. valid properties are: '{}'",
+                    key,
+                    properties.join(", ")
+                )));
+            }
+        } else {
+            return Err(LuaError::RuntimeError(format!(
+                "invalid/unknown property of type '{}' in table",
+                key.type_name(),
+            )));
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------------------------
 
 impl<'lua> IntoLua<'lua> for Note {

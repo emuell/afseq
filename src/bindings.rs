@@ -36,7 +36,7 @@ mod sequence;
 use sequence::SequenceUserData;
 
 mod unwrap;
-use unwrap::bad_argument_error;
+use unwrap::{bad_argument_error, validate_table_properties};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -280,6 +280,11 @@ fn register_global_bindings(
             let timeout_hook = timeout_hook.clone();
             let time_base = *time_base;
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
+                // error on unknown option keys
+                let emitter_properties =
+                    ["unit", "resolution", "offset", "pattern", "repeats", "emit"];
+                validate_table_properties(&table, &emitter_properties)?;
+                // check which time unit is specified
                 let second_time_unit = match table.get::<&str, String>("unit") {
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
                     Err(_) => false,
