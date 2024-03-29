@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     event::{Event, EventIter},
-    BeatTimeBase,
+    BeatTimeBase, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -20,7 +20,12 @@ impl EventIter for EmptyEventIter {
         // nothing to do
     }
 
-    fn run(&mut self, _pulse: crate::PulseIterItem, _emit_event: bool) -> Option<Event> {
+    fn run(
+        &mut self,
+        _pulse: PulseIterItem,
+        _pulse_pattern_length: usize,
+        _emit_event: bool,
+    ) -> Option<Event> {
         None
     }
 

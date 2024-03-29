@@ -30,12 +30,20 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field sample_rate integer
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
----Unlike `step_count` in emitter this includes all pulses, so it also counts pulses which do
+---Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
 ---not emit events. Starts from 1 when the emitter starts running or is reset.
----@field pulse_count integer
+---@field pulse_step integer
 ---Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
 ---Starts from 0 and increases with each new pulse by the pulse's step time duration.
----@field pulse_time_count number
+---@field pulse_time_step number
+---
+---Length of the pattern in pulses (including all pulses from all subdivisions).
+---For patterns generators/functions this will be the length of the currently emitted pulse
+---or subdivision only as the entire pattern is not predictable.
+---@field pattern_length integer
+---Pulse counter, which wraps around with the pattern length, incrementing with each 
+---new **skipped or emitted pulse**.
+---@field pattern_pulse_step integer
 
 ----------------------------------------------------------------------------------------------------
 
@@ -56,10 +64,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field pulse_value number
 ---
 ---Continues step counter, incrementing with each new *emitted* pulse.
----Unlike `pulse_count` this does not include skipped, zero values pulses so it basically counts
+---Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
 ---how often the emit function already got called.
 ---Starts from 1 when the emitter starts running or is reset.
----@field step_count integer
+---@field step integer
 
 ----------------------------------------------------------------------------------------------------
 
@@ -131,7 +139,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  local pattern = table.create({0, 6, 10})
 ---  ---@param context EmitterContext
 ---  return function (context)
----    return pattern:find((context.step_count - 1) % 16) ~= nil
+---    return pattern:find((context.step - 1) % 16) ~= nil
 ---  end
 ---end,
 ---```
@@ -212,7 +220,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---return emitter {
 ---  unit = "1/8",
 ---  pattern = function (context)
----    return math.random() > 0.7 or context.step_count % 4 == 1
+---    return math.random() > 0.7 or context.step % 4 == 1
 ---  end,
 ---  emit = function(context)
 ---    return { key = scale[math.random(#scale)] }

@@ -251,7 +251,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             }
         };
         // generate an event from the event iter
-        let mut event = self.event_iter.run(pulse, emit_event);
+        let pulse_pattern_length = self.pattern.len();
+        let mut event = self.event_iter.run(pulse, pulse_pattern_length, emit_event);
         event = self.event_with_default_instrument(event);
         // return event as sample timed rhythm iter item
         let time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;

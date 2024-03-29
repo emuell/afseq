@@ -14,9 +14,9 @@ use crate::{
 pub struct ScriptedEventIter {
     timeout_hook: LuaTimeoutHook,
     function: LuaFunctionCallback,
-    step_count: usize,
-    pulse_count: usize,
-    pulse_time_count: f64,
+    pulse_step: usize,
+    pulse_time_step: f64,
+    step: usize,
 }
 
 impl ScriptedEventIter {
@@ -32,34 +32,43 @@ impl ScriptedEventIter {
         // create a new function
         let mut function = LuaFunctionCallback::new(lua, function)?;
         // initialize emitter context for the function
-        let step_count = 0;
-        let pulse_count = 0;
-        let pulse_time_count = 0.0;
         let pulse = PulseIterItem::default();
+        let pulse_step = 0;
+        let pulse_time_step = 0.0;
+        let pulse_pattern_length = 1;
+        let step = 0;
         function.set_emitter_context(
             time_base,
-            step_count,
             pulse,
-            pulse_count,
-            pulse_time_count,
+            pulse_step,
+            pulse_time_step,
+            pulse_pattern_length,
+            step,
         )?;
         Ok(Self {
             timeout_hook,
             function,
-            step_count,
-            pulse_count,
-            pulse_time_count,
+            pulse_step,
+            pulse_time_step,
+            step,
         })
     }
 
-    fn next_event(&mut self, pulse: PulseIterItem) -> LuaResult<Event> {
+    fn next_event(
+        &mut self,
+        pulse: PulseIterItem,
+        pulse_pattern_length: usize,
+    ) -> LuaResult<Event> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
         self.function.set_context_pulse_value(pulse)?;
-        self.function
-            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)?;
-        self.function.set_context_step_count(self.step_count)?;
+        self.function.set_context_pulse_step(
+            self.pulse_step,
+            self.pulse_time_step,
+            pulse_pattern_length,
+        )?;
+        self.function.set_context_step(self.step)?;
         // call function with the context and evaluate the result
         Ok(Event::NoteEvents(new_note_events_from_lua(
             &self.function.call()?,
@@ -85,23 +94,28 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Event> {
+    fn run(
+        &mut self,
+        pulse: PulseIterItem,
+        pulse_pattern_length: usize,
+        emit_event: bool,
+    ) -> Option<Event> {
         // generate a new event and move or only update pulse counters
         if emit_event {
-            let event = match self.next_event(pulse) {
+            let event = match self.next_event(pulse, pulse_pattern_length) {
                 Ok(event) => Some(event),
                 Err(err) => {
                     self.function.handle_error(&err);
                     None
                 }
             };
-            self.step_count += 1;
-            self.pulse_count += 1;
-            self.pulse_time_count += pulse.step_time;
+            self.step += 1;
+            self.pulse_step += 1;
+            self.pulse_time_step += pulse.step_time;
             event
         } else {
-            self.pulse_count += 1;
-            self.pulse_time_count += pulse.step_time;
+            self.pulse_step += 1;
+            self.pulse_time_step += pulse.step_time;
             None
         }
     }
@@ -114,17 +128,19 @@ impl EventIter for ScriptedEventIter {
         // reset timeout
         self.timeout_hook.reset();
         // reset step counter
-        self.step_count = 0;
-        if let Err(err) = self.function.set_context_step_count(self.step_count) {
+        self.step = 0;
+        if let Err(err) = self.function.set_context_step(self.step) {
             self.function.handle_error(&err);
         }
         // reset pulse counter
-        self.pulse_count = 0;
-        self.pulse_time_count = 0.0;
-        if let Err(err) = self
-            .function
-            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
-        {
+        self.pulse_step = 0;
+        self.pulse_time_step = 0.0;
+        let pulse_pattern_length = 1;
+        if let Err(err) = self.function.set_context_pulse_step(
+            self.pulse_step,
+            self.pulse_time_step,
+            pulse_pattern_length,
+        ) {
             self.function.handle_error(&err);
         }
         // restore function

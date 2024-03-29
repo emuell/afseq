@@ -1,49 +1,46 @@
 local pattern = require "pattern"
 local fun = require "fun"
 
-local scales = {
-  scale("f", "major").notes,
-  scale("c", "mixolydian").notes,
-}
+math.iwrap = function(index, size)
+  return math.floor(index - 1) % size + 1
+end
 
 return emitter {
   unit = "1/16",
   pattern = pattern.euclidean(6, 8, -5),
   offset = 16 * 64,
   emit = function()
-    local SCALE_STEP_COUNT = 8
-    local VOLUME_STEP_COUNT = 32
-
-    local note_step = 1
-    local scale_index = 1
-
-    local volume_step = 4
-    local volume_direction = 1.0
-
-    return function()
-      -- get current note set
-      local notes = fun.iter({ 1, 6, 3, 4, 0, 3 })
-          :map(function(note_index) return scales[scale_index][note_index] or 0 end)
+    local SCALE_STEP_COUNT = 4
+    local INTERVALS = { 1, 6, 4, 4, 0, 3, 1, 6, 4, 4, 1, 3 }
+    local SCALES = {
+      scale("c", "mixolydian").notes,
+      scale("f", "major").notes,
+    }
+    ---@param context EmitterContext
+    return function(context)
+      -- get scale from current step
+      local scale_index = math.iwrap(
+        math.floor((context.step - 1) / #INTERVALS / SCALE_STEP_COUNT) + 1,
+        #SCALES)
+      local notes = fun.iter(INTERVALS)
+          :map(function(note_index) return SCALES[scale_index][note_index] or 0 end)
           :totable()
-      -- move note step
-      local note = notes[math.floor(note_step % #notes) + 1]
-      -- move scale step
-      scale_index = (math.floor(math.floor(note_step / #notes) / SCALE_STEP_COUNT) % #scales) + 1
-      -- move volume step
-      local volume = 0.3 * volume_step / VOLUME_STEP_COUNT + 0.2
-      if note_step % 2 == 0 then
-        volume = 0.3 * (1.0 - volume_step / VOLUME_STEP_COUNT) + 0.2
+      -- get key from current scale and step
+      local key
+      if context.step % 24 == 1 then
+        key = notes[math.random(#INTERVALS)]
+      else
+        key = notes[math.iwrap(context.step, #INTERVALS)]
       end
-      volume_step = volume_step + volume_direction
-      if volume_step >= VOLUME_STEP_COUNT or volume_step == 0 then
-        volume_direction = -volume_direction
-      end
-      note_step = note_step + 1
+      -- get volume from step
+      local volume = (context.step % 3 == 1 or context.step % 7 == 1)
+        and 0.25 or math.random(3, 4) / 20;
+      volume = volume * 0.5
       -- return final note
-      if note == 0 then
+      if key == 0 then
         return {}
       else
-        return { key = note, volume = volume * 0.25 }
+        return { key = key, volume = volume }
       end
     end
   end

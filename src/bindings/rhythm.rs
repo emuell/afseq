@@ -162,18 +162,18 @@ mod test {
                 return emitter {
                     unit = "1/4",
                     pattern = function()
-                      local pulse_count, pulse_time_count = 1, 0.0 
+                      local pulse_step, pulse_time_step = 1, 0.0 
                       local function validate_context(context) 
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.sample_rate == 44100)
-                        assert(context.pulse_count == pulse_count)
-                        assert(context.pulse_time_count == pulse_time_count)
+                        assert(context.pulse_step == pulse_step)
+                        assert(context.pulse_time_step == pulse_time_step)
                       end
                       return function(context)
                         validate_context(context)
-                        pulse_count = pulse_count + 2
-                        pulse_time_count = pulse_time_count + 1.0
+                        pulse_step = pulse_step + 2
+                        pulse_time_step = pulse_time_step + 1.0
                         return {1, 0}
                       end
                     end,
@@ -181,21 +181,21 @@ mod test {
                       assert(context.beats_per_min == 120)
                       assert(context.beats_per_bar == 4)
                       assert(context.sample_rate == 44100)
-                      local pulse_count, pulse_time_count = 1, 0.0 
-                      local step_count, step_time_count = 1, 0.0 
+                      local pulse_step, pulse_time_step = 1, 0.0 
+                      local step, step_time_count = 1, 0.0 
                       local function validate_context(context) 
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.sample_rate == 44100)
-                        assert(context.pulse_count == pulse_count)
-                        assert(context.pulse_time_count == pulse_time_count)
-                        assert(context.step_count == step_count)
+                        assert(context.pulse_step == pulse_step)
+                        assert(context.pulse_time_step == pulse_time_step)
+                        assert(context.step == step)
                       end
                       return function(context)
                         validate_context(context)
-                        pulse_count = pulse_count + 2
-                        pulse_time_count = pulse_time_count + 1
-                        step_count = step_count + 1
+                        pulse_step = pulse_step + 2
+                        pulse_time_step = pulse_time_step + 1
+                        step = step + 1
                         return "c4"
                       end
                     end

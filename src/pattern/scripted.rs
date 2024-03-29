@@ -16,8 +16,8 @@ pub struct ScriptedPattern {
     function: LuaFunctionCallback,
     repeat_count_option: Option<usize>,
     repeat_count: usize,
-    pulse_count: usize,
-    pulse_time_count: f64,
+    pulse_step: usize,
+    pulse_time_step: f64,
     pulse: Option<Pulse>,
     pulse_iter: Option<PulseIter>,
 }
@@ -35,11 +35,17 @@ impl ScriptedPattern {
         // create a new function
         let mut function = LuaFunctionCallback::new(lua, function)?;
         // initialize function context
-        let pulse_count = 0;
-        let pulse_time_count = 0.0;
+        let pulse_step = 0;
+        let pulse_time_step = 0.0;
+        let pulse_pattern_length = 1;
         let repeat_count_option = None;
         let repeat_count = 0;
-        function.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
+        function.set_pattern_context(
+            time_base,
+            pulse_step,
+            pulse_time_step,
+            pulse_pattern_length,
+        )?;
         let pulse = None;
         let pulse_iter = None;
         Ok(Self {
@@ -47,8 +53,8 @@ impl ScriptedPattern {
             function,
             repeat_count_option,
             repeat_count,
-            pulse_count,
-            pulse_time_count,
+            pulse_step,
+            pulse_time_step,
             pulse,
             pulse_iter,
         })
@@ -58,8 +64,12 @@ impl ScriptedPattern {
         // reset timeout
         self.timeout_hook.reset();
         // update context
-        self.function
-            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)?;
+        let pulse_pattern_length = self.pulse.as_ref().map(|p| p.len()).unwrap_or(1);
+        self.function.set_context_pulse_step(
+            self.pulse_step,
+            self.pulse_time_step,
+            pulse_pattern_length,
+        )?;
         // call function with context and evaluate the result
         pattern_pulse_from_lua(&self.function.call()?)
     }
@@ -83,15 +93,15 @@ impl Pattern for ScriptedPattern {
         if let Some(pulse_iter) = &mut self.pulse_iter {
             if let Some(pulse) = pulse_iter.next() {
                 // move step for the next iter call
-                self.pulse_count += 1;
-                self.pulse_time_count += pulse.step_time;
+                self.pulse_step += 1;
+                self.pulse_time_step += pulse.step_time;
                 return Some(pulse);
             }
         }
         // pulse iter is exhausted now
         self.pulse_iter = None;
         // apply pattern repeat count, unless this is the first run
-        if self.pulse_count > 0 {
+        if self.pulse_step > 0 {
             self.repeat_count += 1;
             if self
                 .repeat_count_option
@@ -113,8 +123,8 @@ impl Pattern for ScriptedPattern {
         self.pulse_iter = Some(pulse_iter);
         self.pulse = Some(pulse);
         // move step for the next iter call
-        self.pulse_count += 1;
-        self.pulse_time_count += pulse_item.step_time;
+        self.pulse_step += 1;
+        self.pulse_time_step += pulse_item.step_time;
         // return the next pulse item
         Some(pulse_item)
     }
@@ -147,13 +157,15 @@ impl Pattern for ScriptedPattern {
         // reset repeat counter
         self.repeat_count = 0;
         // reset step counter
-        self.pulse_count = 0;
-        self.pulse_time_count = 0.0;
+        self.pulse_step = 0;
+        self.pulse_time_step = 0.0;
+        let pulse_pattern_length = 1;
         // update step in context
-        if let Err(err) = self
-            .function
-            .set_context_pulse_count(self.pulse_count, self.pulse_time_count)
-        {
+        if let Err(err) = self.function.set_context_pulse_step(
+            self.pulse_step,
+            self.pulse_time_step,
+            pulse_pattern_length,
+        ) {
             self.function.handle_error(&err);
         }
         // reset function

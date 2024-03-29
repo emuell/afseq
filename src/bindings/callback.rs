@@ -14,7 +14,7 @@ lazy_static! {
 }
 
 /// Returns true if there are any Lua callback errors and returns the !first! one.
-/// 
+///
 /// ### Panics
 /// Panics if accessing the global lua callback error vector failed.
 pub fn has_lua_callback_errors() -> Option<LuaError> {
@@ -27,7 +27,7 @@ pub fn has_lua_callback_errors() -> Option<LuaError> {
 
 /// Returns all Lua callback errors, if any. Check with `has_lua_callback_errors()` to avoid
 /// possible vec clone overhead.
-/// 
+///
 /// ### Panics
 /// Panics if accessing the global lua callback error vector failed.
 pub fn lua_callback_errors() -> Vec<LuaError> {
@@ -38,7 +38,7 @@ pub fn lua_callback_errors() -> Vec<LuaError> {
 }
 
 /// Clears all Lua callback errors.
-/// 
+///
 /// ### Panics
 /// Panics if accessing the global lua callback error vector failed.
 pub fn clear_lua_callback_errors() {
@@ -111,24 +111,24 @@ impl LuaFunctionCallback {
     }
 
     /// Set or update the pulse counter of the function context.
-    pub fn set_context_pulse_count(
+    pub fn set_context_pulse_step(
         &mut self,
-        pulse_count: usize,
-        pulse_time_count: f64,
+        pulse_step: usize,
+        pulse_time_step: f64,
+        pulse_pattern_length: usize,
     ) -> LuaResult<()> {
         let table = self.context.to_ref();
-        table.raw_set("pulse_count", pulse_count + 1)?;
-        table.raw_set("pulse_time_count", pulse_time_count)?;
+        table.raw_set("pulse_step", pulse_step + 1)?;
+        table.raw_set("pulse_time_step", pulse_time_step)?;
+        table.raw_set("pattern_length", pulse_pattern_length)?;
+        table.raw_set("pattern_pulse_step", pulse_step % pulse_pattern_length + 1)?;
         Ok(())
     }
 
     /// Set or update the step counter of the function context.
-    pub fn set_context_step_count(
-        &mut self,
-        step_count: usize,
-    ) -> LuaResult<()> {
+    pub fn set_context_step(&mut self, step: usize) -> LuaResult<()> {
         let table = self.context.to_ref();
-        table.raw_set("step_count", step_count + 1)?;
+        table.raw_set("step", step + 1)?;
         Ok(())
     }
 
@@ -144,11 +144,12 @@ impl LuaFunctionCallback {
     pub fn set_pattern_context(
         &mut self,
         time_base: &BeatTimeBase,
-        pulse_count: usize,
-        pulse_time_count: f64,
+        pulse_step: usize,
+        pulse_time_step: f64,
+        pulse_pattern_length: usize,
     ) -> LuaResult<()> {
         self.set_context_time_base(time_base)?;
-        self.set_context_pulse_count(pulse_count, pulse_time_count)?;
+        self.set_context_pulse_step(pulse_step, pulse_time_step, pulse_pattern_length)?;
         Ok(())
     }
 
@@ -156,13 +157,14 @@ impl LuaFunctionCallback {
     pub fn set_emitter_context(
         &mut self,
         time_base: &BeatTimeBase,
-        step_count: usize,
         pulse: PulseIterItem,
-        pulse_count: usize,
-        pulse_time_count: f64,
+        pulse_step: usize,
+        pulse_time_step: f64,
+        pulse_pattern_length: usize,
+        step: usize,
     ) -> LuaResult<()> {
-        self.set_pattern_context(time_base, pulse_count, pulse_time_count)?;
-        self.set_context_step_count(step_count)?;
+        self.set_pattern_context(time_base, pulse_step, pulse_time_step, pulse_pattern_length)?;
+        self.set_context_step(step)?;
         self.set_context_pulse_value(pulse)?;
         Ok(())
     }
