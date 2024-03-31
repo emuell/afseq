@@ -503,8 +503,9 @@ pub(crate) fn note_events_from_value(
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     match arg {
         LuaValue::UserData(userdata) => {
-            if let Ok(chord) = userdata.take::<NoteUserData>() {
-                Ok(chord.notes)
+            if userdata.is::<NoteUserData>() {
+                let chord = userdata.borrow::<NoteUserData>()?;
+                Ok(chord.notes.clone())
             } else if userdata.is::<SequenceUserData>() {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
@@ -754,11 +755,11 @@ pub(crate) fn event_iter_from_value(
     match value {
         LuaValue::UserData(userdata) => {
             if userdata.is::<NoteUserData>() {
-                let note = userdata.take::<NoteUserData>()?;
-                Ok(Box::new(note.notes.to_event()))
+                let note = userdata.borrow::<NoteUserData>()?;
+                Ok(Box::new(note.notes.clone().to_event()))
             } else if userdata.is::<SequenceUserData>() {
-                let sequence = userdata.take::<SequenceUserData>()?;
-                Ok(Box::new(sequence.notes.to_event_sequence()))
+                let sequence = userdata.borrow::<SequenceUserData>()?;
+                Ok(Box::new(sequence.notes.clone().to_event_sequence()))
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
