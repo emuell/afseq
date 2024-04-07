@@ -1,4 +1,4 @@
-//! Lua script bindings for the entire crate.
+//! Lua bindings for the entire crate.
 
 use std::{cell::RefCell, env, rc::Rc};
 
@@ -10,33 +10,38 @@ use lazy_static::lazy_static;
 use mlua::chunk;
 use mlua::prelude::*;
 
+use self::{
+    note::NoteUserData,
+    rhythm::rhythm_from_userdata,
+    sequence::SequenceUserData,
+    unwrap::{bad_argument_error, validate_table_properties},
+};
+
 use crate::{
-    event::{InstrumentId, NoteEvent},
+    event::InstrumentId,
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::BeatTimeBase,
-    Pulse, Scale,
+    Scale,
 };
 
 // ---------------------------------------------------------------------------------------------
 
-pub mod callback;
-
-pub(crate) mod timeout;
-use timeout::LuaTimeoutHook;
-
-mod rhythm;
-use rhythm::rhythm_from_userdata;
-
-mod scale;
-
+// private binding impls
+mod callback;
 mod note;
-use note::NoteUserData;
-
+mod rhythm;
+mod scale;
 mod sequence;
-use sequence::SequenceUserData;
-
+mod timeout;
 mod unwrap;
-use unwrap::{bad_argument_error, validate_table_properties};
+
+// public re-exports
+pub use callback::{clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors};
+
+// internal re-exports
+pub(crate) use callback::LuaCallback;
+pub(crate) use timeout::LuaTimeoutHook;
+pub(crate) use unwrap::{note_events_from_value, pattern_pulse_from_value};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -134,44 +139,6 @@ pub fn new_rhythm_from_string(
     let result = chunk.eval::<LuaValue>()?;
     // convert result
     rhythm_from_userdata(&result, instrument).map_err(Into::into)
-}
-
-/// Evaluate a precompiled Lua expression which creates and returns a rhythm.
-///
-/// ### Errors
-/// Will return `Err` if the bytecode contents fail to evaluate to a valid rhythm.
-pub fn new_rhythm_from_bytecode(
-    time_base: BeatTimeBase,
-    instrument: Option<InstrumentId>,
-    script: &Vec<u8>,
-    script_name: &str,
-) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
-    // create a new engine and register bindings
-    let (mut lua, mut timeout_hook) =
-        new_engine().map_err(Into::<Box<dyn std::error::Error>>::into)?;
-    register_bindings(&mut lua, &timeout_hook, &time_base)?;
-    // restart the timeout hook
-    timeout_hook.reset();
-    // compile and evaluate script
-    let chunk: LuaChunk = lua.load(script).set_name(script_name);
-    let result = chunk.eval::<LuaValue>()?;
-    // convert result
-    rhythm_from_userdata(&result, instrument).map_err(Into::into)
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Try converting the given lua value to a note events vector.
-pub(crate) fn new_note_events_from_lua(
-    arg: &LuaValue,
-    arg_index: Option<usize>,
-) -> LuaResult<Vec<Option<NoteEvent>>> {
-    unwrap::note_events_from_value(arg, arg_index)
-}
-
-/// Try converting the given lua value to a pattern pulse value.
-pub(crate) fn pattern_pulse_from_lua(value: &LuaValue) -> LuaResult<Pulse> {
-    unwrap::pattern_pulse_from_value(value)
 }
 
 // -------------------------------------------------------------------------------------------------

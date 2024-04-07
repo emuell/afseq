@@ -3,17 +3,17 @@ use std::borrow::Cow;
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{callback::LuaFunctionCallback, new_note_events_from_lua, timeout::LuaTimeoutHook},
+    bindings::{note_events_from_value, LuaCallback, LuaTimeoutHook},
     BeatTimeBase, Event, EventIter, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
 
 /// eventiter impl, which calls an existing lua script function to generate new events.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ScriptedEventIter {
     timeout_hook: LuaTimeoutHook,
-    function: LuaFunctionCallback,
+    callback: Box<dyn LuaCallback>,
     pulse_step: usize,
     pulse_time_step: f64,
     step: usize,
@@ -21,23 +21,21 @@ pub struct ScriptedEventIter {
 
 impl ScriptedEventIter {
     pub(crate) fn new(
-        lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
-        function: LuaFunction<'_>,
+        callback: Box<dyn LuaCallback>,
         time_base: &BeatTimeBase,
     ) -> LuaResult<Self> {
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
         timeout_hook.reset();
-        // create a new function
-        let mut function = LuaFunctionCallback::new(lua, function)?;
         // initialize emitter context for the function
+        let mut callback = callback;
         let pulse = PulseIterItem::default();
         let pulse_step = 0;
         let pulse_time_step = 0.0;
         let pulse_pattern_length = 1;
         let step = 0;
-        function.set_emitter_context(
+        callback.set_emitter_context(
             time_base,
             pulse,
             pulse_step,
@@ -47,7 +45,7 @@ impl ScriptedEventIter {
         )?;
         Ok(Self {
             timeout_hook,
-            function,
+            callback,
             pulse_step,
             pulse_time_step,
             step,
@@ -58,22 +56,36 @@ impl ScriptedEventIter {
         &mut self,
         pulse: PulseIterItem,
         pulse_pattern_length: usize,
-    ) -> LuaResult<Event> {
+    ) -> LuaResult<Option<Event>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
-        self.function.set_context_pulse_value(pulse)?;
-        self.function.set_context_pulse_step(
+        self.callback.set_context_pulse_value(pulse)?;
+        self.callback.set_context_pulse_step(
             self.pulse_step,
             self.pulse_time_step,
             pulse_pattern_length,
         )?;
-        self.function.set_context_step(self.step)?;
-        // call function with the context and evaluate the result
-        Ok(Event::NoteEvents(new_note_events_from_lua(
-            &self.function.call()?,
-            None,
-        )?))
+        self.callback.set_context_step(self.step)?;
+        // invoke callback and evaluate the result
+        if let Some(value) = self.callback.call()? {
+            let events = note_events_from_value(&value, None)?;
+            Ok(Some(Event::NoteEvents(events)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl Clone for ScriptedEventIter {
+    fn clone(&self) -> Self {
+        Self {
+            timeout_hook: self.timeout_hook.clone(),
+            callback: self.callback.duplicate(),
+            pulse_step: self.pulse_step,
+            pulse_time_step: self.pulse_time_step,
+            step: self.step,
+        }
     }
 }
 
@@ -82,15 +94,15 @@ impl EventIter for ScriptedEventIter {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new time base
-        if let Err(err) = self.function.set_context_time_base(time_base) {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.set_context_time_base(time_base) {
+            self.callback.handle_error(&err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
-        if let Err(err) = self.function.set_context_external_data(data) {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.set_context_external_data(data) {
+            self.callback.handle_error(&err);
         }
     }
 
@@ -103,9 +115,9 @@ impl EventIter for ScriptedEventIter {
         // generate a new event and move or only update pulse counters
         if emit_event {
             let event = match self.next_event(pulse, pulse_pattern_length) {
-                Ok(event) => Some(event),
+                Ok(event) => event,
                 Err(err) => {
-                    self.function.handle_error(&err);
+                    self.callback.handle_error(&err);
                     None
                 }
             };
@@ -129,23 +141,23 @@ impl EventIter for ScriptedEventIter {
         self.timeout_hook.reset();
         // reset step counter
         self.step = 0;
-        if let Err(err) = self.function.set_context_step(self.step) {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.set_context_step(self.step) {
+            self.callback.handle_error(&err);
         }
         // reset pulse counter
         self.pulse_step = 0;
         self.pulse_time_step = 0.0;
         let pulse_pattern_length = 1;
-        if let Err(err) = self.function.set_context_pulse_step(
+        if let Err(err) = self.callback.set_context_pulse_step(
             self.pulse_step,
             self.pulse_time_step,
             pulse_pattern_length,
         ) {
-            self.function.handle_error(&err);
+            self.callback.handle_error(&err);
         }
         // restore function
-        if let Err(err) = self.function.reset() {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.reset() {
+            self.callback.handle_error(&err);
         }
     }
 }

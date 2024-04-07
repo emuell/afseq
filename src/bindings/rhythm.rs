@@ -54,10 +54,9 @@ pub(crate) fn rhythm_from_userdata(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::{
         bindings::*,
-        event::Event,
+        event::{Event, NoteEvent},
         note::Note,
         rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, RhythmIterItem},
         time::BeatTimeStep,

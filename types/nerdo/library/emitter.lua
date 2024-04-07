@@ -6,7 +6,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----RENOISE SPECIFIC: Optional trigger context passed to `pattern` and 'emit' functions/generators.
+---RENOISE SPECIFIC: Optional trigger context passed to `pattern` and 'emit' functions.
 ---@class TriggerContext
 ---
 ---Note value that triggered, started the emitter, if any.
@@ -18,7 +18,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to `pattern` functions/generators.
+---Context passed to `pattern` functions.
 ---@class PatternContext : TriggerContext
 -----Transport playback running.
 -----TODO: @field playing boolean
@@ -38,8 +38,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field pulse_time_step number
 ---
 ---Length of the pattern in pulses (including all pulses from all subdivisions).
----For patterns generators/functions this will be the length of the currently emitted pulse
----or subdivision only as the entire pattern is not predictable.
+---For pattern generator functions this will be the length of the currently emitted 
+---pulse or subdivision only as the entire pattern is not predictable.
 ---@field pattern_length integer
 ---Pulse counter, which wraps around with the pattern length, incrementing with each 
 ---new **skipped or emitted pulse**.
@@ -47,7 +47,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to 'emit' functions/generators.
+---Context passed to 'emit' functions.
 ---@class EmitterContext : PatternContext
 ---
 ---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
@@ -119,29 +119,39 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---When no pattern is defined, a constant pulse of `1` is triggered by the emitter.
 ---
 ---Just like the `emitter` property, patterns can either be a fixed array of values or a
----function or generator which produce values dynamically.
+---function or iterator which produces values dynamically.
 ---
 ---### examples:
 ---```lua
+----- a fixed pattern
 ---pattern = { 1, 0, 0, 1 },
+----- maybe trigger with probabilities
+---pattern = { 1, 0, 0.5, 0.9 }, 
+----- "cram" pulses via subdivisions
+---pattern = {1, {1, 1, 1}}
+---
+----- fixed pattern with require "pattern"
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
----pattern = { 1, 0, 0.5, 0.9 }, -- maybe trigger with probabilities
----
----pattern = {1, {1, 1, 1}} -- "cram" pulses via subdivisions
----
----pattern = function(_context)  -- dynamic function
+----- generator function
+---pattern = function(context)
 ---  return math.random(0, 1)
 ---end
 ---
----pattern = function (initial_context) --- dynamic generator
+----- generator function with upvalue state
+---pattern = function(context)
 ---  local pattern = table.create({0, 6, 10})
 ---  ---@param context EmitterContext
----  return function (context)
+---  return function(context)
 ---    return pattern:find((context.step - 1) % 16) ~= nil
 ---  end
 ---end,
+---
+----- 'fun' iterator as pattern
+---pattern = fun.rands(5, 10):map(function(x)
+---    return x / 10.0 --> 0.5 - 1.0
+---  end):take(12):cycle(),
 ---```
 ---@field pattern Pulse[]|(fun(context: PatternContext):Pulse)|(fun(context: PatternContext):fun(context: PatternContext):Pulse)?
 ---
@@ -150,9 +160,9 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---When count is a number > 0, this specifies the number of times the pattern repeats until it
 ---stops.
 ---
----Note: When `pattern` is a function or generator, the repeat count is the number of 
----*function calls*. When the pattern is a pulse array, this is the number of times the whole
----pattern gets repeated.
+---Note: When `pattern` is a function or iterator, the repeat count is the number of 
+---*function calls or iteration steps*. When the pattern is a pulse array, this is the number of
+---times the whole pattern gets repeated.
 ---
 ---### examples:
 ---```lua
@@ -166,19 +176,25 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>
----In order to dynamically generate notes, you can pass a function or a generator function, 
+---In order to dynamically generate notes, you can pass a function or a functions iterator, 
 ---instead of a fixed note array or sequence.
+---
 ---### examples:
 ---```lua
----emit = {"c4", "g4"}, -- a sequence of c4, g4
----emit = {{"c4", "g4"}}, -- a chord of c4, g4
----emit = sequence{"c4", "g4"}:with_volume(0.5), -- a sequence of c4, g4 with volume 0.5
+----- a sequence of c4, g4
+---emit = {"c4", "g4"}, 
+----- a chord of c4, d#4, g4
+---emit = {{"c4", "d#4", "g4"}}, -- or {"c4'min"}
+----- a sequence of c4, g4 with volume 0.5
+---emit = sequence{"c4", "g4"}:with_volume(0.5),
 ---
----emit = function(context) -- a function
+----- a function
+---emit = function(context)
 ---  return 48 + math.random(1, 4) * 5
 ---end,
 ---
----emit = function(initial_context) -- a generator (function with upvalue state)
+----- a generator (function with upvalue state)
+---emit = function(initial_context) 
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
 ---  ---@param context EmitterContext
 ---  return function(context)
@@ -187,6 +203,21 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---    return { key = key, volume = 0.5 }
 ---  end
 ---end
+---
+------ a fun iterator
+---local fun = require "fun"
+---local cmin = scale("c5", "minor") 
+---...
+---emit = fun.iter({1, 5, 2, 7, 3, 5, 3}):map(function(x)
+---    return cmin:degree(x) 
+---  end):cycle()
+---
+----- a note pattern
+---local pattern = require "pattern"
+---local tritone = scale("c5", "tritone")
+---...
+---emit = pattern.from(tritone:chord(1, 4)):euclidean(6) +
+---  pattern.from(tritone:chord(5, 4)):euclidean(6) 
 ---```
 ---@field emit Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun(context: EmitterContext):NoteValue)|(fun(context: EmitterContext):fun(context: EmitterContext):NoteValue)
 

@@ -5,7 +5,10 @@ use std::{ops::RangeBounds, sync::Arc};
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{note::NoteUserData, sequence::SequenceUserData, LuaTimeoutHook},
+    bindings::{
+        callback::LuaCallbackFactory, note::NoteUserData, sequence::SequenceUserData,
+        LuaTimeoutHook,
+    },
     prelude::*,
 };
 
@@ -725,16 +728,23 @@ pub(crate) fn pattern_from_value(
 ) -> LuaResult<Box<dyn Pattern>> {
     match value {
         LuaValue::Function(func) => {
-            let pattern = ScriptedPattern::new(lua, timeout_hook, func.clone(), time_base)?;
+            let callback = LuaCallbackFactory::from_function(lua, func.clone())?;
+            let pattern = ScriptedPattern::new(timeout_hook, callback, time_base)?;
             Ok(Box::new(pattern))
         }
         LuaValue::Table(table) => {
-            let pulses = table
-                .clone()
-                .sequence_values::<LuaValue>()
-                .map(|result| pattern_pulse_from_value(&result?))
-                .collect::<LuaResult<Vec<Pulse>>>()?;
-            Ok(Box::new(pulses.to_pattern()))
+            if LuaCallbackFactory::is_fun_generator(table) {
+                let callback = LuaCallbackFactory::from_fun_generator(lua, table.clone())?;
+                let pattern = ScriptedPattern::new(timeout_hook, callback, time_base)?;
+                Ok(Box::new(pattern))
+            } else {
+                let pulses = table
+                    .clone()
+                    .sequence_values::<LuaValue>()
+                    .map(|result| pattern_pulse_from_value(&result?))
+                    .collect::<LuaResult<Vec<Pulse>>>()?;
+                Ok(Box::new(pulses.to_pattern()))
+            }
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
@@ -769,13 +779,19 @@ pub(crate) fn event_iter_from_value(
             }
         }
         LuaValue::Function(function) => {
-            let event_iter =
-                ScriptedEventIter::new(lua, timeout_hook, function.clone(), time_base)?;
+            let callback = LuaCallbackFactory::from_function(lua, function.clone())?;
+            let event_iter = ScriptedEventIter::new(timeout_hook, callback, time_base)?;
             Ok(Box::new(event_iter))
         }
         LuaValue::Table(ref table) => {
+            // convert fun generator table
+            if LuaCallbackFactory::is_fun_generator(table) {
+                let callback = LuaCallbackFactory::from_fun_generator(lua, table.clone())?;
+                let event_iter = ScriptedEventIter::new(timeout_hook, callback, time_base)?;
+                Ok(Box::new(event_iter))
+            }
             // convert an array alike table to a event sequence
-            if let Some(sequence) = sequence_from_table(&table.clone()) {
+            else if let Some(sequence) = sequence_from_table(table) {
                 let mut note_event_sequence = vec![];
                 for (arg_index, arg) in sequence.iter().enumerate() {
                     note_event_sequence.push(note_events_from_value(arg, Some(arg_index))?);

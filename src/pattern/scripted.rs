@@ -3,17 +3,17 @@ use std::borrow::Cow;
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{callback::LuaFunctionCallback, pattern_pulse_from_lua, timeout::LuaTimeoutHook},
+    bindings::{pattern_pulse_from_value, LuaCallback, LuaTimeoutHook},
     BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
 
 /// Pattern impl, which calls an existing lua script function to generate pulses.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ScriptedPattern {
     timeout_hook: LuaTimeoutHook,
-    function: LuaFunctionCallback,
+    callback: Box<dyn LuaCallback>,
     repeat_count_option: Option<usize>,
     repeat_count: usize,
     pulse_step: usize,
@@ -24,23 +24,21 @@ pub struct ScriptedPattern {
 
 impl ScriptedPattern {
     pub(crate) fn new(
-        lua: &Lua,
         timeout_hook: &LuaTimeoutHook,
-        function: LuaFunction<'_>,
+        callback: Box<dyn LuaCallback>,
         time_base: &BeatTimeBase,
     ) -> LuaResult<Self> {
         // create a new timeout_hook instance and reset it before calling the function
         let mut timeout_hook = timeout_hook.clone();
         timeout_hook.reset();
-        // create a new function
-        let mut function = LuaFunctionCallback::new(lua, function)?;
         // initialize function context
+        let mut callback = callback;
         let pulse_step = 0;
         let pulse_time_step = 0.0;
         let pulse_pattern_length = 1;
         let repeat_count_option = None;
         let repeat_count = 0;
-        function.set_pattern_context(
+        callback.set_pattern_context(
             time_base,
             pulse_step,
             pulse_time_step,
@@ -50,7 +48,7 @@ impl ScriptedPattern {
         let pulse_iter = None;
         Ok(Self {
             timeout_hook,
-            function,
+            callback,
             repeat_count_option,
             repeat_count,
             pulse_step,
@@ -60,18 +58,37 @@ impl ScriptedPattern {
         })
     }
 
-    fn next_pulse(&mut self) -> LuaResult<Pulse> {
+    fn next_pulse(&mut self) -> LuaResult<Option<Pulse>> {
         // reset timeout
         self.timeout_hook.reset();
         // update context
         let pulse_pattern_length = self.pulse.as_ref().map(|p| p.len()).unwrap_or(1);
-        self.function.set_context_pulse_step(
+        self.callback.set_context_pulse_step(
             self.pulse_step,
             self.pulse_time_step,
             pulse_pattern_length,
         )?;
-        // call function with context and evaluate the result
-        pattern_pulse_from_lua(&self.function.call()?)
+        // invoke callback and evaluate the result
+        if let Some(value) = self.callback.call()? {
+            Ok(Some(pattern_pulse_from_value(&value)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl Clone for ScriptedPattern {
+    fn clone(&self) -> Self {
+        Self {
+            timeout_hook: self.timeout_hook.clone(),
+            callback: self.callback.duplicate(),
+            repeat_count_option: self.repeat_count_option,
+            repeat_count: self.repeat_count,
+            pulse_step: self.pulse_step,
+            pulse_time_step: self.pulse_time_step,
+            pulse: self.pulse.clone(),
+            pulse_iter: self.pulse_iter.clone(),
+        }
     }
 }
 
@@ -113,33 +130,39 @@ impl Pattern for ScriptedPattern {
         // call function with context and evaluate the result
         let pulse = match self.next_pulse() {
             Err(err) => {
-                self.function.handle_error(&err);
-                Pulse::from(0.0)
+                self.callback.handle_error(&err);
+                None
             }
             Ok(pulse) => pulse,
         };
-        let mut pulse_iter = pulse.clone().into_iter();
-        let pulse_item = pulse_iter.next().unwrap_or(PulseIterItem::default());
-        self.pulse_iter = Some(pulse_iter);
-        self.pulse = Some(pulse);
-        // move step for the next iter call
-        self.pulse_step += 1;
-        self.pulse_time_step += pulse_item.step_time;
-        // return the next pulse item
-        Some(pulse_item)
+        if let Some(pulse) = pulse {
+            let mut pulse_iter = pulse.clone().into_iter();
+            let pulse_item = pulse_iter.next().unwrap_or(PulseIterItem::default());
+            self.pulse_iter = Some(pulse_iter);
+            self.pulse = Some(pulse);
+            // move step for the next iter call
+            self.pulse_step += 1;
+            self.pulse_time_step += pulse_item.step_time;
+            // return the next pulse item
+            Some(pulse_item)
+        } else {
+            self.pulse = None;
+            self.pulse_iter = None;
+            None
+        }
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // update function context from the new time base
-        if let Err(err) = self.function.set_context_time_base(time_base) {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.set_context_time_base(time_base) {
+            self.callback.handle_error(&err);
         }
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         // update function context from the new time base
-        if let Err(err) = self.function.set_context_external_data(data) {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.set_context_external_data(data) {
+            self.callback.handle_error(&err);
         }
     }
 
@@ -161,16 +184,16 @@ impl Pattern for ScriptedPattern {
         self.pulse_time_step = 0.0;
         let pulse_pattern_length = 1;
         // update step in context
-        if let Err(err) = self.function.set_context_pulse_step(
+        if let Err(err) = self.callback.set_context_pulse_step(
             self.pulse_step,
             self.pulse_time_step,
             pulse_pattern_length,
         ) {
-            self.function.handle_error(&err);
+            self.callback.handle_error(&err);
         }
         // reset function
-        if let Err(err) = self.function.reset() {
-            self.function.handle_error(&err);
+        if let Err(err) = self.callback.reset() {
+            self.callback.handle_error(&err);
         }
         // reset pulse and pulse iter
         self.pulse = None;

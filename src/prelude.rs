@@ -46,8 +46,8 @@ pub use super::{
 // all public scripting types
 pub use super::{
     bindings::{
-        callback::{clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors},
-        new_rhythm_from_bytecode, new_rhythm_from_file, new_rhythm_from_string,
+        clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors,
+        new_rhythm_from_file, new_rhythm_from_string,
     },
     event::scripted::ScriptedEventIter,
     pattern::scripted::ScriptedPattern,
