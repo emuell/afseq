@@ -78,13 +78,13 @@ function Note:with_delay(panning) end
 --- attributes: 
 ---```md
 --- -'#' -> instrument (integer > 0)
---- -'v' -> volume (float in range [0-4])
+--- -'v' -> volume (float in range [0-1])
 --- -'p' -> panning (float in range [-1-1])
 --- -'d' -> delay (float in range [0-1])
 ---```
 ---@param ... NoteValue
 ---@return Note
---- ### examples:
+---### examples:
 --- ```lua
 --- note(60) -- middle C
 --- note("c4") -- middle C

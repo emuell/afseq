@@ -59,7 +59,7 @@ function Sequence:with_delay(delay) end
 ---content and to explicitely pass a sequence of e.g. single notes to the emittor. 
 ---@param ... NoteValue|Note
 ---@return Sequence
---- ### examples:
+---### examples:
 ---```lua
 ---sequence(48, "c5", {}) -- sequence of C4, C5 and an empty note
 ---sequence("c4'maj", "g4'maj"):transpose(5) -- sequence of a +5 transposed C4 and G4 major chord

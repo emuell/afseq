@@ -53,7 +53,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
 ---will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
 ---subdivision, relative to the parent subdivisions pulse step time.
----### Example
+---### examples:
 ---```lua
 ---{1, {1, 1}} --> step times: {1, {0.5, 0.5}}
 ---```
