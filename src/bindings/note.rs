@@ -2,12 +2,15 @@ use mlua::prelude::*;
 
 use super::unwrap::{
     amplify_array_from_value, bad_argument_error, chord_events_from_intervals,
-    chord_events_from_mode, delay_array_from_value, note_events_from_value,
-    panning_array_from_value, sequence_from_value, transpose_steps_array_from_value,
-    volume_array_from_value,
+    chord_events_from_mode, delay_array_from_value, instrument_array_from_value,
+    note_events_from_value, panning_array_from_value, sequence_from_value,
+    transpose_steps_array_from_value, volume_array_from_value,
 };
 
-use crate::{event::NoteEvent, note::Note};
+use crate::{
+    event::{InstrumentId, NoteEvent},
+    note::Note,
+};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -114,6 +117,24 @@ impl LuaUserData for NoteUserData {
                 }
                 if let Some(note) = note {
                     note.volume = (note.volume * volume).clamp(0.0, 1.0);
+                }
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_instrument", |lua, this, value: LuaValue| {
+            let instruments = instrument_array_from_value(lua, value, this.notes.len())?;
+            for (note, instrument) in this.notes.iter_mut().zip(instruments.into_iter()) {
+                if instrument < 0 {
+                    return Err(bad_argument_error(
+                        "with_instrument",
+                        "instrument",
+                        1,
+                        "instrument must be >= 0",
+                    ));
+                }
+                if let Some(note) = note {
+                    note.instrument = Some(InstrumentId::from(instrument as usize));
                 }
             }
             Ok(this.clone())

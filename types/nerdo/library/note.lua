@@ -52,20 +52,20 @@ function Note:amplified(factor) end
 ---```
 function Note:with_volume(volume) end
 
+---Create a copy of the note or chord with new instrument values.
+---@param instrument number|number[] 
+---@return Note
+function Note:with_instrument(instrument) end
+
 ---Create a copy of the note or chord with new panning values.
 ---@param panning number|number[] 
 ---@return Note
 function Note:with_panning(panning) end
 
----Create a copy of the note or chord with new panning values.
+---Create a copy of the note or chord with new delay values.
 ---@param delay number|number[] 
 ---@return Note
 function Note:with_delay(delay) end
-
----Create a copy of the note or chord with new panning values.
----@param panning number|number[] 
----@return Note
-function Note:with_delay(panning) end
 
 ----------------------------------------------------------------------------------------------------
 

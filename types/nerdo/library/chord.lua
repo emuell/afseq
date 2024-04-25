@@ -29,7 +29,7 @@
 ---@param key NoteValue e.g. "c4" or 48
 ---@param mode ChordName
 ---@return Note
----### example:
+---### examples:
 ---```lua
 ---chord("c4", "minor") --> {"c4", "d#4", "f4"}
 ---chord({key = 48, volume = 0.5}, "minor") --> {"c4 v0.5", "d#4 v0.5", "f4 v0.5"}

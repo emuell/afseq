@@ -1,12 +1,15 @@
 use mlua::prelude::*;
 
 use super::unwrap::{
-    amplify_array_from_value, bad_argument_error, delay_array_from_value, note_events_from_value,
-    panning_array_from_value, sequence_from_value, transpose_steps_array_from_value,
-    volume_array_from_value,
+    amplify_array_from_value, bad_argument_error, delay_array_from_value,
+    instrument_array_from_value, note_events_from_value, panning_array_from_value,
+    sequence_from_value, transpose_steps_array_from_value, volume_array_from_value,
 };
 
-use crate::prelude::*;
+use crate::{
+    event::{InstrumentId, NoteEvent},
+    note::Note,
+};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -101,6 +104,24 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
+        methods.add_method_mut("with_instrument", |lua, this, value: LuaValue| {
+            let instruments = instrument_array_from_value(lua, value, this.notes.len())?;
+            for (notes, instrument) in this.notes.iter_mut().zip(instruments) {
+                if instrument < 0 {
+                    return Err(bad_argument_error(
+                        "with_instrument",
+                        "instrument",
+                        1,
+                        "instrument must be >= 0",
+                    ));
+                }
+                for note in notes.iter_mut().flatten() {
+                    note.instrument = Some(InstrumentId::from(instrument as usize));
+                }
+            }
+            Ok(this.clone())
+        });
+
         methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
@@ -162,7 +183,7 @@ impl LuaUserData for SequenceUserData {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::bindings::*;
+    use crate::{bindings::*, event::new_note};
 
     fn evaluate_sequence_userdata(lua: &Lua, expression: &str) -> LuaResult<SequenceUserData> {
         Ok(lua

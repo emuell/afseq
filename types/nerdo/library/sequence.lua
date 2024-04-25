@@ -30,6 +30,11 @@ function Sequence:transposed(step) end
 ---```
 function Sequence:amplified(factor) end
 
+---Create a copy of all notes in the sequence with new instrument values.
+---@param instrument number|number[] 
+---@return Note
+function Sequence:with_instrument(instrument) end
+
 ---Create a copy of all notes in the sequence with new volume values.
 ---@param volume number|number[] 
 ---@return Sequence

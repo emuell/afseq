@@ -141,7 +141,6 @@ fn float_array_from_value<Range>(
     array_len: usize,
     name: &str,
     range: Range,
-    _default: f32,
 ) -> LuaResult<Vec<f32>>
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
@@ -169,22 +168,53 @@ where
     Ok(values)
 }
 
+fn integer_array_from_value<Range>(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+    name: &str,
+    range: Range,
+) -> LuaResult<Vec<i32>>
+where
+    Range: RangeBounds<i32> + std::fmt::Debug,
+{
+    let values;
+    if let Some(value_table) = value.as_table() {
+        values = value_table
+            .clone()
+            .sequence_values::<i32>()
+            .collect::<LuaResult<Vec<i32>>>()?;
+    } else {
+        let value = i32::from_lua(value, lua)?;
+        values = (0..array_len).map(|_| value).collect::<Vec<i32>>();
+    }
+    for value in &values {
+        if !range.contains(value) {
+            return Err(bad_argument_error(
+                None,
+                name,
+                1,
+                format!("{} must be in range [{:?}] but is '{}'", name, range, value).as_str(),
+            ));
+        }
+    }
+    Ok(values)
+}
+
 pub(crate) fn transpose_steps_array_from_value(
     lua: &Lua,
     step: LuaValue,
     array_len: usize,
 ) -> LuaResult<Vec<i32>> {
-    let steps;
-    if let Some(volume_table) = step.as_table() {
-        steps = volume_table
-            .clone()
-            .sequence_values::<i32>()
-            .collect::<LuaResult<Vec<i32>>>()?;
-    } else {
-        let step = i32::from_lua(step, lua)?;
-        steps = (0..array_len).map(|_| step).collect::<Vec<i32>>();
-    }
-    Ok(steps)
+    integer_array_from_value(lua, step, array_len, "transpose_step", i32::MIN..i32::MAX)
+}
+
+pub(crate) fn instrument_array_from_value(
+    lua: &Lua,
+    value: LuaValue,
+    array_len: usize,
+) -> LuaResult<Vec<i32>> {
+    integer_array_from_value(lua, value, array_len, "instrument", 0..=i32::MAX)
 }
 
 pub(crate) fn amplify_array_from_value(
@@ -192,7 +222,7 @@ pub(crate) fn amplify_array_from_value(
     value: LuaValue,
     array_len: usize,
 ) -> LuaResult<Vec<f32>> {
-    float_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX, 1.0)
+    float_array_from_value(lua, value, array_len, "volume", 0.0..=f32::MAX)
 }
 
 pub(crate) fn volume_array_from_value(
@@ -200,7 +230,7 @@ pub(crate) fn volume_array_from_value(
     value: LuaValue,
     array_len: usize,
 ) -> LuaResult<Vec<f32>> {
-    float_array_from_value(lua, value, array_len, "volume", 0.0..=1.0, 1.0)
+    float_array_from_value(lua, value, array_len, "volume", 0.0..=1.0)
 }
 
 pub(crate) fn panning_array_from_value(
@@ -208,7 +238,7 @@ pub(crate) fn panning_array_from_value(
     value: LuaValue,
     array_len: usize,
 ) -> LuaResult<Vec<f32>> {
-    float_array_from_value(lua, value, array_len, "panning", -1.0..=1.0, 0.0)
+    float_array_from_value(lua, value, array_len, "panning", -1.0..=1.0)
 }
 
 pub(crate) fn delay_array_from_value(
@@ -216,7 +246,7 @@ pub(crate) fn delay_array_from_value(
     value: LuaValue,
     array_len: usize,
 ) -> LuaResult<Vec<f32>> {
-    float_array_from_value(lua, value, array_len, "delay", 0.0..=1.0, 0.0)
+    float_array_from_value(lua, value, array_len, "delay", 0.0..=1.0)
 }
 
 // ---------------------------------------------------------------------------------------------
