@@ -1,4 +1,4 @@
-return emitter {
+return rhythm {
   unit = "seconds",
   resolution = 8,
   offset = 8,

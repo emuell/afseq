@@ -54,7 +54,7 @@ impl RhythmIterItem {
 /// multiple notes, or a sigle parameter change event. The event iter impl is an iterator too,
 /// so the emitted event content may dynamically change over time as well.
 pub trait RhythmIter: Debug {
-    /// Create a sample time display printer, which serializes the given sample time to the emitter's
+    /// Create a sample time display printer, which serializes the given sample time to the rhythm's
     /// time base as appropriated (in seconds or beats). May be useful for debugging purposes.
     fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay>;
 

@@ -1,4 +1,4 @@
-//! Arrange multiple `Phrase`S into a single `Emitter`.
+//! Arrange multiple `Phrase`S into a single `Rhythm`.
 
 use crate::{
     event::Event,

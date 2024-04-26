@@ -1,4 +1,4 @@
-return emitter {
+return rhythm {
   unit = "1/16",
   pattern = function()
     local pulses = table.create({ 0, 6, 10 })

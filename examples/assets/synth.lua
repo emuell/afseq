@@ -1,6 +1,6 @@
 local cmin = scale("c4", "minor")
 
-return emitter {
+return rhythm {
   unit = "bars",
   resolution = 4,
   offset = 4,

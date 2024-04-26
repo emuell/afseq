@@ -204,7 +204,7 @@ mod test {
             .load(
                 r#"
                 require "fun"()
-                return emitter {
+                return rhythm {
                     unit = "seconds",
                     pattern = function(context) 
                       return (context.pulse_step == 2) and 0 or 1 
@@ -268,7 +268,7 @@ mod test {
             .load(
                 r#"
                 require "fun"()
-                return emitter {
+                return rhythm {
                     unit = "seconds",
                     pattern = iter{1,0,1}:map(function(x) return x end):cycle():take(8),
                     emit = iter{"c4", "d#4", "g4"}:cycle()

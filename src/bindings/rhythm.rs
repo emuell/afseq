@@ -34,7 +34,7 @@ pub(crate) fn rhythm_from_userdata(
                 from: "userdata",
                 to: "rhythm",
                 message: Some(
-                    "Expected script to return an emitter, got some other userdata".to_string(),
+                    "Expected script to return a rhythm, got some other userdata".to_string(),
                 ),
             })
         }
@@ -43,7 +43,7 @@ pub(crate) fn rhythm_from_userdata(
             from: "userdata",
             to: "rhythm",
             message: Some(format!(
-                "Expected script to return a emitter, got {}",
+                "Expected script to return a rhythm, got {}",
                 value.type_name()
             )),
         })
@@ -90,7 +90,7 @@ mod test {
         let beat_time_rhythm = lua
             .load(
                 r#"
-                emitter {
+                rhythm {
                     unit = "beats",
                     resolution = 0.5,
                     offset = "2",
@@ -158,7 +158,7 @@ mod test {
         let beat_time_rhythm = lua
             .load(
                 r#"
-                return emitter {
+                return rhythm {
                     unit = "1/4",
                     pattern = function()
                       local pulse_step, pulse_time_step = 1, 0.0 
@@ -240,7 +240,7 @@ mod test {
         let second_time_rhythm = lua
             .load(
                 r#"
-                emitter {
+                rhythm {
                     unit = "seconds",
                     resolution = 2,
                     offset = 3,
@@ -293,7 +293,7 @@ mod test {
         let second_time_rhythm = lua
             .load(
                 r#"
-                return emitter {
+                return rhythm {
                     unit = "ms",
                     pattern = function(context)
                       return 1

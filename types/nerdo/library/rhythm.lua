@@ -1,7 +1,7 @@
 ---@meta
 error("Do not try to execute this file. It's just a type definition file.")
 ---
----Part of the afseq trait: Defines LuaLS annotations for the afseq Emitter class.
+---Part of the afseq trait: Defines LuaLS annotations for the afseq Rhythm class.
 ---
 
 ----------------------------------------------------------------------------------------------------
@@ -9,11 +9,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---RENOISE SPECIFIC: Optional trigger context passed to `pattern` and 'emit' functions.
 ---@class TriggerContext
 ---
----Note value that triggered, started the emitter, if any.
+---Note value that triggered, started the rhythm, if any.
 ---@field trigger_note integer?
----Note volume that triggered, started the emitter, if any.
+---Note volume that triggered, started the rhythm, if any.
 ---@field trigger_volume number?
----Note slice offset value that triggered, started the emitter, if any.
+---Note slice offset value that triggered, started the rhythm, if any.
 ---@field trigger_offset integer?
 
 ----------------------------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
 ---Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
----not emit events. Starts from 1 when the emitter starts running or is reset.
+---not emit events. Starts from 1 when the rhythm starts running or is reset.
 ---@field pulse_step integer
 ---Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
 ---Starts from 0 and increases with each new pulse by the pulse's step time duration.
@@ -66,7 +66,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Continues step counter, incrementing with each new *emitted* pulse.
 ---Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
 ---how often the emit function already got called.
----Starts from 1 when the emitter starts running or is reset.
+---Starts from 1 when the rhythm starts running or is reset.
 ---@field step integer
 
 ----------------------------------------------------------------------------------------------------
@@ -76,8 +76,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Construction options for a new emitter.
----@class EmitterOptions
+---Construction options for a new rhythm.
+---@class RhythmOptions
 ---
 ---Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
 ---create other less common rhythm bases.
@@ -96,7 +96,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field resolution number?
 ---
 ---Optional offset in `unit * resolution` time units. By default 0.
----When set, the emitter's event output will be delayed by the given offset value.
+---When set, the rhythm's event output will be delayed by the given offset value.
 ---### examples:
 ---```lua
 ---unit = "1/4",
@@ -110,13 +110,13 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---time unit. 0 or nil values never trigger, and values inbetween do *maybe* trigger.
 ---
 ---To create deterministic random patterns, seed the random number generator before
----creating the emitter via `math.randomseed(some_seed)`
+---creating the rhythm via `math.randomseed(some_seed)`
 ---
 ---Patterns can contains subdivisions, sub tables of pulses, to "cram" multiple pulses
 ---into a single pulse's time interval. This way more complex rhythmical patterns can
 ---be created.
 ---
----When no pattern is defined, a constant pulse of `1` is triggered by the emitter.
+---When no pattern is defined, a constant pulse of `1` is triggered by the rhythm.
 ---
 ---Just like the `emitter` property, patterns can either be a fixed array of values or a
 ---function or iterator which produces values dynamically.
@@ -172,7 +172,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field repeats (integer|boolean)?
 ---
----Specify the melodic pattern of the emitter. For every pulse in the rhythmical pattern, the
+---Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the
 ---next event from the specified emit sequence gets triggered. When the end of the sequence is
 ---reached, it restarts from the beginning.<br>
 ---In order to dynamically generate notes, you can pass a function or a functions iterator, 
@@ -223,12 +223,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Create a new emitter with the given configuration.
+---Create a new rhythm with the given configuration.
 ---
 ---### examples:
 ---```lua
 ----- trigger a chord sequence every 4 bars after 4 bars
----return emitter {
+---return rhythm {
 ---  unit = "bars",
 ---  resolution = 4,
 ---  offset = 1,
@@ -237,7 +237,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 -----trigger notes in an euclidean tripplet pattern
 ---local pattern = require "pattern"
----return emitter {
+---return rhythm {
 ---  unit = "1/8",
 ---  resolution = 3/2,
 ---  pattern = pattern.euclidean(6, 16, 2),
@@ -246,13 +246,13 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 -----trigger notes in a seeded, random subdivision pattern
 ---math.randomseed(23498)
----return emitter {
+---return rhythm {
 ---  unit = "1/8",
 ---  pattern = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
 ---  emit = { "c4" },
 ---}
 -----trigger random notes in a random pattern from a pentatonic scale
----return emitter {
+---return rhythm {
 ---  unit = "1/16",
 ---  pattern = function(context)
 ---    return (context.pulse_step % 4 == 1) or (math.random() > 0.8)
@@ -265,6 +265,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  end
 ---}
 ---```
----@param options EmitterOptions
+---@param options RhythmOptions
 ---@return userdata
-function emitter(options) end
+function rhythm(options) end

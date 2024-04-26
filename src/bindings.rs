@@ -240,17 +240,17 @@ fn register_global_bindings(
         })?,
     )?;
 
-    // function emitter { args... }
+    // function rhythm { args... }
     globals.raw_set(
-        "emitter",
+        "rhythm",
         lua.create_function({
             let timeout_hook = timeout_hook.clone();
             let time_base = *time_base;
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 // error on unknown option keys
-                let emitter_properties =
+                let rhythm_properties =
                     ["unit", "resolution", "offset", "pattern", "repeats", "emit"];
-                validate_table_properties(&table, &emitter_properties)?;
+                validate_table_properties(&table, &rhythm_properties)?;
                 // check which time unit is specified
                 let second_time_unit = match table.get::<&str, String>("unit") {
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),

@@ -5,7 +5,7 @@ math.iwrap = function(index, size)
   return math.floor(index - 1) % size + 1
 end
 
-return emitter {
+return rhythm {
   unit = "1/16",
   pattern = pattern.euclidean(6, 8, -5),
   offset = 16 * 64,
