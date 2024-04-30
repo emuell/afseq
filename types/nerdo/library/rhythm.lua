@@ -187,12 +187,13 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----- a sequence of c4, g4 with volume 0.5
 ---emit = sequence{"c4", "g4"}:with_volume(0.5)
 ---
+----- stateless generator function
 ----- a function
 ---emit = function(context)
 ---  return 48 + math.random(1, 4) * 5
 ---end
 ---
------ a generator (function with upvalue state)
+----- statefull generator function
 ---emit = function(initial_context) 
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
 ---  ---@param context EmitterContext
