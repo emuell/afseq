@@ -14,7 +14,7 @@ pub mod scripted;
 
 /// Interface for a pulse pattern iterator as used by [Rhythm](`crate::Rhythm`).
 pub trait Pattern: Debug {
-    /// Returns if there is a valid pattern. If empty, it can't be run.
+    /// Returns if there is a valid pattern that can be run.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }

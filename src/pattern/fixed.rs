@@ -51,7 +51,10 @@ impl Pattern for FixedPattern {
     }
 
     fn run(&mut self) -> Option<PulseIterItem> {
-        assert!(!self.is_empty(), "Can't run empty patterns");
+        // when we have no pulses there's nothing to run
+        if self.is_empty() {
+            return None;
+        }
         // if we have a pulse iterator, consume it
         if let Some(pulse_iter) = &mut self.pulse_iter {
             if let Some(pulse) = pulse_iter.next() {
