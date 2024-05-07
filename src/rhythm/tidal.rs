@@ -88,6 +88,7 @@ struct Single {
     value: StepValue,
     // might not be necessary to have a span here since it's always 0->1 currently
     span: Span,
+    target : Option<i16>, // value for instruments
     string: String,
 }
 
@@ -122,51 +123,6 @@ struct Choices {
 struct Stack {
     span: Span,
     stack: Vec<Step>,
-}
-
-// recursively sets up the relative span of steps after the initial parsing
-fn update_span(step: &mut Step, span: &Span) {
-    match step {
-        Step::Single(s) => s.span = span.clone(),
-        Step::Alternating(a) => {
-            a.span = span.clone();
-            for s in &mut a.steps {
-                update_span(s, span)
-            }
-        }
-        Step::Subdivision(sd) => {
-            sd.span = span.clone();
-            // let step_size = span.length() / (sd.steps.len() as f64);
-            let step_size = 1.0 / (sd.steps.len() as f64);
-            let mut time = 0.0;
-            for mut step in &mut sd.steps {
-                let sub = Span {
-                    start: time,
-                    end: time + step_size,
-                };
-                update_span(&mut step, &sub);
-                time += step_size
-            }
-        }
-        Step::Polymeter(pm) => {
-            pm.span = span.clone();
-            for s in &mut pm.steps {
-                update_span(s, span)
-            }
-        }
-        Step::Stack(st) => {
-            st.span = span.clone();
-            for s in &mut st.stack {
-                update_span(s, span)
-            }
-        }
-        Step::Choices(cs) => {
-            cs.span = span.clone();
-            for s in &mut cs.choices {
-                update_span(s, span)
-            }
-        }
-    }
 }
 
 fn as_note_value(note: char) -> Option<i16> {
@@ -206,94 +162,6 @@ fn as_pitch(pair: Pair<Rule>) -> Pitch {
     // maybe an error should be thrown instead of a silent clamp
     pitch.note = pitch.note.clamp(0, 127);
     pitch
-}
-
-// recursively output events for the entire cycle based on some state (random seed)
-fn output_events(step: &mut Step, state: State, span: &Span) -> Vec<CycleEvent> {
-    // let mut override_span = span.clone();
-    // if let Some(sp) = override_span {
-    //     update_span(step, &sp);
-    //     override_span = None;
-    // }
-    match step {
-        Step::Single(s) => {
-            vec![CycleEvent {
-                span: s.span.transform(span),
-                value: s.value.clone(),
-            }]
-        }
-        Step::Alternating(a) => {
-            if a.steps.len() == 0 {
-                vec![]
-            } else {
-                let current = a.current % a.steps.len();
-                a.current += 1;
-                if let Some(step) = a.steps.get_mut(current) {
-                    output_events(step, state, &a.span.transform(&span))
-                } else {
-                    vec![]
-                }
-            }
-        }
-        Step::Subdivision(sd) => {
-            if sd.steps.len() == 0 {
-                vec![]
-            } else {
-                let mut events = vec![];
-                for s in &mut sd.steps {
-                    events.extend(output_events(s, state.clone(), &sd.span.transform(&span)))
-                }
-                events
-            }
-        }
-        Step::Polymeter(pm) => {
-            if pm.steps.len() == 0 {
-                vec![]
-            } else {
-                let mut events = vec![];
-                let length = pm.steps.len();
-                let offset = pm.offset;
-
-                let step_size = pm.span.length() / (pm.count as f64);
-                let mut time = pm.span.start;
-
-                pm.offset += pm.count;
-                for i in 0..pm.count {
-                    let start = time;
-                    let end = time + step_size;
-                    time = end;
-                    let sub = Span {
-                        start: start,
-                        end: end,
-                    };
-                    events.extend(output_events(
-                        &mut pm.steps[(offset + i) % length].clone(),
-                        state.clone(),
-                        &sub.transform(&pm.span),
-                    ))
-                }
-                events
-            }
-        }
-        Step::Stack(st) => {
-            if st.stack.len() == 0 {
-                vec![]
-            } else {
-                let mut events = vec![];
-                for s in &mut st.stack {
-                    events.extend(output_events(s, state.clone(), &st.span.transform(span)))
-                }
-                events
-            }
-        }
-        Step::Choices(cs) => {
-            // TODO move this outside
-            let seed = state.seed.unwrap_or_else(|| thread_rng().gen());
-            let mut rng = Xoshiro256PlusPlus::from_seed(seed);
-            let choice = rng.gen_range(0..cs.choices.len());
-            output_events(&mut cs.choices[choice], state, span)
-        }
-    }
 }
 
 // parse a single into a value
@@ -401,6 +269,7 @@ fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
                     span: Span::default(),
                     string: v.as_str().to_string(),
                     value: as_value(v),
+                    target : None,
                 }))
             } else {
                 unreachable!()
@@ -505,6 +374,134 @@ fn unwrap_section(pair: Pair<Rule>) -> Vec<Step> {
         }
     } else {
         vec![]
+    }
+}
+
+// recursively sets up the relative span of steps after the initial parsing
+fn update_span(step: &mut Step, span: &Span) {
+    match step {
+        Step::Single(s) => s.span = span.clone(),
+        Step::Alternating(a) => {
+            a.span = span.clone();
+            for s in &mut a.steps {
+                update_span(s, span)
+            }
+        }
+        Step::Subdivision(sd) => {
+            sd.span = span.clone();
+            // let step_size = span.length() / (sd.steps.len() as f64);
+            let step_size = 1.0 / (sd.steps.len() as f64);
+            let mut time = 0.0;
+            for mut step in &mut sd.steps {
+                let sub = Span {
+                    start: time,
+                    end: time + step_size,
+                };
+                update_span(&mut step, &sub);
+                time += step_size
+            }
+        }
+        Step::Polymeter(pm) => {
+            pm.span = span.clone();
+            for s in &mut pm.steps {
+                update_span(s, span)
+            }
+        }
+        Step::Stack(st) => {
+            st.span = span.clone();
+            for s in &mut st.stack {
+                update_span(s, span)
+            }
+        }
+        Step::Choices(cs) => {
+            cs.span = span.clone();
+            for s in &mut cs.choices {
+                update_span(s, span)
+            }
+        }
+    }
+}
+
+// recursively output events for the entire cycle based on some state (random seed)
+fn output_events(step: &mut Step, state: State, span: &Span) -> Vec<CycleEvent> {
+    match step {
+        Step::Single(s) => {
+            vec![CycleEvent {
+                span: s.span.transform(span),
+                value: s.value.clone(),
+            }]
+        }
+        Step::Alternating(a) => {
+            if a.steps.len() == 0 {
+                vec![]
+            } else {
+                let current = a.current % a.steps.len();
+                a.current += 1;
+                if let Some(step) = a.steps.get_mut(current) {
+                    output_events(step, state, &a.span.transform(&span))
+                } else {
+                    vec![]
+                }
+            }
+        }
+        Step::Subdivision(sd) => {
+            if sd.steps.len() == 0 {
+                vec![]
+            } else {
+                let mut events = vec![];
+                for s in &mut sd.steps {
+                    events.extend(output_events(s, state.clone(), &sd.span.transform(&span)))
+                }
+                events
+            }
+        }
+        Step::Polymeter(pm) => {
+            if pm.steps.len() == 0 {
+                vec![]
+            } else {
+                let mut events = vec![];
+                let length = pm.steps.len();
+                let offset = pm.offset;
+
+                let step_size = pm.span.length() / (pm.count as f64);
+                let mut time = pm.span.start;
+
+                pm.offset += pm.count;
+                for i in 0..pm.count {
+                    let start = time;
+                    let end = time + step_size;
+                    time = end;
+                    let sub = Span {
+                        start: start,
+                        end: end,
+                    };
+                    events.extend(output_events(
+                        &mut pm.steps[(offset + i) % length].clone(),
+                        state.clone(),
+                        &sub.transform(&pm.span),
+                    ))
+                }
+                events
+            }
+        }
+        Step::Stack(st) => {
+            if st.stack.len() == 0 {
+                vec![]
+            } else {
+                let mut events = vec![];
+                for s in &mut st.stack {
+                    events.extend(output_events(s, state.clone(), &st.span.transform(span)))
+                }
+                events
+            }
+        }
+        Step::Choices(cs) => {
+            // TODO move this outside
+            let seed = state.seed.unwrap_or_else(|| thread_rng().gen());
+            let mut rng = Xoshiro256PlusPlus::from_seed(seed);
+            let choice = rng.gen_range(0..cs.choices.len());
+            output_events(&mut cs.choices[choice], state, span)
+        }
     }
 }
 
