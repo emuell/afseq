@@ -13,13 +13,13 @@ pub struct MiniParser;
 
 #[derive(Clone)]
 struct State {
-    seed : Option<[u8;32]>
+    seed: Option<[u8; 32]>,
 }
 
 #[derive(Clone, Debug)]
 struct Pitch {
-    note : i16,
-    octave : u8,
+    note: i16,
+    octave: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -34,26 +34,42 @@ enum StepValue {
 
 #[derive(Clone, Debug)]
 struct Span {
-    start : f64,
-    end : f64,
+    start: f64,
+    end: f64,
 }
 
 impl Span {
+    // transforms a nested relative span according to an absolute span at output time
+    fn transform(&self, outer: &Span) -> Span {
+        let start = outer.start + outer.length() * self.start;
+        Span {
+            start: start,
+            end: start + outer.length() * self.length(),
+        }
+    }
     fn length(&self) -> f64 {
         self.end - self.start
+    }
+    fn default() -> Self {
+        Span {
+            start: 0.0,
+            end: 0.0,
+        }
     }
 }
 
 #[derive(Debug)]
 struct CycleEvent {
-    span : Span,
-    value : StepValue,
+    span: Span,
+    value: StepValue,
 }
-
 
 impl CycleEvent {
     fn to_string(&self) -> String {
-        format!("{:.3} -> {:.3} | {:?}", self.span.start, self.span.end, self.value)
+        format!(
+            "{:.3} -> {:.3} | {:?}",
+            self.span.start, self.span.end, self.value
+        )
     }
 }
 
@@ -69,56 +85,53 @@ enum Step {
 
 #[derive(Clone, Debug)]
 struct Single {
-    value : StepValue,
+    value: StepValue,
     // might not be necessary to have a span here since it's always 0->1 currently
-    span : Span,
-    string : String,
+    span: Span,
+    string: String,
 }
 
 #[derive(Clone, Debug)]
 struct Alternating {
-    current : usize,
-    span : Span,
-    steps : Vec<Step>,
+    current: usize,
+    span: Span,
+    steps: Vec<Step>,
 }
-
 
 #[derive(Clone, Debug)]
 struct Subdivision {
-    span : Span,
-    steps : Vec<Step>,
+    span: Span,
+    steps: Vec<Step>,
 }
 
 #[derive(Clone, Debug)]
 struct Polymeter {
-    count : usize,
-    offset : usize,
-    span : Span,
-    steps : Vec<Step>,
+    count: usize,
+    offset: usize,
+    span: Span,
+    steps: Vec<Step>,
 }
 
 #[derive(Clone, Debug)]
 struct Choices {
-    span : Span,
-    choices : Vec<Step>,
+    span: Span,
+    choices: Vec<Step>,
 }
 
 #[derive(Clone, Debug)]
 struct Stack {
-    span : Span,
-    stack : Vec<Step>,
+    span: Span,
+    stack: Vec<Step>,
 }
 
 // recursively sets up the relative span of steps after the initial parsing
-fn update_span(step: &mut Step, span: &Span){
+fn update_span(step: &mut Step, span: &Span) {
     match step {
-        Step::Single(s) => {
-            s.span = span.clone()
-        }
+        Step::Single(s) => s.span = span.clone(),
         Step::Alternating(a) => {
             a.span = span.clone();
             for s in &mut a.steps {
-                update_span(  s, span)
+                update_span(s, span)
             }
         }
         Step::Subdivision(sd) => {
@@ -127,7 +140,10 @@ fn update_span(step: &mut Step, span: &Span){
             let step_size = 1.0 / (sd.steps.len() as f64);
             let mut time = 0.0;
             for mut step in &mut sd.steps {
-                let sub = Span{start : time, end : time + step_size};
+                let sub = Span {
+                    start: time,
+                    end: time + step_size,
+                };
                 update_span(&mut step, &sub);
                 time += step_size
             }
@@ -141,7 +157,7 @@ fn update_span(step: &mut Step, span: &Span){
         Step::Stack(st) => {
             st.span = span.clone();
             for s in &mut st.stack {
-                update_span(  s, span)
+                update_span(s, span)
             }
         }
         Step::Choices(cs) => {
@@ -153,16 +169,7 @@ fn update_span(step: &mut Step, span: &Span){
     }
 }
 
-// transforms a nested relative span according to an absolute span at output time
-fn transform_span(inner : &Span, outer : &Span) -> Span {
-    let start = outer.start + outer.length() * inner.start;
-    Span {
-        start : start,
-        end : start + outer.length() * inner.length()
-    }
-}
-
-fn as_note_value(note : char) -> Option<i16> {
+fn as_note_value(note: char) -> Option<i16> {
     match note {
         'c' => Some(0),
         'd' => Some(2),
@@ -171,14 +178,14 @@ fn as_note_value(note : char) -> Option<i16> {
         'g' => Some(7),
         'a' => Some(9),
         'b' => Some(11),
-        _ => None
+        _ => None,
     }
 }
 
-fn as_pitch(pair : Pair<Rule>) -> Pitch{
+fn as_pitch(pair: Pair<Rule>) -> Pitch {
     let mut pitch = Pitch {
-        note : 60,
-        octave : 4,
+        note: 60,
+        octave: 4,
     };
     for p in pair.into_inner() {
         match p.as_rule() {
@@ -187,17 +194,13 @@ fn as_pitch(pair : Pair<Rule>) -> Pitch{
                     pitch.note = as_note_value(c).unwrap_or(pitch.note)
                 }
             }
-            Rule::octave => {
-                pitch.octave = p.as_str().parse::<u8>().unwrap_or(pitch.octave)
-            }
-            Rule::mark => {
-                match p.as_str() {
-                    "#" => pitch.note += 1,
-                    "b" => pitch.note -= 1,
-                    _ => ()
-                }
-            }
-            _ => ()
+            Rule::octave => pitch.octave = p.as_str().parse::<u8>().unwrap_or(pitch.octave),
+            Rule::mark => match p.as_str() {
+                "#" => pitch.note += 1,
+                "b" => pitch.note -= 1,
+                _ => (),
+            },
+            _ => (),
         }
     }
     // maybe an error should be thrown instead of a silent clamp
@@ -206,7 +209,7 @@ fn as_pitch(pair : Pair<Rule>) -> Pitch{
 }
 
 // recursively output events for the entire cycle based on some state (random seed)
-fn output_events(step : &mut Step, state: State, span:&Span) -> Vec<CycleEvent> {
+fn output_events(step: &mut Step, state: State, span: &Span) -> Vec<CycleEvent> {
     // let mut override_span = span.clone();
     // if let Some(sp) = override_span {
     //     update_span(step, &sp);
@@ -215,78 +218,81 @@ fn output_events(step : &mut Step, state: State, span:&Span) -> Vec<CycleEvent> 
     match step {
         Step::Single(s) => {
             vec![CycleEvent {
-                span : transform_span(&s.span, span),
-                value : s.value.clone(),
+                span: s.span.transform(span),
+                value: s.value.clone(),
             }]
         }
         Step::Alternating(a) => {
-            if a.steps.len() == 0 { vec![] }
-            else{
+            if a.steps.len() == 0 {
+                vec![]
+            } else {
                 let current = a.current % a.steps.len();
                 a.current += 1;
-                if let Some(step) = a.steps.get_mut(current){
-                    output_events(step, state, &transform_span(&a.span, span))
-                }else{
+                if let Some(step) = a.steps.get_mut(current) {
+                    output_events(step, state, &a.span.transform(&span))
+                } else {
                     vec![]
                 }
             }
         }
         Step::Subdivision(sd) => {
-            if sd.steps.len() == 0 { vec![] }
-            else{
+            if sd.steps.len() == 0 {
+                vec![]
+            } else {
                 let mut events = vec![];
                 for s in &mut sd.steps {
-                    events.extend(output_events(s, state.clone(), &transform_span(&sd.span, span)))
+                    events.extend(output_events(s, state.clone(), &sd.span.transform(&span)))
                 }
                 events
             }
         }
         Step::Polymeter(pm) => {
-            if pm.steps.len() == 0 { vec![] }
-            else{
+            if pm.steps.len() == 0 {
+                vec![]
+            } else {
                 let mut events = vec![];
                 let length = pm.steps.len();
                 let offset = pm.offset;
-                
+
                 let step_size = pm.span.length() / (pm.count as f64);
                 let mut time = pm.span.start;
 
                 pm.offset += pm.count;
-                for i in 0..pm.count{
+                for i in 0..pm.count {
                     let start = time;
                     let end = time + step_size;
                     time = end;
-                    let sub = Span{start : start, end : end};
-                    events.extend(output_events(&mut pm.steps[(offset + i) % length].clone(), state.clone(), &transform_span(&sub, &pm.span)))
+                    let sub = Span {
+                        start: start,
+                        end: end,
+                    };
+                    events.extend(output_events(
+                        &mut pm.steps[(offset + i) % length].clone(),
+                        state.clone(),
+                        &sub.transform(&pm.span),
+                    ))
                 }
                 events
             }
         }
         Step::Stack(st) => {
-            if st.stack.len() == 0 { vec![] }
-            else{
+            if st.stack.len() == 0 {
+                vec![]
+            } else {
                 let mut events = vec![];
                 for s in &mut st.stack {
-                    events.extend(output_events(s, state.clone(), &transform_span(&st.span, span)))
+                    events.extend(output_events(s, state.clone(), &st.span.transform(span)))
                 }
                 events
             }
         }
-        Step::Choices(cs) => { 
+        Step::Choices(cs) => {
             // TODO move this outside
             let seed = state.seed.unwrap_or_else(|| thread_rng().gen());
             let mut rng = Xoshiro256PlusPlus::from_seed(seed);
             let choice = rng.gen_range(0..cs.choices.len());
             output_events(&mut cs.choices[choice], state, span)
         }
-    }
-}
-
-// helper to create default span
-fn span() -> Span {
-    Span {
-        start : 0.0,
-        end : 1.0
     }
 }
 
@@ -297,225 +303,199 @@ fn as_value(pair: Pair<Rule>) -> StepValue {
         Rule::number => {
             if let Some(n) = pair.into_inner().next() {
                 match n.as_rule() {
-                    Rule::integer => 
-                        StepValue::Integer(n.as_str().parse::<u32>().unwrap_or(0)),
-                    Rule::float =>
-                        StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
-                    Rule::normal =>
-                        StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
-                    _ => unreachable!()
+                    Rule::integer => StepValue::Integer(n.as_str().parse::<u32>().unwrap_or(0)),
+                    Rule::float => StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
+                    Rule::normal => StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
+                    _ => unreachable!(),
                 }
-            }else{
+            } else {
                 unreachable!()
             }
         }
-        Rule::hold => {
-            StepValue::Hold
-        }
-        Rule::rest => {
-            StepValue::Rest
-        }
-        Rule::pitch => {
-            StepValue::Pitch(as_pitch(pair))
-        }
-        Rule::name => {
-            StepValue::Name(pair.as_str().to_string())
-        }
-        _ => unreachable!()
+        Rule::hold => StepValue::Hold,
+        Rule::rest => StepValue::Rest,
+        Rule::pitch => StepValue::Pitch(as_pitch(pair)),
+        Rule::name => StepValue::Name(pair.as_str().to_string()),
+        _ => unreachable!(),
     }
 }
 
 // stacks can only appear inside groups like Subdivision, Alternating or Polymeter
 // they will have a stack of steps with their parent's type inside
-fn as_stack(pair : Pair<Rule>, parent: Pair<Rule>) -> Stack {
-
+fn as_stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Stack {
     let mut stack = Stack {
-        span : span(),
-        stack : vec![],
+        span: Span::default(),
+        stack: vec![],
     };
     match parent.as_rule() {
         Rule::alternating => {
-            for p in pair.into_inner(){
-                stack.stack.push(Step::Alternating(Alternating{
-                    span : span(),
-                    current : 0,
-                    steps : section_as_steps(p)
+            for p in pair.into_inner() {
+                stack.stack.push(Step::Alternating(Alternating {
+                    span: Span::default(),
+                    current: 0,
+                    steps: section_as_steps(p),
                 }))
             }
         }
         Rule::subdivision => {
-            for p in pair.clone().into_inner(){
-                stack.stack.push(Step::Subdivision(Subdivision{
-                    span : span(),
-                    steps : section_as_steps(p)
+            for p in pair.clone().into_inner() {
+                stack.stack.push(Step::Subdivision(Subdivision {
+                    span: Span::default(),
+                    steps: section_as_steps(p),
                 }))
             }
         }
         Rule::polymeter => {
             if let Some(count) = as_polymeter_count(&parent) {
-                for p in pair.clone().into_inner(){
-                    stack.stack.push(Step::Polymeter(Polymeter{
-                        count : count,
-                        offset : 0,
-                        span : span(),
-                        steps : section_as_steps(p)
+                for p in pair.clone().into_inner() {
+                    stack.stack.push(Step::Polymeter(Polymeter {
+                        count: count,
+                        offset: 0,
+                        span: Span::default(),
+                        steps: section_as_steps(p),
                     }))
                 }
             }
         }
-        _ => ()
+        _ => (),
     }
     stack
 }
 
-fn as_polymeter_count(pair: &Pair<Rule>) -> Option<usize>{
+fn as_polymeter_count(pair: &Pair<Rule>) -> Option<usize> {
     for p in pair.clone().into_inner() {
         match p.as_rule() {
-            Rule::polymeter_tail => { // TODO a more generic parameter here
-                if let Some(count) = p.into_inner().next(){
-                    return Some(count.as_str().parse::<usize>().unwrap_or(1))
+            Rule::polymeter_tail => {
+                // TODO a more generic parameter here
+                if let Some(count) = p.into_inner().next() {
+                    return Some(count.as_str().parse::<usize>().unwrap_or(1));
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
     None
 }
 
-fn as_polymeter(pair : Pair<Rule>) -> Result<Step, &str>{
+fn as_polymeter(pair: Pair<Rule>) -> Result<Step, &str> {
     if let Some(count) = as_polymeter_count(&pair) {
         let mut inner = pair.clone().into_inner();
-        if let Some(poly_list) = inner.next(){
-            return Ok(Step::Polymeter(Polymeter{
-                count : count,
-                offset : 0,
-                span : span(),
-                steps : section_as_steps(poly_list)
-            }))
+        if let Some(poly_list) = inner.next() {
+            return Ok(Step::Polymeter(Polymeter {
+                count: count,
+                offset: 0,
+                span: Span::default(),
+                steps: section_as_steps(poly_list),
+            }));
         }
     }
     Err("invalid polymeter")
 }
 
 // recursively parse a pair as a Step
-fn as_step(pair : Pair<Rule>) -> Result<Step, &str> {
+fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
     match pair.as_rule() {
         Rule::single => {
-            if let Some(v) = pair.into_inner().next(){
-                Ok(Step::Single(Single{
-                    span : span(),
-                    string : v.as_str().to_string(),
-                    value : as_value(v),
+            if let Some(v) = pair.into_inner().next() {
+                Ok(Step::Single(Single {
+                    span: Span::default(),
+                    string: v.as_str().to_string(),
+                    value: as_value(v),
                 }))
-            }else{
+            } else {
                 unreachable!()
             }
         }
         Rule::alternating => {
             if let Some(first) = pair.clone().into_inner().next() {
                 match first.as_rule() {
-                    Rule::stack => {
-                        Ok(Step::Stack(as_stack(first, pair)))
-                    }
+                    Rule::stack => Ok(Step::Stack(as_stack(first, pair))),
                     _ => {
                         let a = Alternating {
-                            span : span(),
-                            current : 0,
-                            steps : unwrap_section(pair),
+                            span: Span::default(),
+                            current: 0,
+                            steps: unwrap_section(pair),
                         };
                         Ok(Step::Alternating(a))
                     }
                 }
-            }else{
+            } else {
                 Err("empty alternating")
             }
         }
         Rule::subdivision | Rule::mini => {
             if let Some(first) = pair.clone().into_inner().next() {
                 match first.as_rule() {
-                    Rule::stack => {
-                        Ok(Step::Stack(as_stack(first, pair)))
-                    }
+                    Rule::stack => Ok(Step::Stack(as_stack(first, pair))),
                     _ => {
                         let sd = Subdivision {
-                            span : span(),
-                            steps : unwrap_section(pair),
+                            span: Span::default(),
+                            steps: unwrap_section(pair),
                         };
                         Ok(Step::Subdivision(sd))
                     }
                 }
-            }else{
+            } else {
                 Err("empty subdivision")
             }
         }
         Rule::polymeter => {
             if let Some(first) = pair.clone().into_inner().next() {
                 match first.as_rule() {
-                    Rule::stack => {
-                        Ok(Step::Stack(as_stack(first, pair)))
-                    }
-                    _ => {
-                        as_polymeter(pair)
-                    }
+                    Rule::stack => Ok(Step::Stack(as_stack(first, pair))),
+                    _ => as_polymeter(pair),
                 }
-            }else{
+            } else {
                 Err("empty polymeter")
             }
         }
-        Rule::stack => {
+        Rule::stack | Rule::section => {
             // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
-            Err("internal error, unexpected branch reached")
-        }
-        Rule::section => {
             // sections are always immediately handled within other rules
             // using unwrap_section or section_as_steps
-            Err("aa")
+            Err("internal error, unexpected branch reached")
         }
-        Rule::choices => {
-            Err("sas")
-        }
-        _ => Err("type not implemented")
+        Rule::choices => Err("sas"),
+        _ => Err("type not implemented"),
     }
 }
 
 // helper to convert a section rule to a vector of Steps
-fn section_as_steps(pair : Pair<Rule>) -> Vec<Step>{
+fn section_as_steps(pair: Pair<Rule>) -> Vec<Step> {
     let mut steps = vec![];
     for pair in pair.into_inner() {
         match as_step(pair) {
             Ok(s) => steps.push(s),
-            Err(s) => println!("{:?}", s)
+            Err(s) => println!("{:?}", s),
         }
     }
     steps
 }
 
 // helper to convert a section or single to a vector of Steps
-fn unwrap_section(pair : Pair<Rule>) -> Vec<Step> {
-    if let Some(inner) = pair.into_inner().next(){
+fn unwrap_section(pair: Pair<Rule>) -> Vec<Step> {
+    if let Some(inner) = pair.into_inner().next() {
         match inner.as_rule() {
             Rule::single => {
                 if let Ok(s) = as_step(inner) {
                     vec![s]
-                }else{
+                } else {
                     vec![]
                 }
             }
-            Rule::section => {
-                section_as_steps(inner)
-            }
+            Rule::section => section_as_steps(inner),
             Rule::choices => {
-                let mut choices : Vec<Step> = vec![];
+                let mut choices: Vec<Step> = vec![];
                 for p in inner.into_inner() {
-                    if let Some(step) = p.into_inner().next(){
+                    if let Some(step) = p.into_inner().next() {
                         if let Ok(choice) = as_step(step) {
                             choices.push(choice)
                         }
-                    }                    
+                    }
                 }
-                vec![Step::Choices(Choices{
-                    span : span(),
-                    choices
+                vec![Step::Choices(Choices {
+                    span: Span::default(),
+                    choices,
                 })]
             }
             _ => {
@@ -523,29 +503,39 @@ fn unwrap_section(pair : Pair<Rule>) -> Vec<Step> {
                 unreachable!()
             }
         }
-    }else{
+    } else {
         vec![]
     }
 }
 
-fn crawl_step(step: &mut Step, fun :  fn(&mut Step, usize), level : usize){
+fn crawl_step(step: &mut Step, fun: fn(&mut Step, usize), level: usize) {
     fun(step, level);
     match step {
         Step::Single(_s) => (),
-        Step::Alternating(a) => for s in &mut a.steps {
-            crawl_step(s, fun, level + 1)
+        Step::Alternating(a) => {
+            for s in &mut a.steps {
+                crawl_step(s, fun, level + 1)
+            }
         }
-        Step::Polymeter(pm) => for s in &mut pm.steps {
-            crawl_step(s,fun, level + 1)
+        Step::Polymeter(pm) => {
+            for s in &mut pm.steps {
+                crawl_step(s, fun, level + 1)
+            }
         }
-        Step::Subdivision(sd) => for s in &mut sd.steps {
-            crawl_step(s,fun, level + 1)
+        Step::Subdivision(sd) => {
+            for s in &mut sd.steps {
+                crawl_step(s, fun, level + 1)
+            }
         }
-        Step::Choices(cs) => for s in &mut cs.choices {
-            crawl_step(s,fun, level + 1)
+        Step::Choices(cs) => {
+            for s in &mut cs.choices {
+                crawl_step(s, fun, level + 1)
+            }
         }
-        Step::Stack(st)  => for s in &mut st.stack {
-            crawl_step(s, fun, level + 1)
+        Step::Stack(st) => {
+            for s in &mut st.stack {
+                crawl_step(s, fun, level + 1)
+            }
         }
     }
 }
@@ -558,46 +548,31 @@ fn reset_step(step: &mut Step, _level: usize) {
         Step::Polymeter(pm) => {
             pm.offset = 0;
         }
-        _ => ()
+        _ => (),
     }
 }
 
 // parse the root pair of the pest AST into a Subdivision
 // then update the spans of all the generated steps
-fn parse_tree(tree: &Pair<Rule>) -> Result<Step, String>{
+fn parse_tree(tree: &Pair<Rule>) -> Result<Step, String> {
     let mut cycle = as_step(tree.clone())?;
-    update_span(&mut cycle, &span());
+    update_span(&mut cycle, &Span::default());
     Ok(cycle)
 }
 
 // parse a string into a step
-fn parse(input : &str) -> Result<Step, String> {
+fn parse(input: &str) -> Result<Step, String> {
     match MiniParser::parse(Rule::mini, &input) {
         Ok(mut tree) => parse_tree(&tree.next().unwrap()),
-        Err(err) => Err(format!("{}", err))
+        Err(err) => Err(format!("{}", err)),
     }
-    
-    // let parse_result = MiniParser::parse(Rule::mini, &input);
-    // match parse_result {
-    //     Ok(mut ast) => {
-    //         let mini = ast.next().unwrap();
-    //         println!("\nTREE");
-    //         print_pairs(&mini, 0);
-    //         parse_ast(&mini)
-    //     }
-    //     Err(err) => Err(format!("{}", err))
-    //         // match err.variant {
-    //         // ErrorVariant::ParsingError { .. } => Err(format!("{}", err)),
-    // }
 }
-
-
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    fn indent_lines(level : usize) -> String {
+    fn indent_lines(level: usize) -> String {
         let mut lines = String::new();
         for i in 0..level {
             lines += [" │", " |"][i % 2];
@@ -608,29 +583,34 @@ mod test {
     fn print_steps(step: &mut Step, level: usize) {
         let name = match step {
             Step::Single(s) => match &s.value {
-                StepValue::Pitch(_p) => format!("{:?} {}", s.value,  s.string),
-                _ => format!("{:?} {:?}", s.value,  s.string)
-            }
-            Step::Subdivision(sd) => format!("{} [{}]","Subdivision", sd.steps.len()),
-            Step::Alternating(a) => format!("{} <{}>","Alternating", a.steps.len()),
-            Step::Polymeter(pm) => format!("{} {{{}}}","Polymeter", pm.steps.len()),
-            Step::Choices(cs) => format!("{} |{}|","Choices", cs.choices.len()),
-            Step::Stack(st)  => format!("{} ({})","Stack", st.stack.len()),
+                StepValue::Pitch(_p) => format!("{:?} {}", s.value, s.string),
+                _ => format!("{:?} {:?}", s.value, s.string),
+            },
+            Step::Subdivision(sd) => format!("{} [{}]", "Subdivision", sd.steps.len()),
+            Step::Alternating(a) => format!("{} <{}>", "Alternating", a.steps.len()),
+            Step::Polymeter(pm) => format!("{} {{{}}}", "Polymeter", pm.steps.len()),
+            Step::Choices(cs) => format!("{} |{}|", "Choices", cs.choices.len()),
+            Step::Stack(st) => format!("{} ({})", "Stack", st.stack.len()),
         };
         println!("{} {}", indent_lines(level), name);
     }
 
-    fn print_pairs(pair:&Pair<Rule>, level : usize){
-        println!("{} {:?} {:?}", indent_lines(level), pair.as_rule(),pair.as_str());
+    fn print_pairs(pair: &Pair<Rule>, level: usize) {
+        println!(
+            "{} {:?} {:?}",
+            indent_lines(level),
+            pair.as_rule(),
+            pair.as_str()
+        );
         for p in pair.clone().into_inner() {
             print_pairs(&p, level + 1)
         }
     }
 
-    fn parse_with_debug(input : &str){        
+    fn parse_with_debug(input: &str) {
         println!("\n{}", "=".repeat(42));
         println!("\nINPUT\n {:?}\n", input);
-        match MiniParser::parse(Rule::mini,&input) {
+        match MiniParser::parse(Rule::mini, &input) {
             Ok(mut tree) => {
                 let mini = tree.next().unwrap();
                 print_pairs(&mini, 0);
@@ -639,23 +619,24 @@ mod test {
                         println!("\nCYCLE");
                         crawl_step(&mut step, print_steps, 0);
                         let stateful_chars = ['<', '{', '|'];
-                        let repeats = if stateful_chars.iter().any(|&c| input.contains(c)){4}else{1};
+                        let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
+                            4
+                        } else {
+                            1
+                        };
                         println!("\nOUTPUT");
-                        for i in 0..repeats{
+                        for i in 0..repeats {
                             println!(" {}", i);
-                            output_events(&mut step, State{seed : None}, &span()).iter().for_each(|e| println!("  │ {}", e.to_string()));                
+                            output_events(&mut step, State { seed: None }, &Span::default())
+                                .iter()
+                                .for_each(|e| println!("  │ {}", e.to_string()));
+                            // crawl_step(&mut step, reset_step, 0);
                         }
-
-                        // crawl_step(&mut step, reset_step, 0);
-                        // for i in 0..3{
-                        //     println!(" {}", i);
-                        //     output_events(&mut step, State{seed : None}, &span()).iter().for_each(|e| println!("  │ {}", e.to_string()));                
-                        // }
-                    },
-                    Err(s) => println!("{}", s)
+                    }
+                    Err(s) => println!("{}", s),
                 }
             }
-            Err(err) => println!("{}", err)
+            Err(err) => println!("{}", err),
         }
     }
 
@@ -679,13 +660,3 @@ mod test {
         parse_with_debug("{a b <c d e f> [g a]}%3");
     }
 }
-
-/*
-    TODO
-        proper error handling
-        operators
-        output
-            apply rest and hold
-            rework and sort stacks
-            convert to shared types
- */
