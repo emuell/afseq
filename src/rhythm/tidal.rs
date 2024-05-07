@@ -613,6 +613,7 @@ mod test {
         match MiniParser::parse(Rule::mini, &input) {
             Ok(mut tree) => {
                 let mini = tree.next().unwrap();
+                println!("\nTREE");
                 print_pairs(&mini, 0);
                 match parse_tree(&mini) {
                     Ok(mut step) => {
