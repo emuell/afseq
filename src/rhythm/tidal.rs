@@ -25,7 +25,7 @@ struct Pitch {
 #[derive(Clone, Debug)]
 enum StepValue {
     Float(f64),
-    Integer(u32),
+    Integer(i32),
     Pitch(Pitch),
     Name(String),
     Rest,
@@ -303,7 +303,7 @@ fn as_value(pair: Pair<Rule>) -> StepValue {
         Rule::number => {
             if let Some(n) = pair.into_inner().next() {
                 match n.as_rule() {
-                    Rule::integer => StepValue::Integer(n.as_str().parse::<u32>().unwrap_or(0)),
+                    Rule::integer => StepValue::Integer(n.as_str().parse::<i32>().unwrap_or(0)),
                     Rule::float => StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
                     Rule::normal => StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
                     _ => unreachable!(),
