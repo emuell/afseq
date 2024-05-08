@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 use rand::{thread_rng, Rng, SeedableRng};
