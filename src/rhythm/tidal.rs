@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use core::fmt::Display;
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 use rand::{thread_rng, Rng, SeedableRng};
@@ -65,14 +66,14 @@ struct CycleEvent {
     value: StepValue,
 }
 
-impl CycleEvent {
-    fn to_string(&self) -> String {
-        format!(
+impl Display for CycleEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
             "{:.3} -> {:.3} | {:?}",
             self.span.start, self.span.end, self.value
-        )
+        ))
     }
-}
+} 
 
 #[derive(Clone, Debug)]
 enum Step {
@@ -628,7 +629,8 @@ mod test {
                             println!(" {}", i);
                             output_events(&mut step, State { seed: None }, &Span::default())
                                 .iter()
-                                .for_each(|e| println!("  │ {}", e.to_string()));
+                                .enumerate()
+                                .for_each(|(i, e)| println!("  │{:02}│ {}", i, e));
                             // crawl_step(&mut step, reset_step, 0);
                         }
                     }
