@@ -24,17 +24,17 @@ struct Pitch {
     octave: u8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 enum StepValue {
+    #[default] Rest,
+    Hold,
     Float(f64),
     Integer(i32),
     Pitch(Pitch),
     Name(String),
-    Rest,
-    Hold,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct Span {
     start: f64,
     end: f64,
@@ -53,9 +53,9 @@ impl Span {
         self.end - self.start
     }
     fn default() -> Self {
-        Span {
-            start: 0.0,
-            end: 0.0,
+        Span{
+            start : 0.0,
+            end : 1.0
         }
     }
 }
@@ -85,13 +85,24 @@ enum Step {
     Choices(Choices),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct Single {
     value: StepValue,
     // might not be necessary to have a span here since it's always 0->1 currently
     span: Span,
     target : Option<i16>, // value for instruments
     string: String,
+}
+
+impl Single {
+    fn default() -> Self {
+        Single {
+            value: StepValue::Rest,
+            span: Span::default(),
+            target: None,
+            string: String::from("~")
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
