@@ -302,7 +302,7 @@ fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
                     }
                 }
             } else {
-                Err("empty alternating")
+                Ok(Step::Single(Single::default()))
             }
         }
         Rule::subdivision | Rule::mini => {
@@ -318,17 +318,18 @@ fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
                     }
                 }
             } else {
-                Err("empty subdivision")
+                Ok(Step::Single(Single::default()))
             }
         }
         Rule::polymeter => {
             if let Some(first) = pair.clone().into_inner().next() {
                 match first.as_rule() {
                     Rule::stack => Ok(Step::Stack(as_stack(first, pair))),
+                    Rule::polymeter_tail => Ok(Step::Single(Single::default())),
                     _ => as_polymeter(pair),
                 }
             } else {
-                Err("empty polymeter")
+                Ok(Step::Single(Single::default()))
             }
         }
         Rule::stack | Rule::section => {
@@ -670,5 +671,6 @@ mod test {
         parse_with_debug("{a b c d e}%3");
         parse_with_debug("{a b , c d e f g}%3");
         parse_with_debug("{a b <c d e f> [g a]}%3");
+        parse_with_debug("[1 2 ~] {}%42 [] <>");
     }
 }

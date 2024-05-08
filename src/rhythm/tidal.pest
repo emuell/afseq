@@ -42,9 +42,9 @@ op_range     = { ".." ~ parameter } // ???
 op = _{ op_weight | op_bjorklund | op_slow | op_fast | op_replicate | op_degrade | op_tail | op_range }
 
 /// groups
-subdivision     = { "[" ~ (stack | choices | section) ~ "]" }
-alternating     = { "<" ~ (stack | section) ~ ">" }
-polymeter       = { "{" ~ (stack | section) ~ "}" ~ polymeter_tail }
+subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
+alternating     = { "<" ~ (stack | section)? ~ ">" }
+polymeter       = { "{" ~ (stack | section)? ~ "}" ~ polymeter_tail }
 polymeter_tail  = { "%" ~  polymeter_count}
 polymeter_count = { (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ !(ASCII_ALPHANUMERIC | "."))}
 
