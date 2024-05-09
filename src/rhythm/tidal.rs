@@ -488,10 +488,7 @@ fn output(step: &mut Step, state: State) -> Events {
     match step {
         Step::Single(s) => {
             Events::Single(SingleEvent {
-                length: match s.value {
-                    StepValue::Hold => 2.0,
-                    _ => 1.0
-                },
+                length: 1.0,
                 span: Span::default(),
                 value: s.value.clone(),
             })
