@@ -25,7 +25,7 @@ rest = { "~" ~ !(ASCII_ALPHANUMERIC) }
 hold = { "_" ~ !(ASCII_ALPHANUMERIC) }
 
 /// arbitrary string identifier type
-name = { (ASCII_ALPHANUMERIC | "_")+ }
+name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 
 /// possible literals for single steps
 single = { hold | rest | number | pitch | name }
