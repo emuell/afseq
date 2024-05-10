@@ -89,12 +89,13 @@ enum Step {
     Polymeter(Polymeter),
     Stack(Stack),
     Choices(Choices),
+    Expression(Expression),
+    Bjorklund(Bjorklund),
 }
 
 #[derive(Clone, Debug, Default)]
 struct Single {
     value: StepValue,
-    target : Option<i16>, // value for instruments
     string: String,
 }
 
@@ -102,8 +103,37 @@ impl Single {
     fn default() -> Self {
         Single {
             value: StepValue::Rest,
-            target: None,
             string: String::from("~")
+        }
+    }
+    fn to_integer(&self) -> Option<i32> {
+        match &self.value {
+            StepValue::Rest => None,
+            StepValue::Hold => None,
+            StepValue::Name(_n) => None,
+            StepValue::Integer(i) => Some(*i),
+            StepValue::Float(f) => Some(*f as i32),
+            StepValue::Pitch(n) => Some(n.note as i32),
+        }
+    }
+    fn to_target(&self) -> Target {
+        match &self.value {
+            StepValue::Rest => Target::None,
+            StepValue::Hold => Target::None,
+            StepValue::Name(n) => Target::Name(n.clone()),
+            StepValue::Integer(i) => Target::Index(*i),
+            StepValue::Float(f) => Target::Index(*f as i32),
+            StepValue::Pitch(n) => Target::Name(self.string.clone()), // TODO might not be the best conversion idea
+        }
+    }
+    fn to_chance(&self) -> Option<f64> {
+        match &self.value {
+            StepValue::Rest => None,
+            StepValue::Hold => None,
+            StepValue::Name(_n) => None,
+            StepValue::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
+            StepValue::Float(f) => Some(f.clamp(0.0, 1.0)),
+            StepValue::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
         }
     }
 }
@@ -136,6 +166,41 @@ struct Stack {
     stack: Vec<Step>,
 }
 
+#[derive(Clone, Debug)]
+enum Operator {
+    Fast(),       // *
+    Target(),     // :
+    Degrade(),    // ?
+    Replicate(),  // !
+    // Weight(),     // @
+    // Slow(),       // /
+}
+impl Operator {
+    fn parse(pair: Pair<Rule>) -> Result<Operator, &str> {
+        match pair.as_rule() {
+            Rule::op_fast => Ok(Operator::Fast()),
+            Rule::op_target => Ok(Operator::Target()),
+            Rule::op_degrade => Ok(Operator::Degrade()),
+            Rule::op_replicate => Ok(Operator::Replicate()),
+            _ => Err("unrecognized operator")
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Expression {
+    operator: Operator,
+    right: Box<Step>,
+    left: Box<Step>,
+}
+
+#[derive(Clone, Debug)]
+struct Bjorklund {
+    left: Box<Step>,
+    steps: Box<Step>,
+    pulses: Box<Step>,
+    rotation: Option<Box<Step>>,
+}
 
 #[derive(Clone, Debug, Default)]
 enum StepValue {
@@ -202,54 +267,61 @@ impl Span {
     }
 }
 
-#[derive(Debug)]
-struct CycleEvent {
-    span: Span,
-    length : f64,
-    value: StepValue,
+#[derive(Clone, Debug, Default)]
+enum Target {
+    #[default] None,
+    Index(i32),
+    Name(String),
 }
 
-impl Display for CycleEvent {
+impl Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "{:.3} -> {:.3} | {:?}",
-            self.span.start, self.span.end, self.value
-        ))
+        match self {
+            Target::None => f.write_fmt(format_args!("")),
+            _ => {
+                f.write_fmt(format_args!(
+                    "{:?}",
+                    self
+                    // self.span.start, self.span.end, self.value
+                ))
+            }
+        }
     }
-} 
+}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct SingleEvent {
     length: f64,
     span: Span,
     value: StepValue,
+    target : Target, // value for instruments
 }
 
 impl Display for SingleEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "{:.3} -> {:.3} | {:?}",
-            self.span.start, self.span.end, self.value
+            "{:.3} -> {:.3} | {:?} {}",
+            self.span.start, self.span.end, self.value, self.target
             // self.span.start, self.span.end, self.value
         ))
     }
 } 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct MultiEvents {
     length: f64,
     span: Span,
     events: Vec<Events>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PolyEvents {
     length: f64,
     span: Span,
     channels: Vec<Events>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Events {
     Single(SingleEvent),
     Multi(MultiEvents),
@@ -257,6 +329,14 @@ enum Events {
 }
 
 impl Events {
+    fn empty() -> Events {
+        Events::Single(SingleEvent{
+            length: 1.0,
+            span: Span::default(),
+            value: StepValue::Rest,
+            target: Target::None
+        })
+    }
     // only applied for Subdivision and Polymeter groups
     fn subdivide_lengths(events: &mut Vec<Events>){
         let mut length = 0.0;
@@ -285,6 +365,26 @@ impl Events {
                     p.length *= step_size;
                     p.span  = Span::new(start, start + p.length);
                     start += p.length
+                }
+            }
+        }
+    }
+    fn mutate_events<F>(&mut self, mut fun: &mut F)
+    where
+        F: FnMut(&mut SingleEvent),
+    {
+        match self {
+            Events::Single(s) => {
+                fun(s);
+            }
+            Events::Multi(m) => {
+                for e in &mut m.events {
+                    e.mutate_events(fun);
+                }
+            }
+            Events::Poly(p) => {
+                for e in &mut p.channels {
+                    e.mutate_events(fun);
                 }
             }
         }
@@ -382,15 +482,29 @@ fn as_polymeter(pair: Pair<Rule>) -> Result<Step, &str> {
     Err("invalid polymeter")
 }
 
+fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
+    let slope = (pulses as f64) / (steps as f64);
+    let mut pattern = vec![];
+    let mut prev = -1.0;
+    for i in 0..steps {
+        let curr = ((i as f64) * slope).floor();
+        pattern.push(curr != prev);
+        prev = curr;
+    }
+    if let Some(rotate) = rotation {
+        pattern.rotate_left(rotate as usize);
+    }
+    pattern
+}
+
 // recursively parse a pair as a Step
-fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
+fn parse_step(pair: Pair<Rule>) -> Result<Step, &str> {
     match pair.as_rule() {
         Rule::single => {
             if let Some(v) = pair.into_inner().next() {
                 Ok(Step::Single(Single {
                     string: v.as_str().to_string(),
                     value: StepValue::parse(v),
-                    target : None,
                 }))
             } else {
                 unreachable!()
@@ -446,7 +560,54 @@ fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
             // using unwrap_section or section_as_steps
             Err("internal error, unexpected branch reached")
         }
-        _ => Err("type not implemented"),
+        Rule::expr => {
+            let mut inner = pair.clone().into_inner();
+            if let Some(left_pair) = inner.next() {
+                let left = parse_step(left_pair)?;
+                if let Some(op) = inner.next() {
+                    match op.as_rule() {
+                        Rule::op_bjorklund => {
+                            let mut op_inner = op.into_inner();
+                            if let Some(pulse_pair) = op_inner.next() {
+                                let pulses = parse_step(pulse_pair)?;
+                                if let Some(steps_pair) = op_inner.next() {
+                                    let steps = parse_step(steps_pair)?;
+                                    let mut rotate = None;
+                                    if let Some(rotate_pair) = op_inner.next() {
+                                        rotate = Some(parse_step(rotate_pair)?);
+                                    }
+                                    return Ok(Step::Bjorklund(Bjorklund{
+                                        left: Box::new(left),
+                                        pulses: Box::new(pulses),
+                                        steps: Box::new(steps),
+                                        rotation: match rotate {
+                                            Some(r) => Some(Box::new(r)),
+                                            None => None
+                                        }
+                                    }))
+                                }
+                            }
+                        }
+                        _ => {
+                            let operator = Operator::parse(op.clone())?;
+                            if let Some(right_pair) = op.into_inner().next() {
+                                let right = parse_step(right_pair)?;
+                                let expr = Step::Expression(Expression {
+                                    left: Box::new(left),
+                                    right: Box::new(right),
+                                    operator,
+                                });
+                                return Ok(expr)
+                            }
+                        }
+                    }
+                }
+            }
+            Err("incomplete expression")
+        }
+        _ => {
+            Err("rule not implemented")
+        }
     }
 }
 
@@ -454,7 +615,7 @@ fn as_step(pair: Pair<Rule>) -> Result<Step, &str> {
 fn section_as_steps(pair: Pair<Rule>) -> Vec<Step> {
     let mut steps = vec![];
     for pair in pair.into_inner() {
-        match as_step(pair) {
+        match parse_step(pair) {
             Ok(s) => steps.push(s),
             Err(s) => println!("{:?}", s),
         }
@@ -467,18 +628,20 @@ fn unwrap_section(pair: Pair<Rule>) -> Vec<Step> {
     if let Some(inner) = pair.into_inner().next() {
         match inner.as_rule() {
             Rule::single => {
-                if let Ok(s) = as_step(inner) {
+                if let Ok(s) = parse_step(inner) {
                     vec![s]
                 } else {
                     vec![]
                 }
             }
-            Rule::section => section_as_steps(inner),
+            Rule::section => {
+                section_as_steps(inner)
+            }
             Rule::choices => {
                 let mut choices: Vec<Step> = vec![];
                 for p in inner.into_inner() {
                     if let Some(step) = p.into_inner().next() {
-                        if let Ok(choice) = as_step(step) {
+                        if let Ok(choice) = parse_step(step) {
                             choices.push(choice)
                         }
                     }
@@ -503,6 +666,7 @@ fn output(step: &mut Step, state: State) -> Events {
         Step::Single(s) => {
             Events::Single(SingleEvent {
                 length: 1.0,
+                target : Target::None,
                 span: Span::default(),
                 value: s.value.clone(),
             })
@@ -585,7 +749,126 @@ fn output(step: &mut Step, state: State) -> Events {
                 })
             }
         }
-        // _ => Events::Single(SingleEvent {length : 1.0, span: Span::default(), value:StepValue::Rest})
+        Step::Expression(e) => {
+            match e.operator {
+                Operator::Fast() => {
+                    let mut events = vec![];
+                    match e.right.as_ref() {
+                        Step::Single(s) => {
+                            if let Some(mult) = s.to_integer(){
+                                for i in 0..mult{
+                                    events.push(output(&mut e.left, state.clone()))
+                                }
+                            }
+                        }
+                        _ => unreachable!()
+                    }
+                    Events::subdivide_lengths(&mut events);
+                    Events::Multi(MultiEvents {
+                        span: Span::default(),
+                        length: 1.0,
+                        events,
+                    })
+                }
+                Operator::Target() => {
+                    let mut out = output(e.left.as_mut(), state.clone());
+                    match e.right.as_ref() {
+                        Step::Single(s) => {
+                            out.mutate_events(&mut |e| 
+                                e.target = s.to_target()
+                            )
+                        }
+                        _ => unreachable!()
+                    }
+                    out
+                }
+                Operator::Degrade() => {
+                    let mut out = output(e.left.as_mut(), state.clone());
+                    match e.right.as_ref() {
+                        Step::Single(s) => {
+                            out.mutate_events(&mut |e : &mut SingleEvent|
+                                if let Some(chance) = s.to_chance(){
+                                    // TODO move this outside
+                                    let seed = state.seed.unwrap_or_else(|| thread_rng().gen());
+                                    let mut rng = Xoshiro256PlusPlus::from_seed(seed);
+                                    let random = rng.gen_range(0.0..1.0);
+                                    if chance < random {
+                                        e.value = StepValue::Rest
+                                    }
+                                }
+                            )
+                        }
+                        _ => unreachable!()
+                    }
+                    out
+                }
+                Operator::Replicate() => {
+                    let mut events = vec![];
+                    match e.right.as_ref() {
+                        Step::Single(s) => {
+                            if let Some(mult) = s.to_integer(){
+                                let out = output(&mut e.left, state.clone());
+                                for _i in 0..mult{
+                                    events.push(out.clone())
+                                }
+                            }
+                        }
+                        _ => unreachable!()
+                    }
+                    Events::subdivide_lengths(&mut events);
+                    Events::Multi(MultiEvents {
+                        span: Span::default(),
+                        length: 1.0,
+                        events,
+                    })
+                }
+            }
+        }
+        Step::Bjorklund(b) => {
+            let mut events = vec![];
+            match b.pulses.as_ref() {
+                Step::Single(pulses_single) => {
+                    match b.steps.as_ref(){
+                        Step::Single(steps_single) => {
+                            let rotation = match &b.rotation {
+                                Some(r) => match r.as_ref() {
+                                    Step::Single(rotation_single) => {
+                                        if let Some(r) = rotation_single.to_integer() {
+                                            Some(r)
+                                        }else{
+                                            None
+                                        }
+                                    }
+                                    _ => unreachable!()
+                                }
+                                None => None
+                            };
+                            if let Some(pulses) = pulses_single.to_integer() {
+                                if let Some(steps) = steps_single.to_integer(){
+                                    let out = output(&mut b.left, state.clone());
+                                    for pulse in bjorklund_pattern(pulses, steps, rotation) {
+                                        if pulse {
+                                            events.push(out.clone())
+                                        }else{
+                                            events.push(Events::empty())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => unreachable!()
+                    }
+                }
+                _ => unreachable!()
+            }
+            Events::subdivide_lengths(&mut events);
+            Events::Multi(MultiEvents {
+                span: Span::default(),
+                length: 1.0,
+                events,
+            })
+        }
+        // _ => Events::Single(SingleEvent::default())
     }
 }
 
@@ -618,6 +901,18 @@ fn crawl_step(step: &mut Step, fun: fn(&mut Step, usize), level: usize) {
                 crawl_step(s, fun, level + 1)
             }
         }
+        Step::Expression(e) => {
+            crawl_step(e.left.as_mut(), fun, level + 1);
+            crawl_step(e.right.as_mut(), fun, level + 1)
+        }
+        Step::Bjorklund(b) => {
+            crawl_step(b.left.as_mut(), fun, level + 1);
+            crawl_step(b.steps.as_mut(), fun, level + 1);
+            crawl_step(b.pulses.as_mut(), fun, level + 1);
+            if let Some(rotation) = b.rotation.as_mut() {
+                crawl_step(rotation, fun, level + 1);
+            }
+        }
     }
 }
 
@@ -636,7 +931,7 @@ fn reset_step(step: &mut Step, _level: usize) {
 // parse the root pair of the pest AST into a Subdivision
 // then update the spans of all the generated steps
 fn parse_tree(tree: &Pair<Rule>) -> Result<Step, String> {
-    let mut cycle = as_step(tree.clone())?;
+    let mut cycle = parse_step(tree.clone())?;
     // update_span(&mut cycle, &Span::default());
     Ok(cycle)
 }
@@ -672,6 +967,8 @@ mod test {
             Step::Polymeter(pm) => format!("{} {{{}}}", "Polymeter", pm.steps.len()),
             Step::Choices(cs) => format!("{} |{}|", "Choices", cs.choices.len()),
             Step::Stack(st) => format!("{} ({})", "Stack", st.stack.len()),
+            Step::Expression(e) => format!("Expression {:?}", e.operator),
+            Step::Bjorklund(b) => format!("Bjorklund {}", ""),
         };
         println!("{} {}", indent_lines(level), name);
     }
@@ -728,7 +1025,7 @@ mod test {
                         crawl_step(&mut step, print_steps, 0);
                         let stateful_chars = ['<', '{', '|'];
                         let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
-                            8
+                            5
                         } else {
                             1
                         };

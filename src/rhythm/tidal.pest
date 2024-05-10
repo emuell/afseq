@@ -31,15 +31,15 @@ name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 single = { hold | rest | number | pitch | name }
 
 /// operators
-op_weight    = @{ ("@") ~ parameter }
-op_replicate = @{ "!" }
-op_bjorklund = @{ "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
-op_slow      = @{ "/" ~ parameter }
-op_fast      = @{ "*" ~ parameter }
-op_degrade   = @{ "?" ~ parameter }
-op_tail      = @{ ":" ~ parameter }
-op_range     = { ".." ~ parameter } // ???
-op = _{ op_weight | op_bjorklund | op_slow | op_fast | op_replicate | op_degrade | op_tail | op_range }
+op_fast      = ${ "*" ~ parameter }
+op_target    = ${ ":" ~ parameter }
+op_degrade   = ${ "?" ~ parameter }
+op_replicate = ${ "!" ~ parameter }
+op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
+// op_weight    = ${ ("@") ~ parameter }
+// op_slow      = ${ "/" ~ parameter }
+// op_range     = { ".." ~ parameter } // ???
+op = _{ op_fast | op_target | op_degrade | op_replicate | op_bjorklund }
 
 /// groups
 subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
@@ -50,9 +50,9 @@ polymeter_count = { (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ !(ASCII_ALPHANUMERIC |
 
 group     = _{ subdivision | alternating | polymeter }
 
-// this should actually be { expr | group | number } at some point
+// this should actually be { expr | group | single } at some point
 /// parameter for expressions with operators
-parameter = _{ number }
+parameter = _{ single }
 
 expr      = { (single | group) ~ op+ }
 
