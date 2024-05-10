@@ -65,7 +65,7 @@ impl Pitch {
         if pitch.note == 0 && mark == -1 {
             if pitch.octave > 0 {
                 pitch.octave -= 1;
-                pitch.note = (11 as u8);
+                pitch.note = 11 as u8;
             }
         }else if pitch.note == 11 && mark == 1{
             if pitch.octave < 10 {
@@ -123,7 +123,7 @@ impl Single {
             StepValue::Name(n) => Target::Name(n.clone()),
             StepValue::Integer(i) => Target::Index(*i),
             StepValue::Float(f) => Target::Index(*f as i32),
-            StepValue::Pitch(n) => Target::Name(self.string.clone()), // TODO might not be the best conversion idea
+            StepValue::Pitch(_n) => Target::Name(self.string.clone()), // TODO might not be the best conversion idea
         }
     }
     fn to_chance(&self) -> Option<f64> {
@@ -369,7 +369,7 @@ impl Events {
             }
         }
     }
-    fn mutate_events<F>(&mut self, mut fun: &mut F)
+    fn mutate_events<F>(&mut self, fun: &mut F)
     where
         F: FnMut(&mut SingleEvent),
     {
@@ -756,7 +756,7 @@ fn output(step: &mut Step, state: State) -> Events {
                     match e.right.as_ref() {
                         Step::Single(s) => {
                             if let Some(mult) = s.to_integer(){
-                                for i in 0..mult{
+                                for _i in 0..mult{
                                     events.push(output(&mut e.left, state.clone()))
                                 }
                             }
@@ -931,7 +931,7 @@ fn reset_step(step: &mut Step, _level: usize) {
 // parse the root pair of the pest AST into a Subdivision
 // then update the spans of all the generated steps
 fn parse_tree(tree: &Pair<Rule>) -> Result<Step, String> {
-    let mut cycle = parse_step(tree.clone())?;
+    let cycle = parse_step(tree.clone())?;
     // update_span(&mut cycle, &Span::default());
     Ok(cycle)
 }
@@ -968,7 +968,7 @@ mod test {
             Step::Choices(cs) => format!("{} |{}|", "Choices", cs.choices.len()),
             Step::Stack(st) => format!("{} ({})", "Stack", st.stack.len()),
             Step::Expression(e) => format!("Expression {:?}", e.operator),
-            Step::Bjorklund(b) => format!("Bjorklund {}", ""),
+            Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };
         println!("{} {}", indent_lines(level), name);
     }
