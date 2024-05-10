@@ -21,12 +21,12 @@ struct State {
 
 #[derive(Clone, Debug)]
 struct Pitch {
-    note: i16,
+    note: u8,
     octave: u8,
 }
 
 impl Pitch {
-    fn as_note_value(note: char) -> Option<i16> {
+    fn as_note_value(note: char) -> Option<u8> {
         match note {
             'c' => Some(0),
             'd' => Some(2),
@@ -41,9 +41,10 @@ impl Pitch {
 
     fn parse(pair: Pair<Rule>) -> Pitch {
         let mut pitch = Pitch {
-            note: 60,
+            note: 0,
             octave: 4,
         };
+        let mut mark: i8 = 0;
         for p in pair.into_inner() {
             match p.as_rule() {
                 Rule::note => {
@@ -53,15 +54,28 @@ impl Pitch {
                 }
                 Rule::octave => pitch.octave = p.as_str().parse::<u8>().unwrap_or(pitch.octave),
                 Rule::mark => match p.as_str() {
-                    "#" => pitch.note += 1,
-                    "b" => pitch.note -= 1,
+                    "#" => mark = 1,
+                    "b" => mark = -1,
                     _ => (),
                 },
                 _ => (),
             }
         }
         // maybe an error should be thrown instead of a silent clamp
-        pitch.note = pitch.note.clamp(0, 127);
+        if pitch.note == 0 && mark == -1 {
+            if pitch.octave > 0 {
+                pitch.octave -= 1;
+                pitch.note = (11 as u8);
+            }
+        }else if pitch.note == 11 && mark == 1{
+            if pitch.octave < 10 {
+                pitch.note = 0;
+                pitch.octave += 1;
+            }
+        }else{
+            pitch.note = ((pitch.note as i8) + mark) as u8;
+        }
+        // pitch.note = pitch.note.clamp(0, 127);
         pitch
     }
 
