@@ -1023,7 +1023,7 @@ mod test {
                     Ok(mut step) => {
                         println!("\nCYCLE");
                         crawl_step(&mut step, print_steps, 0);
-                        let stateful_chars = ['<', '{', '|'];
+                        let stateful_chars = ['<', '{', '|', '?'];
                         let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
                             5
                         } else {
@@ -1085,7 +1085,12 @@ mod test {
         parse_with_debug("1 [2 [3 [4 [5 [6 [7 [8 [9 10]]]]]]]]");
         parse_with_debug("1 [2 <[3 4] <5 [6 7] [6 _ 7] [8 9 10]>>]");
         parse_with_debug("[1 2] [3 4, 5 6]");
-        // parse_with_debug("1 2, 3 4");
-        
+        parse_with_debug("a*2 b c");
+        parse_with_debug("a b c [d e]*4");
+        parse_with_debug("a:1 b:2 c:3 [d e f g]:4");
+        parse_with_debug("[a b c d]?0.5");
+        parse_with_debug("a b!2 c!3 d!4 [1 2 3 4]!5");
+        parse_with_debug("a(6,8)");
+        parse_with_debug("[a b](3,8)");
     }
 }
