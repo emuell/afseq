@@ -30,10 +30,7 @@ impl Pitch {
     }
 
     fn parse(pair: Pair<Rule>) -> Pitch {
-        let mut pitch = Pitch {
-            note: 0,
-            octave: 4,
-        };
+        let mut pitch = Pitch { note: 0, octave: 4 };
         let mut mark: i8 = 0;
         for p in pair.into_inner() {
             match p.as_rule() {
@@ -57,18 +54,17 @@ impl Pitch {
                 pitch.octave -= 1;
                 pitch.note = 11 as u8;
             }
-        }else if pitch.note == 11 && mark == 1{
+        } else if pitch.note == 11 && mark == 1 {
             if pitch.octave < 10 {
                 pitch.note = 0;
                 pitch.octave += 1;
             }
-        }else{
+        } else {
             pitch.note = ((pitch.note as i8) + mark) as u8;
         }
         // pitch.note = pitch.note.clamp(0, 127);
         pitch
     }
-
 }
 
 #[derive(Clone, Debug)]
@@ -89,12 +85,9 @@ impl Step {
             Some(pair) => {
                 let string = pair.as_str().to_string();
                 let value = StepValue::parse(pair)?;
-                Ok(Step::Single(Single{
-                    string,
-                    value,
-                }))
+                Ok(Step::Single(Single { string, value }))
             }
-            None => Err("empty single".to_string())
+            None => Err("empty single".to_string()),
         }
     }
 }
@@ -109,7 +102,7 @@ impl Single {
     fn default() -> Self {
         Single {
             value: StepValue::Rest,
-            string: String::from("~")
+            string: String::from("~"),
         }
     }
     fn to_integer(&self) -> Option<i32> {
@@ -174,12 +167,12 @@ struct Stack {
 
 #[derive(Clone, Debug)]
 enum Operator {
-    Fast(),       // *
-    Target(),     // :
-    Degrade(),    // ?
-    Replicate(),  // !
-    // Weight(),     // @
-    // Slow(),       // /
+    Fast(),    // *
+    Target(),  // :
+    Degrade(), // ?
+    Replicate(), // !
+               // Weight(),     // @
+               // Slow(),       // /
 }
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Operator, String> {
@@ -188,7 +181,7 @@ impl Operator {
             Rule::op_target => Ok(Operator::Target()),
             Rule::op_degrade => Ok(Operator::Degrade()),
             Rule::op_replicate => Ok(Operator::Replicate()),
-            _ => Err(format!("unsupported operator: {:?}", pair.as_rule()))
+            _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
         }
     }
 }
@@ -210,7 +203,8 @@ struct Bjorklund {
 
 #[derive(Clone, Debug, Default)]
 enum StepValue {
-    #[default] Rest,
+    #[default]
+    Rest,
     Hold,
     Float(f64),
     Integer(i32),
@@ -227,9 +221,15 @@ impl StepValue {
             Rule::number => {
                 if let Some(n) = pair.into_inner().next() {
                     match n.as_rule() {
-                        Rule::integer => Ok(StepValue::Integer(n.as_str().parse::<i32>().unwrap_or(0))),
-                        Rule::float => Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
-                        Rule::normal => Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
+                        Rule::integer => {
+                            Ok(StepValue::Integer(n.as_str().parse::<i32>().unwrap_or(0)))
+                        }
+                        Rule::float => {
+                            Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
+                        }
+                        Rule::normal => {
+                            Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
+                        }
                         _ => Err(format!("unrecognized number\n{:?}", n)),
                     }
                 } else {
@@ -264,9 +264,9 @@ impl Span {
         self.end - self.start
     }
     fn default() -> Self {
-        Span{
-            start : 0.0,
-            end : 1.0
+        Span {
+            start: 0.0,
+            end: 1.0,
         }
     }
     fn new(start: f64, end: f64) -> Self {
@@ -276,7 +276,8 @@ impl Span {
 
 #[derive(Clone, Debug, Default)]
 enum Target {
-    #[default] None,
+    #[default]
+    None,
     Index(i32),
     Name(String),
 }
@@ -288,8 +289,7 @@ impl Display for Target {
             _ => {
                 f.write_fmt(format_args!(
                     "{:?}",
-                    self
-                    // self.span.start, self.span.end, self.value
+                    self // self.span.start, self.span.end, self.value
                 ))
             }
         }
@@ -301,18 +301,20 @@ struct SingleEvent {
     length: f64,
     span: Span,
     value: StepValue,
-    target : Target, // value for instruments
+    target: Target, // value for instruments
 }
 
 impl Display for SingleEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "{:.3} -> {:.3} | {:?} {}",
-            self.span.start, self.span.end, self.value, self.target
-            // self.span.start, self.span.end, self.value
+            self.span.start,
+            self.span.end,
+            self.value,
+            self.target // self.span.start, self.span.end, self.value
         ))
     }
-} 
+}
 
 #[derive(Debug, Clone)]
 struct MultiEvents {
@@ -337,15 +339,15 @@ enum Events {
 
 impl Events {
     fn empty() -> Events {
-        Events::Single(SingleEvent{
+        Events::Single(SingleEvent {
             length: 1.0,
             span: Span::default(),
             value: StepValue::Rest,
-            target: Target::None
+            target: Target::None,
         })
     }
     // only applied for Subdivision and Polymeter groups
-    fn subdivide_lengths(events: &mut Vec<Events>){
+    fn subdivide_lengths(events: &mut Vec<Events>) {
         let mut length = 0.0;
         for e in &mut *events {
             match e {
@@ -360,17 +362,17 @@ impl Events {
             match e {
                 Events::Single(s) => {
                     s.length *= step_size;
-                    s.span  = Span::new(start, start + s.length);
+                    s.span = Span::new(start, start + s.length);
                     start += s.length
                 }
                 Events::Multi(m) => {
                     m.length *= step_size;
-                    m.span  = Span::new(start, start + m.length);
+                    m.span = Span::new(start, start + m.length);
                     start += m.length
                 }
                 Events::Poly(p) => {
                     p.length *= step_size;
-                    p.span  = Span::new(start, start + p.length);
+                    p.span = Span::new(start, start + p.length);
                     start += p.length
                 }
             }
@@ -396,14 +398,12 @@ impl Events {
             }
         }
     }
-    fn flatten(&self, channels: &mut Vec<Vec<SingleEvent>>, channel: usize){
+    fn flatten(&self, channels: &mut Vec<Vec<SingleEvent>>, channel: usize) {
         if channels.len() <= channel {
             channels.push(vec![])
         }
         match self {
-            Events::Single(s) => {
-                channels[channel].push(s.clone())
-            }
+            Events::Single(s) => channels[channel].push(s.clone()),
             Events::Multi(m) => {
                 for e in &m.events {
                     e.flatten(channels, channel);
@@ -428,7 +428,6 @@ pub struct Cycle {
 }
 
 impl Cycle {
-
     // stacks can only appear inside groups like Subdivision, Alternating or Polymeter
     // they will have a stack of steps with their parent's type inside
     fn parse_stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Result<Step, String> {
@@ -444,24 +443,22 @@ impl Cycle {
             _ => return Err(format!("invalid parent to stack\n{:?}", parent)),
         }
 
-        let mut stack = Stack {
-            stack: vec![]
-        };
+        let mut stack = Stack { stack: vec![] };
 
         match parent.as_rule() {
             Rule::alternating => {
                 for c in channels {
                     stack.stack.push(Step::Alternating(Alternating {
                         current: 0,
-                        steps: c
+                        steps: c,
                     }))
                 }
             }
             Rule::subdivision | Rule::mini => {
                 for c in channels {
-                    stack.stack.push(Step::Subdivision(Subdivision {
-                        steps: c
-                    }))
+                    stack
+                        .stack
+                        .push(Step::Subdivision(Subdivision { steps: c }))
                 }
             }
             Rule::polymeter => {
@@ -478,7 +475,6 @@ impl Cycle {
         }
         Ok(Step::Stack(stack))
     }
-
 
     fn parse_polymeter_count(pair: &Pair<Rule>) -> Result<usize, String> {
         for p in pair.clone().into_inner() {
@@ -543,40 +539,31 @@ impl Cycle {
                     let single = Step::parse_single(inner)?;
                     Ok(vec![single])
                 }
-                Rule::section => {
-                    Cycle::parse_section(inner)
-                }
+                Rule::section => Cycle::parse_section(inner),
                 Rule::choices => {
                     let mut choices: Vec<Step> = vec![];
                     for p in inner.clone().into_inner() {
                         if let Some(step) = p.into_inner().next() {
                             let choice = Cycle::parse_step(step)?;
                             choices.push(choice)
-                        }else{
-                            return Err(format!("empty choice\n{:?}", inner))
+                        } else {
+                            return Err(format!("empty choice\n{:?}", inner));
                         }
                     }
-                    Ok(vec![Step::Choices(Choices {
-                        choices,
-                    })])
+                    Ok(vec![Step::Choices(Choices { choices })])
                 }
-                _ => {
-                    Err(format!("unexpected rule in section\n{:?}", inner))
-                }
+                _ => Err(format!("unexpected rule in section\n{:?}", inner)),
             }
         } else {
             Err("empty section".to_string())
         }
     }
 
-
     // recursively parse a pair as a Step
     // errors here should be unreachable unless there is a bug in the pest grammar
     fn parse_step(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.as_rule() {
-            Rule::single => {
-                Step::parse_single(pair)
-            }
+            Rule::single => Step::parse_single(pair),
             Rule::subdivision | Rule::mini => {
                 if let Some(first) = pair.clone().into_inner().next() {
                     match first.as_rule() {
@@ -633,39 +620,41 @@ impl Cycle {
                         let left = Cycle::parse_step(left_pair)?;
                         match inner.next() {
                             None => Err(format!("incomplete expression\n{:?}", pair)),
-                            Some(op) => {
-                                match op.as_rule() {
-                                    Rule::op_bjorklund => {
-                                        let mut op_inner = op.into_inner();
-                                        if let Some(pulse_pair) = op_inner.next() {
-                                            let pulses = Cycle::parse_step(pulse_pair)?;
-                                            if let Some(steps_pair) = op_inner.next() {
-                                                let steps = Cycle::parse_step(steps_pair)?;
-                                                let mut rotate = None;
-                                                if let Some(rotate_pair) = op_inner.next() {
-                                                    rotate = Some(Cycle::parse_step(rotate_pair)?);
-                                                }
-                                                return Ok(Step::Bjorklund(Bjorklund{
-                                                    left: Box::new(left),
-                                                    pulses: Box::new(pulses),
-                                                    steps: Box::new(steps),
-                                                    rotation: match rotate {
-                                                        Some(r) => Some(Box::new(r)),
-                                                        None => None
-                                                    }
-                                                }))
+                            Some(op) => match op.as_rule() {
+                                Rule::op_bjorklund => {
+                                    let mut op_inner = op.into_inner();
+                                    if let Some(pulse_pair) = op_inner.next() {
+                                        let pulses = Cycle::parse_step(pulse_pair)?;
+                                        if let Some(steps_pair) = op_inner.next() {
+                                            let steps = Cycle::parse_step(steps_pair)?;
+                                            let mut rotate = None;
+                                            if let Some(rotate_pair) = op_inner.next() {
+                                                rotate = Some(Cycle::parse_step(rotate_pair)?);
                                             }
+                                            return Ok(Step::Bjorklund(Bjorklund {
+                                                left: Box::new(left),
+                                                pulses: Box::new(pulses),
+                                                steps: Box::new(steps),
+                                                rotation: match rotate {
+                                                    Some(r) => Some(Box::new(r)),
+                                                    None => None,
+                                                },
+                                            }));
                                         }
-                                        return Err(format!("invalid bjorklund\n{:?}", pair))
                                     }
-                                    _ => {
-                                        let operator = Operator::parse(op.clone())?;
-                                        let mut inner = op.into_inner();
-                                        match inner.next() {
-                                            None => Err(format!("missing right hand side in expression\n{:?}", inner)),
-                                            Some(right_pair) => {
-                                                let right = Cycle::parse_step(right_pair)?;
-                                                match right {
+                                    return Err(format!("invalid bjorklund\n{:?}", pair));
+                                }
+                                _ => {
+                                    let operator = Operator::parse(op.clone())?;
+                                    let mut inner = op.into_inner();
+                                    match inner.next() {
+                                        None => Err(format!(
+                                            "missing right hand side in expression\n{:?}",
+                                            inner
+                                        )),
+                                        Some(right_pair) => {
+                                            let right = Cycle::parse_step(right_pair)?;
+                                            match right {
                                                     Step::Single(_) =>{
                                                         let expr = Step::Expression(Expression {
                                                             left: Box::new(left),
@@ -676,18 +665,15 @@ impl Cycle {
                                                     }
                                                     _ => Err("only single values are supported on the right hand side".to_string())
                                                 }
-                                            }
                                         }
                                     }
                                 }
-                            }
+                            },
                         }
                     }
                 }
             }
-            _ => {
-                Err(format!("rule not implemented\n{:?}", pair))
-            }
+            _ => Err(format!("rule not implemented\n{:?}", pair)),
         }
     }
 
@@ -751,14 +737,12 @@ impl Cycle {
     // recursively output events for the entire cycle based on some state (random seed)
     fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus) -> Events {
         match step {
-            Step::Single(s) => {
-                Events::Single(SingleEvent {
-                    length: 1.0,
-                    target : Target::None,
-                    span: Span::default(),
-                    value: s.value.clone(),
-                })
-            }
+            Step::Single(s) => Events::Single(SingleEvent {
+                length: 1.0,
+                target: Target::None,
+                span: Span::default(),
+                value: s.value.clone(),
+            }),
             Step::Subdivision(sd) => {
                 if sd.steps.len() == 0 {
                     Events::empty()
@@ -771,10 +755,10 @@ impl Cycle {
                     }
                     // only applied for Subdivision and Polymeter groups
                     Events::subdivide_lengths(&mut events);
-                    Events::Multi(MultiEvents{
+                    Events::Multi(MultiEvents {
                         span: Span::default(),
                         length: 1.0,
-                        events
+                        events,
                     })
                 }
             }
@@ -802,20 +786,20 @@ impl Cycle {
                     let mut events = vec![];
                     let length = pm.steps.len();
                     let offset = pm.offset;
-                    
+
                     for i in 0..pm.count {
                         events.push(Cycle::output(
                             &mut pm.steps[(offset + i) % length].clone(),
-                            rng
+                            rng,
                         ))
                     }
                     pm.offset += pm.count;
                     // only applied for Subdivision and Polymeter groups
                     Events::subdivide_lengths(&mut events);
-                    Events::Multi(MultiEvents{
+                    Events::Multi(MultiEvents {
                         span: Span::default(),
                         length: 1.0,
-                        events
+                        events,
                     })
                 }
             }
@@ -827,10 +811,10 @@ impl Cycle {
                     for s in &mut st.stack {
                         channels.push(Cycle::output(s, rng))
                     }
-                    Events::Poly(PolyEvents{
+                    Events::Poly(PolyEvents {
                         span: Span::default(),
-                        length:1.0,
-                        channels
+                        length: 1.0,
+                        channels,
                     })
                 }
             }
@@ -840,13 +824,13 @@ impl Cycle {
                         let mut events = vec![];
                         match e.right.as_ref() {
                             Step::Single(s) => {
-                                if let Some(mult) = s.to_integer(){
-                                    for _i in 0..mult{
+                                if let Some(mult) = s.to_integer() {
+                                    for _i in 0..mult {
                                         events.push(Cycle::output(&mut e.left, rng))
                                     }
                                 }
                             }
-                            _ => () // TODO support something other than Step::Single as the right hand side
+                            _ => (), // TODO support something other than Step::Single as the right hand side
                         }
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
@@ -858,28 +842,22 @@ impl Cycle {
                     Operator::Target() => {
                         let mut out = Cycle::output(e.left.as_mut(), rng);
                         match e.right.as_ref() {
-                            Step::Single(s) => {
-                                out.mutate_events(&mut |e| 
-                                    e.target = s.to_target()
-                                )
-                            }
-                            _ => () // TODO support something other than Step::Single as the right hand side
+                            Step::Single(s) => out.mutate_events(&mut |e| e.target = s.to_target()),
+                            _ => (), // TODO support something other than Step::Single as the right hand side
                         }
                         out
                     }
                     Operator::Degrade() => {
                         let mut out = Cycle::output(e.left.as_mut(), rng);
                         match e.right.as_ref() {
-                            Step::Single(s) => {
-                                out.mutate_events(&mut |e : &mut SingleEvent|
-                                    if let Some(chance) = s.to_chance(){
-                                        if chance < rng.gen_range(0.0..1.0) {
-                                            e.value = StepValue::Rest
-                                        }
+                            Step::Single(s) => out.mutate_events(&mut |e: &mut SingleEvent| {
+                                if let Some(chance) = s.to_chance() {
+                                    if chance < rng.gen_range(0.0..1.0) {
+                                        e.value = StepValue::Rest
                                     }
-                                )
-                            }
-                            _ => () // TODO support something other than Step::Single as the right hand side
+                                }
+                            }),
+                            _ => (), // TODO support something other than Step::Single as the right hand side
                         }
                         out
                     }
@@ -887,14 +865,14 @@ impl Cycle {
                         let mut events = vec![];
                         match e.right.as_ref() {
                             Step::Single(s) => {
-                                if let Some(mult) = s.to_integer(){
+                                if let Some(mult) = s.to_integer() {
                                     let out = Cycle::output(&mut e.left, rng);
-                                    for _i in 0..mult{
+                                    for _i in 0..mult {
                                         events.push(out.clone())
                                     }
                                 }
                             }
-                            _ => () // TODO support something other than Step::Single as the right hand side
+                            _ => (), // TODO support something other than Step::Single as the right hand side
                         }
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
@@ -909,38 +887,40 @@ impl Cycle {
                 let mut events = vec![];
                 match b.pulses.as_ref() {
                     Step::Single(pulses_single) => {
-                        match b.steps.as_ref(){
+                        match b.steps.as_ref() {
                             Step::Single(steps_single) => {
                                 let rotation = match &b.rotation {
                                     Some(r) => match r.as_ref() {
                                         Step::Single(rotation_single) => {
                                             if let Some(r) = rotation_single.to_integer() {
                                                 Some(r)
-                                            }else{
+                                            } else {
                                                 None
                                             }
                                         }
-                                        _ => None // TODO support something other than Step::Single as rotation
-                                    }
-                                    None => None
+                                        _ => None, // TODO support something other than Step::Single as rotation
+                                    },
+                                    None => None,
                                 };
                                 if let Some(pulses) = pulses_single.to_integer() {
-                                    if let Some(steps) = steps_single.to_integer(){
+                                    if let Some(steps) = steps_single.to_integer() {
                                         let out = Cycle::output(&mut b.left, rng);
-                                        for pulse in Cycle::bjorklund_pattern(pulses, steps, rotation) {
+                                        for pulse in
+                                            Cycle::bjorklund_pattern(pulses, steps, rotation)
+                                        {
                                             if pulse {
                                                 events.push(out.clone())
-                                            }else{
+                                            } else {
                                                 events.push(Events::empty())
                                             }
                                         }
                                     }
                                 }
                             }
-                            _ => () // TODO support something other than Step::Single as steps
+                            _ => (), // TODO support something other than Step::Single as steps
                         }
                     }
-                    _ => () // TODO support something other than Step::Single as pulses
+                    _ => (), // TODO support something other than Step::Single as pulses
                 }
                 Events::subdivide_lengths(&mut events);
                 Events::Multi(MultiEvents {
@@ -948,8 +928,7 @@ impl Cycle {
                     length: 1.0,
                     events,
                 })
-            }
-            // _ => Events::Single(SingleEvent::default())
+            } // _ => Events::Single(SingleEvent::default())
         }
     }
 
@@ -986,7 +965,7 @@ impl Cycle {
 
     // parse the root pair of the pest AST into a Subdivision
     // then update the spans of all the generated steps
-    fn generate(cycle: &mut Cycle) -> Vec<Vec<SingleEvent>>{
+    fn generate(cycle: &mut Cycle) -> Vec<Vec<SingleEvent>> {
         let mut events = Cycle::output(&mut cycle.root, &mut cycle.rng);
         Cycle::transform_spans(&mut events, &Span::default());
         // println!("{:#?}", events);
@@ -1004,15 +983,12 @@ impl Cycle {
                     let root = Cycle::parse_step(mini)?;
                     let seed = seed.unwrap_or_else(|| thread_rng().gen());
                     let rng = Xoshiro256PlusPlus::from_seed(seed);
-                    Ok(Self {
-                        root,
-                        rng,
-                    })
-                }else{
+                    Ok(Self { root, rng })
+                } else {
                     Err("couldn't parse input".to_string())
                 }
             }
-            Err(err) => Err(format!("{}", err))
+            Err(err) => Err(format!("{}", err)),
         }
     }
 
@@ -1054,10 +1030,9 @@ impl Cycle {
     }
 
     // TODO impl Display for Cycle
-    fn print(&mut self){
+    fn print(&mut self) {
         Cycle::crawl(&mut self.root, Cycle::print_steps, 0);
     }
-    
 }
 
 #[derive(Clone)]
@@ -1069,7 +1044,7 @@ struct State {
 mod test {
     use super::*;
 
-    fn parse_with_debug(input: &str){
+    fn parse_with_debug(input: &str) {
         println!("\n{}", "=".repeat(42));
         println!("\nINPUT\n {:?}", input);
         match Cycle::from(input, None) {
@@ -1099,15 +1074,13 @@ mod test {
                             i += 1
                         }
                         ci += 1
-
                     }
                     // cycle.reset();
                 }
             }
-            Err(err) => println!("{}", err)
+            Err(err) => println!("{}", err),
         }
     }
-
 
     #[test]
     pub fn test_tidal() {
