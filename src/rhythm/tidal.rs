@@ -458,6 +458,7 @@ impl Events {
 #[grammar = "rhythm/tidal.pest"]
 pub struct Cycle {
     root: Step,
+    iteration: u32,
     rng: Xoshiro256PlusPlus,
 }
 
@@ -994,6 +995,7 @@ impl Cycle {
 
     // reset all the stateful steps like Alternating and Polymeter to their starting state
     fn reset(&mut self) {
+        self.iteration = 0;
         Cycle::crawl(&mut self.root, Cycle::reset_step, 0)
     }
 
@@ -1005,8 +1007,8 @@ impl Cycle {
         let mut channels = vec![];
         events.flatten(&mut channels, 0);
 
-        // TODO comment this out, it's just for test debugging
-        println!("\n{}", "OUTPUT");
+        // this is just for test debugging
+        println!("\n{} {}", "OUTPUT", self.iteration);
         let mut ci = 0;
         let channel_count = channels.len();
         for channel in &mut channels {
@@ -1021,6 +1023,7 @@ impl Cycle {
             ci += 1
         }
 
+        self.iteration += 1;
         channels
     }
 
@@ -1033,7 +1036,8 @@ impl Cycle {
                     let root = Cycle::parse_step(mini)?;
                     let seed = seed.unwrap_or_else(|| thread_rng().gen());
                     let rng = Xoshiro256PlusPlus::from_seed(seed);
-                    let mut cycle = Self { root, rng };
+                    let iteration = 0;
+                    let mut cycle = Self { root, rng, iteration };
                     println!("\nCYCLE");
                     cycle.print();
                     Ok(cycle)
