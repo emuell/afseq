@@ -240,7 +240,7 @@ impl StepValue {
             Rule::rest => Ok(StepValue::Rest),
             Rule::pitch => Ok(StepValue::Pitch(Pitch::parse(pair))),
             Rule::name => Ok(StepValue::Name(pair.as_str().to_string())),
-            _ => Err(format!("unrecognized pair\n{:?}", pair)),
+            _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
         }
     }
 }
@@ -561,7 +561,7 @@ impl Cycle {
                     })])
                 }
                 _ => {
-                    Err(format!("unexpected rule in section{:?}", inner))
+                    Err(format!("unexpected rule in section\n{:?}", inner))
                 }
             }
         } else {
