@@ -1122,42 +1122,50 @@ struct State {
 mod test {
     use super::*;
 
-    fn parse_with_debug(input: &str) {
-        println!("\n{}", "=".repeat(42));
-        println!("\nINPUT\n {:?}", input);
-        match Cycle::from(input, None) {
-            Ok(mut cycle) => {
-                println!("\nCYCLE");
-                cycle.print();
+    // fn parse_with_debug(input: &str) {
+    //     println!("\n{}", "=".repeat(42));
+    //     println!("\nINPUT\n {:?}", input);
+    //     match Cycle::from(input, None) {
+    //         Ok(mut cycle) => {
+    //             // println!("\nCYCLE");
+    //             // cycle.print();
 
-                let stateful_chars = ['<', '{', '|', '?'];
-                let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
-                    5
-                } else {
-                    1
-                };
-                println!("\nOUTPUT");
-                for i in 0..repeats {
-                    println!(" {}", i);
-                    let mut channels = cycle.generate();
-                    let mut ci = 0;
-                    let channel_count = channels.len();
-                    for channel in &mut channels {
-                        if channel_count > 1 {
-                            println!(" /{}", ci);
-                        }
-                        let mut i = 0;
-                        for event in channel {
-                            println!("  │{:02}│ {}", i, event);
-                            i += 1
-                        }
-                        ci += 1
-                    }
-                    // cycle.reset();
-                }
-            }
-            Err(err) => println!("{}", err),
+    //             let stateful_chars = ['<', '{', '|', '?'];
+    //             let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
+    //                 5
+    //             } else {
+    //                 1
+    //             };
+    //             println!("\nOUTPUT");
+    //             for i in 0..repeats {
+    //             //     println!(" {}", i);
+    //                 let mut channels = cycle.generate();
+    //             //     let mut ci = 0;
+    //             //     let channel_count = channels.len();
+    //             //     for channel in &mut channels {
+    //             //         if channel_count > 1 {
+    //             //             println!(" /{}", ci);
+    //             //         }
+    //             //         let mut i = 0;
+    //             //         for event in channel {
+    //             //             println!("  │{:02}│ {}", i, event);
+    //             //             i += 1
+    //             //         }
+    //             //         ci += 1
+    //             //     }
+    //             //     // cycle.reset();
+    //             }
+    //         }
+    //         Err(err) => println!("{}", err),
+    //     }
+    // }
+
+    fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<CycleEvent>>>) -> Result<(), String> {
+        let mut cycle = Cycle::from(input, None)?;
+        for out in outputs {
+            assert_eq!(cycle.generate(), out);
         }
+        Ok(())
     }
 
     #[test]
@@ -1166,11 +1174,10 @@ mod test {
         // let file = fs::read_to_string("rhythm/test.tidal").expect("file not found");
         // let line = file.lines().next().expect("no lines in file");
         // println!("\nInput:\n{:?}\n", line);
-        assert!(Cycle::from("a b c [d", None).is_err());
         assert_eq!(
             Cycle::from("a b c d", None)?.generate(),
             [[
-                CycleEvent::at(F::from(0), F::new(1u8,4u8)).note(9,4),
+                CycleEvent::at(F::from(0),      F::new(1u8,4u8)).note(9,4),
                 CycleEvent::at(F::new(1u8,4u8), F::new(1u8,4u8)).note(11,4),
                 CycleEvent::at(F::new(2u8,4u8), F::new(1u8,4u8)).note(0,4),
                 CycleEvent::at(F::new(3u8,4u8), F::new(1u8,4u8)).note(2,4),
@@ -1179,35 +1186,303 @@ mod test {
         assert_eq!(
             Cycle::from("a b [ c d ]", None)?.generate(),
             [[
-                CycleEvent::at(F::from(0), F::new(1u8,3u8)).note(9,4),
+                CycleEvent::at(F::from(0),      F::new(1u8,3u8)).note(9,4),
                 CycleEvent::at(F::new(1u8,3u8), F::new(1u8,3u8)).note(11,4),
-                CycleEvent::at( F::new(2u8,3u8), F::new(1u8,6u8)).note(0,4),
+                CycleEvent::at(F::new(2u8,3u8), F::new(1u8,6u8)).note(0,4),
                 CycleEvent::at(F::new(5u8,6u8), F::new(1u8,6u8)).note(2,4),
             ]]
         );
+        assert_eq!(
+            Cycle::from("[a a] [b4 b5 b6] [c0 d1 c2 d3]", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0),        F::new(1u8,6u8)).note(9,4),
+                CycleEvent::at(F::new(1u8,6u8),   F::new(1u8,6u8)).note(9,4),
+                CycleEvent::at(F::new(3u8,9u8),   F::new(1u8,9u8)).note(11,4),
+                CycleEvent::at(F::new(4u8,9u8),   F::new(1u8,9u8)).note(11,5),
+                CycleEvent::at(F::new(5u8,9u8),   F::new(1u8,9u8)).note(11,6),
+                CycleEvent::at(F::new(8u8,12u8),  F::new(1u8,12u8)).note(0,0),
+                CycleEvent::at(F::new(9u8,12u8),  F::new(1u8,12u8)).note(2,1),
+                CycleEvent::at(F::new(10u8,12u8), F::new(1u8,12u8)).note(0,2),
+                CycleEvent::at(F::new(11u8,12u8), F::new(1u8,12u8)).note(2,3),
+            ]]
+        );
+        assert_eq!(
+            Cycle::from("[a0 [bb1 [b2 c3]]] c#4 [[[d5 D#6] E7 ] F8]", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0),        F::new(1u8,6u8)).note(9,0),
+                CycleEvent::at(F::new(1u8,6u8),   F::new(1u8,12u8)).note(10,1),
+                CycleEvent::at(F::new(3u8,12u8),  F::new(1u8,24u8)).note(11,2),
+                CycleEvent::at(F::new(7u8,24u8),  F::new(1u8,24u8)).note(0,3),
+                CycleEvent::at(F::new(1u8,3u8),   F::new(1u8,3u8)).note(1,4),
+                CycleEvent::at(F::new(2u8,3u8),   F::new(1u8,24u8)).note(2,5),
+                CycleEvent::at(F::new(17u8,24u8), F::new(1u8,24u8)).note(3,6),
+                CycleEvent::at(F::new(9u8,12u8),  F::new(1u8,12u8)).note(4,7),
+                CycleEvent::at(F::new(5u8,6u8),   F::new(1u8,6u8)).note(5,8),
+            ]]
+        );
+        assert_eq!(
+            Cycle::from("[R [e [n o]]] , [[[i s] e ] _]", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0),      F::new(1u8,2u8)).name("R"),
+                CycleEvent::at(F::new(1u8,2u8), F::new(1u8,4u8)).note(4,4),
+                CycleEvent::at(F::new(3u8,4u8), F::new(1u8,8u8)).name("n"),
+                CycleEvent::at(F::new(7u8,8u8), F::new(1u8,8u8)).name("o"),
+            ],
+            [
+                CycleEvent::at(F::from(0),      F::new(1u8,8u8)).name("i"),
+                CycleEvent::at(F::new(1u8,8u8), F::new(1u8,8u8)).name("s"),
+                CycleEvent::at(F::new(1u8,4u8), F::new(1u8,4u8)).note(4,4),
+                CycleEvent::at(F::new(1u8,2u8), F::new(1u8,2u8)).hold(),
+            ],
+            ]
+        );
+
+        assert_cycles("<a b c d>", 
+            vec![
+                vec![vec![CycleEvent::at(F::from(0), F::from(1)).note(9,4)]],
+                vec![vec![CycleEvent::at(F::from(0), F::from(1)).note(11,4)]],
+                vec![vec![CycleEvent::at(F::from(0), F::from(1)).note(0,4)]],
+                vec![vec![CycleEvent::at(F::from(0), F::from(1)).note(2,4)]],
+            ]
+        )?;
+
+        assert_cycles("<a ~ ~ a0> <b <c d>>", 
+            vec![
+                vec![vec![
+                    CycleEvent::at(F::from(0),      F::new(1u8,2u8)).note(9,4),
+                    CycleEvent::at(F::new(1u8,2u8), F::new(1u8,2u8)).note(11,4),
+                ]],
+                vec![vec![
+                    CycleEvent::at(F::from(0),      F::new(1u8,2u8)),
+                    CycleEvent::at(F::new(1u8,2u8), F::new(1u8,2u8)).note(0,4),
+                ]],
+                vec![vec![
+                    CycleEvent::at(F::from(0),      F::new(1u8,2u8)),
+                    CycleEvent::at(F::new(1u8,2u8), F::new(1u8,2u8)).note(11,4),
+                ]],
+                vec![vec![
+                    CycleEvent::at(F::from(0),      F::new(1u8,2u8)).note(9,0),
+                    CycleEvent::at(F::new(1u8,2u8), F::new(1u8,2u8)).note(2,4),
+                ]],
+            ]
+        )?;
+
+        assert_cycles("<<a a8> b,  <c [d e]>>", 
+            vec![
+                vec![
+                    vec![ CycleEvent::at(F::from(0), F::from(1)).note(9,4) ],
+                    vec![ CycleEvent::at(F::from(0), F::from(1)).note(0,4) ],
+                ],
+                vec![
+                    vec![ CycleEvent::at(F::from(0),    F::from(1)).note(11,4) ],
+                    vec![ 
+                        CycleEvent::at(F::from(0),      F::new(1u8,2u8)).note(2,4),
+                        CycleEvent::at(F::new(1u8,2u8), F::new(1u8,2u8)).note(4,4),
+                    ],
+                ],
+                vec![
+                    vec![ CycleEvent::at(F::from(0), F::from(1)).note(9,8) ],
+                    vec![ CycleEvent::at(F::from(0), F::from(1)).note(0,4) ],
+                ],
+            ]
+        )?;
+
+        assert_cycles("{-3 -2 -1 0 1 2 3}%4", 
+            vec![
+                vec![vec![ 
+                    CycleEvent::at(F::from(0),      F::new(1u8, 4u8)).int(-3),
+                    CycleEvent::at(F::new(1u8,4u8), F::new(1u8, 4u8)).int(-2),
+                    CycleEvent::at(F::new(2u8,4u8), F::new(1u8, 4u8)).int(-1),
+                    CycleEvent::at(F::new(3u8,4u8), F::new(1u8, 4u8)).int(0),
+                ]],
+                vec![vec![ 
+                    CycleEvent::at(F::from(0),      F::new(1u8, 4u8)).int(1),
+                    CycleEvent::at(F::new(1u8,4u8), F::new(1u8, 4u8)).int(2),
+                    CycleEvent::at(F::new(2u8,4u8), F::new(1u8, 4u8)).int(3),
+                    CycleEvent::at(F::new(3u8,4u8), F::new(1u8, 4u8)).int(-3),
+                ]],
+                vec![vec![ 
+                    CycleEvent::at(F::from(0),      F::new(1u8, 4u8)).int(-2),
+                    CycleEvent::at(F::new(1u8,4u8), F::new(1u8, 4u8)).int(-1),
+                    CycleEvent::at(F::new(2u8,4u8), F::new(1u8, 4u8)).int(0),
+                    CycleEvent::at(F::new(3u8,4u8), F::new(1u8, 4u8)).int(1),
+                ]],
+            ]
+        )?;
+
+        assert_cycles("{<0 0 d#8:test> 1 <c d e>:3 [<.5 0.95> 1.]}%3", 
+            vec![
+                vec![vec![ 
+                    CycleEvent::at(F::from(0),      F::new(1u8, 3u8)).int(0),
+                    CycleEvent::at(F::new(1u8,3u8), F::new(1u8, 3u8)).int(1),
+                    CycleEvent::at(F::new(2u8,3u8), F::new(1u8, 3u8)).note(0,4).target(Target::Index(3)),
+                ]],
+                vec![vec![ 
+                    CycleEvent::at(F::from(0),      F::new(1u8, 6u8)).float(0.5),
+                    CycleEvent::at(F::new(1u8,6u8), F::new(1u8, 6u8)).float(1.0),
+                    CycleEvent::at(F::new(1u8,3u8), F::new(1u8, 3u8)).int(0),
+                    CycleEvent::at(F::new(2u8,3u8), F::new(1u8, 3u8)).int(1),
+                ]],
+                vec![vec![ 
+                    CycleEvent::at(F::from(0),      F::new(1u8, 3u8)).note(2,4).target(Target::Index(3)),
+                    CycleEvent::at(F::new(2u8,6u8), F::new(1u8, 6u8)).float(0.95),
+                    CycleEvent::at(F::new(3u8,6u8), F::new(1u8, 6u8)).float(1.0),
+                    CycleEvent::at(F::new(2u8,3u8), F::new(1u8, 3u8)).note(3,8).target(Target::Name("test".to_string())),
+                ]],
+            ]
+        )?;
+
+        assert_eq!(
+            Cycle::from("[1 middle _] {}%42 [] <>", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0),      F::new(1u8,12u8)).int(1),
+                CycleEvent::at(F::new(1u8,12u8), F::new(1u8,12u8)).name("middle"),
+                CycleEvent::at(F::new(2u8,12u8), F::new(1u8,12u8)).hold(),
+                CycleEvent::at(F::new(1u8,4u8), F::new(1u8,4u8)),
+                CycleEvent::at(F::new(2u8,4u8), F::new(1u8,4u8)),
+                CycleEvent::at(F::new(3u8,4u8), F::new(1u8,4u8)),
+            ]]
+        );
+
+
+        assert_cycles("[1 2] [3 4,[5 6]:42]",
+            vec![
+                vec![vec![
+                    CycleEvent::at(F::from(0),      F::new(1u8,4u8)).int(1),
+                    CycleEvent::at(F::new(1u8,4u8), F::new(1u8,4u8)).int(2),
+                    CycleEvent::at(F::new(2u8,4u8), F::new(1u8,4u8)).int(3),
+                    CycleEvent::at(F::new(3u8,4u8), F::new(1u8,4u8)).int(4),
+                ],
+                vec![
+                    CycleEvent::at(F::new(1u8,2u8), F::new(1u8,4u8)).int(5).target(Target::Index(42)),
+                    CycleEvent::at(F::new(3u8,4u8), F::new(1u8,4u8)).int(6).target(Target::Index(42)),
+                ]
+            ]]
+        )?;
+        
+        assert_eq!(
+            Cycle::from("1 second*2 eb3*3 [32 32]*4", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0),      F::new(1u8,4u8)).int(1),
+                CycleEvent::at(F::new(2u8,8u8), F::new(1u8,8u8)).name("second"),
+                CycleEvent::at(F::new(3u8,8u8), F::new(1u8,8u8)).name("second"),
+                CycleEvent::at(F::new(6u8,12u8), F::new(1u8,12u8)).note(3,3),
+                CycleEvent::at(F::new(7u8,12u8), F::new(1u8,12u8)).note(3,3),
+                CycleEvent::at(F::new(8u8,12u8), F::new(1u8,12u8)).note(3,3),
+                CycleEvent::at(F::new(24u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(25u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(26u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(27u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(28u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(29u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(30u8,32u8), F::new(1u8,32u8)).int(32),
+                CycleEvent::at(F::new(31u8,32u8), F::new(1u8,32u8)).int(32),
+            ]]
+        );
+
+        assert_cycles("tresillo(6,8), outside(4,11)",
+            vec![vec![
+                vec![
+                    CycleEvent::at(F::from(0),      F::new(1u8,8u8)).name("tresillo"),
+                    CycleEvent::at(F::new(1u8,8u8), F::new(1u8,8u8)),
+                    CycleEvent::at(F::new(2u8,8u8), F::new(1u8,8u8)).name("tresillo"),
+                    CycleEvent::at(F::new(3u8,8u8), F::new(1u8,8u8)).name("tresillo"),
+                    CycleEvent::at(F::new(4u8,8u8), F::new(1u8,8u8)).name("tresillo"),
+                    CycleEvent::at(F::new(5u8,8u8), F::new(1u8,8u8)),
+                    CycleEvent::at(F::new(6u8,8u8), F::new(1u8,8u8)).name("tresillo"),
+                    CycleEvent::at(F::new(7u8,8u8), F::new(1u8,8u8)).name("tresillo"),
+                ],
+                vec![
+                    CycleEvent::at(F::from(0),        F::new(1u8,11u8)).name("outside"),
+                    CycleEvent::at(F::new(1u8,11u8),  F::new(1u8,11u8)),
+                    CycleEvent::at(F::new(2u8,11u8),  F::new(1u8,11u8)),
+                    CycleEvent::at(F::new(3u8,11u8),  F::new(1u8,11u8)).name("outside"),
+                    CycleEvent::at(F::new(4u8,11u8),  F::new(1u8,11u8)),
+                    CycleEvent::at(F::new(5u8,11u8),  F::new(1u8,11u8)),
+                    CycleEvent::at(F::new(6u8,11u8),  F::new(1u8,11u8)).name("outside"),
+                    CycleEvent::at(F::new(7u8,11u8),  F::new(1u8,11u8)),
+                    CycleEvent::at(F::new(8u8,11u8),  F::new(1u8,11u8)),
+                    CycleEvent::at(F::new(9u8,11u8),  F::new(1u8,11u8)).name("outside"),
+                    CycleEvent::at(F::new(10u8,11u8), F::new(1u8,11u8)),
+                ],
+            ]]
+        )?;
+
+        assert_cycles("[<1 10> <2 20>:a](2,5)",
+            vec![
+                vec![vec![
+                    CycleEvent::at(F::from(0),       F::new(1u8,10u8)).int(1),
+                    CycleEvent::at(F::new(1u8,10u8), F::new(1u8,10u8)).int(2).target(Target::Name("a".to_string())),
+                    CycleEvent::at(F::new(1u8,5u8),  F::new(1u8,5u8)),
+                    CycleEvent::at(F::new(2u8,5u8),  F::new(1u8,5u8)),
+                    CycleEvent::at(F::new(3u8,5u8),  F::new(1u8,10u8)).int(1),
+                    CycleEvent::at(F::new(7u8,10u8), F::new(1u8,10u8)).int(2).target(Target::Name("a".to_string())),
+                    CycleEvent::at(F::new(4u8,5u8),  F::new(1u8,5u8)),
+                ]],
+                vec![vec![
+                    CycleEvent::at(F::from(0),       F::new(1u8,10u8)).int(10),
+                    CycleEvent::at(F::new(1u8,10u8), F::new(1u8,10u8)).int(20).target(Target::Name("a".to_string())),
+                    CycleEvent::at(F::new(1u8,5u8),  F::new(1u8,5u8)),
+                    CycleEvent::at(F::new(2u8,5u8),  F::new(1u8,5u8)),
+                    CycleEvent::at(F::new(3u8,5u8),  F::new(1u8,10u8)).int(10),
+                    CycleEvent::at(F::new(7u8,10u8), F::new(1u8,10u8)).int(20).target(Target::Name("a".to_string())),
+                    CycleEvent::at(F::new(4u8,5u8),  F::new(1u8,5u8)),
+                ]],
+            ]
+        )?; 
+
+        assert_eq!(
+            Cycle::from("1!2 3 [4!3 5]", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0),      F::new(1u8,4u8)).int(1),
+                CycleEvent::at(F::new(1u8,4u8), F::new(1u8,4u8)).int(1),
+                CycleEvent::at(F::new(2u8,4u8), F::new(1u8,4u8)).int(3),
+                CycleEvent::at(F::new(12u8,16u8), F::new(1u8,16u8)).int(4),
+                CycleEvent::at(F::new(13u8,16u8), F::new(1u8,16u8)).int(4),
+                CycleEvent::at(F::new(14u8,16u8), F::new(1u8,16u8)).int(4),
+                CycleEvent::at(F::new(15u8,16u8), F::new(1u8,16u8)).int(5),
+            ]]
+        );
+
+
+        assert_cycles("[0 1]!2 <a b>!2",
+            vec![
+                vec![vec![
+                    CycleEvent::at(F::from(0),       F::new(1u8,8u8)).int(0),
+                    CycleEvent::at(F::new(1u8,8u8), F::new(1u8,8u8)).int(1),
+                    CycleEvent::at(F::new(2u8,8u8), F::new(1u8,8u8)).int(0),
+                    CycleEvent::at(F::new(3u8,8u8), F::new(1u8,8u8)).int(1),
+                    CycleEvent::at(F::new(2u8,4u8),  F::new(1u8,4u8)).note(9,4),
+                    CycleEvent::at(F::new(3u8,4u8),  F::new(1u8,4u8)).note(9,4),
+                ]],
+                vec![vec![
+                    CycleEvent::at(F::from(0),       F::new(1u8,8u8)).int(0),
+                    CycleEvent::at(F::new(1u8,8u8), F::new(1u8,8u8)).int(1),
+                    CycleEvent::at(F::new(2u8,8u8), F::new(1u8,8u8)).int(0),
+                    CycleEvent::at(F::new(3u8,8u8), F::new(1u8,8u8)).int(1),
+                    CycleEvent::at(F::new(2u8,4u8),  F::new(1u8,4u8)).note(11,4),
+                    CycleEvent::at(F::new(3u8,4u8),  F::new(1u8,4u8)).note(11,4),
+                ]],
+            ]
+        )?; 
+        
+        // TODO test random output // parse_with_debug("[a b c d]?0.5");
+
+        assert!(Cycle::from("a b c [d", None).is_err());
+        assert!(Cycle::from("a b/ c [d", None).is_err());
+        assert!(Cycle::from("a b--- c [d", None).is_err());
+        assert!(Cycle::from("*a b c [d", None).is_err());
+        assert!(Cycle::from("a {{{}}", None).is_err());
+        assert!(Cycle::from("a*[]", None).is_err());
+        assert!(Cycle::from("] a z [", None).is_err());
+        assert!(Cycle::from("->err", None).is_err());
+        assert!(Cycle::from("(a, b)", None).is_err());
+        assert!(Cycle::from("#(12, 32)", None).is_err());
+        assert!(Cycle::from("#c $", None).is_err());
+        assert!(Cycle::from("1.. 2 3", None).is_err());
+        assert!(Cycle::from("1 ..2 3", None).is_err());
+
+
         Ok(())
-        // parse_with_debug("a b [c d]");
-        // parse_with_debug("[a a] [b b b] [c d c d]");
-        // parse_with_debug("[a [b [c d]]] e [[[f g] a ] b]");
-        // parse_with_debug("[a [b [c d]]] , [[[f g] a ] b]");
-        // parse_with_debug("a b <c d>");
-        // parse_with_debug("<a b , <c d>>");
-        // parse_with_debug("<a <b c d> e <f <a b c d>> <g a b>>");
-        // parse_with_debug("{a b c d e}%4");
-        // parse_with_debug("{a b c d e}%3");
-        // parse_with_debug("{a b , c d e f g}%3");
-        // parse_with_debug("{a b <c d e f> [g a]}%3");
-        // parse_with_debug("[1 2 ~] {}%42 [] <>");
-        // parse_with_debug("1 [2 [3 [4 [5 [6 [7 [8 [9 10]]]]]]]]");
-        // parse_with_debug("1 [2 <[3 4] <5 [6 7] [6 _ 7] [8 9 10]>>]");
-        // parse_with_debug("[1 2] [3 4, 5 6]");
-        // parse_with_debug("a*2 b c");
-        // parse_with_debug("a b c [d e]*4");
-        // parse_with_debug("a:1 b:2 c:3 [d e f g]:4");
-        // parse_with_debug("[a b c d]?0.5");
-        // parse_with_debug("a b!2 c!3 d!4 [1 2 3 4]!5");
-        // parse_with_debug("a(6,8)");
-        // parse_with_debug("[a b](3,8)");
-        // parse_with_debug("a b, 0.4 0.8");
     }
 }
