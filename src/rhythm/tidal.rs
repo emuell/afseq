@@ -9,7 +9,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 // use pest::Token::Start;
 // use pest::error::ErrorVariant;
 
-use fraction;
+use fraction::{Fraction, Zero, One};
 type F = fraction::Fraction;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -250,8 +250,8 @@ impl Value {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Span {
-    start: F,
-    end: F,
+    start: Fraction,
+    end: Fraction,
 }
 
 // convert a std rust range into a a Span
@@ -273,16 +273,16 @@ impl Span {
             end: start + outer.length() * self.length(),
         }
     }
-    fn length(&self) -> F {
+    fn length(&self) -> Fraction {
         self.end - self.start
     }
     fn default() -> Self {
         Span {
-            start: F::from(0),
-            end: F::from(1),
+            start: Fraction::zero(),
+            end: Fraction::one(),
         }
     }
-    fn new(start: F, end: F) -> Self {
+    fn new(start: Fraction, end: Fraction) -> Self {
         Self { start, end }
     }
 }
@@ -352,14 +352,14 @@ impl Display for CycleEvent {
 
 #[derive(Debug, Clone)]
 struct MultiEvents {
-    length: F,
+    length: Fraction,
     span: Span,
     events: Vec<Events>,
 }
 
 #[derive(Debug, Clone)]
 struct PolyEvents {
-    length: F,
+    length: Fraction,
     span: Span,
     channels: Vec<Events>,
 }
@@ -374,7 +374,7 @@ enum Events {
 impl Events {
     fn empty() -> Events {
         Events::Single(CycleEvent {
-            length: F::from(1),
+            length: Fraction::one(),
             span: Span::default(),
             value: Value::Rest,
             target: Target::None,
@@ -382,7 +382,7 @@ impl Events {
     }
     // only applied for Subdivision and Polymeter groups
     fn subdivide_lengths(events: &mut Vec<Events>) {
-        let mut length = F::from(0);
+        let mut length = Fraction::zero();
         for e in &mut *events {
             match e {
                 Events::Single(s) => length += s.length,
@@ -390,8 +390,8 @@ impl Events {
                 Events::Poly(p) => length += p.length,
             }
         }
-        let step_size = F::from(1) / length;
-        let mut start = F::from(0);
+        let step_size = Fraction::one() / length;
+        let mut start = Fraction::zero();
         for e in &mut *events {
             match e {
                 Events::Single(s) => {
@@ -772,7 +772,7 @@ impl Cycle {
     fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus) -> Events {
         match step {
             Step::Single(s) => Events::Single(CycleEvent {
-                length: F::from(1),
+                length: Fraction::one(),
                 target: Target::None,
                 span: Span::default(),
                 value: s.value.clone(),
@@ -791,7 +791,7 @@ impl Cycle {
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
                         span: Span::default(),
-                        length: F::from(1),
+                        length: Fraction::one(),
                         events,
                     })
                 }
@@ -832,7 +832,7 @@ impl Cycle {
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
                         span: Span::default(),
-                        length: F::from(1),
+                        length: Fraction::one(),
                         events,
                     })
                 }
@@ -847,7 +847,7 @@ impl Cycle {
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
-                        length: F::from(1),
+                        length: Fraction::one(),
                         channels,
                     })
                 }
@@ -869,7 +869,7 @@ impl Cycle {
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
                             span: Span::default(),
-                            length: F::from(1),
+                            length: Fraction::one(),
                             events,
                         })
                     }
@@ -959,7 +959,7 @@ impl Cycle {
                 Events::subdivide_lengths(&mut events);
                 Events::Multi(MultiEvents {
                     span: Span::default(),
-                    length: F::from(1),
+                    length: Fraction::one(),
                     events,
                 })
             } // _ => Events::Single(SingleEvent::default())
