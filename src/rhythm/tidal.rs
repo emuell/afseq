@@ -9,7 +9,10 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 // use pest::Token::Start;
 // use pest::error::ErrorVariant;
 
-#[derive(Clone, Debug)]
+use fraction;
+type F = fraction::Fraction;
+
+#[derive(Clone, Debug, PartialEq)]
 struct Pitch {
     note: u8,
     octave: u8,
@@ -84,7 +87,7 @@ impl Step {
         match single.into_inner().next() {
             Some(pair) => {
                 let string = pair.as_str().to_string();
-                let value = StepValue::parse(pair)?;
+                let value = Value::parse(pair)?;
                 Ok(Step::Single(Single { string, value }))
             }
             None => Err("empty single".to_string()),
@@ -94,45 +97,45 @@ impl Step {
 
 #[derive(Clone, Debug, Default)]
 struct Single {
-    value: StepValue,
+    value: Value,
     string: String,
 }
 
 impl Single {
     fn default() -> Self {
         Single {
-            value: StepValue::Rest,
+            value: Value::Rest,
             string: String::from("~"),
         }
     }
     fn to_integer(&self) -> Option<i32> {
         match &self.value {
-            StepValue::Rest => None,
-            StepValue::Hold => None,
-            StepValue::Name(_n) => None,
-            StepValue::Integer(i) => Some(*i),
-            StepValue::Float(f) => Some(*f as i32),
-            StepValue::Pitch(n) => Some(n.note as i32),
+            Value::Rest => None,
+            Value::Hold => None,
+            Value::Name(_n) => None,
+            Value::Integer(i) => Some(*i),
+            Value::Float(f) => Some(*f as i32),
+            Value::Pitch(n) => Some(n.note as i32),
         }
     }
     fn to_target(&self) -> Target {
         match &self.value {
-            StepValue::Rest => Target::None,
-            StepValue::Hold => Target::None,
-            StepValue::Name(n) => Target::Name(n.clone()),
-            StepValue::Integer(i) => Target::Index(*i),
-            StepValue::Float(f) => Target::Index(*f as i32),
-            StepValue::Pitch(_n) => Target::Name(self.string.clone()), // TODO might not be the best conversion idea
+            Value::Rest => Target::None,
+            Value::Hold => Target::None,
+            Value::Name(n) => Target::Name(n.clone()),
+            Value::Integer(i) => Target::Index(*i),
+            Value::Float(f) => Target::Index(*f as i32),
+            Value::Pitch(_n) => Target::Name(self.string.clone()), // TODO might not be the best conversion idea
         }
     }
     fn to_chance(&self) -> Option<f64> {
         match &self.value {
-            StepValue::Rest => None,
-            StepValue::Hold => None,
-            StepValue::Name(_n) => None,
-            StepValue::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
-            StepValue::Float(f) => Some(f.clamp(0.0, 1.0)),
-            StepValue::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
+            Value::Rest => None,
+            Value::Hold => None,
+            Value::Name(_n) => None,
+            Value::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
+            Value::Float(f) => Some(f.clamp(0.0, 1.0)),
+            Value::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
         }
     }
 }
@@ -201,8 +204,8 @@ struct Bjorklund {
     rotation: Option<Box<Step>>,
 }
 
-#[derive(Clone, Debug, Default)]
-enum StepValue {
+#[derive(Clone, Debug, Default, PartialEq)]
+enum Value {
     #[default]
     Rest,
     Hold,
@@ -212,23 +215,23 @@ enum StepValue {
     Name(String),
 }
 
-impl StepValue {
+impl Value {
     // parse a single into a value
     // the errors here should be unreachable unless there is a bug in the pest grammar
-    fn parse(pair: Pair<Rule>) -> Result<StepValue, String> {
+    fn parse(pair: Pair<Rule>) -> Result<Value, String> {
         // println!("{:?}", pair);
         match pair.as_rule() {
             Rule::number => {
                 if let Some(n) = pair.into_inner().next() {
                     match n.as_rule() {
                         Rule::integer => {
-                            Ok(StepValue::Integer(n.as_str().parse::<i32>().unwrap_or(0)))
+                            Ok(Value::Integer(n.as_str().parse::<i32>().unwrap_or(0)))
                         }
                         Rule::float => {
-                            Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
+                            Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
                         }
                         Rule::normal => {
-                            Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
+                            Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
                         }
                         _ => Err(format!("unrecognized number\n{:?}", n)),
                     }
@@ -236,20 +239,30 @@ impl StepValue {
                     Err("empty single".to_string())
                 }
             }
-            Rule::hold => Ok(StepValue::Hold),
-            Rule::rest => Ok(StepValue::Rest),
-            Rule::pitch => Ok(StepValue::Pitch(Pitch::parse(pair))),
-            Rule::name => Ok(StepValue::Name(pair.as_str().to_string())),
+            Rule::hold => Ok(Value::Hold),
+            Rule::rest => Ok(Value::Rest),
+            Rule::pitch => Ok(Value::Pitch(Pitch::parse(pair))),
+            Rule::name => Ok(Value::Name(pair.as_str().to_string())),
             _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
         }
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct Span {
-    start: f64,
-    end: f64,
+    start: F,
+    end: F,
 }
+
+// convert a std rust range into a a Span
+// impl From<std::ops::Range<f64>> for Span {
+//     fn from(value: std::ops::Range<f64>) -> Self {
+//         Self {
+//             start: value.start,
+//             end: value.end,
+//         }
+//     }
+// }
 
 impl Span {
     // transforms a nested relative span according to an absolute span at output time
@@ -260,21 +273,21 @@ impl Span {
             end: start + outer.length() * self.length(),
         }
     }
-    fn length(&self) -> f64 {
+    fn length(&self) -> F {
         self.end - self.start
     }
     fn default() -> Self {
         Span {
-            start: 0.0,
-            end: 1.0,
+            start: F::from(0),
+            end: F::from(1),
         }
     }
-    fn new(start: f64, end: f64) -> Self {
+    fn new(start: F, end: F) -> Self {
         Self { start, end }
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 enum Target {
     #[default]
     None,
@@ -296,15 +309,36 @@ impl Display for Target {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-struct SingleEvent {
-    length: f64,
+#[derive(Debug, Clone, Default, PartialEq)]
+struct CycleEvent {
+    length: F,
     span: Span,
-    value: StepValue,
+    value: Value,
     target: Target, // value for instruments
 }
+impl CycleEvent {
+    fn at(start: F, length: F) -> Self {
+        Self {
+            length,
+            span: Span {
+                start,
+                end: start + length
+            },
+            value: Value::Rest,
+            target: Target::None
+        }
+    }
+    fn note(&mut self, note: u8, octave: u8) -> Self {
+        self.value = Value::Pitch(Pitch{ note, octave });
+        self.clone()
+    }
+    fn target(&mut self, target: Target) -> Self {
+        self.target = target;
+        self.clone()
+    }
+}
 
-impl Display for SingleEvent {
+impl Display for CycleEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "{:.3} -> {:.3} | {:?} {}",
@@ -318,37 +352,37 @@ impl Display for SingleEvent {
 
 #[derive(Debug, Clone)]
 struct MultiEvents {
-    length: f64,
+    length: F,
     span: Span,
     events: Vec<Events>,
 }
 
 #[derive(Debug, Clone)]
 struct PolyEvents {
-    length: f64,
+    length: F,
     span: Span,
     channels: Vec<Events>,
 }
 
 #[derive(Debug, Clone)]
 enum Events {
-    Single(SingleEvent),
+    Single(CycleEvent),
     Multi(MultiEvents),
     Poly(PolyEvents),
 }
 
 impl Events {
     fn empty() -> Events {
-        Events::Single(SingleEvent {
-            length: 1.0,
+        Events::Single(CycleEvent {
+            length: F::from(1),
             span: Span::default(),
-            value: StepValue::Rest,
+            value: Value::Rest,
             target: Target::None,
         })
     }
     // only applied for Subdivision and Polymeter groups
     fn subdivide_lengths(events: &mut Vec<Events>) {
-        let mut length = 0.0;
+        let mut length = F::from(0);
         for e in &mut *events {
             match e {
                 Events::Single(s) => length += s.length,
@@ -356,8 +390,8 @@ impl Events {
                 Events::Poly(p) => length += p.length,
             }
         }
-        let step_size = 1.0 / (length as f64);
-        let mut start = 0.0;
+        let step_size = F::from(1) / length;
+        let mut start = F::from(0);
         for e in &mut *events {
             match e {
                 Events::Single(s) => {
@@ -380,7 +414,7 @@ impl Events {
     }
     fn mutate_events<F>(&mut self, fun: &mut F)
     where
-        F: FnMut(&mut SingleEvent),
+        F: FnMut(&mut CycleEvent),
     {
         match self {
             Events::Single(s) => {
@@ -398,7 +432,7 @@ impl Events {
             }
         }
     }
-    fn flatten(&self, channels: &mut Vec<Vec<SingleEvent>>, channel: usize) {
+    fn flatten(&self, channels: &mut Vec<Vec<CycleEvent>>, channel: usize) {
         if channels.len() <= channel {
             channels.push(vec![])
         }
@@ -737,8 +771,8 @@ impl Cycle {
     // recursively output events for the entire cycle based on some state (random seed)
     fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus) -> Events {
         match step {
-            Step::Single(s) => Events::Single(SingleEvent {
-                length: 1.0,
+            Step::Single(s) => Events::Single(CycleEvent {
+                length: F::from(1),
                 target: Target::None,
                 span: Span::default(),
                 value: s.value.clone(),
@@ -757,7 +791,7 @@ impl Cycle {
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
                         span: Span::default(),
-                        length: 1.0,
+                        length: F::from(1),
                         events,
                     })
                 }
@@ -798,7 +832,7 @@ impl Cycle {
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
                         span: Span::default(),
-                        length: 1.0,
+                        length: F::from(1),
                         events,
                     })
                 }
@@ -813,7 +847,7 @@ impl Cycle {
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
-                        length: 1.0,
+                        length: F::from(1),
                         channels,
                     })
                 }
@@ -835,7 +869,7 @@ impl Cycle {
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
                             span: Span::default(),
-                            length: 1.0,
+                            length: F::from(1),
                             events,
                         })
                     }
@@ -850,10 +884,10 @@ impl Cycle {
                     Operator::Degrade() => {
                         let mut out = Cycle::output(e.left.as_mut(), rng);
                         match e.right.as_ref() {
-                            Step::Single(s) => out.mutate_events(&mut |e: &mut SingleEvent| {
+                            Step::Single(s) => out.mutate_events(&mut |e: &mut CycleEvent| {
                                 if let Some(chance) = s.to_chance() {
                                     if chance < rng.gen_range(0.0..1.0) {
-                                        e.value = StepValue::Rest
+                                        e.value = Value::Rest
                                     }
                                 }
                             }),
@@ -877,7 +911,7 @@ impl Cycle {
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
                             span: Span::default(),
-                            length: 1.0,
+                            length: F::from(1),
                             events,
                         })
                     }
@@ -925,7 +959,7 @@ impl Cycle {
                 Events::subdivide_lengths(&mut events);
                 Events::Multi(MultiEvents {
                     span: Span::default(),
-                    length: 1.0,
+                    length: F::from(1),
                     events,
                 })
             } // _ => Events::Single(SingleEvent::default())
@@ -965,12 +999,28 @@ impl Cycle {
 
     // parse the root pair of the pest AST into a Subdivision
     // then update the spans of all the generated steps
-    fn generate(cycle: &mut Cycle) -> Vec<Vec<SingleEvent>> {
-        let mut events = Cycle::output(&mut cycle.root, &mut cycle.rng);
+    fn generate(&mut self) -> Vec<Vec<CycleEvent>> {
+        let mut events = Cycle::output(&mut self.root, &mut self.rng);
         Cycle::transform_spans(&mut events, &Span::default());
-        // println!("{:#?}", events);
         let mut channels = vec![];
         events.flatten(&mut channels, 0);
+
+        // TODO comment this out, it's just for test debugging
+        println!("\n{}", "OUTPUT");
+        let mut ci = 0;
+        let channel_count = channels.len();
+        for channel in &mut channels {
+            if channel_count > 1 {
+                println!(" /{}", ci);
+            }
+            let mut i = 0;
+            for event in channel {
+                println!("  │{:02}│ {}", i, event);
+                i += 1
+            }
+            ci += 1
+        }
+
         channels
     }
 
@@ -983,7 +1033,10 @@ impl Cycle {
                     let root = Cycle::parse_step(mini)?;
                     let seed = seed.unwrap_or_else(|| thread_rng().gen());
                     let rng = Xoshiro256PlusPlus::from_seed(seed);
-                    Ok(Self { root, rng })
+                    let mut cycle = Self { root, rng };
+                    println!("\nCYCLE");
+                    cycle.print();
+                    Ok(cycle)
                 } else {
                     Err("couldn't parse input".to_string())
                 }
@@ -1003,7 +1056,7 @@ impl Cycle {
     fn print_steps(step: &mut Step, level: usize) {
         let name = match step {
             Step::Single(s) => match &s.value {
-                StepValue::Pitch(_p) => format!("{:?} {}", s.value, s.string),
+                Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
             },
             Step::Subdivision(sd) => format!("{} [{}]", "Subdivision", sd.steps.len()),
@@ -1061,7 +1114,7 @@ mod test {
                 println!("\nOUTPUT");
                 for i in 0..repeats {
                     println!(" {}", i);
-                    let mut channels = Cycle::generate(&mut cycle);
+                    let mut channels = cycle.generate();
                     let mut ci = 0;
                     let channel_count = channels.len();
                     for channel in &mut channels {
@@ -1083,34 +1136,53 @@ mod test {
     }
 
     #[test]
-    pub fn test_tidal() {
+
+    pub fn test_tidal() -> Result<(), String> {
         // let file = fs::read_to_string("rhythm/test.tidal").expect("file not found");
         // let line = file.lines().next().expect("no lines in file");
         // println!("\nInput:\n{:?}\n", line);
-
-        parse_with_debug("a b c d");
-        parse_with_debug("a b [c d]");
-        parse_with_debug("[a a] [b b b] [c d c d]");
-        parse_with_debug("[a [b [c d]]] e [[[f g] a ] b]");
-        parse_with_debug("[a [b [c d]]] , [[[f g] a ] b]");
-        parse_with_debug("a b <c d>");
-        parse_with_debug("<a b , <c d>>");
-        parse_with_debug("<a <b c d> e <f <a b c d>> <g a b>>");
-        parse_with_debug("{a b c d e}%4");
-        parse_with_debug("{a b c d e}%3");
-        parse_with_debug("{a b , c d e f g}%3");
-        parse_with_debug("{a b <c d e f> [g a]}%3");
-        parse_with_debug("[1 2 ~] {}%42 [] <>");
-        parse_with_debug("1 [2 [3 [4 [5 [6 [7 [8 [9 10]]]]]]]]");
-        parse_with_debug("1 [2 <[3 4] <5 [6 7] [6 _ 7] [8 9 10]>>]");
-        parse_with_debug("[1 2] [3 4, 5 6]");
-        parse_with_debug("a*2 b c");
-        parse_with_debug("a b c [d e]*4");
-        parse_with_debug("a:1 b:2 c:3 [d e f g]:4");
-        parse_with_debug("[a b c d]?0.5");
-        parse_with_debug("a b!2 c!3 d!4 [1 2 3 4]!5");
-        parse_with_debug("a(6,8)");
-        parse_with_debug("[a b](3,8)");
-        parse_with_debug("[] [] [] []");
+        assert!(Cycle::from("a b c [d", None).is_err());
+        assert_eq!(
+            Cycle::from("a b c d", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0), F::new(1u8,4u8)).note(9,4),
+                CycleEvent::at(F::new(1u8,4u8), F::new(1u8,4u8)).note(11,4),
+                CycleEvent::at(F::new(2u8,4u8), F::new(1u8,4u8)).note(0,4),
+                CycleEvent::at(F::new(3u8,4u8), F::new(1u8,4u8)).note(2,4),
+            ]]
+        );
+        assert_eq!(
+            Cycle::from("a b [ c d ]", None)?.generate(),
+            [[
+                CycleEvent::at(F::from(0), F::new(1u8,3u8)).note(9,4),
+                CycleEvent::at(F::new(1u8,3u8), F::new(1u8,3u8)).note(11,4),
+                CycleEvent::at( F::new(2u8,3u8), F::new(1u8,6u8)).note(0,4),
+                CycleEvent::at(F::new(5u8,6u8), F::new(1u8,6u8)).note(2,4),
+            ]]
+        );
+        Ok(())
+        // parse_with_debug("a b [c d]");
+        // parse_with_debug("[a a] [b b b] [c d c d]");
+        // parse_with_debug("[a [b [c d]]] e [[[f g] a ] b]");
+        // parse_with_debug("[a [b [c d]]] , [[[f g] a ] b]");
+        // parse_with_debug("a b <c d>");
+        // parse_with_debug("<a b , <c d>>");
+        // parse_with_debug("<a <b c d> e <f <a b c d>> <g a b>>");
+        // parse_with_debug("{a b c d e}%4");
+        // parse_with_debug("{a b c d e}%3");
+        // parse_with_debug("{a b , c d e f g}%3");
+        // parse_with_debug("{a b <c d e f> [g a]}%3");
+        // parse_with_debug("[1 2 ~] {}%42 [] <>");
+        // parse_with_debug("1 [2 [3 [4 [5 [6 [7 [8 [9 10]]]]]]]]");
+        // parse_with_debug("1 [2 <[3 4] <5 [6 7] [6 _ 7] [8 9 10]>>]");
+        // parse_with_debug("[1 2] [3 4, 5 6]");
+        // parse_with_debug("a*2 b c");
+        // parse_with_debug("a b c [d e]*4");
+        // parse_with_debug("a:1 b:2 c:3 [d e f g]:4");
+        // parse_with_debug("[a b c d]?0.5");
+        // parse_with_debug("a b!2 c!3 d!4 [1 2 3 4]!5");
+        // parse_with_debug("a(6,8)");
+        // parse_with_debug("[a b](3,8)");
+        // parse_with_debug("a b, 0.4 0.8");
     }
 }
