@@ -43,7 +43,9 @@ impl BeatTimeRhythm {
         if table.contains_key("unit")? {
             let unit = table.get::<_, String>("unit")?;
             match unit.as_str() {
-                "bars" | "1/1" => step = BeatTimeStep::Bar(resolution),
+                "bars" => step = BeatTimeStep::Bar(resolution),
+                "1/1" => step = BeatTimeStep::Whole(resolution),
+                "1/2" => step = BeatTimeStep::Half(resolution),
                 "beats" | "1/4" => step = BeatTimeStep::Beats(resolution),
                 "1/8" => step = BeatTimeStep::Eighth(resolution),
                 "1/16" => step = BeatTimeStep::Sixteenth(resolution),

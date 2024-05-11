@@ -50,5 +50,6 @@ impl BeatTimeBase {
     generate_step_funcs!(sixteenth, BeatTimeStep::Sixteenth);
     generate_step_funcs!(eighth, BeatTimeStep::Eighth);
     generate_step_funcs!(beat, BeatTimeStep::Beats);
+    generate_step_funcs!(half, BeatTimeStep::Half);
     generate_step_funcs!(bar, BeatTimeStep::Bar);
 }

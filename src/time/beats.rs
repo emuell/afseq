@@ -61,6 +61,8 @@ pub enum BeatTimeStep {
     Sixteenth(f32),
     Eighth(f32),
     Beats(f32),
+    Half(f32),
+    Whole(f32),
     Bar(f32),
 }
 
@@ -74,6 +76,8 @@ impl BeatTimeStep {
             BeatTimeStep::Sixteenth(amount) => amount,
             BeatTimeStep::Eighth(amount) => amount,
             BeatTimeStep::Beats(amount) => amount,
+            BeatTimeStep::Half(amount) => amount,
+            BeatTimeStep::Whole(amount) => amount,
             BeatTimeStep::Bar(amount) => amount,
         }
     }
@@ -85,6 +89,8 @@ impl BeatTimeStep {
             BeatTimeStep::Sixteenth(_) => *self = BeatTimeStep::Sixteenth(step),
             BeatTimeStep::Eighth(_) => *self = BeatTimeStep::Eighth(step),
             BeatTimeStep::Beats(_) => *self = BeatTimeStep::Beats(step),
+            BeatTimeStep::Half(_) => *self = BeatTimeStep::Half(step),
+            BeatTimeStep::Whole(_) => *self = BeatTimeStep::Whole(step),
             BeatTimeStep::Bar(_) => *self = BeatTimeStep::Bar(step),
         };
     }
@@ -97,6 +103,8 @@ impl BeatTimeStep {
             BeatTimeStep::Sixteenth(_) => time_base.samples_per_beat() / 4.0,
             BeatTimeStep::Eighth(_) => time_base.samples_per_beat() / 2.0,
             BeatTimeStep::Beats(_) => time_base.samples_per_beat(),
+            BeatTimeStep::Half(_) => time_base.samples_per_beat() * 2.0,
+            BeatTimeStep::Whole(_) => time_base.samples_per_beat() * 4.0,
             BeatTimeStep::Bar(_) => time_base.samples_per_bar(),
         }
     }
