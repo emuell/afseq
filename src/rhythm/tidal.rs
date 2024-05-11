@@ -332,6 +332,25 @@ impl CycleEvent {
         self.value = Value::Pitch(Pitch{ note, octave });
         self.clone()
     }
+
+    fn int(&mut self, i: i32) -> Self {
+        self.value = Value::Integer(i);
+        self.clone()
+    }
+    fn name(&mut self, n: &str) -> Self{
+        self.value = Value::Name(n.to_string());
+        self.clone()
+    }
+    fn hold(&mut self) -> Self {
+        self.value = Value::Hold;
+        self.clone()
+    }
+
+    fn float(&mut self, f: f64) -> Self {
+        self.value = Value::Float(f);
+        self.clone()
+    }
+
     fn target(&mut self, target: Target) -> Self {
         self.target = target;
         self.clone()
