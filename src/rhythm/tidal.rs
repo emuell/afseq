@@ -9,16 +9,6 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 // use pest::Token::Start;
 // use pest::error::ErrorVariant;
 
-#[derive(Parser)]
-#[grammar = "rhythm/tidal.pest"]
-struct MiniParser {
-}
-
-#[derive(Clone)]
-struct State {
-    seed: Option<[u8; 32]>,
-}
-
 #[derive(Clone, Debug)]
 struct Pitch {
     note: u8,
@@ -91,6 +81,22 @@ enum Step {
     Choices(Choices),
     Expression(Expression),
     Bjorklund(Bjorklund),
+}
+
+impl Step {
+    fn parse_single(single: Pair<Rule>) -> Result<Step, String> {
+        match single.into_inner().next() {
+            Some(pair) => {
+                let string = pair.as_str().to_string();
+                let value = StepValue::parse(pair)?;
+                Ok(Step::Single(Single{
+                    string,
+                    value,
+                }))
+            }
+            None => Err("empty single".to_string())
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -176,13 +182,13 @@ enum Operator {
     // Slow(),       // /
 }
 impl Operator {
-    fn parse(pair: Pair<Rule>) -> Result<Operator, &str> {
+    fn parse(pair: Pair<Rule>) -> Result<Operator, String> {
         match pair.as_rule() {
             Rule::op_fast => Ok(Operator::Fast()),
             Rule::op_target => Ok(Operator::Target()),
             Rule::op_degrade => Ok(Operator::Degrade()),
             Rule::op_replicate => Ok(Operator::Replicate()),
-            _ => Err("unrecognized operator")
+            _ => Err(format!("unsupported operator: {:?}", pair.as_rule()))
         }
     }
 }
@@ -214,26 +220,27 @@ enum StepValue {
 
 impl StepValue {
     // parse a single into a value
-    fn parse(pair: Pair<Rule>) -> StepValue {
+    // the errors here should be unreachable unless there is a bug in the pest grammar
+    fn parse(pair: Pair<Rule>) -> Result<StepValue, String> {
         // println!("{:?}", pair);
         match pair.as_rule() {
             Rule::number => {
                 if let Some(n) = pair.into_inner().next() {
                     match n.as_rule() {
-                        Rule::integer => StepValue::Integer(n.as_str().parse::<i32>().unwrap_or(0)),
-                        Rule::float => StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
-                        Rule::normal => StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0)),
-                        _ => unreachable!(),
+                        Rule::integer => Ok(StepValue::Integer(n.as_str().parse::<i32>().unwrap_or(0))),
+                        Rule::float => Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
+                        Rule::normal => Ok(StepValue::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
+                        _ => Err(format!("unrecognized number\n{:?}", n)),
                     }
                 } else {
-                    unreachable!()
+                    Err("empty single".to_string())
                 }
             }
-            Rule::hold => StepValue::Hold,
-            Rule::rest => StepValue::Rest,
-            Rule::pitch => StepValue::Pitch(Pitch::parse(pair)),
-            Rule::name => StepValue::Name(pair.as_str().to_string()),
-            _ => unreachable!(),
+            Rule::hold => Ok(StepValue::Hold),
+            Rule::rest => Ok(StepValue::Rest),
+            Rule::pitch => Ok(StepValue::Pitch(Pitch::parse(pair))),
+            Rule::name => Ok(StepValue::Name(pair.as_str().to_string())),
+            _ => Err(format!("unrecognized pair\n{:?}", pair)),
         }
     }
 }
@@ -389,7 +396,7 @@ impl Events {
             }
         }
     }
-    fn collect(&self, channels: &mut Vec<Vec<SingleEvent>>, channel: usize){
+    fn flatten(&self, channels: &mut Vec<Vec<SingleEvent>>, channel: usize){
         if channels.len() <= channel {
             channels.push(vec![])
         }
@@ -399,13 +406,13 @@ impl Events {
             }
             Events::Multi(m) => {
                 for e in &m.events {
-                    e.collect(channels, channel);
+                    e.flatten(channels, channel);
                 }
             }
             Events::Poly(p) => {
                 let mut c = channel;
                 for e in &p.channels {
-                    e.collect(channels, c);
+                    e.flatten(channels, c);
                     c += 1
                 }
             }
@@ -413,540 +420,601 @@ impl Events {
     }
 }
 
-// stacks can only appear inside groups like Subdivision, Alternating or Polymeter
-// they will have a stack of steps with their parent's type inside
-fn as_stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Stack {
-    let mut stack = Stack {
-        stack: vec![],
-    };
+#[derive(Parser, Debug)]
+#[grammar = "rhythm/tidal.pest"]
+pub struct Cycle {
+    root: Step,
+    rng: Xoshiro256PlusPlus,
+}
 
-    match parent.as_rule() {
-        Rule::alternating => {
-            for p in pair.into_inner() {
-                stack.stack.push(Step::Alternating(Alternating {
-                    current: 0,
-                    steps: section_as_steps(p),
-                }))
+impl Cycle {
+
+    // stacks can only appear inside groups like Subdivision, Alternating or Polymeter
+    // they will have a stack of steps with their parent's type inside
+    fn parse_stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Result<Step, String> {
+        let mut channels = vec![];
+
+        match parent.as_rule() {
+            Rule::subdivision | Rule::mini | Rule::alternating | Rule::polymeter => {
+                for p in pair.into_inner() {
+                    let section = Cycle::parse_section(p)?;
+                    channels.push(section);
+                }
             }
+            _ => return Err(format!("invalid parent to stack\n{:?}", parent)),
         }
-        Rule::subdivision | Rule::mini => {
-            for p in pair.clone().into_inner() {
-                stack.stack.push(Step::Subdivision(Subdivision {
-                    steps: section_as_steps(p),
-                }))
-            }
-        }
-        Rule::polymeter => {
-            if let Some(count) = as_polymeter_count(&parent) {
-                for p in pair.clone().into_inner() {
-                    stack.stack.push(Step::Polymeter(Polymeter {
-                        count,
-                        offset: 0,
-                        steps: section_as_steps(p),
+
+        let mut stack = Stack {
+            stack: vec![]
+        };
+
+        match parent.as_rule() {
+            Rule::alternating => {
+                for c in channels {
+                    stack.stack.push(Step::Alternating(Alternating {
+                        current: 0,
+                        steps: c
                     }))
                 }
             }
-        }
-        _ => (),
-    }
-    stack
-}
-
-
-fn as_polymeter_count(pair: &Pair<Rule>) -> Option<usize> {
-    for p in pair.clone().into_inner() {
-        match p.as_rule() {
-            Rule::polymeter_tail => {
-                // TODO a more generic parameter here
-                if let Some(count) = p.into_inner().next() {
-                    return Some(count.as_str().parse::<usize>().unwrap_or(1));
+            Rule::subdivision | Rule::mini => {
+                for c in channels {
+                    stack.stack.push(Step::Subdivision(Subdivision {
+                        steps: c
+                    }))
                 }
             }
-            _ => (),
+            Rule::polymeter => {
+                let count = Cycle::parse_polymeter_count(&parent)?;
+                for c in channels {
+                    stack.stack.push(Step::Polymeter(Polymeter {
+                        offset: 0,
+                        steps: c,
+                        count,
+                    }))
+                }
+            }
+            _ => return Err(format!("invalid parent to stack\n{:?}", parent)),
         }
+        Ok(Step::Stack(stack))
     }
-    None
-}
 
-fn as_polymeter(pair: Pair<Rule>) -> Result<Step, &str> {
-    if let Some(count) = as_polymeter_count(&pair) {
+
+    fn parse_polymeter_count(pair: &Pair<Rule>) -> Result<usize, String> {
+        for p in pair.clone().into_inner() {
+            match p.as_rule() {
+                Rule::polymeter_tail => {
+                    // TODO allow more generic parameter here
+                    if let Some(count) = p.into_inner().next() {
+                        return Ok(count.as_str().parse::<usize>().unwrap_or(1));
+                    }
+                }
+                _ => (),
+            }
+        }
+        Err(format!("invalid polymeter count\n{:?}", pair))
+    }
+
+    fn parse_polymeter(pair: Pair<Rule>) -> Result<Step, String> {
+        let count = Cycle::parse_polymeter_count(&pair)?;
         let mut inner = pair.clone().into_inner();
         if let Some(poly_list) = inner.next() {
             return Ok(Step::Polymeter(Polymeter {
                 count,
                 offset: 0,
-                steps: section_as_steps(poly_list),
+                steps: Cycle::parse_section(poly_list).unwrap_or(vec![]),
             }));
         }
+        Err(format!("invalid polymeter\n{:?}", pair))
     }
-    Err("invalid polymeter")
-}
 
-fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
-    let slope = (pulses as f64) / (steps as f64);
-    let mut pattern = vec![];
-    let mut prev = -1.0;
-    for i in 0..steps {
-        let curr = ((i as f64) * slope).floor();
-        pattern.push(curr != prev);
-        prev = curr;
+    fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
+        let slope = (pulses as f64) / (steps as f64);
+        let mut pattern = vec![];
+        let mut prev = -1.0;
+        for i in 0..steps {
+            let curr = ((i as f64) * slope).floor();
+            pattern.push(curr != prev);
+            prev = curr;
+        }
+        if let Some(rotate) = rotation {
+            pattern.rotate_left(rotate as usize);
+        }
+        pattern
     }
-    if let Some(rotate) = rotation {
-        pattern.rotate_left(rotate as usize);
-    }
-    pattern
-}
 
-// recursively parse a pair as a Step
-fn parse_step(pair: Pair<Rule>) -> Result<Step, &str> {
-    match pair.as_rule() {
-        Rule::single => {
-            if let Some(v) = pair.into_inner().next() {
-                Ok(Step::Single(Single {
-                    string: v.as_str().to_string(),
-                    value: StepValue::parse(v),
-                }))
-            } else {
-                unreachable!()
+    // helper to convert a section rule to a vector of Steps
+    fn parse_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
+        let mut steps = vec![];
+        for pair in pair.into_inner() {
+            match Cycle::parse_step(pair) {
+                Ok(s) => steps.push(s),
+                Err(s) => return Err(format!("failed to parse section\n{:?}", s)),
             }
         }
-        Rule::subdivision | Rule::mini => {
-            if let Some(first) = pair.clone().into_inner().next() {
-                match first.as_rule() {
-                    Rule::stack => {
-                        Ok(Step::Stack(as_stack(first, pair)))
-                    }
-                    _ => {
-                        let sd = Subdivision {
-                            steps: unwrap_section(pair),
-                        };
-                        Ok(Step::Subdivision(sd))
-                    }
+        Ok(steps)
+    }
+
+    // helper to convert a section or single to a vector of Steps
+    fn extract_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
+        if let Some(inner) = pair.into_inner().next() {
+            match inner.as_rule() {
+                Rule::single => {
+                    let single = Step::parse_single(inner)?;
+                    Ok(vec![single])
                 }
-            } else {
-                Ok(Step::Single(Single::default()))
-            }
-        }
-        Rule::alternating => {
-            if let Some(first) = pair.clone().into_inner().next() {
-                match first.as_rule() {
-                    Rule::stack => Ok(Step::Stack(as_stack(first, pair))),
-                    _ => {
-                        let a = Alternating {
-                            current: 0,
-                            steps: unwrap_section(pair),
-                        };
-                        Ok(Step::Alternating(a))
+                Rule::section => {
+                    Cycle::parse_section(inner)
+                }
+                Rule::choices => {
+                    let mut choices: Vec<Step> = vec![];
+                    for p in inner.clone().into_inner() {
+                        if let Some(step) = p.into_inner().next() {
+                            let choice = Cycle::parse_step(step)?;
+                            choices.push(choice)
+                        }else{
+                            return Err(format!("empty choice\n{:?}", inner))
+                        }
                     }
+                    Ok(vec![Step::Choices(Choices {
+                        choices,
+                    })])
                 }
-            } else {
-                Ok(Step::Single(Single::default()))
-            }
-        }
-        Rule::polymeter => {
-            if let Some(first) = pair.clone().into_inner().next() {
-                match first.as_rule() {
-                    Rule::stack => Ok(Step::Stack(as_stack(first, pair))),
-                    Rule::polymeter_tail => Ok(Step::Single(Single::default())),
-                    _ => as_polymeter(pair),
+                _ => {
+                    Err(format!("unexpected rule in section{:?}", inner))
                 }
-            } else {
-                Ok(Step::Single(Single::default()))
             }
+        } else {
+            Err("empty section".to_string())
         }
-        Rule::stack | Rule::section | Rule::choices => {
-            // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
-            // sections and choices are always immediately handled within other rules
-            // using unwrap_section or section_as_steps
-            Err("internal error, unexpected branch reached")
-        }
-        Rule::expr => {
-            let mut inner = pair.clone().into_inner();
-            if let Some(left_pair) = inner.next() {
-                let left = parse_step(left_pair)?;
-                if let Some(op) = inner.next() {
-                    match op.as_rule() {
-                        Rule::op_bjorklund => {
-                            let mut op_inner = op.into_inner();
-                            if let Some(pulse_pair) = op_inner.next() {
-                                let pulses = parse_step(pulse_pair)?;
-                                if let Some(steps_pair) = op_inner.next() {
-                                    let steps = parse_step(steps_pair)?;
-                                    let mut rotate = None;
-                                    if let Some(rotate_pair) = op_inner.next() {
-                                        rotate = Some(parse_step(rotate_pair)?);
-                                    }
-                                    return Ok(Step::Bjorklund(Bjorklund{
-                                        left: Box::new(left),
-                                        pulses: Box::new(pulses),
-                                        steps: Box::new(steps),
-                                        rotation: match rotate {
-                                            Some(r) => Some(Box::new(r)),
-                                            None => None
+    }
+
+
+    // recursively parse a pair as a Step
+    // errors here should be unreachable unless there is a bug in the pest grammar
+    fn parse_step(pair: Pair<Rule>) -> Result<Step, String> {
+        match pair.as_rule() {
+            Rule::single => {
+                Step::parse_single(pair)
+            }
+            Rule::subdivision | Rule::mini => {
+                if let Some(first) = pair.clone().into_inner().next() {
+                    match first.as_rule() {
+                        Rule::stack => Cycle::parse_stack(first, pair),
+                        _ => {
+                            let sd = Subdivision {
+                                steps: Cycle::extract_section(pair).unwrap_or(vec![]),
+                            };
+                            Ok(Step::Subdivision(sd))
+                        }
+                    }
+                } else {
+                    Ok(Step::Single(Single::default()))
+                }
+            }
+            Rule::alternating => {
+                if let Some(first) = pair.clone().into_inner().next() {
+                    match first.as_rule() {
+                        Rule::stack => Cycle::parse_stack(first, pair),
+                        _ => {
+                            let a = Alternating {
+                                current: 0,
+                                steps: Cycle::extract_section(pair).unwrap_or(vec![]),
+                            };
+                            Ok(Step::Alternating(a))
+                        }
+                    }
+                } else {
+                    Ok(Step::Single(Single::default()))
+                }
+            }
+            Rule::polymeter => {
+                if let Some(first) = pair.clone().into_inner().next() {
+                    match first.as_rule() {
+                        Rule::stack => Cycle::parse_stack(first, pair),
+                        Rule::polymeter_tail => Ok(Step::Single(Single::default())),
+                        _ => Cycle::parse_polymeter(pair),
+                    }
+                } else {
+                    Ok(Step::Single(Single::default()))
+                }
+            }
+            Rule::stack | Rule::section | Rule::choices => {
+                // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
+                // sections and choices are always immediately handled within other rules
+                // using Cycle::extract_section or Cycle::parse_section
+                Err(format!("unexpected pair\n{:?}", pair))
+            }
+            Rule::expr => {
+                let mut inner = pair.clone().into_inner();
+                match inner.next() {
+                    None => Err(format!("empty expression\n{:?}", pair)),
+                    Some(left_pair) => {
+                        let left = Cycle::parse_step(left_pair)?;
+                        match inner.next() {
+                            None => Err(format!("incomplete expression\n{:?}", pair)),
+                            Some(op) => {
+                                match op.as_rule() {
+                                    Rule::op_bjorklund => {
+                                        let mut op_inner = op.into_inner();
+                                        if let Some(pulse_pair) = op_inner.next() {
+                                            let pulses = Cycle::parse_step(pulse_pair)?;
+                                            if let Some(steps_pair) = op_inner.next() {
+                                                let steps = Cycle::parse_step(steps_pair)?;
+                                                let mut rotate = None;
+                                                if let Some(rotate_pair) = op_inner.next() {
+                                                    rotate = Some(Cycle::parse_step(rotate_pair)?);
+                                                }
+                                                return Ok(Step::Bjorklund(Bjorklund{
+                                                    left: Box::new(left),
+                                                    pulses: Box::new(pulses),
+                                                    steps: Box::new(steps),
+                                                    rotation: match rotate {
+                                                        Some(r) => Some(Box::new(r)),
+                                                        None => None
+                                                    }
+                                                }))
+                                            }
                                         }
-                                    }))
+                                        return Err(format!("invalid bjorklund\n{:?}", pair))
+                                    }
+                                    _ => {
+                                        let operator = Operator::parse(op.clone())?;
+                                        let mut inner = op.into_inner();
+                                        match inner.next() {
+                                            None => Err(format!("missing right hand side in expression\n{:?}", inner)),
+                                            Some(right_pair) => {
+                                                let right = Cycle::parse_step(right_pair)?;
+                                                match right {
+                                                    Step::Single(_) =>{
+                                                        let expr = Step::Expression(Expression {
+                                                            left: Box::new(left),
+                                                            right: Box::new(right),
+                                                            operator,
+                                                        });
+                                                        Ok(expr)
+                                                    }
+                                                    _ => Err("only single values are supported on the right hand side".to_string())
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                        _ => {
-                            let operator = Operator::parse(op.clone())?;
-                            if let Some(right_pair) = op.into_inner().next() {
-                                let right = parse_step(right_pair)?;
-                                let expr = Step::Expression(Expression {
-                                    left: Box::new(left),
-                                    right: Box::new(right),
-                                    operator,
-                                });
-                                return Ok(expr)
-                            }
-                        }
                     }
                 }
-            }
-            Err("incomplete expression")
-        }
-        _ => {
-            Err("rule not implemented")
-        }
-    }
-}
-
-// helper to convert a section rule to a vector of Steps
-fn section_as_steps(pair: Pair<Rule>) -> Vec<Step> {
-    let mut steps = vec![];
-    for pair in pair.into_inner() {
-        match parse_step(pair) {
-            Ok(s) => steps.push(s),
-            Err(s) => println!("{:?}", s),
-        }
-    }
-    steps
-}
-
-// helper to convert a section or single to a vector of Steps
-fn unwrap_section(pair: Pair<Rule>) -> Vec<Step> {
-    if let Some(inner) = pair.into_inner().next() {
-        match inner.as_rule() {
-            Rule::single => {
-                if let Ok(s) = parse_step(inner) {
-                    vec![s]
-                } else {
-                    vec![]
-                }
-            }
-            Rule::section => {
-                section_as_steps(inner)
-            }
-            Rule::choices => {
-                let mut choices: Vec<Step> = vec![];
-                for p in inner.into_inner() {
-                    if let Some(step) = p.into_inner().next() {
-                        if let Ok(choice) = parse_step(step) {
-                            choices.push(choice)
-                        }
-                    }
-                }
-                vec![Step::Choices(Choices {
-                    choices,
-                })]
             }
             _ => {
-                println!("{:?}", inner);
-                unreachable!()
+                Err(format!("rule not implemented\n{:?}", pair))
             }
         }
-    } else {
-        vec![]
     }
-}
 
-// recursively output events for the entire cycle based on some state (random seed)
-fn output(step: &mut Step, state: State) -> Events {
-    match step {
-        Step::Single(s) => {
-            Events::Single(SingleEvent {
-                length: 1.0,
-                target : Target::None,
-                span: Span::default(),
-                value: s.value.clone(),
-            })
-        }
-        Step::Subdivision(sd) => {
-            if sd.steps.len() == 0 {
-                unreachable!()
-            } else {
-                let mut events = vec![];
+    // TODO some rust abstraction impl?
+    fn crawl(step: &mut Step, fun: fn(&mut Step, usize), level: usize) {
+        fun(step, level);
+        match step {
+            Step::Single(_s) => (),
+            Step::Alternating(a) => {
+                for s in &mut a.steps {
+                    Cycle::crawl(s, fun, level + 1)
+                }
+            }
+            Step::Polymeter(pm) => {
+                for s in &mut pm.steps {
+                    Cycle::crawl(s, fun, level + 1)
+                }
+            }
+            Step::Subdivision(sd) => {
                 for s in &mut sd.steps {
-                    let e = output(s, state.clone());
-                    events.push(e)
-                    // events.extend(output_events(s, state.clone()))
-                }
-                // only applied for Subdivision and Polymeter groups
-                Events::subdivide_lengths(&mut events);
-                Events::Multi(MultiEvents{
-                    span: Span::default(),
-                    length: 1.0,
-                    events
-                })
-            }
-        }
-        Step::Alternating(a) => {
-            if a.steps.len() == 0 {
-                unreachable!()
-            } else {
-                let current = a.current % a.steps.len();
-                a.current += 1;
-                if let Some(step) = a.steps.get_mut(current) {
-                    output(step, state)
-                } else {
-                    unreachable!()
+                    Cycle::crawl(s, fun, level + 1)
                 }
             }
-        }
-        Step::Choices(cs) => {
-            // TODO move this outside
-            let seed = state.seed.unwrap_or_else(|| thread_rng().gen());
-            let mut rng = Xoshiro256PlusPlus::from_seed(seed);
-            let choice = rng.gen_range(0..cs.choices.len());
-            output(&mut cs.choices[choice], state)
-        }
-        Step::Polymeter(pm) => {
-            if pm.steps.len() == 0 {
-                unreachable!()
-            } else {
-                let mut events = vec![];
-                let length = pm.steps.len();
-                let offset = pm.offset;
-                
-                for i in 0..pm.count {
-                    events.push(output(
-                        &mut pm.steps[(offset + i) % length].clone(),
-                        state.clone()
-                    ))
+            Step::Choices(cs) => {
+                for s in &mut cs.choices {
+                    Cycle::crawl(s, fun, level + 1)
                 }
-                pm.offset += pm.count;
-                // only applied for Subdivision and Polymeter groups
-                Events::subdivide_lengths(&mut events);
-                Events::Multi(MultiEvents{
-                    span: Span::default(),
-                    length: 1.0,
-                    events
-                })
             }
-        }
-        Step::Stack(st) => {
-            if st.stack.len() == 0 {
-                unreachable!()
-            } else {
-                let mut channels = vec![];
+            Step::Stack(st) => {
                 for s in &mut st.stack {
-                    channels.push(output(s, state.clone()))
+                    Cycle::crawl(s, fun, level + 1)
                 }
-                Events::Poly(PolyEvents{
+            }
+            Step::Expression(e) => {
+                Cycle::crawl(e.left.as_mut(), fun, level + 1);
+                Cycle::crawl(e.right.as_mut(), fun, level + 1)
+            }
+            Step::Bjorklund(b) => {
+                Cycle::crawl(b.left.as_mut(), fun, level + 1);
+                Cycle::crawl(b.steps.as_mut(), fun, level + 1);
+                Cycle::crawl(b.pulses.as_mut(), fun, level + 1);
+                if let Some(rotation) = b.rotation.as_mut() {
+                    Cycle::crawl(rotation, fun, level + 1);
+                }
+            }
+        }
+    }
+
+    fn reset_step(step: &mut Step, _level: usize) {
+        match step {
+            Step::Alternating(a) => {
+                a.current = 0;
+            }
+            Step::Polymeter(pm) => {
+                pm.offset = 0;
+            }
+            _ => (),
+        }
+    }
+
+    // recursively output events for the entire cycle based on some state (random seed)
+    fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus) -> Events {
+        match step {
+            Step::Single(s) => {
+                Events::Single(SingleEvent {
+                    length: 1.0,
+                    target : Target::None,
                     span: Span::default(),
-                    length:1.0,
-                    channels
+                    value: s.value.clone(),
                 })
             }
-        }
-        Step::Expression(e) => {
-            match e.operator {
-                Operator::Fast() => {
+            Step::Subdivision(sd) => {
+                if sd.steps.len() == 0 {
+                    Events::empty()
+                } else {
                     let mut events = vec![];
-                    match e.right.as_ref() {
-                        Step::Single(s) => {
-                            if let Some(mult) = s.to_integer(){
-                                for _i in 0..mult{
-                                    events.push(output(&mut e.left, state.clone()))
-                                }
-                            }
-                        }
-                        _ => unreachable!()
+                    for s in &mut sd.steps {
+                        let e = Cycle::output(s, rng);
+                        events.push(e)
+                        // events.extend(output_events(s, rng))
                     }
+                    // only applied for Subdivision and Polymeter groups
                     Events::subdivide_lengths(&mut events);
-                    Events::Multi(MultiEvents {
+                    Events::Multi(MultiEvents{
                         span: Span::default(),
                         length: 1.0,
-                        events,
-                    })
-                }
-                Operator::Target() => {
-                    let mut out = output(e.left.as_mut(), state.clone());
-                    match e.right.as_ref() {
-                        Step::Single(s) => {
-                            out.mutate_events(&mut |e| 
-                                e.target = s.to_target()
-                            )
-                        }
-                        _ => unreachable!()
-                    }
-                    out
-                }
-                Operator::Degrade() => {
-                    let mut out = output(e.left.as_mut(), state.clone());
-                    match e.right.as_ref() {
-                        Step::Single(s) => {
-                            out.mutate_events(&mut |e : &mut SingleEvent|
-                                if let Some(chance) = s.to_chance(){
-                                    // TODO move this outside
-                                    let seed = state.seed.unwrap_or_else(|| thread_rng().gen());
-                                    let mut rng = Xoshiro256PlusPlus::from_seed(seed);
-                                    let random = rng.gen_range(0.0..1.0);
-                                    if chance < random {
-                                        e.value = StepValue::Rest
-                                    }
-                                }
-                            )
-                        }
-                        _ => unreachable!()
-                    }
-                    out
-                }
-                Operator::Replicate() => {
-                    let mut events = vec![];
-                    match e.right.as_ref() {
-                        Step::Single(s) => {
-                            if let Some(mult) = s.to_integer(){
-                                let out = output(&mut e.left, state.clone());
-                                for _i in 0..mult{
-                                    events.push(out.clone())
-                                }
-                            }
-                        }
-                        _ => unreachable!()
-                    }
-                    Events::subdivide_lengths(&mut events);
-                    Events::Multi(MultiEvents {
-                        span: Span::default(),
-                        length: 1.0,
-                        events,
+                        events
                     })
                 }
             }
-        }
-        Step::Bjorklund(b) => {
-            let mut events = vec![];
-            match b.pulses.as_ref() {
-                Step::Single(pulses_single) => {
-                    match b.steps.as_ref(){
-                        Step::Single(steps_single) => {
-                            let rotation = match &b.rotation {
-                                Some(r) => match r.as_ref() {
-                                    Step::Single(rotation_single) => {
-                                        if let Some(r) = rotation_single.to_integer() {
-                                            Some(r)
-                                        }else{
-                                            None
+            Step::Alternating(a) => {
+                if a.steps.len() == 0 {
+                    Events::empty()
+                } else {
+                    let current = a.current % a.steps.len();
+                    a.current += 1;
+                    if let Some(step) = a.steps.get_mut(current) {
+                        Cycle::output(step, rng)
+                    } else {
+                        Events::empty() // this can never happen
+                    }
+                }
+            }
+            Step::Choices(cs) => {
+                let choice = rng.gen_range(0..cs.choices.len());
+                Cycle::output(&mut cs.choices[choice], rng)
+            }
+            Step::Polymeter(pm) => {
+                if pm.steps.len() == 0 {
+                    Events::empty()
+                } else {
+                    let mut events = vec![];
+                    let length = pm.steps.len();
+                    let offset = pm.offset;
+                    
+                    for i in 0..pm.count {
+                        events.push(Cycle::output(
+                            &mut pm.steps[(offset + i) % length].clone(),
+                            rng
+                        ))
+                    }
+                    pm.offset += pm.count;
+                    // only applied for Subdivision and Polymeter groups
+                    Events::subdivide_lengths(&mut events);
+                    Events::Multi(MultiEvents{
+                        span: Span::default(),
+                        length: 1.0,
+                        events
+                    })
+                }
+            }
+            Step::Stack(st) => {
+                if st.stack.len() == 0 {
+                    Events::empty()
+                } else {
+                    let mut channels = vec![];
+                    for s in &mut st.stack {
+                        channels.push(Cycle::output(s, rng))
+                    }
+                    Events::Poly(PolyEvents{
+                        span: Span::default(),
+                        length:1.0,
+                        channels
+                    })
+                }
+            }
+            Step::Expression(e) => {
+                match e.operator {
+                    Operator::Fast() => {
+                        let mut events = vec![];
+                        match e.right.as_ref() {
+                            Step::Single(s) => {
+                                if let Some(mult) = s.to_integer(){
+                                    for _i in 0..mult{
+                                        events.push(Cycle::output(&mut e.left, rng))
+                                    }
+                                }
+                            }
+                            _ => () // TODO support something other than Step::Single as the right hand side
+                        }
+                        Events::subdivide_lengths(&mut events);
+                        Events::Multi(MultiEvents {
+                            span: Span::default(),
+                            length: 1.0,
+                            events,
+                        })
+                    }
+                    Operator::Target() => {
+                        let mut out = Cycle::output(e.left.as_mut(), rng);
+                        match e.right.as_ref() {
+                            Step::Single(s) => {
+                                out.mutate_events(&mut |e| 
+                                    e.target = s.to_target()
+                                )
+                            }
+                            _ => () // TODO support something other than Step::Single as the right hand side
+                        }
+                        out
+                    }
+                    Operator::Degrade() => {
+                        let mut out = Cycle::output(e.left.as_mut(), rng);
+                        match e.right.as_ref() {
+                            Step::Single(s) => {
+                                out.mutate_events(&mut |e : &mut SingleEvent|
+                                    if let Some(chance) = s.to_chance(){
+                                        if chance < rng.gen_range(0.0..1.0) {
+                                            e.value = StepValue::Rest
                                         }
                                     }
-                                    _ => unreachable!()
+                                )
+                            }
+                            _ => () // TODO support something other than Step::Single as the right hand side
+                        }
+                        out
+                    }
+                    Operator::Replicate() => {
+                        let mut events = vec![];
+                        match e.right.as_ref() {
+                            Step::Single(s) => {
+                                if let Some(mult) = s.to_integer(){
+                                    let out = Cycle::output(&mut e.left, rng);
+                                    for _i in 0..mult{
+                                        events.push(out.clone())
+                                    }
                                 }
-                                None => None
-                            };
-                            if let Some(pulses) = pulses_single.to_integer() {
-                                if let Some(steps) = steps_single.to_integer(){
-                                    let out = output(&mut b.left, state.clone());
-                                    for pulse in bjorklund_pattern(pulses, steps, rotation) {
-                                        if pulse {
-                                            events.push(out.clone())
-                                        }else{
-                                            events.push(Events::empty())
+                            }
+                            _ => () // TODO support something other than Step::Single as the right hand side
+                        }
+                        Events::subdivide_lengths(&mut events);
+                        Events::Multi(MultiEvents {
+                            span: Span::default(),
+                            length: 1.0,
+                            events,
+                        })
+                    }
+                }
+            }
+            Step::Bjorklund(b) => {
+                let mut events = vec![];
+                match b.pulses.as_ref() {
+                    Step::Single(pulses_single) => {
+                        match b.steps.as_ref(){
+                            Step::Single(steps_single) => {
+                                let rotation = match &b.rotation {
+                                    Some(r) => match r.as_ref() {
+                                        Step::Single(rotation_single) => {
+                                            if let Some(r) = rotation_single.to_integer() {
+                                                Some(r)
+                                            }else{
+                                                None
+                                            }
+                                        }
+                                        _ => None // TODO support something other than Step::Single as rotation
+                                    }
+                                    None => None
+                                };
+                                if let Some(pulses) = pulses_single.to_integer() {
+                                    if let Some(steps) = steps_single.to_integer(){
+                                        let out = Cycle::output(&mut b.left, rng);
+                                        for pulse in Cycle::bjorklund_pattern(pulses, steps, rotation) {
+                                            if pulse {
+                                                events.push(out.clone())
+                                            }else{
+                                                events.push(Events::empty())
+                                            }
                                         }
                                     }
                                 }
                             }
+                            _ => () // TODO support something other than Step::Single as steps
                         }
-                        _ => unreachable!()
                     }
+                    _ => () // TODO support something other than Step::Single as pulses
                 }
-                _ => unreachable!()
+                Events::subdivide_lengths(&mut events);
+                Events::Multi(MultiEvents {
+                    span: Span::default(),
+                    length: 1.0,
+                    events,
+                })
             }
-            Events::subdivide_lengths(&mut events);
-            Events::Multi(MultiEvents {
-                span: Span::default(),
-                length: 1.0,
-                events,
-            })
+            // _ => Events::Single(SingleEvent::default())
         }
-        // _ => Events::Single(SingleEvent::default())
     }
-}
 
-fn crawl_step(step: &mut Step, fun: fn(&mut Step, usize), level: usize) {
-    fun(step, level);
-    match step {
-        Step::Single(_s) => (),
-        Step::Alternating(a) => {
-            for s in &mut a.steps {
-                crawl_step(s, fun, level + 1)
+    // recursively transform the spans of events from relative time to absolute
+    fn transform_spans(events: &mut Events, span: &Span) {
+        let unit = span.length();
+        match events {
+            Events::Single(s) => {
+                s.length *= unit;
+                s.span = s.span.transform(&span);
             }
-        }
-        Step::Polymeter(pm) => {
-            for s in &mut pm.steps {
-                crawl_step(s, fun, level + 1)
+            Events::Multi(m) => {
+                m.length *= unit;
+                m.span = m.span.transform(&span);
+
+                for e in &mut m.events {
+                    Cycle::transform_spans(e, &m.span);
+                }
             }
-        }
-        Step::Subdivision(sd) => {
-            for s in &mut sd.steps {
-                crawl_step(s, fun, level + 1)
-            }
-        }
-        Step::Choices(cs) => {
-            for s in &mut cs.choices {
-                crawl_step(s, fun, level + 1)
-            }
-        }
-        Step::Stack(st) => {
-            for s in &mut st.stack {
-                crawl_step(s, fun, level + 1)
-            }
-        }
-        Step::Expression(e) => {
-            crawl_step(e.left.as_mut(), fun, level + 1);
-            crawl_step(e.right.as_mut(), fun, level + 1)
-        }
-        Step::Bjorklund(b) => {
-            crawl_step(b.left.as_mut(), fun, level + 1);
-            crawl_step(b.steps.as_mut(), fun, level + 1);
-            crawl_step(b.pulses.as_mut(), fun, level + 1);
-            if let Some(rotation) = b.rotation.as_mut() {
-                crawl_step(rotation, fun, level + 1);
+            Events::Poly(p) => {
+                p.length *= unit;
+                p.span = p.span.transform(&span);
+                for e in &mut p.channels {
+                    Cycle::transform_spans(e, &p.span);
+                }
             }
         }
     }
-}
 
-fn reset_step(step: &mut Step, _level: usize) {
-    match step {
-        Step::Alternating(a) => {
-            a.current = 0;
-        }
-        Step::Polymeter(pm) => {
-            pm.offset = 0;
-        }
-        _ => (),
+    // reset all the stateful steps like Alternating and Polymeter to their starting state
+    fn reset(&mut self) {
+        Cycle::crawl(&mut self.root, Cycle::reset_step, 0)
     }
-}
 
-// parse the root pair of the pest AST into a Subdivision
-// then update the spans of all the generated steps
-fn parse_tree(tree: &Pair<Rule>) -> Result<Step, String> {
-    let cycle = parse_step(tree.clone())?;
-    // update_span(&mut cycle, &Span::default());
-    Ok(cycle)
-}
-
-// parse a string into a step
-fn parse(input: &str) -> Result<Step, String> {
-    match MiniParser::parse(Rule::mini, &input) {
-        Ok(mut tree) => parse_tree(&tree.next().unwrap()),
-        Err(err) => Err(format!("{}", err)),
+    // parse the root pair of the pest AST into a Subdivision
+    // then update the spans of all the generated steps
+    fn generate(cycle: &mut Cycle) -> Vec<Vec<SingleEvent>>{
+        let mut events = Cycle::output(&mut cycle.root, &mut cycle.rng);
+        Cycle::transform_spans(&mut events, &Span::default());
+        // println!("{:#?}", events);
+        let mut channels = vec![];
+        events.flatten(&mut channels, 0);
+        channels
     }
-}
 
-#[cfg(test)]
-mod test {
-    use super::*;
+    fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
+        match Cycle::parse(Rule::mini, input) {
+            Ok(mut tree) => {
+                if let Some(mini) = tree.next() {
+                    println!("\nTREE");
+                    Cycle::print_pairs(&mini, 0);
+                    let root = Cycle::parse_step(mini)?;
+                    let seed = seed.unwrap_or_else(|| thread_rng().gen());
+                    let rng = Xoshiro256PlusPlus::from_seed(seed);
+                    Ok(Self {
+                        root,
+                        rng,
+                    })
+                }else{
+                    Err("couldn't parse input".to_string())
+                }
+            }
+            Err(err) => Err(format!("{}", err))
+        }
+    }
 
     fn indent_lines(level: usize) -> String {
         let mut lines = String::new();
@@ -970,98 +1038,76 @@ mod test {
             Step::Expression(e) => format!("Expression {:?}", e.operator),
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };
-        println!("{} {}", indent_lines(level), name);
+        println!("{} {}", Cycle::indent_lines(level), name);
     }
 
     fn print_pairs(pair: &Pair<Rule>, level: usize) {
         println!(
             "{} {:?} {:?}",
-            indent_lines(level),
+            Cycle::indent_lines(level),
             pair.as_rule(),
             pair.as_str()
         );
         for p in pair.clone().into_inner() {
-            print_pairs(&p, level + 1)
+            Cycle::print_pairs(&p, level + 1)
         }
     }
 
-    fn set_event_spans(events: &mut Events, span: &Span) {
-        let unit = span.length();
-        match events {
-            Events::Single(s) => {
-                s.length *= unit;
-                s.span = s.span.transform(&span);
-            }
-            Events::Multi(m) => {
-                m.length *= unit;
-                m.span = m.span.transform(&span);
-
-                for e in &mut m.events {
-                    set_event_spans(e, &m.span);
-                }
-            }
-            Events::Poly(p) => {
-                p.length *= unit;
-                p.span = p.span.transform(&span);
-                for e in &mut p.channels {
-                    set_event_spans(e, &p.span);
-                }
-            }
-        }
+    // TODO impl Display for Cycle
+    fn print(&mut self){
+        Cycle::crawl(&mut self.root, Cycle::print_steps, 0);
     }
+    
+}
 
-    fn parse_with_debug(input: &str) {
+#[derive(Clone)]
+struct State {
+    seed: Option<[u8; 32]>,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn parse_with_debug(input: &str){
         println!("\n{}", "=".repeat(42));
         println!("\nINPUT\n {:?}", input);
+        match Cycle::from(input, None) {
+            Ok(mut cycle) => {
+                println!("\nCYCLE");
+                cycle.print();
 
-        match MiniParser::parse(Rule::mini, &input) {
-            Ok(mut tree) => {
-                let mini = tree.next().unwrap();
-                println!("\nTREE");
-                print_pairs(&mini, 0);
-                match parse_tree(&mini) {
-                    Ok(mut step) => {
-                        println!("\nCYCLE");
-                        crawl_step(&mut step, print_steps, 0);
-                        let stateful_chars = ['<', '{', '|', '?'];
-                        let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
-                            5
-                        } else {
-                            1
-                        };
-                        println!("\nOUTPUT");
-                        for i in 0..repeats {
-                            println!(" {}", i);
-                            let mut events = output(&mut step, State { seed: None });
-                            set_event_spans(&mut events, &Span::default());
-                            // println!("{:#?}", events);
-
-                            let mut channels = vec![];
-                            events.collect(&mut channels, 0);
-
-                            let mut ci = 0;
-                            let channel_count = channels.len();
-                            for channel in &mut channels {
-                                if channel_count > 1 {
-                                    println!(" /{}", ci);
-                                }
-                                let mut i = 0;
-                                for event in channel {
-                                    println!("  │{:02}│ {}", i, event);
-                                    i += 1
-                                }
-                                ci += 1
-
-                            }
-                            // crawl_step(&mut step, reset_step, 0);
+                let stateful_chars = ['<', '{', '|', '?'];
+                let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
+                    5
+                } else {
+                    1
+                };
+                println!("\nOUTPUT");
+                for i in 0..repeats {
+                    println!(" {}", i);
+                    let mut channels = Cycle::generate(&mut cycle);
+                    let mut ci = 0;
+                    let channel_count = channels.len();
+                    for channel in &mut channels {
+                        if channel_count > 1 {
+                            println!(" /{}", ci);
                         }
+                        let mut i = 0;
+                        for event in channel {
+                            println!("  │{:02}│ {}", i, event);
+                            i += 1
+                        }
+                        ci += 1
+
                     }
-                    Err(s) => println!("{}", s),
+                    // cycle.reset();
                 }
             }
-            Err(err) => println!("{}", err),
+            Err(err) => println!("{}", err)
         }
     }
+
 
     #[test]
     pub fn test_tidal() {
@@ -1092,5 +1138,6 @@ mod test {
         parse_with_debug("a b!2 c!3 d!4 [1 2 3 4]!5");
         parse_with_debug("a(6,8)");
         parse_with_debug("[a b](3,8)");
+        parse_with_debug("[] [] [] []");
     }
 }
