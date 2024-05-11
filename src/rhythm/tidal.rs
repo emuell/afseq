@@ -824,7 +824,7 @@ impl Cycle {
 
                     for i in 0..pm.count {
                         events.push(Cycle::output(
-                            &mut pm.steps[(offset + i) % length].clone(),
+                            &mut pm.steps[(offset + i) % length],
                             rng,
                         ))
                     }
@@ -898,9 +898,11 @@ impl Cycle {
                     }
                     Operator::Replicate() => {
                         let mut events = vec![];
+                        let mut length = Fraction::from(1);
                         match e.right.as_ref() {
                             Step::Single(s) => {
                                 if let Some(mult) = s.to_integer() {
+                                    length = Fraction::from(mult);
                                     let out = Cycle::output(&mut e.left, rng);
                                     for _i in 0..mult {
                                         events.push(out.clone())
@@ -912,7 +914,7 @@ impl Cycle {
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
                             span: Span::default(),
-                            length: F::from(1),
+                            length,
                             events,
                         })
                     }
