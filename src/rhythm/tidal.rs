@@ -51,7 +51,7 @@ impl Pitch {
         if pitch.note == 0 && mark == -1 {
             if pitch.octave > 0 {
                 pitch.octave -= 1;
-                pitch.note = 11 as u8;
+                pitch.note = 11;
             }
         } else if pitch.note == 11 && mark == 1 {
             if pitch.octave < 10 {
@@ -170,8 +170,8 @@ enum Operator {
     Target(),  // :
     Degrade(), // ?
     Replicate(), // !
-               // Weight(),     // @
-               // Slow(),       // /
+    // Weight(),     // @
+    // Slow(),       // /
 }
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Operator, String> {
@@ -504,28 +504,13 @@ impl Events {
     }
 
     // merge holds then rests separately to avoid collapsing rests and holding notes before them
-    fn merge(channels: &Vec<Vec<Event>>) -> Vec<Vec<Event>> {
+    fn merge(channels: &[Vec<Event>]) -> Vec<Vec<Event>> {
         channels
             .iter()
-            .map(|events| Events::merge_holds(events))
+            .map(Events::merge_holds)
             .map(|events| Events::merge_rests(&events))
             .collect()
     }
-
-    // fn filter_events(events: &Vec<Event>, include: Value) -> Vec<Event> {
-    //     events
-    //         .iter()
-    //         .map(|e| e.clone())
-    //         .filter(|e| e.value == include)
-    //         .collect()
-    // }
-
-    // fn filter(channels: &Vec<Vec<Event>>, include: Value) -> Vec<Vec<Event>> {
-    //     channels
-    //         .iter()
-    //         .map(|events| Events::filter_events(events, include.clone()))
-    //         .collect()
-    // }
 }
 
 #[derive(Parser, Debug)]
@@ -588,15 +573,12 @@ impl Cycle {
 
     fn parse_polymeter_count(pair: &Pair<Rule>) -> Result<usize, String> {
         for p in pair.clone().into_inner() {
-            match p.as_rule() {
-                Rule::polymeter_tail => {
-                    // TODO allow more generic parameter here
-                    if let Some(count) = p.into_inner().next() {
-                        return Ok(count.as_str().parse::<usize>().unwrap_or(1));
-                    }
+            if p.as_rule() == Rule::polymeter_tail {
+                if let Some(count) = p.into_inner().next() {
+                    return Ok(count.as_str().parse::<usize>().unwrap_or(1));
                 }
-                _ => (),
             }
+            // TODO allow more generic parameter here
         }
         Err(format!("invalid polymeter count\n{:?}", pair))
     }
@@ -608,7 +590,7 @@ impl Cycle {
             return Ok(Step::Polymeter(Polymeter {
                 count,
                 offset: 0,
-                steps: Cycle::parse_section(poly_list).unwrap_or(vec![]),
+                steps: Cycle::parse_section(poly_list).unwrap_or_default(),
             }));
         }
         Err(format!("invalid polymeter\n{:?}", pair))
@@ -680,7 +662,7 @@ impl Cycle {
                         Rule::stack => Cycle::parse_stack(first, pair),
                         _ => {
                             let sd = Subdivision {
-                                steps: Cycle::extract_section(pair).unwrap_or(vec![]),
+                                steps: Cycle::extract_section(pair).unwrap_or_default(),
                             };
                             Ok(Step::Subdivision(sd))
                         }
@@ -696,7 +678,7 @@ impl Cycle {
                         _ => {
                             let a = Alternating {
                                 current: 0,
-                                steps: Cycle::extract_section(pair).unwrap_or(vec![]),
+                                steps: Cycle::extract_section(pair).unwrap_or_default(),
                             };
                             Ok(Step::Alternating(a))
                         }
@@ -745,14 +727,11 @@ impl Cycle {
                                                 left: Box::new(left),
                                                 pulses: Box::new(pulses),
                                                 steps: Box::new(steps),
-                                                rotation: match rotate {
-                                                    Some(r) => Some(Box::new(r)),
-                                                    None => None,
-                                                },
+                                                rotation: rotate.map(Box::new),
                                             }));
                                         }
                                     }
-                                    return Err(format!("invalid bjorklund\n{:?}", pair));
+                                    Err(format!("invalid bjorklund\n{:?}", pair))
                                 }
                                 _ => {
                                     let operator = Operator::parse(op.clone())?;
@@ -854,7 +833,7 @@ impl Cycle {
                 value: s.value.clone(),
             }),
             Step::Subdivision(sd) => {
-                if sd.steps.len() == 0 {
+                if sd.steps.is_empty() {
                     Events::empty()
                 } else {
                     let mut events = vec![];
@@ -873,7 +852,7 @@ impl Cycle {
                 }
             }
             Step::Alternating(a) => {
-                if a.steps.len() == 0 {
+                if a.steps.is_empty() {
                     Events::empty()
                 } else {
                     let current = a.current % a.steps.len();
@@ -890,7 +869,7 @@ impl Cycle {
                 Cycle::output(&mut cs.choices[choice], rng)
             }
             Step::Polymeter(pm) => {
-                if pm.steps.len() == 0 {
+                if pm.steps.is_empty() {
                     Events::empty()
                 } else {
                     let mut events = vec![];
@@ -911,7 +890,7 @@ impl Cycle {
                 }
             }
             Step::Stack(st) => {
-                if st.stack.len() == 0 {
+                if st.stack.is_empty() {
                     Events::empty()
                 } else {
                     let mut channels = vec![];
@@ -1000,13 +979,7 @@ impl Cycle {
                             Step::Single(steps_single) => {
                                 let rotation = match &b.rotation {
                                     Some(r) => match r.as_ref() {
-                                        Step::Single(rotation_single) => {
-                                            if let Some(r) = rotation_single.to_integer() {
-                                                Some(r)
-                                            } else {
-                                                None
-                                            }
-                                        }
+                                        Step::Single(rotation_single) => rotation_single.to_integer(),
                                         _ => None, // TODO support something other than Step::Single as rotation
                                     },
                                     None => None,
@@ -1047,11 +1020,11 @@ impl Cycle {
         match events {
             Events::Single(s) => {
                 s.length *= unit;
-                s.span = s.span.transform(&span);
+                s.span = s.span.transform(span);
             }
             Events::Multi(m) => {
                 m.length *= unit;
-                m.span = m.span.transform(&span);
+                m.span = m.span.transform(span);
 
                 for e in &mut m.events {
                     Cycle::transform_spans(e, &m.span);
@@ -1059,7 +1032,7 @@ impl Cycle {
             }
             Events::Poly(p) => {
                 p.length *= unit;
-                p.span = p.span.transform(&span);
+                p.span = p.span.transform(span);
                 for e in &mut p.channels {
                     Cycle::transform_spans(e, &p.span);
                 }
@@ -1082,19 +1055,15 @@ impl Cycle {
         events.flatten(&mut channels, 0);
 
         // this is just for test debugging
-        println!("\n{} {}", "OUTPUT", self.iteration);
-        let mut ci = 0;
+        println!("\nOUTPUT {}", self.iteration);
         let channel_count = channels.len();
-        for channel in &mut channels {
+        for (ci, channel) in channels.iter().enumerate() {
             if channel_count > 1 {
                 println!(" /{}", ci);
             }
-            let mut i = 0;
-            for event in channel {
+            for (i, event) in channel.iter().enumerate() {
                 println!("  │{:02}│ {}", i, event);
-                i += 1
             }
-            ci += 1
         }
 
         self.iteration += 1;
