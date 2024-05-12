@@ -34,6 +34,7 @@ crossbeam-channel = { version = "^0.5", optional = true }
 afplay = { git = "https://github.com/emuell/afplay", default-features = false, features = [
     "cpal-output",
 ], optional = true }
+fraction = { version = "0.15.2" }
 
 [dev-dependencies]
 notify = { version = "^6.1" }

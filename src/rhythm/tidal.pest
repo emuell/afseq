@@ -1,56 +1,74 @@
-// PEST parser definition for tidal mini-notations, based
-// on the TidalCycles mini-notation parser by Alex McLean.
+//! pest parser grammar for mini-notations, based
+//! on the TidalCycles mini-notation parser by Alex McLean.
 
-// numbers
-number        = @{ minus? ~ int ~ frac? ~ exp? }
-decimal_point = _{ "." }
-digit1_9      = _{ '1'..'9' }
-e             = _{ "e" | "E" }
-exp           = _{ e ~ (minus | plus)? ~ ASCII_DIGIT+ }
-frac          = _{ decimal_point ~ ASCII_DIGIT+ }
-int           = _{ zero | (digit1_9 ~ ASCII_DIGIT*) }
-minus         = _{ "-" }
-plus          = _{ "+" }
-zero          = _{ "0" }
-
-// delimiters
-comma = _{ "," }
-pipe  = _{ "|" }
-dot   = _{ "." }
-
-// character classes
+// define whitespaces as space, tab and non-breaking space
 WHITESPACE = _{ " " | "\t" | "\u{A0}" }
 
-// mini
-step_char = _{ ASCII_ALPHA | ASCII_DIGIT | "~" | "-" | "#" | "." | "^" | "_" }
-step      = @{ step_char+ }
+/// numbers types allowing [ "1" "1.0" "1." ".1" ]
+digit   = @{("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
+integer = @{ "-"? ~ digit}
+normal  = @{ "-"? ~ "." ~ digit }
+float   = @{ "-"? ~ digit ~ "." ~ (digit)* }
+// exp           = _{ ^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+ }
+number  = ${ (normal | float | integer) ~ !(ASCII_ALPHA) }
 
-sub_cycle       = { "[" ~ stack_or_choose ~ "]" }
-polymeter       = { "{" ~ polymeter_stack ~ "}" ~ polymeter_steps? }
-polymeter_steps = { "%" ~ slice }
+/// case-incensitive pitch type with note, optional octave and sharp or flat mark
+octave  = { "10" | ASCII_DIGIT }
+mark    = { "#"|"b" }
+note    = ${ (^"a"|^"b"|^"c"|^"d"|^"e"|^"f"|^"g") }
+pitch   = ${ note ~ mark? ~ octave? ~ !(ASCII_ALPHANUMERIC)}
 
-slow_sequence = { "<" ~ polymeter_stack ~ ">" }
+/// type for empty steps
+rest = @{ "~" ~ !(ASCII_ALPHANUMERIC) }
 
-slice    = _{ step | sub_cycle | polymeter | slow_sequence }
-slice_op = _{ op_weight | op_bjorklund | op_slow | op_fast | op_replicate | op_degrade | op_tail | op_range }
+/// type for held steps
+hold = @{ "_" ~ !(ASCII_ALPHANUMERIC) }
 
-op_weight    = { ("@" | "_") ~ number }
-op_replicate = { "!" }
-op_bjorklund = { "(" ~ (slice_with_ops ~ comma)+ ~ slice_with_ops ~ ")" }
-op_slow      = { "/" ~ number }
-op_fast      = { "*" ~ number }
-op_degrade   = { "?" ~ number }
-op_tail      = { ":" ~ number }
-op_range     = { ".." ~ number } // ???
+/// arbitrary string identifier type
+name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 
-slice_with_ops = _{ slice ~ slice_op* }
-sequence       = _{ slice_with_ops+ }
+/// possible literals for single steps
+single = { hold | rest | number | pitch | name }
 
-stack_tail  = { (comma ~ sequence)+ }
-choose_tail = { (pipe ~ sequence)+ }
-dot_tail    = { (dot ~ sequence)+ }
+/// operators
+op_fast      = ${ "*" ~ parameter }
+op_target    = ${ ":" ~ parameter }
+op_degrade   = ${ "?" ~ parameter }
+op_replicate = ${ "!" ~ parameter }
+op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
+// op_weight    = ${ ("@") ~ parameter }
+// op_slow      = ${ "/" ~ parameter }
+// op_range     = { ".." ~ parameter } // ???
+op = _{ op_fast | op_target | op_degrade | op_replicate | op_bjorklund }
 
-stack_or_choose = _{ sequence ~ (stack_tail | choose_tail | dot_tail)? }
-polymeter_stack = _{ sequence ~ stack_tail? }
+/// groups
+subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
+alternating     = { "<" ~ (stack | section)? ~ ">" }
+polymeter       = { "{" ~ (stack | section)? ~ "}" ~ polymeter_tail }
+polymeter_tail  = { "%" ~  polymeter_count}
+polymeter_count = { (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ !(ASCII_ALPHANUMERIC | "."))}
 
-mini = { SOI ~ stack_or_choose ~ EOI }
+group     = _{ subdivision | alternating | polymeter }
+
+// this should actually be { expr | group | single } at some point
+/// parameter for expressions with operators
+parameter = _{ single }
+
+expr      = { (single | group) ~ op+ }
+
+/// helper container that splits steps into sections
+section   = { (expr | single | group)+ }
+
+/// a single choice inside a choice list
+choice    = { expr | single | group }
+/// at least 2 choices, can only be inside subdivisions or the root
+choices   = { (choice) ~ ("|" ~ choice)+ }
+
+/// parallel sections of events found inside groups
+stack     = { (section) ~ ("," ~ section)+ }
+
+// shorthand for subdivisions
+// split          = { (section) ~ ("." ~ section)+ }
+
+/// the root of the cycle
+mini = { SOI ~ ( stack | choices | section) ~ (EOI | NEWLINE) }
