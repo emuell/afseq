@@ -908,6 +908,7 @@ impl Cycle {
                 match e.operator {
                     Operator::Fast() => {
                         let mut events = vec![];
+                         #[allow(clippy::single_match)] // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => {
                                 if let Some(mult) = s.to_integer() {
@@ -916,7 +917,7 @@ impl Cycle {
                                     }
                                 }
                             }
-                            _ => (), // TODO support something other than Step::Single as the right hand side
+                            _ => (), 
                         }
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
@@ -927,14 +928,16 @@ impl Cycle {
                     }
                     Operator::Target() => {
                         let mut out = Cycle::output(e.left.as_mut(), rng);
+                         #[allow(clippy::single_match)] // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => out.mutate_events(&mut |e| e.target = s.to_target()),
-                            _ => (), // TODO support something other than Step::Single as the right hand side
+                            _ => (),
                         }
                         out
                     }
                     Operator::Degrade() => {
                         let mut out = Cycle::output(e.left.as_mut(), rng);
+                         #[allow(clippy::single_match)] // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => out.mutate_events(&mut |e: &mut Event| {
                                 if let Some(chance) = s.to_chance() {
@@ -943,13 +946,14 @@ impl Cycle {
                                     }
                                 }
                             }),
-                            _ => (), // TODO support something other than Step::Single as the right hand side
+                            _ => (),
                         }
                         out
                     }
                     Operator::Replicate() => {
                         let mut events = vec![];
                         let mut length = Fraction::from(1);
+                         #[allow(clippy::single_match)] // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => {
                                 if let Some(mult) = s.to_integer() {
@@ -960,7 +964,7 @@ impl Cycle {
                                     }
                                 }
                             }
-                            _ => (), // TODO support something other than Step::Single as the right hand side
+                            _ => (),
                         }
                         Events::subdivide_lengths(&mut events);
                         Events::Multi(MultiEvents {
@@ -973,6 +977,7 @@ impl Cycle {
             }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
+                #[allow(clippy::single_match)] // TODO support something other than Step::Single as the right hand side
                 match b.pulses.as_ref() {
                     Step::Single(pulses_single) => {
                         match b.steps.as_ref() {
