@@ -1078,6 +1078,7 @@ impl Cycle {
     fn is_stateful(&self) -> bool {
         ['<', '{', '|', '?'].iter().any(|&c| self.input.contains(c))
     }
+
     fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
         match Cycle::parse(Rule::mini, input) {
             Ok(mut tree) => {
@@ -1157,44 +1158,6 @@ struct State {
 mod test {
     use super::*;
 
-    // fn parse_with_debug(input: &str) {
-    //     println!("\n{}", "=".repeat(42));
-    //     println!("\nINPUT\n {:?}", input);
-    //     match Cycle::from(input, None) {
-    //         Ok(mut cycle) => {
-    //             // println!("\nCYCLE");
-    //             // cycle.print();
-
-    //             let stateful_chars = ['<', '{', '|', '?'];
-    //             let repeats = if stateful_chars.iter().any(|&c| input.contains(c)) {
-    //                 5
-    //             } else {
-    //                 1
-    //             };
-    //             println!("\nOUTPUT");
-    //             for i in 0..repeats {
-    //             //     println!(" {}", i);
-    //                 let mut channels = cycle.generate();
-    //             //     let mut ci = 0;
-    //             //     let channel_count = channels.len();
-    //             //     for channel in &mut channels {
-    //             //         if channel_count > 1 {
-    //             //             println!(" /{}", ci);
-    //             //         }
-    //             //         let mut i = 0;
-    //             //         for event in channel {
-    //             //             println!("  │{:02}│ {}", i, event);
-    //             //             i += 1
-    //             //         }
-    //             //         ci += 1
-    //             //     }
-    //             //     // cycle.reset();
-    //             }
-    //         }
-    //         Err(err) => println!("{}", err),
-    //     }
-    // }
-
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
         let mut cycle = Cycle::from(input, None)?;
         for out in outputs {
@@ -1206,9 +1169,6 @@ mod test {
     #[test]
 
     pub fn test_tidal() -> Result<(), String> {
-        // let file = fs::read_to_string("rhythm/test.tidal").expect("file not found");
-        // let line = file.lines().next().expect("no lines in file");
-        // println!("\nInput:\n{:?}\n", line);
         assert_eq!(
             Cycle::from("a b c d", None)?.generate(),
             [[
@@ -1527,10 +1487,7 @@ mod test {
             ],
         )?;
 
-        // let test = Cycle::from("1 ~ ~ 2 3 _ ~ _", None)?.generate();
-        // println!("{:#?}", Events::merge(&test));
-
-        // TODO test random output // parse_with_debug("[a b c d]?0.5");
+        // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
         assert!(Cycle::from("a b c [d", None).is_err());
         assert!(Cycle::from("a b/ c [d", None).is_err());
