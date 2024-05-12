@@ -533,6 +533,7 @@ impl Events {
 pub struct Cycle {
     root: Step,
     iteration: u32,
+    input: String,
     rng: Xoshiro256PlusPlus,
 }
 
@@ -1100,6 +1101,9 @@ impl Cycle {
         channels
     }
 
+    fn is_stateful(&self) -> bool {
+        ['<', '{', '|', '?'].iter().any(|&c| self.input.contains(c))
+    }
     fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
         match Cycle::parse(Rule::mini, input) {
             Ok(mut tree) => {
@@ -1114,6 +1118,7 @@ impl Cycle {
                         root,
                         rng,
                         iteration,
+                        input: input.to_string(),
                     };
                     println!("\nCYCLE");
                     cycle.print();
