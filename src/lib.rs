@@ -37,6 +37,9 @@ pub use scale::Scale;
 pub mod event;
 pub use event::{Event, EventIter};
 
+pub mod tidal;
+// pub use tidal::{Cycle};
+
 pub mod pulse;
 pub use pulse::{Pulse, PulseIter, PulseIterItem};
 
