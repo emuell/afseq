@@ -1,12 +1,15 @@
 #![allow(dead_code)]
 use core::fmt::Display;
+
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
+
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
+
 use fraction::{Fraction, One, Zero};
 
-type F = fraction::Fraction;
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq)]
 struct Pitch {
@@ -513,8 +516,10 @@ impl Events {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[derive(Parser, Debug)]
-#[grammar = "rhythm/tidal.pest"]
+#[grammar = "tidal/cycle.pest"]
 pub struct Cycle {
     root: Step,
     iteration: u32,
@@ -1149,14 +1154,12 @@ impl Cycle {
     }
 }
 
-#[derive(Clone)]
-struct State {
-    seed: Option<[u8; 32]>,
-}
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {
     use super::*;
+    type F = fraction::Fraction;
 
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
         let mut cycle = Cycle::from(input, None)?;
@@ -1168,7 +1171,7 @@ mod test {
 
     #[test]
 
-    pub fn test_tidal() -> Result<(), String> {
+    pub fn cycle() -> Result<(), String> {
         assert_eq!(
             Cycle::from("a b c d", None)?.generate(),
             [[
