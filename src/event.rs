@@ -356,12 +356,14 @@ pub trait EventIter: Debug {
     /// `pulse_pattern_length` is the length of the pulse pattern.
     /// `emit_event` indicates whether the iterator should trigger the next event in the sequence as
     /// evaluated by the rhythm's gate.
+    /// 
+    /// Returns an optional stack of events, which should be emitted for the given pulse. 
     fn run(
         &mut self,
         pulse: PulseIterItem,
         pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Event>;
+    ) -> Option<Vec<Event>>;
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
@@ -376,7 +378,7 @@ pub trait EventIter: Debug {
 
 /// Standard Iterator impl for [`EventIter`]. Runs the iter with a 1 valued [`PulseIterItem`].
 impl Iterator for dyn EventIter {
-    type Item = Event;
+    type Item = Vec<Event>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let pulse = PulseIterItem {

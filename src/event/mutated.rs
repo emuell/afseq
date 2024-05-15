@@ -77,7 +77,7 @@ impl EventIter for MutatedEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Event> {
+    ) -> Option<Vec<Event>> {
         if emit_event {
             let event = self.events[self.event_index].clone();
             self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
@@ -85,7 +85,7 @@ impl EventIter for MutatedEventIter {
             if self.event_index >= self.events.len() {
                 self.event_index = 0;
             }
-            Some(event)
+            Some(vec![event])
         } else {
             None
         }

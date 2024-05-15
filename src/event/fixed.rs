@@ -48,7 +48,7 @@ impl EventIter for FixedEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Event> {
+    ) -> Option<Vec<Event>> {
         if !emit_event || self.events.is_empty() {
             return None;
         }
@@ -57,7 +57,7 @@ impl EventIter for FixedEventIter {
         if self.event_index >= self.events.len() {
             self.event_index = 0;
         }
-        Some(event)
+        Some(vec![event])
     }
 
     fn duplicate(&self) -> Box<dyn EventIter> {
