@@ -11,6 +11,7 @@ use mlua::chunk;
 use mlua::prelude::*;
 
 use self::{
+    cycle::CycleUserData,
     note::NoteUserData,
     rhythm::rhythm_from_userdata,
     sequence::SequenceUserData,
@@ -28,6 +29,7 @@ use crate::{
 
 // private binding impls
 mod callback;
+mod cycle;
 mod note;
 mod rhythm;
 mod scale;
@@ -237,6 +239,20 @@ fn register_global_bindings(
         "sequence",
         lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<SequenceUserData> {
             SequenceUserData::from(args)
+        })?,
+    )?;
+
+    // function cycle(input)
+    globals.raw_set(
+        "cycle",
+        lua.create_function(|lua, arg: LuaString| -> LuaResult<CycleUserData> {
+            // NB: don't keep borrowing app_data_ref here
+            let rand_seed = {
+                lua.app_data_ref::<LuaAppData>()
+                    .expect("Failed to access Lua app data")
+                    .rand_seed
+            };
+            CycleUserData::from(arg, rand_seed)
         })?,
     )?;
 

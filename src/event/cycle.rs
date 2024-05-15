@@ -12,7 +12,7 @@ use crate::{
 
 /// Emits a vector of [`Event`]S from a Tidal [`Cycle`].
 ///
-/// Channels from cycle are merged down into note events on different voives.
+/// Channels from cycle are merged down into note events on different voices.
 /// Times in cycles are converted to note delays.
 ///
 /// Float and String targets are currently unsupported and will result into None events.
@@ -22,26 +22,24 @@ pub struct CycleEventIter {
 }
 
 impl CycleEventIter {
-    /// Create a new cycle event iter from the given mini notation string.
-    ///
-    /// Returns error when the cycle string is invalid.
-    pub fn from_mini(input: &str) -> Result<Self, String> {
-        Ok(Self::from_cycle(Cycle::from(input, None)?))
-    }
-
-    /// Create a new cycle event iter from the given mini notation string and the
-    /// given seed for the cycle's random number generator.
-    ///
-    /// Returns error when the cycle string is invalid.
-    pub fn from_mini_with_seed(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
-        Ok(Self::from_cycle(Cycle::from(input, seed)?))
-    }
-
     /// Create a new cycle event iter from the given precompiled cycle
-    ///
-    /// Returns error when the cycle string is invalid.
-    pub(crate) fn from_cycle(cycle: Cycle) -> Self {
+    pub(crate) fn new(cycle: Cycle) -> Self {
         Self { cycle }
+    }
+
+    /// Try creating a new cycle event iter from the given mini notation string.
+    ///
+    /// Returns error when the cycle string failed to parse.
+    pub fn from_mini(input: &str) -> Result<Self, String> {
+        Ok(Self::new(Cycle::from(input, None)?))
+    }
+
+    /// Try creating a new cycle event iter from the given mini notation string
+    /// and the given seed for the cycle's random number generator.
+    ///
+    /// Returns error when the cycle string failed to parse.
+    pub fn from_mini_with_seed(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
+        Ok(Self::new(Cycle::from(input, seed)?))
     }
 
     /// Generate next batch of events from the next cycle run.
@@ -107,10 +105,10 @@ impl EventIter for CycleEventIter {
         _pulse_pattern_length: usize,
         emit_event: bool,
     ) -> Option<Vec<Event>> {
-        if !emit_event {
-            None
-        } else {
+        if emit_event {
             Some(self.generate_events())
+        } else {
+            None
         }
     }
 
