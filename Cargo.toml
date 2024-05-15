@@ -1,6 +1,6 @@
 [package]
 name = "afseq"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Experimental, dynamic, imperative and functional music sequence generator for Rust and Lua"
 authors = ["Eduard Müller <mail@emuell.net>"]
