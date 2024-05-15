@@ -31,7 +31,7 @@ impl BeatTimeRhythm {
             resolution = table.get::<&str, f32>("resolution")?;
             if resolution <= 0.0 {
                 return Err(bad_argument_error(
-                    "emit",
+                    "rhythm",
                     "resolution",
                     1,
                     "resolution must be > 0",
