@@ -10,8 +10,8 @@ use crossbeam_channel::Sender;
 
 use afplay::{
     source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlaybackStatusContext, AudioFilePlaybackStatusEvent, AudioFilePlayer, AudioOutput,
-    DefaultAudioOutput, Error, FilePlaybackOptions,
+    AudioFilePlaybackStatusContext, AudioFilePlaybackStatusEvent, AudioFilePlayer, AudioHostId,
+    AudioOutput, DefaultAudioOutput, Error, FilePlaybackOptions,
 };
 
 use crate::{
@@ -151,8 +151,18 @@ impl SamplePlayer {
         sample_pool: Arc<RwLock<SamplePool>>,
         playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        // create audio output (Jack on Linux, else the default system device)
+        let audio_output = {
+            #[cfg(target_os = "linux")]
+            {
+                DefaultAudioOutput::open_with_host(AudioHostId::Jack)?
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                DefaultAudioOutput::open_with_host(AudioHostId::Default)?
+            }
+        };
         // create player
-        let audio_output = DefaultAudioOutput::open()?;
         let player = AudioFilePlayer::new(audio_output.sink(), playback_status_sender);
         let playing_notes = Vec::new();
         let new_note_action = NewNoteAction::Continue;
