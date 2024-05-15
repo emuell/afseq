@@ -172,11 +172,16 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field repeats (integer|boolean)?
 ---
----Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the
----next event from the specified emit sequence gets triggered. When the end of the sequence is
----reached, it restarts from the beginning.<br>
----In order to dynamically generate notes, you can pass a function or a functions iterator, 
----instead of a fixed note array or sequence.
+---Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the event
+---from the specified emit sequence. When the end of the sequence is reached, it starts again from
+---the beginning.<br>
+---
+---To generate notes dynamically, you can pass a function or a function iterator, instead of a 
+---fixed array or sequence of notes.<br>
+---
+---Events can also be generated using the tidal cycle mini-notation. Cycles are repeated endlessly
+---by default, and have the duration of a single pulse in the pattern. Patterns can be used to 
+---sequence cycles too.
 ---
 ---### examples:
 ---```lua
@@ -218,8 +223,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---emit = pattern.from(tritone:chord(1, 4)):euclidean(6) +
 ---  pattern.from(tritone:chord(5, 4)):euclidean(6)
 ---
+----- a tidal cycle
+---emit = cycle("<[a3 c4 e4 a4]*3 [d4 g3 g4 c4]>")
+-----
 ---```
----@field emit Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun(context: EmitterContext):NoteValue)|(fun(context: EmitterContext):fun(context: EmitterContext):NoteValue)
+---@field emit Cycle|Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun(context: EmitterContext):NoteValue)|(fun(context: EmitterContext):fun(context: EmitterContext):NoteValue)
 
 
 ----------------------------------------------------------------------------------------------------
@@ -252,6 +260,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  pattern = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
 ---  emit = { "c4" },
 ---}
+---
 -----trigger random notes in a random pattern from a pentatonic scale
 ---return rhythm {
 ---  unit = "1/16",
@@ -265,6 +274,14 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---    end
 ---  end
 ---}
+---
+-----play a seeded tidal cycle
+---math.randomseed(9347565)
+---return rhythm {
+---  unit = "bar", -- emit one cycle per bar
+---  emit = cycle("[c4 [f5 f4]*2]|[c4 [g5 g4]*3]")
+---}
+-----
 ---```
 ---@param options RhythmOptions
 ---@return userdata

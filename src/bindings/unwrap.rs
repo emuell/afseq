@@ -6,8 +6,8 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaCallbackFactory, note::NoteUserData, sequence::SequenceUserData,
-        LuaTimeoutHook,
+        callback::LuaCallbackFactory, cycle::CycleUserData, note::NoteUserData,
+        sequence::SequenceUserData, LuaTimeoutHook,
     },
     prelude::*,
 };
@@ -800,6 +800,9 @@ pub(crate) fn event_iter_from_value(
             } else if userdata.is::<SequenceUserData>() {
                 let sequence = userdata.borrow::<SequenceUserData>()?;
                 Ok(Box::new(sequence.notes.clone().to_event_sequence()))
+            } else if userdata.is::<CycleUserData>() {
+                let cycle_userdata = userdata.borrow::<CycleUserData>()?;
+                Ok(Box::new(CycleEventIter::new(cycle_userdata.cycle.clone())))
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
