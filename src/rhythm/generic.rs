@@ -3,6 +3,7 @@
 use std::{
     borrow::{Borrow, Cow},
     cell::RefCell,
+    collections::VecDeque,
     fmt::Debug,
     rc::Rc,
 };
@@ -15,7 +16,7 @@ use crate::{
     gate::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
-    Gate, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
+    Gate, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -48,6 +49,8 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     event_iter: Box<dyn EventIter>,
     event_iter_sample_time: SampleTime,
     event_iter_next_sample_time: f64,
+    event_iter_pulse_item: PulseIterItem,
+    event_iter_items: VecDeque<Event>,
     sample_offset: SampleTime,
 }
 
@@ -62,6 +65,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         let event_iter = Box::<FixedEventIter>::default();
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
+        let event_iter_pulse_item = PulseIterItem::default();
+        let event_iter_items = VecDeque::new();
         let sample_offset = 0;
         Self {
             time_base,
@@ -73,6 +78,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             event_iter,
             event_iter_sample_time,
             event_iter_next_sample_time,
+            event_iter_pulse_item,
+            event_iter_items,
             sample_offset,
         }
     }
@@ -169,29 +176,15 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     }
 
     /// Set default instrument to event if none is set, else return the event as it is
-    fn event_with_default_instrument(&self, event: Option<Event>) -> Option<Event> {
+    fn event_with_default_instrument(&self, mut event: Event) -> Event {
         if let Some(instrument) = self.instrument {
-            if let Some(event) = event {
-                if let Event::NoteEvents(note_events) = event {
-                    let new_note_events = note_events
-                        .into_iter()
-                        .map(|note_event| {
-                            note_event.map(|mut note_event| {
-                                note_event.instrument = note_event.instrument.or(Some(instrument));
-                                note_event
-                            })
-                        })
-                        .collect::<Vec<_>>();
-                    Some(Event::NoteEvents(new_note_events))
-                } else {
-                    Some(event)
+            if let Event::NoteEvents(note_events) = &mut event {
+                for note_event in note_events.iter_mut().flatten() {
+                    note_event.instrument = note_event.instrument.or(Some(instrument));
                 }
-            } else {
-                event
             }
-        } else {
-            event
         }
+        event
     }
 }
 
@@ -202,6 +195,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Clone
         Self {
             pattern: self.pattern.duplicate(),
             event_iter: self.event_iter.duplicate(),
+            event_iter_items: self.event_iter_items.clone(),
             gate: self.gate.duplicate(),
             ..*self
         }
@@ -233,35 +227,55 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
-        // check if the next event is scheduled before the given target time
+        // check if the next event is due before the given target time
         self.event_iter_sample_time = sample_time;
         let next_sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
         if next_sample_time >= sample_time {
             // next event is not yet due
             return None;
         }
-        // generate a pulse from the pattern and pass the pulse to the gate
-        let (pulse, emit_event) = {
-            if let Some(pulse) = self.pattern.run() {
-                let emit_event = self.gate.run(&pulse);
-                (pulse, emit_event)
+        // fetch a new event items if neccessary
+        if self.event_iter_items.is_empty() {
+            // generate a pulse from the pattern and pass the pulse to the gate
+            let (new_pulse_item, emit_event) = {
+                if let Some(pulse) = self.pattern.run() {
+                    let emit_event = self.gate.run(&pulse);
+                    (pulse, emit_event)
+                } else {
+                    // pattern playback finished
+                    return None;
+                }
+            };
+            self.event_iter_pulse_item = new_pulse_item;
+            // generate new events from the gated pulse
+            let slice = self
+                .event_iter
+                .run(new_pulse_item, self.pattern.len(), emit_event);
+            if let Some(slice) = slice {
+                self.event_iter_items = VecDeque::from(slice);
             } else {
-                // pattern playback finished
-                return None;
+                self.event_iter_items.clear();
             }
-        };
-        // generate an event from the event iter
-        let pulse_pattern_length = self.pattern.len();
-        let mut event = self.event_iter.run(pulse, pulse_pattern_length, emit_event);
-        event = self.event_with_default_instrument(event);
+        }
+        // calculate current event's time and duration
+        let step_sample_time =
+            self.step.to_samples(&self.time_base) * self.event_iter_pulse_item.step_time;
+        let event_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
+        let event_duration = step_sample_time as SampleTime;
+        // fetch a new event item from the event deque
+        let event_item = self
+            .event_iter_items
+            .pop_front()
+            .map(|event| self.event_with_default_instrument(event));
+        // advance to the next pulse in the next iteration when all events got consumed
+        if self.event_iter_items.is_empty() {
+            self.event_iter_next_sample_time += step_sample_time;
+        }
         // return event as sample timed rhythm iter item
-        let time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-        let duration = (self.step.to_samples(&self.time_base) * pulse.step_time) as SampleTime;
-        self.event_iter_next_sample_time += self.step.to_samples(&self.time_base) * pulse.step_time;
         Some(RhythmIterItem {
-            time,
-            event,
-            duration,
+            time: event_time,
+            event: event_item,
+            duration: event_duration,
         })
     }
 }
@@ -308,11 +322,14 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
     fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;
+        // reset pattern and gate
+        self.pattern.reset();
+        self.gate.reset();
         // reset iterator state
         self.event_iter.reset();
         self.event_iter_sample_time = 0;
         self.event_iter_next_sample_time = self.offset.to_samples(&self.time_base);
-        self.pattern.reset();
-        self.gate.reset();
+        self.event_iter_pulse_item = PulseIterItem::default();
+        self.event_iter_items.clear();
     }
 }

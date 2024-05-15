@@ -25,7 +25,7 @@ impl EventIter for EmptyEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         _emit_event: bool,
-    ) -> Option<Event> {
+    ) -> Option<Vec<Event>> {
         None
     }
 
