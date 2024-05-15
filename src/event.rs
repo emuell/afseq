@@ -12,6 +12,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+pub mod cycle;
 pub mod empty;
 pub mod fixed;
 pub mod mutated;
