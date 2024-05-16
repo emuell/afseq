@@ -12,7 +12,7 @@
 ---@class Scale
 ---Scale note values as integers, in ascending order of the mode, starting from the scale's key note.
 ---@field notes integer[]
-Scale = {}
+local Scale = {}
 
 ---Create a chord from the given degree, built from the scale's intervals.
 ---Skips nth notes from the root as degree, then takes every second note

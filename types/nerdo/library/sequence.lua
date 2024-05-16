@@ -8,7 +8,7 @@
 
 ---@class Sequence
 ---@field notes NoteTable[][]
-Sequence = {}
+local Sequence = {}
 
 ---Create a copy of all notes in the sequence with transposed note values.
 ---@param step integer|integer[]

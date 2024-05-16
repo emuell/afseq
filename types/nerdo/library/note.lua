@@ -12,13 +12,13 @@
 ---@field volume number? Volume in range [0.0 - 1.0]
 ---@field panning number? Panning factor in range [-1.0 - 1.0] where 0 is center
 ---@field delay number? Delay factor in range [0.0 - 1.0]
-NoteTable = {}
+local NoteTable = {}
 
 ----------------------------------------------------------------------------------------------------
 
 ---@class Note
 ---@field notes NoteTable[]
-Note = {}
+local Note = {}
 
 ---Create a transposed copy of the note or chord.
 ---@param step integer|integer[]
