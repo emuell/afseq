@@ -71,4 +71,4 @@ stack     = { (section) ~ ("," ~ section)+ }
 // split          = { (section) ~ ("." ~ section)+ }
 
 /// the root of the cycle
-mini = { SOI ~ ( stack | choices | section) ~ (EOI | NEWLINE) }
+mini = { SOI ~ ( stack | choices | section) ~ EOI }
