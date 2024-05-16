@@ -1260,6 +1260,10 @@ mod test {
             ]]
         );
         assert_eq!(
+            Cycle::from("\ta\r\n\tb\nc\n d\n\n", None)?.generate(),
+            Cycle::from("a b c d", None)?.generate()
+        );
+        assert_eq!(
             Cycle::from("a b [ c d ]", None)?.generate(),
             [[
                 Event::at(F::from(0), F::new(1u8, 3u8)).with_note(9, 4),

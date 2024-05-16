@@ -1,8 +1,8 @@
 //! pest parser grammar for mini-notations, based
 //! on the TidalCycles mini-notation parser by Alex McLean.
 
-// define whitespaces as space, tab and non-breaking space
-WHITESPACE = _{ " " | "\t" | "\u{A0}" }
+// define whitespaces as space, tab, non-breaking space and newlines
+WHITESPACE = _{ " " | "\t" | "\u{A0}" | NEWLINE }
 
 /// numbers types allowing [ "1" "1.0" "1." ".1" ]
 digit   = @{("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
@@ -71,4 +71,4 @@ stack     = { (section) ~ ("," ~ section)+ }
 // split          = { (section) ~ ("." ~ section)+ }
 
 /// the root of the cycle
-mini = { SOI ~ ( stack | choices | section) ~ (EOI | NEWLINE) }
+mini = { SOI ~ ( stack | choices | section) ~ EOI }
