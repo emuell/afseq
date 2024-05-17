@@ -722,7 +722,7 @@ impl Cycle {
         }
         if let Some(rotate) = rotation {
             if steps > 0 {
-                pattern.rotate_left((rotate % (steps)) as usize);
+                pattern.rotate_left((rotate % steps) as usize);
             }
         }
         pattern
