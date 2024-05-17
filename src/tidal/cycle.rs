@@ -712,20 +712,22 @@ impl Cycle {
     }
 
     fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
-        let slope = (pulses as f64) / (steps as f64);
-        let mut pattern = vec![];
-        let mut prev = -1.0;
-        for i in 0..steps {
-            let curr = ((i as f64) * slope).floor();
-            pattern.push(curr != prev);
-            prev = curr;
-        }
-        if let Some(rotate) = rotation {
-            if steps > 0 {
+        if steps > 0 {
+            let slope = (pulses as f64) / (steps as f64);
+            let mut pattern = vec![];
+            let mut prev = -1.0;
+            for i in 0..steps {
+                let curr = ((i as f64) * slope).floor();
+                pattern.push(curr != prev);
+                prev = curr;
+            }
+            if let Some(rotate) = rotation {
                 pattern.rotate_left((rotate % steps) as usize);
             }
+            pattern
+        } else {
+            vec![]
         }
-        pattern
     }
 
     // helper to convert a section rule to a vector of Steps
