@@ -28,6 +28,7 @@ pub use super::{
     Chord,
     Event,
     EventIter,
+    EventIterItem,
     Gate,
     Note,
     Pattern,

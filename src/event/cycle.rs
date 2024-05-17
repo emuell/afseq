@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use fraction::{Fraction, ToPrimitive};
+use fraction::Fraction;
 
 use crate::{
-    event::{new_note, Event, EventIter, InstrumentId, NoteEvent},
+    event::{new_note, Event, EventIter, EventIterItem, InstrumentId, NoteEvent},
     tidal::{Cycle, Target as CycleTarget, Value as CycleValue},
     BeatTimeBase, Note, PulseIterItem,
 };
@@ -13,8 +13,6 @@ use crate::{
 /// Emits a vector of [`Event`]S from a Tidal [`Cycle`].
 ///
 /// Channels from cycle are merged down into note events on different voices.
-/// Times in cycles are converted to note delays.
-///
 /// Float and String targets are currently unsupported and will result into None events.
 #[derive(Clone, Debug)]
 pub struct CycleEventIter {
@@ -44,12 +42,13 @@ impl CycleEventIter {
 
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
-    fn generate_events(&mut self) -> Vec<Event> {
+    fn generate_events(&mut self) -> Vec<EventIterItem> {
         // convert cycle channel items to a list of note events, sorted by time
-        let mut timed_note_events: Vec<(Fraction, Vec<Option<NoteEvent>>)> = Vec::new();
+        let mut timed_note_events: Vec<(Fraction, Fraction, Vec<Option<NoteEvent>>)> = Vec::new();
         for (channel_index, channel) in self.cycle.generate().into_iter().enumerate() {
             for event in channel.into_iter() {
-                let start_time = event.span().start();
+                let start = event.span().start();
+                let length = event.span().length();
                 let instrument = match event.target() {
                     CycleTarget::None => None,
                     CycleTarget::Index(i) => Some(InstrumentId::from(i as usize)),
@@ -64,27 +63,31 @@ impl CycleEventIter {
                     CycleValue::Name(_) => None, // TODO
                 };
                 if let Some(note_event) = note_event {
-                    match timed_note_events.binary_search_by(|(time, _)| time.cmp(&start_time)) {
+                    match timed_note_events.binary_search_by(|(time, _, _)| time.cmp(&start)) {
                         Ok(pos) => {
-                            let note_events = &mut timed_note_events[pos].1;
+                            // use max length of all notes in stack
+                            let note_length = &mut timed_note_events[pos].1;
+                            *note_length = (*note_length).max(length);
+                            // add note to existing time stack
+                            let note_events = &mut timed_note_events[pos].2;
                             note_events.resize(channel_index + 1, None);
                             note_events[channel_index] = Some(note_event);
                         }
                         Err(pos) => {
-                            timed_note_events.insert(pos, (start_time, vec![Some(note_event)]))
+                            timed_note_events.insert(pos, (start, length, vec![Some(note_event)]))
                         }
                     }
                 }
             }
         }
         // convert to a list of NoteEvents, applying start time as note delay
-        let mut events: Vec<Event> = Vec::with_capacity(timed_note_events.len());
-        for (start_time, mut note_events) in timed_note_events.into_iter() {
-            let delay = start_time.to_f32().unwrap_or(0.0);
-            for note_event in note_events.iter_mut().flatten() {
-                note_event.delay = delay
-            }
-            events.push(Event::NoteEvents(note_events));
+        let mut events: Vec<EventIterItem> = Vec::with_capacity(timed_note_events.len());
+        for (start_time, length, note_events) in timed_note_events.into_iter() {
+            events.push(EventIterItem::new_with_fraction(
+                Event::NoteEvents(note_events),
+                start_time,
+                length,
+            ));
         }
         events
     }
@@ -104,7 +107,7 @@ impl EventIter for CycleEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Vec<Event>> {
+    ) -> Option<Vec<EventIterItem>> {
         if emit_event {
             Some(self.generate_events())
         } else {

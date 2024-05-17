@@ -8,11 +8,13 @@ use std::{
     rc::Rc,
 };
 
+use fraction::ToPrimitive;
+
 #[cfg(test)]
 use std::borrow::BorrowMut;
 
 use crate::{
-    event::{fixed::FixedEventIter, Event, EventIter, InstrumentId},
+    event::{fixed::FixedEventIter, Event, EventIter, EventIterItem, InstrumentId},
     gate::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
@@ -50,7 +52,7 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     event_iter_sample_time: SampleTime,
     event_iter_next_sample_time: f64,
     event_iter_pulse_item: PulseIterItem,
-    event_iter_items: VecDeque<Event>,
+    event_iter_items: VecDeque<EventIterItem>,
     sample_offset: SampleTime,
 }
 
@@ -176,15 +178,15 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     }
 
     /// Set default instrument to event if none is set, else return the event as it is
-    fn event_with_default_instrument(&self, mut event: Event) -> Event {
+    fn event_with_default_instrument(&self, mut event_item: EventIterItem) -> EventIterItem {
         if let Some(instrument) = self.instrument {
-            if let Event::NoteEvents(note_events) = &mut event {
+            if let Event::NoteEvents(note_events) = &mut event_item.event {
                 for note_event in note_events.iter_mut().flatten() {
                     note_event.instrument = note_event.instrument.or(Some(instrument));
                 }
             }
         }
-        event
+        event_item
     }
 }
 
@@ -260,23 +262,43 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         // calculate current event's time and duration
         let step_sample_time =
             self.step.to_samples(&self.time_base) * self.event_iter_pulse_item.step_time;
-        let event_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
-        let event_duration = step_sample_time as SampleTime;
+        let event_iter_time = self.sample_offset as f64 + self.event_iter_next_sample_time;
+        let event_iter_duration = step_sample_time;
         // fetch a new event item from the event deque
         let event_item = self
             .event_iter_items
             .pop_front()
             .map(|event| self.event_with_default_instrument(event));
-        // advance to the next pulse in the next iteration when all events got consumed
-        if self.event_iter_items.is_empty() {
-            self.event_iter_next_sample_time += step_sample_time;
-        }
         // return event as sample timed rhythm iter item
-        Some(RhythmIterItem {
-            time: event_time,
-            event: event_item,
-            duration: event_duration,
-        })
+        if let Some(event_item) = event_item {
+            // apply start and length from the event
+            let event_time =
+                event_iter_time + step_sample_time * event_item.start.to_f64().unwrap_or(0.0);
+            let event_duration = event_iter_duration * event_item.length.to_f64().unwrap_or(1.0);
+            if event_time as SampleTime >= sample_time {
+                // the given event is not yet due. put it back:
+                self.event_iter_items.push_front(event_item);
+                return None;
+            }
+            // advance to the next pulse in the next iteration when all events got consumed
+            if self.event_iter_items.is_empty() {
+                self.event_iter_next_sample_time += step_sample_time;
+            }
+            Some(RhythmIterItem {
+                time: event_time as SampleTime,
+                event: Some(event_item.event),
+                duration: event_duration as SampleTime,
+            })
+        } else {
+            // advance to the next pulse in the next iteration
+            self.event_iter_next_sample_time += step_sample_time;
+            // and return a timed None event
+            Some(RhythmIterItem {
+                time: event_iter_time as SampleTime,
+                event: None,
+                duration: event_iter_duration as SampleTime,
+            })
+        }
     }
 }
 

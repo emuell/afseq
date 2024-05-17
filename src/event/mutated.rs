@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
-    event::{fixed::FixedEventIter, Event, EventIter},
+    event::{fixed::FixedEventIter, Event, EventIter, EventIterItem},
     BeatTimeBase, PulseIterItem,
 };
 
@@ -77,7 +77,7 @@ impl EventIter for MutatedEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Vec<Event>> {
+    ) -> Option<Vec<EventIterItem>> {
         if emit_event {
             let event = self.events[self.event_index].clone();
             self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
@@ -85,7 +85,7 @@ impl EventIter for MutatedEventIter {
             if self.event_index >= self.events.len() {
                 self.event_index = 0;
             }
-            Some(vec![event])
+            Some(vec![EventIterItem::new(event)])
         } else {
             None
         }
