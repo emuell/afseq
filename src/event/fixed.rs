@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    event::{Event, EventIter, NoteEvent, ParameterChangeEvent},
+    event::{Event, EventIter, EventIterItem, NoteEvent, ParameterChangeEvent},
     BeatTimeBase, Note, PulseIterItem,
 };
 
@@ -48,7 +48,7 @@ impl EventIter for FixedEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Vec<Event>> {
+    ) -> Option<Vec<EventIterItem>> {
         if !emit_event || self.events.is_empty() {
             return None;
         }
@@ -57,7 +57,7 @@ impl EventIter for FixedEventIter {
         if self.event_index >= self.events.len() {
             self.event_index = 0;
         }
-        Some(vec![event])
+        Some(vec![EventIterItem::new(event)])
     }
 
     fn duplicate(&self) -> Box<dyn EventIter> {

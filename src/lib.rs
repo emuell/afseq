@@ -35,7 +35,7 @@ pub mod scale;
 pub use scale::Scale;
 
 pub mod event;
-pub use event::{Event, EventIter};
+pub use event::{Event, EventIter, EventIterItem};
 
 pub mod tidal;
 // pub use tidal::{Cycle};

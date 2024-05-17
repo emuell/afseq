@@ -1,9 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{
-    event::{Event, EventIter},
-    BeatTimeBase, PulseIterItem,
-};
+use crate::{event::EventIter, BeatTimeBase, EventIterItem, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -25,7 +22,7 @@ impl EventIter for EmptyEventIter {
         _pulse: PulseIterItem,
         _pulse_pattern_length: usize,
         _emit_event: bool,
-    ) -> Option<Vec<Event>> {
+    ) -> Option<Vec<EventIterItem>> {
         None
     }
 

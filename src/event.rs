@@ -1,16 +1,19 @@
 //! Events and event iterators which get emitted by a `Rhythm`.
 
-use crate::{BeatTimeBase, Note, PulseIterItem};
-use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
-
-use derive_more::{Deref, Display, From, Into};
-
 use std::{
     borrow::Cow,
     fmt::Debug,
     fmt::Display,
     sync::atomic::{AtomicUsize, Ordering},
 };
+
+use crate::{BeatTimeBase, Note, PulseIterItem};
+use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
+
+use derive_more::{Deref, Display, From, Into};
+use fraction::{ConstOne, ConstZero, Fraction};
+
+// -------------------------------------------------------------------------------------------------
 
 pub mod cycle;
 pub mod empty;
@@ -343,6 +346,36 @@ impl Display for Event {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Event with an optional start and length fraction which gets emitted by an [`EventIter`].
+#[derive(Clone, PartialEq, Debug)]
+pub struct EventIterItem {
+    pub event: Event,     // The emitted event
+    pub start: Fraction,  // Relative event start time in range 0..1
+    pub length: Fraction, // Relative event length in range 0..1
+}
+
+impl EventIterItem {
+    /// Create a new event iter item with default start and length
+    pub fn new(event: Event) -> Self {
+        Self {
+            event,
+            start: Fraction::ZERO,
+            length: Fraction::ONE,
+        }
+    }
+
+    /// Create a new event iter item with custom start and length
+    pub fn new_with_fraction(event: Event, start: Fraction, length: Fraction) -> Self {
+        Self {
+            start,
+            length,
+            event,
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// A resettable [`Event`] iterator, triggered via [`Pulse`](`crate::Pulse`)S.
 /// Used by [Rhythm](`crate::Rhythm`) to emit events from pulse patterns.
 pub trait EventIter: Debug {
@@ -357,14 +390,14 @@ pub trait EventIter: Debug {
     /// `pulse_pattern_length` is the length of the pulse pattern.
     /// `emit_event` indicates whether the iterator should trigger the next event in the sequence as
     /// evaluated by the rhythm's gate.
-    /// 
-    /// Returns an optional stack of events, which should be emitted for the given pulse. 
+    ///
+    /// Returns an optional stack of event iter items, which should be emitted for the given pulse.
     fn run(
         &mut self,
         pulse: PulseIterItem,
         pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Vec<Event>>;
+    ) -> Option<Vec<EventIterItem>>;
 
     /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
     /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
@@ -379,7 +412,7 @@ pub trait EventIter: Debug {
 
 /// Standard Iterator impl for [`EventIter`]. Runs the iter with a 1 valued [`PulseIterItem`].
 impl Iterator for dyn EventIter {
-    type Item = Vec<Event>;
+    type Item = Vec<EventIterItem>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let pulse = PulseIterItem {

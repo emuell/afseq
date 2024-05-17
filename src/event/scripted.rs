@@ -4,7 +4,7 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{note_events_from_value, LuaCallback, LuaTimeoutHook},
-    BeatTimeBase, Event, EventIter, PulseIterItem,
+    BeatTimeBase, Event, EventIter, EventIterItem, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ impl ScriptedEventIter {
         &mut self,
         pulse: PulseIterItem,
         pulse_pattern_length: usize,
-    ) -> LuaResult<Option<Vec<Event>>> {
+    ) -> LuaResult<Option<Vec<EventIterItem>>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
@@ -70,7 +70,7 @@ impl ScriptedEventIter {
         // invoke callback and evaluate the result
         if let Some(value) = self.callback.call()? {
             let events = note_events_from_value(&value, None)?;
-            Ok(Some(vec![Event::NoteEvents(events)]))
+            Ok(Some(vec![EventIterItem::new(Event::NoteEvents(events))]))
         } else {
             Ok(None)
         }
@@ -111,7 +111,7 @@ impl EventIter for ScriptedEventIter {
         pulse: PulseIterItem,
         pulse_pattern_length: usize,
         emit_event: bool,
-    ) -> Option<Vec<Event>> {
+    ) -> Option<Vec<EventIterItem>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
             let event = match self.next_event(pulse, pulse_pattern_length) {
