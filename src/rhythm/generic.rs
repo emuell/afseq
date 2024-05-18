@@ -8,7 +8,7 @@ use std::{
     rc::Rc,
 };
 
-use fraction::ToPrimitive;
+use fraction::{ConstOne, ConstZero, Fraction, ToPrimitive};
 
 #[cfg(test)]
 use std::borrow::BorrowMut;
@@ -177,6 +177,26 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         Self { event_iter, ..self }
     }
 
+    /// Return current pulse duration in samples
+    pub fn current_steps_sample_duration(&self) -> f64 {
+        self.step.to_samples(&self.time_base) * self.event_iter_pulse_item.step_time
+    }
+
+    /// Return start sample time of the given event iter item
+    fn event_iter_item_start_time(&self, start: &Fraction) -> SampleTime {
+        let step_time = self.current_steps_sample_duration();
+        let event_iter_time = self.sample_offset as f64 + self.event_iter_next_sample_time;
+        let start = start.to_f64().unwrap_or(0.0);
+        (event_iter_time + (step_time * start)) as SampleTime
+    }
+
+    /// Return duration in sample time of the given event iter item
+    fn event_iter_item_duration(&self, length: &Fraction) -> SampleTime {
+        let step_time = self.current_steps_sample_duration();
+        let length = length.to_f64().unwrap_or(1.0);
+        (step_time * length) as SampleTime
+    }
+
     /// Set default instrument to event if none is set, else return the event as it is
     fn event_with_default_instrument(&self, mut event_item: EventIterItem) -> EventIterItem {
         if let Some(instrument) = self.instrument {
@@ -229,14 +249,14 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
-        // check if the next event is due before the given target time
+        // quickly check if the next event is due before the given target time
         self.event_iter_sample_time = sample_time;
         let next_sample_time = self.sample_offset + self.event_iter_next_sample_time as SampleTime;
         if next_sample_time >= sample_time {
             // next event is not yet due
             return None;
         }
-        // fetch a new event items if neccessary
+        // fetch new event iter items, if neccessary
         if self.event_iter_items.is_empty() {
             // generate a pulse from the pattern and pass the pulse to the gate
             let (new_pulse_item, emit_event) = {
@@ -259,44 +279,43 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
                 self.event_iter_items.clear();
             }
         }
-        // calculate current event's time and duration
-        let step_sample_time =
-            self.step.to_samples(&self.time_base) * self.event_iter_pulse_item.step_time;
-        let event_iter_time = self.sample_offset as f64 + self.event_iter_next_sample_time;
-        let event_iter_duration = step_sample_time;
-        // fetch a new event item from the event deque
-        let event_item = self
+        // fetch a new event item from the event iter item deque
+        if let Some(event_item) = self
             .event_iter_items
             .pop_front()
-            .map(|event| self.event_with_default_instrument(event));
-        // return event as sample timed rhythm iter item
-        if let Some(event_item) = event_item {
-            // apply start and length from the event
-            let event_time =
-                event_iter_time + step_sample_time * event_item.start.to_f64().unwrap_or(0.0);
-            let event_duration = event_iter_duration * event_item.length.to_f64().unwrap_or(1.0);
-            if event_time as SampleTime >= sample_time {
-                // the given event is not yet due. put it back:
+            .map(|event| self.event_with_default_instrument(event))
+        {
+            if self.event_iter_item_start_time(&event_item.start) >= sample_time {
+                // the given event iter item is not yet due: put it back
                 self.event_iter_items.push_front(event_item);
                 return None;
             }
+            // return event as sample timed rhythm iter item
+            let time = self.event_iter_item_start_time(&event_item.start);
+            let event = Some(event_item.event);
+            let duration = self.event_iter_item_duration(&event_item.length);
             // advance to the next pulse in the next iteration when all events got consumed
             if self.event_iter_items.is_empty() {
-                self.event_iter_next_sample_time += step_sample_time;
+                self.event_iter_next_sample_time += self.current_steps_sample_duration();
             }
+            // return event as rhythm iter item
             Some(RhythmIterItem {
-                time: event_time as SampleTime,
-                event: Some(event_item.event),
-                duration: event_duration as SampleTime,
+                time,
+                event,
+                duration,
             })
         } else {
-            // advance to the next pulse in the next iteration
-            self.event_iter_next_sample_time += step_sample_time;
             // and return a timed None event
+            let time = self.event_iter_item_start_time(&Fraction::ZERO);
+            let event = None;
+            let duration = self.event_iter_item_duration(&Fraction::ONE);
+            // advance to the next pulse in the next iteration
+            self.event_iter_next_sample_time += self.current_steps_sample_duration();
+            // return event as rhythm iter item
             Some(RhythmIterItem {
-                time: event_iter_time as SampleTime,
-                event: None,
-                duration: event_iter_duration as SampleTime,
+                time,
+                event,
+                duration,
             })
         }
     }
