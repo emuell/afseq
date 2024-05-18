@@ -21,7 +21,7 @@ local Cycle = {}
 --- * `:` - Sets the instrument or remappable target instead of selecting samples
 --- * `/` - Slow pattern operator is not implemented yet
 --- * `@` - Elongate operator is missing (use explicit `_` steps instead)
---- * `.` - Shorthand for groups is missing (use `[a b] [c d]` instead or `a b . c d`)
+--- * `.` - Shorthand for groups is missing (use `[a b] [c d]` instead of `a b . c d`)
 ---
 --- [Tidal Cycles Reference](https://tidalcycles.org/docs/reference/mini_notation/)
 ---
@@ -29,6 +29,13 @@ local Cycle = {}
 ---@return Cycle
 ---### examples:
 --- ```lua
---- TODO
+-----A chord sequence 
+---cycle("[c4, e4, g4] [e4, g4, b4] [g4, b4, d5] [b4, d5, f#5]")
+-----Arpegio pattern with variations
+---cycle("<c4 e4 g4> <e4 g4> <g4 b4 d5> <b4 f5>")
+-----Euclidean Rhythms
+---cycle("c4(3,8) e4(5,8) g4(7,8)")
+--- Polyrhythm
+---cycle("{c4 e4 g4 b4}%2, {f4 d4 a4}%4")
 --- ```
 function cycle(input) end
