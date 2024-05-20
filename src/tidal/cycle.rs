@@ -711,23 +711,29 @@ impl Cycle {
         Err(format!("invalid polymeter\n{:?}", pair))
     }
 
-    fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
-        if steps > 0 {
-            let slope = (pulses as f64) / (steps as f64);
-            let mut pattern = vec![];
-            let mut prev = -1.0;
-            for i in 0..steps {
-                let curr = ((i as f64) * slope).floor();
-                pattern.push(curr != prev);
-                prev = curr;
-            }
-            if let Some(rotate) = rotation {
-                pattern.rotate_left((rotate % steps) as usize);
-            }
-            pattern
-        } else {
-            vec![]
+    fn rotate(pattern: &mut [bool], r: i32) {
+        let steps = pattern.len();
+        if steps == 0 { return }
+        match r {
+            r if r > 0 => pattern.rotate_left((r as usize) % steps),
+            r if r < 0 => pattern.rotate_right((r.unsigned_abs() as usize) % steps),
+            _ => (),
         }
+    }
+
+    fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
+        let slope = (pulses as f64) / (steps as f64);
+        let mut pattern = vec![];
+        let mut prev = -1.0;
+        for i in 0..steps {
+            let curr = ((i as f64) * slope).floor();
+            pattern.push(curr != prev);
+            prev = curr;
+        }
+        if let Some(r) = rotation {
+            Cycle::rotate(&mut pattern, r);
+        }
+        pattern
     }
 
     // helper to convert a section rule to a vector of Steps
@@ -1593,6 +1599,12 @@ mod test {
             Cycle::from("[a b c](3,8,9)", None)?.generate(),
             Cycle::from("[a b c](3,8,1)", None)?.generate()
         );
+
+        assert_eq!(
+            Cycle::from("[a b c](3,8,7)", None)?.generate(),
+            Cycle::from("[a b c](3,8,-1)", None)?.generate()
+        );
+
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
