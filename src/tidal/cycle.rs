@@ -711,6 +711,16 @@ impl Cycle {
         Err(format!("invalid polymeter\n{:?}", pair))
     }
 
+    fn rotate(pattern: &mut [bool], r: i32) {
+        let steps = pattern.len();
+        if steps == 0 { return }
+        match r {
+            r if r > 0 => pattern.rotate_left((r as usize) % steps),
+            r if r < 0 => pattern.rotate_right((r.unsigned_abs() as usize) % steps),
+            _ => (),
+        }
+    }
+
     fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
         let slope = (pulses as f64) / (steps as f64);
         let mut pattern = vec![];
@@ -720,8 +730,8 @@ impl Cycle {
             pattern.push(curr != prev);
             prev = curr;
         }
-        if let Some(rotate) = rotation {
-            pattern.rotate_left(rotate as usize);
+        if let Some(r) = rotation {
+            Cycle::rotate(&mut pattern, r);
         }
         pattern
     }
@@ -1571,6 +1581,30 @@ mod test {
                 ]],
             ],
         )?;
+
+        assert_eq!(Cycle::from("c(3,8,9)", None)?.generate(),
+            [[
+                Event::at(F::from(0), F::new(1u8,8u8)),
+                Event::at(F::new(1u8,8u8), F::new(1u8,8u8)),
+                Event::at(F::new(2u8,8u8), F::new(1u8,8u8)).with_note(0, 4),
+                Event::at(F::new(3u8,8u8), F::new(1u8,8u8)),
+                Event::at(F::new(4u8,8u8), F::new(1u8,8u8)),
+                Event::at(F::new(5u8,8u8), F::new(1u8,8u8)).with_note(0, 4),
+                Event::at(F::new(6u8,8u8), F::new(1u8,8u8)),
+                Event::at(F::new(7u8,8u8), F::new(1u8,8u8)).with_note(0, 4),
+            ]]
+        );
+
+        assert_eq!(
+            Cycle::from("[a b c](3,8,9)", None)?.generate(),
+            Cycle::from("[a b c](3,8,1)", None)?.generate()
+        );
+
+        assert_eq!(
+            Cycle::from("[a b c](3,8,7)", None)?.generate(),
+            Cycle::from("[a b c](3,8,-1)", None)?.generate()
+        );
+
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
