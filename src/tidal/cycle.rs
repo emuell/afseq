@@ -8,6 +8,8 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use fraction::{Fraction, One, Zero};
 
+use crate::pattern::euclidean::euclidean;
+
 // -------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -711,31 +713,6 @@ impl Cycle {
         Err(format!("invalid polymeter\n{:?}", pair))
     }
 
-    fn rotate(pattern: &mut [bool], r: i32) {
-        let steps = pattern.len();
-        if steps == 0 { return }
-        match r {
-            r if r > 0 => pattern.rotate_left((r as usize) % steps),
-            r if r < 0 => pattern.rotate_right((r.unsigned_abs() as usize) % steps),
-            _ => (),
-        }
-    }
-
-    fn bjorklund_pattern(pulses: i32, steps: i32, rotation: Option<i32>) -> Vec<bool> {
-        let slope = (pulses as f64) / (steps as f64);
-        let mut pattern = vec![];
-        let mut prev = -1.0;
-        for i in 0..steps {
-            let curr = ((i as f64) * slope).floor();
-            pattern.push(curr != prev);
-            prev = curr;
-        }
-        if let Some(r) = rotation {
-            Cycle::rotate(&mut pattern, r);
-        }
-        pattern
-    }
-
     // helper to convert a section rule to a vector of Steps
     fn parse_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
         let mut steps = vec![];
@@ -1052,9 +1029,9 @@ impl Cycle {
                 #[allow(clippy::single_match)]
                 // TODO support something other than Step::Single as the right hand side
                 match b.pulses.as_ref() {
-                    Step::Single(pulses_single) => {
+                    Step::Single(steps_single) => {
                         match b.steps.as_ref() {
-                            Step::Single(steps_single) => {
+                            Step::Single(pulses_single) => {
                                 let rotation = match &b.rotation {
                                     Some(r) => match r.as_ref() {
                                         Step::Single(rotation_single) => {
@@ -1064,12 +1041,14 @@ impl Cycle {
                                     },
                                     None => None,
                                 };
-                                if let Some(pulses) = pulses_single.to_integer() {
-                                    if let Some(steps) = steps_single.to_integer() {
+                                if let Some(steps) = steps_single.to_integer() {
+                                    if let Some(pulses) = pulses_single.to_integer() {
                                         let out = Cycle::output(&mut b.left, rng);
-                                        for pulse in
-                                            Cycle::bjorklund_pattern(pulses, steps, rotation)
-                                        {
+                                        for pulse in euclidean(
+                                            steps.max(0) as u32,
+                                            pulses.max(0) as u32,
+                                            rotation.unwrap_or(0),
+                                        ) {
                                             if pulse {
                                                 events.push(out.clone())
                                             } else {
@@ -1524,11 +1503,11 @@ mod test {
                         .with_int(2)
                         .with_target(Target::Name("a".to_string())),
                     Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(3u8, 5u8), F::new(1u8, 10u8)).with_int(1),
-                    Event::at(F::new(7u8, 10u8), F::new(1u8, 10u8))
+                    Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(1),
+                    Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(2)
                         .with_target(Target::Name("a".to_string())),
+                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)),
                     Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)),
                 ]],
                 vec![vec![
@@ -1537,11 +1516,11 @@ mod test {
                         .with_int(20)
                         .with_target(Target::Name("a".to_string())),
                     Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(3u8, 5u8), F::new(1u8, 10u8)).with_int(10),
-                    Event::at(F::new(7u8, 10u8), F::new(1u8, 10u8))
+                    Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(10),
+                    Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(20)
                         .with_target(Target::Name("a".to_string())),
+                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)),
                     Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)),
                 ]],
             ],
@@ -1604,7 +1583,6 @@ mod test {
             Cycle::from("[a b c](3,8,7)", None)?.generate(),
             Cycle::from("[a b c](3,8,-1)", None)?.generate()
         );
-
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
