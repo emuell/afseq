@@ -144,35 +144,47 @@ function pattern.euclidean(steps, length, offset, empty_value)
       table.insert(front, { v })
     end
   else
-    assert(type(steps) == "number" and steps > 0,
+    assert(type(steps) == "number" and steps >= 0,
       "invalid steps argument (must be a table or an integer > 0)")
     for _ = 1, steps do
       table.insert(front, { 1 })
     end
   end
-  assert(type(length) == "number" and length > 0, 
+  assert(type(length) == "number" and length > 0,
     "invalid length argument (expecting an integer > 0)")
-  assert(length >= #front, 
-    "invalid length or step (length must be >= #pulses)")
-  assert(type(offset) == "number" or offset == nil, 
+  assert(type(offset) == "number" or offset == nil,
     "invalid offset argument (must be an integer or nil)")
   empty_value = empty_value == nil and empty_pulse_value(steps) or 0
-  local back = {}
-  for _ = 1, length - #front do
-    table.insert(back, { empty_value })
+  if #front == 0 then
+    local result = pattern.new();
+    for _ = 1, length do
+      result:push_back(empty_value)
+    end
+    return result
+  elseif #front >= length then
+    local result = pattern.new();
+    for _ = 1, length do
+      result:push_back(1)
+    end
+    return result
+  else
+    local back = {}
+    for _ = 1, length - #front do
+      table.insert(back, { empty_value })
+    end
+    -- spread
+    local rhythms = euclidean_impl(front, back);
+    -- convert to pattern and flatten
+    local result = pattern.new();
+    for _, g in ipairs(rhythms) do
+      result:push_back(g);
+    end
+    -- rotate
+    if offset then
+      result:rotate(-offset)
+    end
+    return result
   end
-  -- spread
-  local rhythms = euclidean_impl(front, back);
-  -- convert to pattern and flatten
-  local result = pattern.new();
-  for _, g in ipairs(rhythms) do
-    result:push_back(g);
-  end
-  -- rotate
-  if offset then
-    result:rotate(offset)
-  end
-  return result
 end
 
 ----------------------------------------------------------------------------------------------------
