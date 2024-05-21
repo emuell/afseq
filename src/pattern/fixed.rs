@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use super::euclidean::euclidean;
 use crate::{BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
@@ -42,6 +43,11 @@ impl FixedPattern {
             repeat_count_option,
             repeat_count,
         }
+    }
+
+    /// Create a pattern from an euclidan rhythm.
+    pub fn from_euclidean(steps: u32, pulses: u32, offset: i32) -> Self {
+        Self::from_pulses(euclidean(steps, pulses, offset))
     }
 }
 
