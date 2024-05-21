@@ -555,7 +555,7 @@ impl Events {
             }
         }
     }
-    
+
     fn flatten(&self, channels: &mut Vec<Vec<Event>>, channel: usize) {
         if channels.len() <= channel {
             channels.push(vec![])
@@ -1561,16 +1561,17 @@ mod test {
             ],
         )?;
 
-        assert_eq!(Cycle::from("c(3,8,9)", None)?.generate(),
+        assert_eq!(
+            Cycle::from("c(3,8,9)", None)?.generate(),
             [[
-                Event::at(F::from(0), F::new(1u8,8u8)),
-                Event::at(F::new(1u8,8u8), F::new(1u8,8u8)),
-                Event::at(F::new(2u8,8u8), F::new(1u8,8u8)).with_note(0, 4),
-                Event::at(F::new(3u8,8u8), F::new(1u8,8u8)),
-                Event::at(F::new(4u8,8u8), F::new(1u8,8u8)),
-                Event::at(F::new(5u8,8u8), F::new(1u8,8u8)).with_note(0, 4),
-                Event::at(F::new(6u8,8u8), F::new(1u8,8u8)),
-                Event::at(F::new(7u8,8u8), F::new(1u8,8u8)).with_note(0, 4),
+                Event::at(F::from(0), F::new(1u8, 8u8)),
+                Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)),
+                Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
+                Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)),
+                Event::at(F::new(4u8, 8u8), F::new(1u8, 8u8)),
+                Event::at(F::new(5u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
+                Event::at(F::new(6u8, 8u8), F::new(1u8, 8u8)),
+                Event::at(F::new(7u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
             ]]
         );
 
