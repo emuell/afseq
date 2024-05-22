@@ -13,7 +13,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ScriptedEventIter {
     timeout_hook: LuaTimeoutHook,
-    callback: Box<dyn LuaCallback>,
+    callback: LuaCallback,
     pulse_step: usize,
     pulse_time_step: f64,
     step: usize,
@@ -22,7 +22,7 @@ pub struct ScriptedEventIter {
 impl ScriptedEventIter {
     pub(crate) fn new(
         timeout_hook: &LuaTimeoutHook,
-        callback: Box<dyn LuaCallback>,
+        callback: LuaCallback,
         time_base: &BeatTimeBase,
     ) -> LuaResult<Self> {
         // create a new timeout_hook instance and reset it before calling the function
@@ -81,7 +81,7 @@ impl Clone for ScriptedEventIter {
     fn clone(&self) -> Self {
         Self {
             timeout_hook: self.timeout_hook.clone(),
-            callback: self.callback.duplicate(),
+            callback: self.callback.clone(),
             pulse_step: self.pulse_step,
             pulse_time_step: self.pulse_time_step,
             step: self.step,

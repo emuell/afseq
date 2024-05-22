@@ -156,7 +156,6 @@ pub(crate) fn register_bindings(
     register_math_bindings(lua)?;
     register_table_bindings(lua)?;
     register_pattern_module(lua)?;
-    register_fun_module(lua)?;
     Ok(())
 }
 
@@ -444,37 +443,6 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
     }))
 }
 
-fn register_fun_module(lua: &mut Lua) -> LuaResult<()> {
-    // cache module bytecode to speed up requires
-    lazy_static! {
-        static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
-            let strip = true;
-            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
-                .load(include_str!("../types/nerdo/library/extras/fun.lua"))
-                .into_function()
-                .map(|x| x.dump(strip))
-        };
-    }
-    // see https://github.com/khvzak/mlua/discussions/322
-    let package: LuaTable = lua.globals().get("package")?;
-    let loaders: LuaTable = package.get("loaders")?; // NB: "searchers" in lua 5.2
-    loaders.push(LuaFunction::wrap(|lua, path: String| {
-        if path == "fun" {
-            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.as_ref() {
-                Ok(bytecode) => lua
-                    .load(bytecode)
-                    .set_name("[inbuilt:fun.lua]")
-                    .set_mode(mlua::ChunkMode::Binary)
-                    .call::<_, LuaValue>(()),
-                Err(err) => Err(err.clone()),
-            })
-            .into_lua(lua)
-        } else {
-            "not found".into_lua(lua)
-        }
-    }))
-}
-
 // --------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -512,21 +480,6 @@ mod test {
                 r#"
                 local pattern = require "pattern"
                 return pattern.new()
-                "#
-            )
-            .eval::<LuaTable>()
-            .is_ok());
-
-        // fun.lua is present, but only when required
-        assert!(lua
-            .load(r#"return fun.iter {1,2,3}:map(function(v) return v*2 end):totable()"#)
-            .eval::<LuaTable>()
-            .is_err());
-        assert!(lua
-            .load(
-                r#"
-                local fun = require "fun"
-                return fun.iter {1,2,3}:map(function(v) return v*2 end):totable()
                 "#
             )
             .eval::<LuaTable>()
