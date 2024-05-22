@@ -130,7 +130,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----- "cram" pulses into a sigle pulse slot via subdivisions
 ---pattern = { 1, { 1, 1, 1 } }
 ---
------ fixed pattern with require "pattern"
+----- fixed patterns created via "patterns"
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
@@ -206,7 +206,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---end
 ---
 ----- a note pattern
----local pattern = require "pattern"
 ---local tritone = scale("c5", "tritone")
 ---...
 ---emit = pattern.from(tritone:chord(1, 4)):euclidean(6) +

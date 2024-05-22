@@ -25,17 +25,18 @@ local empty_pulse_values = {
 ---@class Pattern : table
 ---@operator add(Pattern|table): Pattern
 ---@operator mul(number): Pattern
-local pattern = {}
+pattern = {}
 
 ----------------------------------------------------------------------------------------------------
 --- Pattern creation
 ----------------------------------------------------------------------------------------------------
 
----Create a new empty pattern.
+---Create a new empty pattern or pattern with the given length.
+---@param length integer?
+---@param value PulseValue? Value used as initial value when length > 0. by default 0.
 ---@return Pattern
-function pattern.new()
-  local t = {}
-  return setmetatable(t, {
+function pattern.new(length, value)
+  local t = setmetatable({}, {
     ---all table functions can be accessed as member functions
     __index = pattern,
     ---operator + adds two patterns
@@ -47,6 +48,14 @@ function pattern.new()
       return a:copy():repeat_n(b)
     end
   })
+  -- initialize
+  if length ~= nil then
+    value = value or 0
+    for _ = 1, length do
+      table.insert(t, value)
+    end
+  end
+  return t
 end
 
 ---Create a new pattern from a set of values or tables.
@@ -55,6 +64,22 @@ end
 ---@return Pattern
 function pattern.from(...)
   return pattern.new():push_back(...)
+end
+
+---Similar to `from`, but also maps the given values with the given function,
+---in order to generate pattern from some existing table or values
+---@param fun fun(value: PulseValue):PulseValue
+---@param ... PulseValue|(PulseValue[])
+function pattern.generate(fun, ...)
+  local args = { ... }
+  -- unpack single table arg into args
+  if #args == 1 and type(args[1]) == "table" then
+    ---@cast args PulseValue[][]
+    args = args[1]
+  end
+  return pattern.new(#args):init(function(index)
+    return fun(args[index])
+  end)
 end
 
 -- create a shallow-copy of the given pattern (or self)
@@ -70,21 +95,21 @@ end
 ---@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
 ---Shortcut for:
 ---```lua
----pattern.new():init(1, steps):spread(length / steps):rotate(offset) -- or
+---pattern.new(1, steps):spread(length / steps):rotate(offset) -- or
 ---pattern.from{1,1,1}:spread(length / #self):rotate(offset)
 ---```
 function pattern.distributed(steps, length, offset, empty_value)
-  assert(type(length) == "number" and length > 0, 
+  assert(type(length) == "number" and length > 0,
     "invalid length argument (must be an integer > 0)")
   local from
   if type(steps) == "table" then
     from = pattern.from(steps)
   else
-    assert(type(steps) == "number" and steps > 0, 
+    assert(type(steps) == "number" and steps > 0,
       "invalid step argument (must be an integer > 0)")
-    from = pattern.new():init(1, steps)
+    from = pattern.new(steps, 1)
   end
-  assert(length >= #from, 
+  assert(length >= #from,
     "Invalid length or steps arguments (length must be >= steps")
   return from:spread(length / #from, empty_value):rotate(offset or 0)
 end
@@ -203,9 +228,9 @@ end
 ---@param j integer? Subrange end (defaults to pattern length)
 ---@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
 function pattern.subrange(self, i, j, empty_value)
-  assert(type(i) == "number" and i > 0, 
+  assert(type(i) == "number" and i > 0,
     "invalid subrange start argument (must be an integer > 0)")
-  assert(j == nil or (type(j) == "number" and j > 0), 
+  assert(j == nil or (type(j) == "number" and j > 0),
     "invalid subrange end argument (must be an integer > 0)")
   local len = j or #self
   local a = pattern.new()
@@ -219,7 +244,7 @@ end
 ---Get first n items from the pattern as new pattern.
 ---@param length integer
 function pattern.take(self, length)
-  assert(type(length) == "number" and length > 0, 
+  assert(type(length) == "number" and length > 0,
     "invalid length argument (must be an integer > 0)")
   return self:subrange(1, length)
 end
@@ -238,19 +263,22 @@ end
 
 ---Fill pattern with the given value or generator function in length.
 ---@param value PulseValue|fun(index: integer):PulseValue
----@param length integer
+---@param length integer?
 function pattern.init(self, value, length)
-  assert(type(length) == "number" and length > 0, 
+  assert(type(length) == "nil" or (type(length) == "number" and length > 0),
     "invalid length argument (must be an integer > 0)")
-  self:clear()
+  length = length or #self
   if type(value) == 'function' then
     for i = 1, length do
-      table.insert(self, value(i))
+      self[i] = value(i)
     end
   else
-    for _ = 1, length do
-      table.insert(self, value)
+    for i = 1, length do
+      self[i] = value
     end
+  end
+  while #self > length do
+    table.remove(self, #self)
   end
   return self
 end
@@ -268,7 +296,7 @@ end
 ---Shift contents by the given amount to the left (negative amount) or right.
 ---@param amount integer
 function pattern.rotate(self, amount)
-  assert(type(amount) == "number", 
+  assert(type(amount) == "number",
     "invalid amount argument (must be an integer)")
   local n = #self
   amount = amount % n
@@ -320,7 +348,7 @@ end
 ---Duplicate the pattern n times.
 ---@param count integer
 function pattern.repeat_n(self, count)
-    assert(type(count) == "number" and count > 0, 
+  assert(type(count) == "number" and count > 0,
     "invalid count argument (must be an integer > 0)")
   local num = #self
   for _ = 1, count - 1 do
@@ -337,7 +365,7 @@ end
 ---@param amount number Spread factor (2 = double, 0.5 = half the size).
 ---@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
 function pattern.spread(self, amount, empty_value)
-  assert(type(amount) == "number" and amount > 0, 
+  assert(type(amount) == "number" and amount > 0,
     "invalid amount argument (must be an integer > 0)")
   empty_value = empty_value == nil and empty_pulse_value(self) or 0
   local old_num = #self
@@ -348,5 +376,3 @@ function pattern.spread(self, amount, empty_value)
   end
   return self
 end
-
-return pattern
