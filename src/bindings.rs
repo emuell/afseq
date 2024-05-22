@@ -415,32 +415,23 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
 fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up requires
     lazy_static! {
-        static ref FUN_BYTECODE: LuaResult<Vec<u8>> = {
+        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> = {
             let strip = true;
             Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
-                .load(include_str!("../types/nerdo/library/extras/pattern.lua"))
+                .load(include_str!("../types/nerdo/library/pattern.lua"))
                 .into_function()
                 .map(|x| x.dump(strip))
         };
     }
-    // see https://github.com/khvzak/mlua/discussions/322
-    let package: LuaTable = lua.globals().get("package")?;
-    let loaders: LuaTable = package.get("loaders")?; // NB: "searchers" in lua 5.2
-    loaders.push(LuaFunction::wrap(|lua, path: String| {
-        if path == "pattern" {
-            LuaFunction::wrap(|lua, ()| match FUN_BYTECODE.as_ref() {
-                Ok(bytecode) => lua
-                    .load(bytecode)
-                    .set_name("[inbuilt:pattern.lua]")
-                    .set_mode(mlua::ChunkMode::Binary)
-                    .call::<_, LuaValue>(()),
-                Err(err) => Err(err.clone()),
-            })
-            .into_lua(lua)
-        } else {
-            "not found".into_lua(lua)
-        }
-    }))
+    // implemented in lua: load and evaluate cached chunk
+    match PATTERN_BYTECODE.as_ref() {
+        Ok(bytecode) => lua
+            .load(bytecode)
+            .set_name("[inbuilt:pattern.lua]")
+            .set_mode(mlua::ChunkMode::Binary)
+            .exec(),
+        Err(err) => Err(err.clone()),
+    }
 }
 
 // --------------------------------------------------------------------------------------------------
@@ -470,18 +461,9 @@ mod test {
         // table.lua is present
         assert!(lua.load(r#"return table.new()"#).eval::<LuaTable>().is_ok());
 
-        // pattern.lua is present, but only when required
+        // pattern.lua is present
         assert!(lua
             .load(r#"return pattern.new()"#)
-            .eval::<LuaTable>()
-            .is_err());
-        assert!(lua
-            .load(
-                r#"
-                local pattern = require "pattern"
-                return pattern.new()
-                "#
-            )
             .eval::<LuaTable>()
             .is_ok());
 
