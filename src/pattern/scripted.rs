@@ -13,7 +13,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ScriptedPattern {
     timeout_hook: LuaTimeoutHook,
-    callback: Box<dyn LuaCallback>,
+    callback: LuaCallback,
     repeat_count_option: Option<usize>,
     repeat_count: usize,
     pulse_step: usize,
@@ -25,7 +25,7 @@ pub struct ScriptedPattern {
 impl ScriptedPattern {
     pub(crate) fn new(
         timeout_hook: &LuaTimeoutHook,
-        callback: Box<dyn LuaCallback>,
+        callback: LuaCallback,
         time_base: &BeatTimeBase,
     ) -> LuaResult<Self> {
         // create a new timeout_hook instance and reset it before calling the function
@@ -81,7 +81,7 @@ impl Clone for ScriptedPattern {
     fn clone(&self) -> Self {
         Self {
             timeout_hook: self.timeout_hook.clone(),
-            callback: self.callback.duplicate(),
+            callback: self.callback.clone(),
             repeat_count_option: self.repeat_count_option,
             repeat_count: self.repeat_count,
             pulse_step: self.pulse_step,
