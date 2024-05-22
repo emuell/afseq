@@ -1,5 +1,3 @@
-local pattern = require "pattern"
-
 ---Wrap a lua 1 based integer index into the given array/table length.
 ---
 ----> `(index - 1) % length + 1`
