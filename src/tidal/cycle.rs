@@ -22,6 +22,7 @@ enum Step {
     Choices(Choices),
     Expression(Expression),
     Bjorklund(Bjorklund),
+    Repeat,
 }
 
 impl Step {
@@ -55,6 +56,7 @@ impl Step {
     #[allow(dead_code)]
     fn inner_steps(&self) -> Vec<&Step> {
         match self {
+            Step::Repeat => vec![],
             Step::Single(_s) => vec![],
             Step::Alternating(a) => a.steps.iter().collect(),
             Step::Polymeter(pm) => pm.steps.iter().collect(),
@@ -74,6 +76,7 @@ impl Step {
 
     fn inner_steps_mut(&mut self) -> Vec<&mut Step> {
         match self {
+            Step::Repeat => vec![],
             Step::Single(_s) => vec![],
             Step::Alternating(a) => a.steps.iter_mut().collect(),
             Step::Polymeter(pm) => pm.steps.iter_mut().collect(),
@@ -715,10 +718,20 @@ impl Cycle {
 
     // helper to convert a section rule to a vector of Steps
     fn parse_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
-        let mut steps = vec![];
+        let mut steps: Vec<Step> = vec![];
         for pair in pair.into_inner() {
             match Cycle::parse_step(pair) {
-                Ok(s) => steps.push(s),
+                Ok(s) => match s {
+                    Step::Repeat => {
+                        if let Some(last) = steps.last() {
+                            steps.push(last.clone())
+                        }else{
+                            steps.push(Step::Single(Single::default()))
+                            // return Err(String::from("repeat must have a preceding value"))
+                        }
+                    }
+                    _ => steps.push(s)
+                }
                 Err(s) => return Err(format!("failed to parse section\n{:?}", s)),
             }
         }
@@ -729,6 +742,7 @@ impl Cycle {
     fn extract_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
         if let Some(inner) = pair.into_inner().next() {
             match inner.as_rule() {
+                Rule::repeat => Ok(vec![Step::Repeat]),
                 Rule::single => {
                     let single = Step::parse_single(inner)?;
                     Ok(vec![single])
@@ -757,6 +771,7 @@ impl Cycle {
     // errors here should be unreachable unless there is a bug in the pest grammar
     fn parse_step(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.as_rule() {
+            Rule::repeat => Ok(Step::Repeat),
             Rule::single => Step::parse_single(pair),
             Rule::subdivision | Rule::mini => {
                 if let Some(first) = pair.clone().into_inner().next() {
@@ -871,6 +886,8 @@ impl Cycle {
     // recursively output events for the entire cycle based on some state (random seed)
     fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus) -> Events {
         match step {
+            // repeats only make it here if they had no preceding value
+            Step::Repeat => Events::empty(), 
             Step::Single(s) => Events::Single(Event {
                 length: Fraction::one(),
                 target: Target::None,
@@ -1184,6 +1201,7 @@ impl Cycle {
     #[cfg(test)]
     fn print_steps(step: &Step, level: usize) {
         let name = match step {
+            Step::Repeat => format!("Repeat"),
             Step::Single(s) => match &s.value {
                 Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
@@ -1583,6 +1601,22 @@ mod test {
         assert_eq!(
             Cycle::from("[a b c](3,8,7)", None)?.generate(),
             Cycle::from("[a b c](3,8,-1)", None)?.generate()
+        );
+
+
+        assert_eq!(
+            Cycle::from("[a a a a]", None)?.generate(),
+            Cycle::from("[a ! ! !]", None)?.generate()
+        );
+
+        assert_eq!(
+            Cycle::from("[! ! a !]", None)?.generate(),
+            Cycle::from("[~ ~ a a]", None)?.generate()
+        );
+
+        assert_eq!(
+            Cycle::from("[a b] ! ! <a b c> !", None)?.generate(),
+            Cycle::from("[a b] [a b] [a b] <a b c> <a b c>", None)?.generate()
         );
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");

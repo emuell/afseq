@@ -27,6 +27,8 @@ hold = @{ "_" ~ !(ASCII_ALPHANUMERIC) }
 /// arbitrary string identifier type
 name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 
+repeat = { "!" }
+
 /// possible literals for single steps
 single = { hold | rest | number | pitch | name }
 
@@ -57,7 +59,7 @@ parameter = _{ single }
 expr      = { (single | group) ~ op+ }
 
 /// helper container that splits steps into sections
-section   = { (expr | single | group)+ }
+section   = { (expr | single | repeat | group)+ }
 
 /// a single choice inside a choice list
 choice    = { expr | single | group }
