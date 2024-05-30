@@ -66,22 +66,6 @@ function pattern.from(...)
   return pattern.new():push_back(...)
 end
 
----Similar to `from`, but also maps the given values with the given function,
----in order to generate pattern from some existing table or values
----@param fun fun(value: PulseValue):PulseValue
----@param ... PulseValue|(PulseValue[])
-function pattern.generate(fun, ...)
-  local args = { ... }
-  -- unpack single table arg into args
-  if #args == 1 and type(args[1]) == "table" then
-    ---@cast args PulseValue[][]
-    args = args[1]
-  end
-  return pattern.new(#args):init(function(index)
-    return fun(args[index])
-  end)
-end
-
 -- create a shallow-copy of the given pattern (or self)
 function pattern.copy(self)
   return pattern.from(self:unpack())
@@ -279,6 +263,16 @@ function pattern.init(self, value, length)
   end
   while #self > length do
     table.remove(self, #self)
+  end
+  return self
+end
+
+---Apply the given function to every item in the pattern.
+---@param fun fun(value: PulseValue):PulseValue
+function pattern.map(self, fun)
+  local num = #self
+  for i = 1, num do
+    self[i] = fun(self[i])
   end
   return self
 end

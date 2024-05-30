@@ -8,10 +8,10 @@ return rhythm {
   offset = 16 * 64,
   emit = function()
     local SCALE_STEP_COUNT = 4
-    local INTERVALS = { 1, 6, 4, 4, 0, 3, 1, 6, 4, 4, 1, 3 }
+    local INTERVALS = { 0, 3, 5, 4, 3, 5, 3, 1, 4, 0, 5, 1 }
     local SCALES = {
       scale("c", "mixolydian").notes,
-      scale("f", "major").notes,
+      scale("g", "major").notes,
     }
     ---@param context EmitterContext
     return function(context)
@@ -19,9 +19,9 @@ return rhythm {
       local scale_index = math.iwrap(
         math.floor((context.step - 1) / #INTERVALS / SCALE_STEP_COUNT) + 1,
         #SCALES)
-      local notes = pattern.generate(function(note_index) 
+      local notes = pattern.from(INTERVALS):map(function(note_index) 
         return SCALES[scale_index][note_index] or 0 
-      end, INTERVALS)
+      end)
       -- get key from current scale and step
       local key
       if context.step % 24 == 1 then
