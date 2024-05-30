@@ -84,7 +84,7 @@ end
 
 -- create a shallow-copy of the given pattern (or self)
 function pattern.copy(self)
-  return pattern.from(self)
+  return pattern.from(self:unpack())
 end
 
 ---Create an new pattern or spread and existing pattern evenly within the given length,
@@ -329,7 +329,8 @@ function pattern.push_back(self, ...)
       table.insert(self, v)
     end
   end
-  for i = 1, select("#", ...) do
+  local len = select("#", ...)
+  for i = 1,len  do
     local v = select(i, ...)
     add_unpacked(v)
   end
