@@ -265,7 +265,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 -----play a seeded tidal cycle
 ---math.randomseed(9347565)
 ---return rhythm {
----  unit = "bar", -- emit one cycle per bar
+---  unit = "bars", -- emit one cycle per bar
 ---  emit = cycle("[c4 [f5 f4]*2]|[c4 [g5 g4]*3]")
 ---}
 -----
