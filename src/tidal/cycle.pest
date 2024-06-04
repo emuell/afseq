@@ -35,7 +35,7 @@ single = { hold | rest | number | pitch | name }
 /// operators
 op_fast      = ${ "*" ~ parameter }
 op_target    = ${ ":" ~ parameter }
-op_degrade   = ${ "?" ~ parameter }
+op_degrade   = ${ "?" ~ parameter? }
 op_replicate = ${ "!" ~ parameter }
 op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
 // op_weight    = ${ ("@") ~ parameter }

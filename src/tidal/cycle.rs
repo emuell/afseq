@@ -12,7 +12,7 @@ use crate::pattern::euclidean::euclidean;
 
 // -------------------------------------------------------------------------------------------------
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum Step {
     Single(Single),
     Alternating(Alternating),
@@ -95,7 +95,7 @@ impl Step {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct Single {
     value: Value,
     string: String,
@@ -140,35 +140,35 @@ impl Single {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Alternating {
     current: usize,
     steps: Vec<Step>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Subdivision {
     steps: Vec<Step>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Polymeter {
     count: usize,
     offset: usize,
     steps: Vec<Step>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Choices {
     choices: Vec<Step>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Stack {
     stack: Vec<Step>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Fast(),      // *
     Target(),    // :
@@ -190,14 +190,14 @@ impl Operator {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Expression {
     operator: Operator,
     right: Box<Step>,
     left: Box<Step>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Bjorklund {
     left: Box<Step>,
     steps: Box<Step>,
@@ -633,7 +633,7 @@ impl Events {
 #[grammar = "tidal/cycle.pest"]
 struct CycleParser {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Cycle {
     root: Step,
     iteration: u32,
@@ -854,10 +854,26 @@ impl Cycle {
                                     let operator = Operator::parse(op.clone())?;
                                     let mut inner = op.into_inner();
                                     match inner.next() {
-                                        None => Err(format!(
-                                            "missing right hand side in expression\n{:?}",
-                                            inner
-                                        )),
+                                        None => match operator {
+                                            Operator::Degrade() => {
+                                                Ok(Step::Expression(Expression {
+                                                    left: Box::new(left),
+                                                    right: Box::new(Step::Single(
+                                                        Single {
+                                                            value: Value::Float(0.5),
+                                                            string: "0.5".to_string()
+                                                        }
+                                                    )),
+                                                    operator
+                                                }))
+                                            }
+                                            _ => {
+                                                Err(format!(
+                                                    "missing right hand side in expression\n{:?}",
+                                                    inner
+                                                ))
+                                            }
+                                        }
                                         Some(right_pair) => {
                                             let right = Cycle::parse_step(right_pair)?;
                                             match right {
@@ -1201,7 +1217,7 @@ impl Cycle {
     #[cfg(test)]
     fn print_steps(step: &Step, level: usize) {
         let name = match step {
-            Step::Repeat => format!("Repeat"),
+            Step::Repeat => "Repeat".to_string(),
             Step::Single(s) => match &s.value {
                 Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
@@ -1618,6 +1634,11 @@ mod test {
         assert_eq!(
             Cycle::from("a ~ ~ ~", None)?.generate(),
             Cycle::from("a - - -", None)?.generate()
+        );
+
+        assert_eq!(
+            Cycle::from("a? b?", None)?.root,
+            Cycle::from("a?0.5 b?0.5", None)?.root
         );
 
         assert_eq!(
