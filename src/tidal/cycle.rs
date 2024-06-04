@@ -1614,6 +1614,12 @@ mod test {
             Cycle::from("[~ ~ a a]", None)?.generate()
         );
 
+
+        assert_eq!(
+            Cycle::from("a ~ ~ ~", None)?.generate(),
+            Cycle::from("a - - -", None)?.generate()
+        );
+
         assert_eq!(
             Cycle::from("[a b] ! ! <a b c> !", None)?.generate(),
             Cycle::from("[a b] [a b] [a b] <a b c> <a b c>", None)?.generate()

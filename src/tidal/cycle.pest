@@ -19,7 +19,7 @@ note    = ${ (^"a"|^"b"|^"c"|^"d"|^"e"|^"f"|^"g") }
 pitch   = ${ note ~ mark? ~ octave? ~ !(ASCII_ALPHANUMERIC)}
 
 /// type for empty steps
-rest = @{ "~" ~ !(ASCII_ALPHANUMERIC) }
+rest = @{ ("~" | "-") ~ !(ASCII_ALPHANUMERIC) }
 
 /// type for held steps
 hold = @{ "_" ~ !(ASCII_ALPHANUMERIC) }
