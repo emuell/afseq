@@ -15,7 +15,7 @@ use std::borrow::BorrowMut;
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter, EventIterItem, InstrumentId},
-    gate::ProbabilityGate,
+    gate::probability::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
     Gate, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
