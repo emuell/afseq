@@ -22,6 +22,24 @@ local empty_pulse_values = {
 }
 
 ---Array alike table with helper functions to ease creating rhythmic patterns.
+---
+---### examples:
+---```lua
+----- using + and * operators to combine patterns
+---pattern.from{ 0, 1 } * 3 + { 1, 0 }
+----- repeating, spreading and subsets
+---pattern.from{ 0, 1, { 1, 1 } }:repeat_n(4):spread(1.25):take(16)
+----- euclidean patterns
+---pattern.euclidean(12, 16)
+---pattern.from{ 1, 0.5, 1, 1 }:euclidean(12)
+----- generate/init from functions
+---pattern.new(12):init(function() return math.random(0.5, 1.0) end )
+----- generate note patterns
+---pattern.from{ "c4", "g4", "a4" } * 7 + { "a4", "g4", "c4" }
+---pattern.from{ 1, 5, 6, 4 }:map(function(degree) 
+---  return scale("c", "minor"):chord(degree) 
+---end)
+---```
 ---@class Pattern : table
 ---@operator add(Pattern|table): Pattern
 ---@operator mul(number): Pattern
