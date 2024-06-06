@@ -98,7 +98,7 @@ impl LuaCallback {
         let table = self.context.to_ref();
         table.raw_set("beats_per_min", time_base.beats_per_min)?;
         table.raw_set("beats_per_bar", time_base.beats_per_bar)?;
-        table.raw_set("sample_rate", time_base.samples_per_sec)?;
+        table.raw_set("samples_per_sec", time_base.samples_per_sec)?;
         Ok(())
     }
 

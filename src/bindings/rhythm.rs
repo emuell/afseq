@@ -165,7 +165,7 @@ mod test {
                       local function validate_context(context) 
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
-                        assert(context.sample_rate == 44100)
+                        assert(context.samples_per_sec == 44100)
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                       end
@@ -179,12 +179,12 @@ mod test {
                     gate = function(context) 
                       assert(context.beats_per_min == 120)
                       assert(context.beats_per_bar == 4)
-                      assert(context.sample_rate == 44100)
+                      assert(context.samples_per_sec == 44100)
                       local pulse_step, pulse_time_step = 1, 0.0 
                       local function validate_context(context) 
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
-                        assert(context.sample_rate == 44100)
+                        assert(context.samples_per_sec == 44100)
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                       end
@@ -198,13 +198,13 @@ mod test {
                     emit = function(context)
                       assert(context.beats_per_min == 120)
                       assert(context.beats_per_bar == 4)
-                      assert(context.sample_rate == 44100)
+                      assert(context.samples_per_sec == 44100)
                       local pulse_step, pulse_time_step = 1, 0.0 
                       local step = 1 
                       local function validate_context(context) 
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
-                        assert(context.sample_rate == 44100)
+                        assert(context.samples_per_sec == 44100)
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                         assert(context.step == step)

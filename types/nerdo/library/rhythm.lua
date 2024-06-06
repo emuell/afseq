@@ -20,14 +20,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ---Context passed to `pattern` functions.
 ---@class PatternContext : TriggerContext
------Transport playback running.
------TODO: @field playing boolean
 -----Project's tempo in beats per minutes.
 ---@field beats_per_min number
 -----Project's beats per bar setting.
 ---@field beats_per_bar integer
 -----Project's sample rate in samples per second.
----@field sample_rate integer
+---@field samples_per_sec integer
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
 ---Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
@@ -99,7 +97,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---unit = "1/4",
 ---resolution = 4,
 ---offset = 4 -- start emitting after 4*4 beats
----```  
+---```
 ---@field offset number?
 ---
 ---Specify the rythmical pattern of the emitter. Each pulse with a value of 1 or true
@@ -148,11 +146,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field pattern Pulse[]|(fun(context: PatternContext):Pulse)|(fun(context: PatternContext):fun(context: PatternContext):Pulse)?
 ---
----If and how many times a pattern should repeat. When 0 or false, the pattern does not repeat 
+---If and how many times a pattern should repeat. When 0 or false, the pattern does not repeat
 ---and plays back only once. When true, the pattern repeats endlessly, which is the default.
 ---When a number > 0, this specifies the number of times the pattern repeats until it stops.
 ---
----Note: When `pattern` is a function or iterator, the repeat count is the number of 
+---Note: When `pattern` is a function or iterator, the repeat count is the number of
 ---*function calls or iteration steps*. When the pattern is a pulse array, this is the number of
 ---times the whole pattern gets repeated.
 ---
@@ -170,7 +168,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---the pulse value as probability, like:
 ---```lua
 ---gate = function(context)
----  return context.pulse_value >= 1 or context.pulse_value > math.random() 
+---  return context.pulse_value >= 1 or context.pulse_value > math.random()
 ---end
 ---```
 ---@field gate Pulse[]|(fun(context: GateContext):boolean)|(fun(context: GateContext):fun(context: GateContext):boolean)?
@@ -179,11 +177,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---from the specified emit sequence. When the end of the sequence is reached, it starts again from
 ---the beginning.<br>
 ---
----To generate notes dynamically, you can pass a function or a function iterator, instead of a 
+---To generate notes dynamically, you can pass a function or a function iterator, instead of a
 ---fixed array or sequence of notes.<br>
 ---
 ---Events can also be generated using the tidal cycle mini-notation. Cycles are repeated endlessly
----by default, and have the duration of a single pulse in the pattern. Patterns can be used to 
+---by default, and have the duration of a single pulse in the pattern. Patterns can be used to
 ---sequence cycles too.
 ---
 ---### examples:
@@ -202,7 +200,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---end
 ---
 ----- statefull generator function
----emit = function(initial_context) 
+---emit = function(initial_context)
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
 ---  ---@param context EmitterContext
 ---  return function(context)
