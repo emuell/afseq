@@ -1,7 +1,3 @@
-math.iwrap = function(index, size)
-  return math.floor(index - 1) % size + 1
-end
-
 return rhythm {
   unit = "1/16",
   pattern = pattern.euclidean(6, 8, -5),
@@ -16,7 +12,7 @@ return rhythm {
     ---@param context EmitterContext
     return function(context)
       -- get scale from current step
-      local scale_index = math.iwrap(
+      local scale_index = math.imod(
         math.floor((context.step - 1) / #INTERVALS / SCALE_STEP_COUNT) + 1,
         #SCALES)
       local notes = pattern.from(INTERVALS):map(function(note_index) 
@@ -27,7 +23,7 @@ return rhythm {
       if context.step % 24 == 1 then
         key = notes[math.random(#INTERVALS)]
       else
-        key = notes[math.iwrap(context.step, #INTERVALS)]
+        key = notes[math.imod(context.step, #INTERVALS)]
       end
       -- get volume from step
       local volume = (context.step % 3 == 1 or context.step % 7 == 1)

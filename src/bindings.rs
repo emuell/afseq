@@ -303,6 +303,26 @@ fn register_global_bindings(
 fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
     let math = lua.globals().get::<_, LuaTable>("math")?;
 
+    // cache module bytecode to speed up initialization
+    lazy_static! {
+        static ref MATH_BYTECODE: LuaResult<Vec<u8>> = {
+            let strip = true;
+            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
+                .load(include_str!("../types/nerdo/library/math.lua"))
+                .into_function()
+                .map(|x| x.dump(strip))
+        };
+    }
+    // implemented in lua: load and evaluate cached chunk
+    match MATH_BYTECODE.as_ref() {
+        Ok(bytecode) => lua
+            .load(bytecode)
+            .set_name("[inbuilt:math.lua]")
+            .set_mode(mlua::ChunkMode::Binary)
+            .exec()?,
+        Err(err) => return Err(err.clone()),
+    };
+
     // function math.random([min], [max])
     math.raw_set(
         "random",

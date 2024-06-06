@@ -1,13 +1,3 @@
----Wrap a lua 1 based integer index into the given array/table length.
----
-----> `(index - 1) % length + 1`
----@param index integer
----@param length integer
----@return integer
-math.imod = function(index, length)
-  return ((index - 1) % length) + 1
-end
-
 math.randomseed(0x12345)
 
 return rhythm {
