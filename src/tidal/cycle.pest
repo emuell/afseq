@@ -63,12 +63,13 @@ op = _{ op_fast | op_bjorklund }
 
 expr        = { (single | group) ~ op+ }
 single_expr = { (single | group) ~ single_op+ }
+range_expr  = ${ integer ~ ".." ~ integer }
 
 /// helper container that splits steps into sections
-section   = { (single_expr | expr | single | repeat | group)+ }
+section   = { (single_expr | expr | range_expr | single | repeat | group)+ }
 
 /// a single choice inside a choice list
-choice    = { single_expr | expr | single | group }
+choice    = { single_expr | expr | range_expr | single | group }
 /// at least 2 choices, can only be inside subdivisions or the root
 choices   = { (choice) ~ ("|" ~ choice)+ }
 

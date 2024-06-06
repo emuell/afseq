@@ -23,6 +23,7 @@ enum Step {
     Expression(Expression),
     SingleExpression(SingleExpression),
     Bjorklund(Bjorklund),
+    Range(Range),
     Repeat,
 }
 
@@ -66,6 +67,7 @@ impl Step {
             Step::Stack(st) => st.stack.iter().collect(),
             Step::Expression(e) => vec![&e.left, &e.right],
             Step::SingleExpression(e) => vec![&e.left],
+            Step::Range(_) => vec![],
             Step::Bjorklund(b) => {
                 if let Some(rotation) = &b.rotation {
                     vec![&b.left, &b.steps, &b.pulses, &**rotation]
@@ -79,6 +81,7 @@ impl Step {
     fn inner_steps_mut(&mut self) -> Vec<&mut Step> {
         match self {
             Step::Repeat => vec![],
+            Step::Range(_) => vec![],
             Step::Single(_s) => vec![],
             Step::Alternating(a) => a.steps.iter_mut().collect(),
             Step::Polymeter(pm) => pm.steps.iter_mut().collect(),
@@ -204,6 +207,12 @@ struct Bjorklund {
     steps: Box<Step>,
     pulses: Box<Step>,
     rotation: Option<Box<Step>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Range {
+    start: i32,
+    end: i32
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -752,6 +761,19 @@ impl Cycle {
                     _ => steps.push(step)
                 }
             }
+            Step::Range(r) => {
+                let range = if r.start <= r.end {
+                    Box::new(r.start..=r.end) as Box<dyn Iterator<Item = i32>>
+                } else {
+                    Box::new((r.end..=r.start).rev()) as Box<dyn Iterator<Item = i32>>
+                };
+                for i in range {
+                    steps.push(Step::Single(Single {
+                        value: Value::Integer(i),
+                        string: i.to_string()
+                    }))
+                }
+            }
             _ => steps.push(step)
         }
     }
@@ -920,6 +942,31 @@ impl Cycle {
                 // using Cycle::extract_section or Cycle::parse_section
                 Err(format!("unexpected pair\n{:?}", pair))
             }
+            Rule::range_expr => {
+                let mut inner = pair.clone().into_inner();
+                match inner.next() {
+                    None => Err(format!("empty expression\n{:?}", pair)),
+                    Some(left_pair) => {
+                        if let Ok(start) = left_pair.as_str().parse::<i32>() {
+                            match inner.next() {
+                                None => Err("range expression has no right side".to_string()),
+                                Some(right_pair) => {
+                                    if let Ok(end) = right_pair.as_str().parse::<i32>() {
+                                        Ok(Step::Range(Range {
+                                            start,
+                                            end
+                                        }))
+                                    } else {
+                                        Err(format!("range expected integer on the right side, got '{}'", right_pair.as_str()))
+                                    }
+                                },
+                            }
+                        } else {
+                            Err(format!("range expected integer on the left side, got '{}'", left_pair.as_str()))
+                        }
+                    }
+                }
+            }
             Rule::single_expr => {
                 let mut inner = pair.clone().into_inner();
                 match inner.next() {
@@ -943,7 +990,6 @@ impl Cycle {
                                         Ok(Step::SingleExpression(SingleExpression {
                                             left: Box::new(left),
                                             right: if matches!(operator, SingleOperator::Target()) && matches!(right.value, Value::Pitch(_)) {
-                                                println!("matching target with pitch!!");
                                                 Value::Name(right_pair.as_str().to_string())
                                             } else {
                                                 right.value
@@ -1024,7 +1070,9 @@ impl Cycle {
     fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus) -> Events {
         match step {
             // repeats only make it here if they had no preceding value
-            Step::Repeat => Events::empty(), 
+            Step::Repeat => Events::empty(),
+            // ranges get applied at parse time
+            Step::Range(_) => Events::empty(), 
             Step::Single(s) => Events::Single(Event {
                 length: Fraction::one(),
                 target: Target::None,
@@ -1313,6 +1361,7 @@ impl Cycle {
     fn print_steps(step: &Step, level: usize) {
         let name = match step {
             Step::Repeat => "Repeat".to_string(),
+            Step::Range(r) => format!("Range {}..{}", r.start, r.end),
             Step::Single(s) => match &s.value {
                 Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
@@ -1752,8 +1801,19 @@ mod test {
             Cycle::from("{a b, c d e}", None)?.generate()
         );
 
+        assert_eq!(
+            Cycle::from("0..3", None)?.generate(),
+            Cycle::from("0 1 2 3", None)?.generate(),
+        );
+
+        assert_eq!(
+            Cycle::from("-5..-8", None)?.generate(),
+            Cycle::from("-5 -6 -7 -8", None)?.generate(),
+        );
+
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
+        assert!(Cycle::from("-2.3..4.", None).is_err());
         assert!(Cycle::from("a b c [d", None).is_err());
         assert!(Cycle::from("a b/ c [d", None).is_err());
         assert!(Cycle::from("a b--- c [d", None).is_err());
