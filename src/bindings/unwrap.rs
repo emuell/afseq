@@ -750,6 +750,38 @@ pub(crate) fn pattern_repeat_count_from_value(value: &LuaValue) -> LuaResult<Opt
 
 // -------------------------------------------------------------------------------------------------
 
+pub fn gate_trigger_from_value(value: &LuaValue) -> LuaResult<bool> {
+    match value {
+        LuaValue::Nil => Ok(false),
+        LuaValue::Boolean(bool) => Ok(*bool),
+        LuaValue::Integer(integer) => Ok(*integer != 0),
+        LuaValue::Number(number) => Ok(*number != 0.0),
+        LuaValue::String(str) => {
+            let str = str.to_string_lossy();
+            if let Ok(number) = str.parse::<f32>() {
+                Ok(number != 0.0)
+            } else if let Ok(integer) = str.parse::<u32>() {
+                Ok(integer != 0)
+            } else if let Ok(bool) = str.parse::<bool>() {
+                Ok(bool)
+            } else {
+                Err(LuaError::FromLuaConversionError {
+                    from: "string",
+                    to: "gate value",
+                    message: Some("Invalid boolean gate string value".to_string()),
+                })
+            }
+        }
+        _ => Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "gate value",
+            message: Some("Invalid boolean gate value".to_string()),
+        }),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 pub(crate) fn pattern_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
@@ -774,6 +806,28 @@ pub(crate) fn pattern_from_value(
             from: value.type_name(),
             to: "pattern",
             message: Some("pattern must either be an array or a function".to_string()),
+        }),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub(crate) fn gate_from_value(
+    lua: &Lua,
+    timeout_hook: &LuaTimeoutHook,
+    value: &LuaValue,
+    time_base: &BeatTimeBase,
+) -> LuaResult<Box<dyn Gate>> {
+    match value {
+        LuaValue::Function(func) => {
+            let callback = LuaCallback::new(lua, func.clone())?;
+            let gate = ScriptedGate::new(timeout_hook, callback, time_base)?;
+            Ok(Box::new(gate))
+        }
+        _ => Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "gate",
+            message: Some("gate must either be nil or a function".to_string()),
         }),
     }
 }

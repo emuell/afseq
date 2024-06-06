@@ -32,7 +32,7 @@ impl Gate for ProbabilityGate {
         // nothing to do
     }
 
-    fn run(&mut self, pulse: &PulseIterItem) -> bool {
+    fn run(&mut self, pulse: &PulseIterItem, _pulse_pattern_length: usize) -> bool {
         pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand_gen.gen_range(0.0..1.0))
     }
 
