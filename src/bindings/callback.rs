@@ -154,6 +154,20 @@ impl LuaCallback {
         Ok(())
     }
 
+    /// Sets the gate context for the callback. Only used for function callbacks.
+    pub fn set_gate_context(
+        &mut self,
+        time_base: &BeatTimeBase,
+        pulse: PulseIterItem,
+        pulse_step: usize,
+        pulse_time_step: f64,
+        pulse_pattern_length: usize,
+    ) -> LuaResult<()> {
+        self.set_pattern_context(time_base, pulse_step, pulse_time_step, pulse_pattern_length)?;
+        self.set_context_pulse_value(pulse)?;
+        Ok(())
+    }
+
     /// Sets the emitter context for the callback. Only used for function callbacks.
     pub fn set_emitter_context(
         &mut self,
@@ -164,9 +178,8 @@ impl LuaCallback {
         pulse_pattern_length: usize,
         step: usize,
     ) -> LuaResult<()> {
-        self.set_pattern_context(time_base, pulse_step, pulse_time_step, pulse_pattern_length)?;
+        self.set_gate_context(time_base, pulse, pulse_step, pulse_time_step, pulse_pattern_length)?;
         self.set_context_step(step)?;
-        self.set_context_pulse_value(pulse)?;
         Ok(())
     }
 

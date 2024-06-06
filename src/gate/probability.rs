@@ -1,7 +1,9 @@
+use std::borrow::Cow;
+
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use crate::{Gate, BeatTimeBase, PulseIterItem};
+use crate::{BeatTimeBase, Gate, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -23,6 +25,10 @@ impl ProbabilityGate {
 
 impl Gate for ProbabilityGate {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
+        // nothing to do
+    }
+
+    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
         // nothing to do
     }
 

@@ -1,6 +1,6 @@
 //! Defines if an `Event` should be triggered or not for a given `Pulse`.
 
-use std::fmt::Debug;
+use std::{borrow::Cow, fmt::Debug};
 
 use crate::{BeatTimeBase, PulseIterItem};
 
@@ -15,6 +15,9 @@ pub mod probability;
 pub trait Gate: Debug {
     /// Set or update the gate's internal beat or second time base with the new time base.
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
+
+    /// Set optional, application specific external context data for the pattern.
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Returns true if the event should be triggered, else false.
     fn run(&mut self, pulse: &PulseIterItem) -> bool;
