@@ -675,47 +675,33 @@ pub struct Cycle {
 }
 
 impl Cycle {
+
     // stacks can only appear inside groups like Subdivision, Alternating or Polymeter
     // they will have a stack of steps with their parent's type inside
-    fn parse_stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Result<Step, String> {
+    fn parse_sections_in_stack(pair: Pair<Rule>) -> Result<Vec<Vec<Step>>, String> {
         let mut channels = vec![];
-
-        match parent.as_rule() {
-            Rule::subdivision | Rule::mini | Rule::alternating | Rule::polymeter => {
-                for p in pair.into_inner() {
-                    let section = Cycle::parse_section(p)?;
-                    channels.push(section);
-                }
-            }
-            _ => return Err(format!("invalid parent to stack\n{:?}", parent)),
+        for p in pair.into_inner() {
+            let section = Cycle::parse_section(p)?;
+            channels.push(section);
         }
-
+        Ok(channels)
+    }
+    fn parse_stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Result<Step, String> {
         let mut stack = Stack { stack: vec![] };
-
         match parent.as_rule() {
             Rule::alternating => {
-                for c in channels {
+                for s in Cycle::parse_sections_in_stack(pair)? {
                     stack.stack.push(Step::Alternating(Alternating {
                         current: 0,
-                        steps: c,
+                        steps: s,
                     }))
                 }
             }
             Rule::subdivision | Rule::mini => {
-                for c in channels {
+                for s in Cycle::parse_sections_in_stack(pair)? {
                     stack
                         .stack
-                        .push(Step::Subdivision(Subdivision { steps: c }))
-                }
-            }
-            Rule::polymeter => {
-                let count = Cycle::parse_polymeter_count(&parent)?;
-                for c in channels {
-                    stack.stack.push(Step::Polymeter(Polymeter {
-                        offset: 0,
-                        steps: c,
-                        count,
-                    }))
+                        .push(Step::Subdivision(Subdivision { steps: s }))
                 }
             }
             _ => return Err(format!("invalid parent to stack\n{:?}", parent)),
@@ -723,29 +709,13 @@ impl Cycle {
         Ok(Step::Stack(stack))
     }
 
-    fn parse_polymeter_count(pair: &Pair<Rule>) -> Result<usize, String> {
-        for p in pair.clone().into_inner() {
-            if p.as_rule() == Rule::polymeter_tail {
-                if let Some(count) = p.into_inner().next() {
-                    return Ok(count.as_str().parse::<usize>().unwrap_or(1));
-                }
-            }
-            // TODO allow more generic parameter here
+    // TODO allow for polymeter count other than usize
+    fn parse_polymeter_tail(pair: Pair<Rule>) -> Result<usize, String> {
+        if let Some(count) = pair.clone().into_inner().next() {
+            Ok(count.as_str().parse::<usize>().unwrap_or(1))
+        } else {
+            Err(format!("invalid polymeter tail type '{}'", pair.as_str()))
         }
-        Err(format!("invalid polymeter count\n{:?}", pair))
-    }
-
-    fn parse_polymeter(pair: Pair<Rule>) -> Result<Step, String> {
-        let count = Cycle::parse_polymeter_count(&pair)?;
-        let mut inner = pair.clone().into_inner();
-        if let Some(poly_list) = inner.next() {
-            return Ok(Step::Polymeter(Polymeter {
-                count,
-                offset: 0,
-                steps: Cycle::parse_section(poly_list).unwrap_or_default(),
-            }));
-        }
-        Err(format!("invalid polymeter\n{:?}", pair))
     }
 
     fn push_applied(steps: &mut Vec<Step>, step: Step) {
@@ -755,7 +725,6 @@ impl Cycle {
                     steps.push(last.clone())
                 }else{
                     steps.push(Step::Single(Single::default()))
-                    // return Err(String::from("repeat must have a preceding value"))
                 }
             }
             Step::SingleExpression(e ) => {
@@ -870,14 +839,79 @@ impl Cycle {
                 }
             }
             Rule::polymeter => {
-                if let Some(first) = pair.clone().into_inner().next() {
-                    match first.as_rule() {
-                        Rule::stack => Cycle::parse_stack(first, pair),
-                        Rule::polymeter_tail => Ok(Step::Single(Single::default())),
-                        _ => Cycle::parse_polymeter(pair),
+                let mut count: Option<usize> = None;
+                let mut steps: Option<Vec<Step>> = None;
+                let mut stack: Option<Vec<Vec<Step>>> = None;
+                
+                for p in pair.clone().into_inner() {
+                    match p.as_rule() {
+                        Rule::polymeter_tail => {
+                            count = Cycle::parse_polymeter_tail(p).ok()
+                        }
+                        Rule::stack => {
+                            stack = Cycle::parse_sections_in_stack(p).ok()
+                        }
+                        _ => {
+                            steps = Cycle::parse_section(p).ok()
+                        }
                     }
+                }
+
+                let empty_step = Ok(Step::Single(Single::default()));
+
+                if let Some(count) = count {
+                    if let Some(stack) = stack {
+                        // if there is an explicit count sections in a stack will all have that
+                        let mut s = Stack { stack: vec![] };
+                        for steps in stack {
+                            s.stack.push(Step::Polymeter(Polymeter{
+                                steps,
+                                count,
+                                offset: 0,
+                            }))
+                        }
+                        Ok(Step::Stack(s))
+                    }else if let Some(steps) = steps {
+                        // otherwise it will be a single polymeter
+                        Ok(Step::Polymeter(Polymeter{
+                            steps,
+                            count,
+                            offset: 0
+                        }))
+                    } else {
+                        // if there was nothing inside it will just be an empty step (ie "{}%2")
+                        empty_step
+                    }
+                } else if let Some(stack) = stack {
+                    // if there is a stack but no count, the first section will determine the count of the rest
+                    if let Some(first) = stack.first() {
+                        let count = first.len();
+                        if count == 0 || stack.len() == 1{
+                            // unreachable, a stack won't pass parsing if it doesn't have more than one elements, empty sections are not allowed
+                            empty_step
+                        } else {
+                            let mut s = Stack { stack: vec![] };
+                            for steps in stack {
+                                s.stack.push(Step::Polymeter(Polymeter{
+                                    steps,
+                                    count,
+                                    offset: 0,
+                                }))
+                            }
+                            Ok(Step::Stack(s))
+                        }
+                    } else {
+                        // unreachable, a stack won't pass parsing if it doesn't have more than one elements
+                        empty_step
+                    }
+                } else if let Some(steps) = steps {
+                    // if there was no stack and no count, the steps are treated as a regular subdivision
+                    Ok(Step::Subdivision(Subdivision{
+                        steps
+                    }))
                 } else {
-                    Ok(Step::Single(Single::default()))
+                    // when it's just "{}" it will result in an empty step
+                    empty_step
                 }
             }
             Rule::stack | Rule::section | Rule::choices => {
@@ -1283,11 +1317,11 @@ impl Cycle {
                 Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
             },
-            Step::Subdivision(sd) => format!("{} [{}]", "Subdivision", sd.steps.len()),
-            Step::Alternating(a) => format!("{} <{}>", "Alternating", a.steps.len()),
-            Step::Polymeter(pm) => format!("{} {{{}}}", "Polymeter", pm.steps.len()),
-            Step::Choices(cs) => format!("{} |{}|", "Choices", cs.choices.len()),
-            Step::Stack(st) => format!("{} ({})", "Stack", st.stack.len()),
+            Step::Subdivision(sd) => format!("Subdivision [{}]", sd.steps.len()),
+            Step::Alternating(a) => format!("Alternating <{}>", a.steps.len()),
+            Step::Polymeter(pm) => format!("Polymeter {{{}%{}}}", pm.steps.len(), pm.count),
+            Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
+            Step::Stack(st) => format!("Stack ({})", st.stack.len()),
             Step::Expression(e) => format!("Expression {:?}", e.operator),
             Step::SingleExpression(e) => format!("SingleExpression {:?} : {:?}", e.operator, e.right),
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
@@ -1711,6 +1745,11 @@ mod test {
         assert_eq!(
             Cycle::from("{a b!2 c}%3", None)?.generate(),
             Cycle::from("{a b b c}%3", None)?.generate()
+        );
+
+        assert_eq!(
+            Cycle::from("a b, {c d e}%2", None)?.generate(),
+            Cycle::from("{a b, c d e}", None)?.generate()
         );
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");

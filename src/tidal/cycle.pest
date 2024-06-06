@@ -35,9 +35,10 @@ single = { hold | rest | number | pitch | name }
 /// groups
 subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
 alternating     = { "<" ~ (stack | section)? ~ ">" }
-polymeter       = { "{" ~ (stack | section)? ~ "}" ~ polymeter_tail }
-polymeter_tail  = { "%" ~  polymeter_count}
+
 polymeter_count = { (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ !(ASCII_ALPHANUMERIC | "."))}
+polymeter_tail  = { "%" ~  polymeter_count}
+polymeter       = { "{" ~ (stack | section)? ~ "}" ~ polymeter_tail? }
 
 group     = _{ subdivision | alternating | polymeter }
 
