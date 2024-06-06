@@ -2,7 +2,7 @@ use mlua::prelude::*;
 
 use super::super::{
     unwrap::{
-        bad_argument_error, event_iter_from_value, pattern_from_value,
+        bad_argument_error, event_iter_from_value, gate_from_value, pattern_from_value,
         pattern_repeat_count_from_value,
     },
     LuaTimeoutHook,
@@ -69,6 +69,12 @@ impl SecondTimeRhythm {
             let value = table.get::<_, LuaValue>("pattern")?;
             let pattern = pattern_from_value(lua, timeout_hook, &value, time_base)?;
             rhythm = rhythm.with_pattern_dyn(pattern);
+        }
+        // gate
+        if table.contains_key("gate")? {
+            let value = table.get::<_, LuaValue>("gate")?;
+            let gate = gate_from_value(lua, timeout_hook, &value, time_base)?;
+            rhythm = rhythm.with_gate_dyn(gate);
         }
         // repeat
         if table.contains_key("repeats")? {

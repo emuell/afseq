@@ -261,7 +261,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             // generate a pulse from the pattern and pass the pulse to the gate
             let (new_pulse_item, emit_event) = {
                 if let Some(pulse) = self.pattern.run() {
-                    let emit_event = self.gate.run(&pulse);
+                    let emit_event = self.gate.run(&pulse, self.pattern.len());
                     (pulse, emit_event)
                 } else {
                     // pattern playback finished

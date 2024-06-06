@@ -1,0 +1,147 @@
+use std::borrow::Cow;
+
+use mlua::prelude::*;
+
+use crate::{
+    bindings::{gate_trigger_from_value, LuaCallback, LuaTimeoutHook},
+    BeatTimeBase, Gate, PulseIterItem,
+};
+
+// -------------------------------------------------------------------------------------------------
+
+/// Gate impl, which calls an existing lua script function to filter pulses.
+#[derive(Debug)]
+pub struct ScriptedGate {
+    timeout_hook: LuaTimeoutHook,
+    callback: LuaCallback,
+    pulse_step: usize,
+    pulse_time_step: f64,
+}
+
+impl ScriptedGate {
+    pub(crate) fn new(
+        timeout_hook: &LuaTimeoutHook,
+        callback: LuaCallback,
+        time_base: &BeatTimeBase,
+    ) -> LuaResult<Self> {
+        // create a new timeout_hook instance and reset it before calling the function
+        let mut timeout_hook = timeout_hook.clone();
+        timeout_hook.reset();
+        // initialize function context
+        let mut callback = callback;
+        let pulse = PulseIterItem {
+            value: 1.0,
+            step_time: 1.0,
+        };
+        let pulse_step = 0;
+        let pulse_time_step = 0.0;
+        let pulse_pattern_length = 1;
+        callback.set_gate_context(
+            time_base,
+            pulse,
+            pulse_step,
+            pulse_time_step,
+            pulse_pattern_length,
+        )?;
+        Ok(Self {
+            timeout_hook,
+            callback,
+            pulse_step,
+            pulse_time_step,
+        })
+    }
+
+    fn next_gate_trigger_value(
+        &mut self,
+        pulse: &PulseIterItem,
+        pulse_pattern_length: usize,
+    ) -> LuaResult<bool> {
+        // reset timeout
+        self.timeout_hook.reset();
+        // update context
+        self.callback.set_context_pulse_value(*pulse)?;
+        self.callback.set_context_pulse_step(
+            self.pulse_step,
+            self.pulse_time_step,
+            pulse_pattern_length,
+        )?;
+        // invoke callback and evaluate the result
+        if let Some(value) = self.callback.call()? {
+            gate_trigger_from_value(&value)
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+impl Clone for ScriptedGate {
+    fn clone(&self) -> Self {
+        Self {
+            timeout_hook: self.timeout_hook.clone(),
+            callback: self.callback.clone(),
+            pulse_step: self.pulse_step,
+            pulse_time_step: self.pulse_time_step,
+        }
+    }
+}
+
+impl Gate for ScriptedGate {
+    fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        // update function context from the new time base
+        if let Err(err) = self.callback.set_context_time_base(time_base) {
+            self.callback.handle_error(&err);
+        }
+    }
+
+    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        // update function context from the new time base
+        if let Err(err) = self.callback.set_context_external_data(data) {
+            self.callback.handle_error(&err);
+        }
+    }
+
+    fn run(&mut self, pulse: &PulseIterItem, pulse_pattern_length: usize) -> bool {
+        // call function with context and evaluate the result
+        let result = match self.next_gate_trigger_value(pulse, pulse_pattern_length) {
+            Err(err) => {
+                self.callback.handle_error(&err);
+                false
+            }
+            Ok(value) => value,
+        };
+        // move step for the next iter call
+        self.pulse_step += 1;
+        self.pulse_time_step += pulse.step_time;
+        // return function result
+        result
+    }
+
+    fn duplicate(&self) -> Box<dyn Gate> {
+        Box::new(self.clone())
+    }
+
+    fn reset(&mut self) {
+        // reset timeout
+        self.timeout_hook.reset();
+        // reset step counter
+        self.pulse_step = 0;
+        self.pulse_time_step = 0.0;
+        let pulse_pattern_length = 1;
+        // update step in context
+        if let Err(err) = self.callback.set_context_pulse_step(
+            self.pulse_step,
+            self.pulse_time_step,
+            pulse_pattern_length,
+        ) {
+            self.callback.handle_error(&err);
+        }
+        // reset function
+        if let Err(err) = self.callback.reset() {
+            self.callback.handle_error(&err);
+        }
+        // reset function
+        if let Err(err) = self.callback.reset() {
+            self.callback.handle_error(&err);
+        }
+    }
+}

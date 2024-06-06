@@ -55,6 +55,7 @@ pub use super::{
     },
     event::scripted::ScriptedEventIter,
     pattern::scripted::ScriptedPattern,
+    gate::scripted::ScriptedGate,
 };
 
 #[cfg(feature = "player")]

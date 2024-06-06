@@ -47,8 +47,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to 'emit' functions.
----@class EmitterContext : PatternContext
+---Context passed to `gate` functions.
+---@class GateContext : PatternContext
 ---
 ---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
 ---will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
@@ -62,6 +62,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---to be called, so they never end up here.
 ---Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
 ---@field pulse_value number
+
+----------------------------------------------------------------------------------------------------
+
+---Context passed to 'emit' functions.
+---@class EmitterContext : GateContext
 ---
 ---Continues step counter, incrementing with each new *emitted* pulse.
 ---Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
@@ -167,6 +172,16 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---repeat = true -- play & repeat forever
 ---```
 ---@field repeats (integer|boolean)?
+---
+---Set optional pulse train filter between pattern and emitter. By default a probability
+---gate is used, which passes 1s directly, skips 0s, and applies values in range (0 - 1) using
+---the pulse value as probability, like:
+---```lua
+---gate = function(context)
+---  return context.pulse_value >= 1 or context.pulse_value > math.random() 
+---end
+---```
+---@field gate Pulse[]|(fun(context: GateContext):boolean)|(fun(context: GateContext):fun(context: GateContext):boolean)?
 ---
 ---Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the event
 ---from the specified emit sequence. When the end of the sequence is reached, it starts again from

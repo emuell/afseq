@@ -43,7 +43,9 @@ pub use callback::{clear_lua_callback_errors, has_lua_callback_errors, lua_callb
 // internal re-exports
 pub(crate) use callback::LuaCallback;
 pub(crate) use timeout::LuaTimeoutHook;
-pub(crate) use unwrap::{note_events_from_value, pattern_pulse_from_value};
+pub(crate) use unwrap::{
+    gate_trigger_from_value, note_events_from_value, pattern_pulse_from_value,
+};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -263,9 +265,16 @@ fn register_global_bindings(
             let time_base = *time_base;
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 // error on unknown option keys
-                let rhythm_properties =
-                    ["unit", "resolution", "offset", "pattern", "repeats", "emit"];
-                validate_table_properties(&table, &rhythm_properties)?;
+                const RHYTHM_PROPERTIES: [&str; 7] = [
+                    "unit",
+                    "resolution",
+                    "offset",
+                    "pattern",
+                    "gate",
+                    "repeats",
+                    "emit",
+                ];
+                validate_table_properties(&table, &RHYTHM_PROPERTIES)?;
                 // check which time unit is specified
                 let second_time_unit = match table.get::<&str, String>("unit") {
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
