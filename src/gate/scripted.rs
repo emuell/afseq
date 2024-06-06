@@ -66,11 +66,7 @@ impl ScriptedGate {
             pulse_pattern_length,
         )?;
         // invoke callback and evaluate the result
-        if let Some(value) = self.callback.call()? {
-            gate_trigger_from_value(&value)
-        } else {
-            Ok(false)
-        }
+        gate_trigger_from_value(&self.callback.call()?)
     }
 }
 

@@ -69,11 +69,7 @@ impl ScriptedPattern {
             pulse_pattern_length,
         )?;
         // invoke callback and evaluate the result
-        if let Some(value) = self.callback.call()? {
-            Ok(Some(pattern_pulse_from_value(&value)?))
-        } else {
-            Ok(None)
-        }
+        Ok(Some(pattern_pulse_from_value(&self.callback.call()?)?))
     }
 }
 

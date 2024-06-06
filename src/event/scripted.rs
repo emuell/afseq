@@ -68,12 +68,8 @@ impl ScriptedEventIter {
         )?;
         self.callback.set_context_step(self.step)?;
         // invoke callback and evaluate the result
-        if let Some(value) = self.callback.call()? {
-            let events = note_events_from_value(&value, None)?;
-            Ok(Some(vec![EventIterItem::new(Event::NoteEvents(events))]))
-        } else {
-            Ok(None)
-        }
+        let events = note_events_from_value(&self.callback.call()?, None)?;
+        Ok(Some(vec![EventIterItem::new(Event::NoteEvents(events))]))
     }
 }
 

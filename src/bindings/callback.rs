@@ -178,7 +178,13 @@ impl LuaCallback {
         pulse_pattern_length: usize,
         step: usize,
     ) -> LuaResult<()> {
-        self.set_gate_context(time_base, pulse, pulse_step, pulse_time_step, pulse_pattern_length)?;
+        self.set_gate_context(
+            time_base,
+            pulse,
+            pulse_step,
+            pulse_time_step,
+            pulse_pattern_length,
+        )?;
         self.set_context_step(step)?;
         Ok(())
     }
@@ -193,8 +199,7 @@ impl LuaCallback {
     }
 
     /// Invoke the Lua function callback or generator.
-    /// Returns `None` for iterators, when the iteration finished.
-    pub fn call(&mut self) -> LuaResult<Option<LuaValue>> {
+    pub fn call(&mut self) -> LuaResult<LuaValue> {
         if !self.initialized {
             self.initialized = true;
             let function = self.function.clone();
@@ -216,7 +221,7 @@ impl LuaCallback {
                 self.generator = None;
             }
         }
-        Ok(Some(self.function.call(self.context.to_ref())?))
+        self.function.call(self.context.to_ref())
     }
 
     /// Report a Lua callback errors. The error will be logged and usually cleared after
