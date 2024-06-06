@@ -793,30 +793,28 @@ impl Cycle {
 
     // helper to convert a section or single to a vector of Steps
     fn extract_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
-        if let Some(inner) = pair.into_inner().next() {
-            match inner.as_rule() {
-                Rule::repeat => Ok(vec![Step::Repeat]),
-                Rule::single => {
-                    let single = Step::parse_single(inner)?;
-                    Ok(vec![Step::Single(single)])
-                }
-                Rule::section => Cycle::parse_section(inner),
-                Rule::choices => {
-                    let mut choices: Vec<Step> = vec![];
-                    for p in inner.clone().into_inner() {
-                        if let Some(step) = p.into_inner().next() {
-                            let choice = Cycle::parse_step(step)?;
-                            Cycle::push_applied(&mut choices, choice)
-                        } else {
-                            return Err(format!("empty choice\n{:?}", inner));
-                        }
-                    }
-                    Ok(vec![Step::Choices(Choices { choices })])
-                }
-                _ => Err(format!("unexpected rule in section\n{:?}", inner)),
+        let inner = pair.clone().into_inner().next()
+            .ok_or_else(|| format!("empty section\n{:?}", pair))?;
+        match inner.as_rule() {
+            Rule::repeat => Ok(vec![Step::Repeat]),
+            Rule::single => {
+                let single = Step::parse_single(inner)?;
+                Ok(vec![Step::Single(single)])
             }
-        } else {
-            Err("empty section".to_string())
+            Rule::section => Cycle::parse_section(inner),
+            Rule::choices => {
+                let mut choices: Vec<Step> = vec![];
+                for p in inner.clone().into_inner() {
+                    if let Some(step) = p.into_inner().next() {
+                        let choice = Cycle::parse_step(step)?;
+                        Cycle::push_applied(&mut choices, choice)
+                    } else {
+                        return Err(format!("empty choice\n{:?}", inner));
+                    }
+                }
+                Ok(vec![Step::Choices(Choices { choices })])
+            }
+            _ => Err(format!("unexpected rule in section\n{:?}", inner)),
         }
     }
 
@@ -826,18 +824,16 @@ impl Cycle {
         match pair.as_rule() {
             Rule::repeat => Ok(Step::Repeat),
             Rule::single => {
-                let single = Step::parse_single(pair)?;
-                Ok(Step::Single(single))
+                Step::parse_single(pair).map(Step::Single)
             }
             Rule::subdivision | Rule::mini => {
                 if let Some(first) = pair.clone().into_inner().next() {
                     match first.as_rule() {
                         Rule::stack => Cycle::parse_stack(first, pair),
                         _ => {
-                            let sd = Subdivision {
+                            Ok(Step::Subdivision(Subdivision {
                                 steps: Cycle::extract_section(pair).unwrap_or_default(),
-                            };
-                            Ok(Step::Subdivision(sd))
+                            }))
                         }
                     }
                 } else {
@@ -881,59 +877,58 @@ impl Cycle {
 
                 let empty_step = Ok(Step::Single(Single::default()));
 
-                if let Some(count) = count {
-                    if let Some(stack) = stack {
-                        // if there is an explicit count sections in a stack will all have that
+                match (count, stack, steps) {
+                    (Some(count), None, Some(steps)) => {
+                        // a regular polymeter with explicit count
+                        Ok(Step::Polymeter(Polymeter {
+                            steps,
+                            count,
+                            offset: 0,
+                        }))
+                    }
+                    (Some(count), Some(stack), _) => {
+                        // sections in a stack with explicit count will all have that
                         let mut s = Stack { stack: vec![] };
                         for steps in stack {
-                            s.stack.push(Step::Polymeter(Polymeter{
+                            s.stack.push(Step::Polymeter(Polymeter {
                                 steps,
                                 count,
                                 offset: 0,
-                            }))
+                            }));
                         }
                         Ok(Step::Stack(s))
-                    }else if let Some(steps) = steps {
-                        // otherwise it will be a single polymeter
-                        Ok(Step::Polymeter(Polymeter{
-                            steps,
-                            count,
-                            offset: 0
-                        }))
-                    } else {
-                        // if there was nothing inside it will just be an empty step (ie "{}%2")
-                        empty_step
                     }
-                } else if let Some(stack) = stack {
-                    // if there is a stack but no count, the first section will determine the count of the rest
-                    if let Some(first) = stack.first() {
-                        let count = first.len();
-                        if count == 0 || stack.len() == 1{
-                            // unreachable, a stack won't pass parsing if it doesn't have more than one elements, empty sections are not allowed
-                            empty_step
-                        } else {
-                            let mut s = Stack { stack: vec![] };
-                            for steps in stack {
-                                s.stack.push(Step::Polymeter(Polymeter{
-                                    steps,
-                                    count,
-                                    offset: 0,
-                                }))
+                    (None, Some(stack), _) => {
+                        if let Some(first) = stack.first() {
+                            let count = first.len();
+                            if count == 0 || stack.len() == 1 {
+                                // unreachable, a stack will always have more than one sections with each having at least one item
+                                empty_step
+                            } else {
+                                // if there is a stack but no count, the first section will determine the count of the rest
+                                let mut s = Stack { stack: vec![] };
+                                for steps in stack {
+                                    s.stack.push(Step::Polymeter(Polymeter {
+                                        steps,
+                                        count,
+                                        offset: 0,
+                                    }));
+                                }
+                                Ok(Step::Stack(s))
                             }
-                            Ok(Step::Stack(s))
+                        } else {
+                            // unreachable, empty stacks won't make it through parsing
+                            empty_step
                         }
-                    } else {
-                        // unreachable, a stack won't pass parsing if it doesn't have more than one elements
+                    }
+                    (None, None, Some(steps)) => {
+                        // if there is only one section and no count, it is treated as a subdivision
+                        Ok(Step::Subdivision(Subdivision { steps }))
+                    }
+                    _ => {
+                        // empty polymeter like {} and {}%2 will become a single rest
                         empty_step
                     }
-                } else if let Some(steps) = steps {
-                    // if there was no stack and no count, the steps are treated as a regular subdivision
-                    Ok(Step::Subdivision(Subdivision{
-                        steps
-                    }))
-                } else {
-                    // when it's just "{}" it will result in an empty step
-                    empty_step
                 }
             }
             Rule::stack | Rule::section | Rule::choices => {
@@ -944,120 +939,92 @@ impl Cycle {
             }
             Rule::range_expr => {
                 let mut inner = pair.clone().into_inner();
-                match inner.next() {
-                    None => Err(format!("empty expression\n{:?}", pair)),
-                    Some(left_pair) => {
-                        if let Ok(start) = left_pair.as_str().parse::<i32>() {
-                            match inner.next() {
-                                None => Err("range expression has no right side".to_string()),
-                                Some(right_pair) => {
-                                    if let Ok(end) = right_pair.as_str().parse::<i32>() {
-                                        Ok(Step::Range(Range {
-                                            start,
-                                            end
-                                        }))
-                                    } else {
-                                        Err(format!("range expected integer on the right side, got '{}'", right_pair.as_str()))
-                                    }
-                                },
-                            }
-                        } else {
-                            Err(format!("range expected integer on the left side, got '{}'", left_pair.as_str()))
-                        }
-                    }
-                }
+                let start_pair = inner.next()
+                    .ok_or_else(|| format!("empty expression\n{:?}", pair))?;
+                let start = start_pair.as_str().parse::<i32>()
+                    .map_err(|_| format!("range expected integer on the left side, got '{}'", start_pair.as_str()))?;
+
+                let end_pair = inner.next()
+                    .ok_or_else(|| "range expression has no right side".to_string())?;
+                let end = end_pair.as_str().parse::<i32>()
+                    .map_err(|_| format!("range expected integer on the right side, got '{}'", end_pair.as_str()))?;
+                Ok(Step::Range(Range { start, end }))
             }
+
             Rule::single_expr => {
                 let mut inner = pair.clone().into_inner();
-                match inner.next() {
-                    None => Err(format!("empty expression\n{:?}", pair)),
-                    Some(left_pair) => {
-                        let left = Cycle::parse_step(left_pair)?;
-                        match inner.next() {
-                            None => Err(format!("incomplete expression\n{:?}", pair)),
-                            Some(op) => {
-                                let operator = SingleOperator::parse(op.clone())?;
-                                let mut inner = op.into_inner();
-                                match inner.next() {
-                                    None =>
-                                        Ok(Step::SingleExpression(SingleExpression {
-                                            left: Box::new(left),
-                                            right: operator.default_value(),
-                                            operator
-                                        })),
-                                    Some(right_pair) => {
-                                        let right = Step::parse_single(right_pair.clone())?;
-                                        Ok(Step::SingleExpression(SingleExpression {
-                                            left: Box::new(left),
-                                            right: if matches!(operator, SingleOperator::Target()) && matches!(right.value, Value::Pitch(_)) {
-                                                Value::Name(right_pair.as_str().to_string())
-                                            } else {
-                                                right.value
-                                            },
-                                            operator,
-                                        }))
-                                    }
-                                }
-                            },
-                        }
-                    }
+                let left_pair = inner.next()
+                    .ok_or_else(|| format!("empty expression\n{:?}", pair))?;
+                let left = Cycle::parse_step(left_pair)?;
+
+                let op_pair = inner.next()
+                    .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
+                let operator = SingleOperator::parse(op_pair.clone())?;
+
+                if let Some(right_pair) = op_pair.into_inner().next() {
+                    let right = Step::parse_single(right_pair.clone())?;
+                    Ok(Step::SingleExpression(SingleExpression {
+                        left: Box::new(left),
+                        right: if matches!(operator, SingleOperator::Target()) && matches!(right.value, Value::Pitch(_)) {
+                            Value::Name(right_pair.as_str().to_string())
+                        } else {
+                            right.value
+                        },
+                        operator,
+                    }))
+                }else {
+                    Ok(Step::SingleExpression(SingleExpression {
+                        left: Box::new(left),
+                        right: operator.default_value(),
+                        operator
+                    }))
                 }
             }
             Rule::expr => {
                 let mut inner = pair.clone().into_inner();
-                match inner.next() {
-                    None => Err(format!("empty expression\n{:?}", pair)),
-                    Some(left_pair) => {
-                        let left = Cycle::parse_step(left_pair)?;
-                        match inner.next() {
-                            None => Err(format!("incomplete expression\n{:?}", pair)),
-                            Some(op) => match op.as_rule() {
-                                Rule::op_bjorklund => {
-                                    let mut op_inner = op.into_inner();
-                                    if let Some(pulse_pair) = op_inner.next() {
-                                        let pulses = Cycle::parse_step(pulse_pair)?;
-                                        if let Some(steps_pair) = op_inner.next() {
-                                            let steps = Cycle::parse_step(steps_pair)?;
-                                            let mut rotate = None;
-                                            if let Some(rotate_pair) = op_inner.next() {
-                                                rotate = Some(Cycle::parse_step(rotate_pair)?);
-                                            }
-                                            return Ok(Step::Bjorklund(Bjorklund {
-                                                left: Box::new(left),
-                                                pulses: Box::new(pulses),
-                                                steps: Box::new(steps),
-                                                rotation: rotate.map(Box::new),
-                                            }));
-                                        }
-                                    }
-                                    Err(format!("invalid bjorklund\n{:?}", pair))
-                                }
-                                _ => {
-                                    let operator = Operator::parse(op.clone())?;
-                                    let mut inner = op.into_inner();
-                                    match inner.next() {
-                                        None => 
-                                            Err(format!(
-                                                "missing right hand side in expression\n{:?}",
-                                                inner
-                                            )),
-                                        Some(right_pair) => {
-                                            let right = Cycle::parse_step(right_pair)?;
-                                            match right {
-                                                    Step::Single(_) =>{
-                                                        let expr = Step::Expression(Expression {
-                                                            left: Box::new(left),
-                                                            right: Box::new(right),
-                                                            operator,
-                                                        });
-                                                        Ok(expr)
-                                                    }
-                                                    _ => Err("only single values are supported on the right hand side".to_string())
-                                                }
-                                        }
-                                    }
-                                }
-                            },
+                let left_pair = inner.next()
+                    .ok_or_else(|| format!("empty expression\n{:?}", pair))?;
+                let left = Cycle::parse_step(left_pair)?;
+
+                let op_pair = inner.next()
+                    .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
+                match op_pair.as_rule() {
+                    Rule::op_bjorklund => {
+                        let mut inner = op_pair.into_inner();
+
+                        let pulse_pair = inner.next()
+                            .ok_or_else(|| format!("no pulse in bjorklund\n{:?}", pair))?;
+                        let pulses = Cycle::parse_step(pulse_pair)?;
+
+                        let steps_pair = inner.next()
+                            .ok_or_else(|| format!("no steps in bjorklund\n{:?}", pair))?;
+                        let steps = Cycle::parse_step(steps_pair)?;
+
+                        let rotate = inner.next().map(Cycle::parse_step).transpose()?;
+
+                        Ok(Step::Bjorklund(Bjorklund {
+                            left: Box::new(left),
+                            pulses: Box::new(pulses),
+                            steps: Box::new(steps),
+                            rotation: rotate.map(Box::new),
+                        }))
+                    }
+                    _ => {
+                        let operator = Operator::parse(op_pair.clone())?;
+                        let mut inner = op_pair.into_inner();
+                        let right_pair = inner.next()
+                            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))?;
+                        let right = Cycle::parse_step(right_pair)?;
+                        match right {
+                            Step::Single(_) =>{
+                                let expr = Step::Expression(Expression {
+                                    left: Box::new(left),
+                                    right: Box::new(right),
+                                    operator,
+                                });
+                                Ok(expr)
+                            }
+                            _ => Err("only single values are supported on the right hand side".to_string())
                         }
                     }
                 }
@@ -1209,13 +1176,13 @@ impl Cycle {
                         match b.steps.as_ref() {
                             Step::Single(pulses_single) => {
                                 let rotation = match &b.rotation {
+                                    None => None,
                                     Some(r) => match r.as_ref() {
                                         Step::Single(rotation_single) => {
                                             rotation_single.value.to_integer()
                                         }
                                         _ => None, // TODO support something other than Step::Single as rotation
                                     },
-                                    None => None,
                                 };
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
