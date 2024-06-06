@@ -353,6 +353,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
         self.pattern.set_external_context(data);
+        self.gate.set_external_context(data);
         self.event_iter.set_external_context(data);
     }
 
