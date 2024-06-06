@@ -72,12 +72,7 @@ impl EventIter for MutatedEventIter {
         // nothing to do
     }
 
-    fn run(
-        &mut self,
-        _pulse: PulseIterItem,
-        _pulse_pattern_length: usize,
-        emit_event: bool,
-    ) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         if emit_event {
             let event = self.events[self.event_index].clone();
             self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);

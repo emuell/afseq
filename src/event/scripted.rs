@@ -33,16 +33,8 @@ impl ScriptedEventIter {
         let pulse = PulseIterItem::default();
         let pulse_step = 0;
         let pulse_time_step = 0.0;
-        let pulse_pattern_length = 1;
         let step = 0;
-        callback.set_emitter_context(
-            time_base,
-            pulse,
-            pulse_step,
-            pulse_time_step,
-            pulse_pattern_length,
-            step,
-        )?;
+        callback.set_emitter_context(time_base, pulse, pulse_step, pulse_time_step, step)?;
         Ok(Self {
             timeout_hook,
             callback,
@@ -52,20 +44,13 @@ impl ScriptedEventIter {
         })
     }
 
-    fn next_event(
-        &mut self,
-        pulse: PulseIterItem,
-        pulse_pattern_length: usize,
-    ) -> LuaResult<Option<Vec<EventIterItem>>> {
+    fn next_event(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
         self.callback.set_context_pulse_value(pulse)?;
-        self.callback.set_context_pulse_step(
-            self.pulse_step,
-            self.pulse_time_step,
-            pulse_pattern_length,
-        )?;
+        self.callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
         self.callback.set_context_step(self.step)?;
         // invoke callback and evaluate the result
         let events = note_events_from_value(&self.callback.call()?, None)?;
@@ -105,12 +90,11 @@ impl EventIter for ScriptedEventIter {
     fn run(
         &mut self,
         pulse: PulseIterItem,
-        pulse_pattern_length: usize,
         emit_event: bool,
     ) -> Option<Vec<EventIterItem>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
-            let event = match self.next_event(pulse, pulse_pattern_length) {
+            let event = match self.next_event(pulse) {
                 Ok(event) => event,
                 Err(err) => {
                     self.callback.handle_error(&err);
@@ -143,12 +127,10 @@ impl EventIter for ScriptedEventIter {
         // reset pulse counter
         self.pulse_step = 0;
         self.pulse_time_step = 0.0;
-        let pulse_pattern_length = 1;
-        if let Err(err) = self.callback.set_context_pulse_step(
-            self.pulse_step,
-            self.pulse_time_step,
-            pulse_pattern_length,
-        ) {
+        if let Err(err) = self
+            .callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)
+        {
             self.callback.handle_error(&err);
         }
         // restore function

@@ -124,13 +124,10 @@ impl LuaCallback {
         &mut self,
         pulse_step: usize,
         pulse_time_step: f64,
-        pulse_pattern_length: usize,
     ) -> LuaResult<()> {
         let table = self.context.to_ref();
         table.raw_set("pulse_step", pulse_step + 1)?;
         table.raw_set("pulse_time_step", pulse_time_step)?;
-        table.raw_set("pattern_length", pulse_pattern_length)?;
-        table.raw_set("pattern_pulse_step", pulse_step % pulse_pattern_length + 1)?;
         Ok(())
     }
 
@@ -147,10 +144,9 @@ impl LuaCallback {
         time_base: &BeatTimeBase,
         pulse_step: usize,
         pulse_time_step: f64,
-        pulse_pattern_length: usize,
     ) -> LuaResult<()> {
         self.set_context_time_base(time_base)?;
-        self.set_context_pulse_step(pulse_step, pulse_time_step, pulse_pattern_length)?;
+        self.set_context_pulse_step(pulse_step, pulse_time_step)?;
         Ok(())
     }
 
@@ -161,9 +157,8 @@ impl LuaCallback {
         pulse: PulseIterItem,
         pulse_step: usize,
         pulse_time_step: f64,
-        pulse_pattern_length: usize,
     ) -> LuaResult<()> {
-        self.set_pattern_context(time_base, pulse_step, pulse_time_step, pulse_pattern_length)?;
+        self.set_pattern_context(time_base, pulse_step, pulse_time_step)?;
         self.set_context_pulse_value(pulse)?;
         Ok(())
     }
@@ -175,7 +170,6 @@ impl LuaCallback {
         pulse: PulseIterItem,
         pulse_step: usize,
         pulse_time_step: f64,
-        pulse_pattern_length: usize,
         step: usize,
     ) -> LuaResult<()> {
         self.set_gate_context(
@@ -183,7 +177,6 @@ impl LuaCallback {
             pulse,
             pulse_step,
             pulse_time_step,
-            pulse_pattern_length,
         )?;
         self.set_context_step(step)?;
         Ok(())

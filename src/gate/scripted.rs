@@ -35,14 +35,7 @@ impl ScriptedGate {
         };
         let pulse_step = 0;
         let pulse_time_step = 0.0;
-        let pulse_pattern_length = 1;
-        callback.set_gate_context(
-            time_base,
-            pulse,
-            pulse_step,
-            pulse_time_step,
-            pulse_pattern_length,
-        )?;
+        callback.set_gate_context(time_base, pulse, pulse_step, pulse_time_step)?;
         Ok(Self {
             timeout_hook,
             callback,
@@ -51,20 +44,13 @@ impl ScriptedGate {
         })
     }
 
-    fn next_gate_trigger_value(
-        &mut self,
-        pulse: &PulseIterItem,
-        pulse_pattern_length: usize,
-    ) -> LuaResult<bool> {
+    fn next_gate_trigger_value(&mut self, pulse: &PulseIterItem) -> LuaResult<bool> {
         // reset timeout
         self.timeout_hook.reset();
         // update context
         self.callback.set_context_pulse_value(*pulse)?;
-        self.callback.set_context_pulse_step(
-            self.pulse_step,
-            self.pulse_time_step,
-            pulse_pattern_length,
-        )?;
+        self.callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
         // invoke callback and evaluate the result
         gate_trigger_from_value(&self.callback.call()?)
     }
@@ -96,9 +82,9 @@ impl Gate for ScriptedGate {
         }
     }
 
-    fn run(&mut self, pulse: &PulseIterItem, pulse_pattern_length: usize) -> bool {
+    fn run(&mut self, pulse: &PulseIterItem) -> bool {
         // call function with context and evaluate the result
-        let result = match self.next_gate_trigger_value(pulse, pulse_pattern_length) {
+        let result = match self.next_gate_trigger_value(pulse) {
             Err(err) => {
                 self.callback.handle_error(&err);
                 false
@@ -122,13 +108,11 @@ impl Gate for ScriptedGate {
         // reset step counter
         self.pulse_step = 0;
         self.pulse_time_step = 0.0;
-        let pulse_pattern_length = 1;
         // update step in context
-        if let Err(err) = self.callback.set_context_pulse_step(
-            self.pulse_step,
-            self.pulse_time_step,
-            pulse_pattern_length,
-        ) {
+        if let Err(err) = self
+            .callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)
+        {
             self.callback.handle_error(&err);
         }
         // reset function

@@ -22,7 +22,7 @@ pub trait Gate: Debug {
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Returns true if the event should be triggered, else false.
-    fn run(&mut self, pulse: &PulseIterItem, pulse_pattern_length: usize) -> bool;
+    fn run(&mut self, pulse: &PulseIterItem) -> bool;
 
     /// Create a new cloned instance of this gate. This actualy is a clone(), wrapped into
     /// a `Box<dyn Gate>`, but called 'duplicate' to avoid conflicts with possible

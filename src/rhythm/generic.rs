@@ -261,7 +261,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             // generate a pulse from the pattern and pass the pulse to the gate
             let (new_pulse_item, emit_event) = {
                 if let Some(pulse) = self.pattern.run() {
-                    let emit_event = self.gate.run(&pulse, self.pattern.len());
+                    let emit_event = self.gate.run(&pulse);
                     (pulse, emit_event)
                 } else {
                     // pattern playback finished
@@ -270,9 +270,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             };
             self.event_iter_pulse_item = new_pulse_item;
             // generate new events from the gated pulse
-            let slice = self
-                .event_iter
-                .run(new_pulse_item, self.pattern.len(), emit_event);
+            let slice = self.event_iter.run(new_pulse_item, emit_event);
             if let Some(slice) = slice {
                 self.event_iter_items = VecDeque::from(slice);
             } else {

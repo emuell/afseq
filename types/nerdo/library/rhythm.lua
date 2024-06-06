@@ -36,14 +36,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
 ---Starts from 0 and increases with each new pulse by the pulse's step time duration.
 ---@field pulse_time_step number
----
----Length of the pattern in pulses (including all pulses from all subdivisions).
----For pattern generator functions this will be the length of the currently emitted 
----pulse or subdivision only as the entire pattern is not predictable.
----@field pattern_length integer
----Pulse counter, which wraps around with the pattern length, incrementing with each 
----new **skipped or emitted pulse**.
----@field pattern_pulse_step integer
 
 ----------------------------------------------------------------------------------------------------
 

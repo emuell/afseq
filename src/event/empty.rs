@@ -17,12 +17,7 @@ impl EventIter for EmptyEventIter {
         // nothing to do
     }
 
-    fn run(
-        &mut self,
-        _pulse: PulseIterItem,
-        _pulse_pattern_length: usize,
-        _emit_event: bool,
-    ) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: PulseIterItem, _emit_event: bool) -> Option<Vec<EventIterItem>> {
         None
     }
 

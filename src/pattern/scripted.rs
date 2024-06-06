@@ -35,15 +35,9 @@ impl ScriptedPattern {
         let mut callback = callback;
         let pulse_step = 0;
         let pulse_time_step = 0.0;
-        let pulse_pattern_length = 1;
         let repeat_count_option = None;
         let repeat_count = 0;
-        callback.set_pattern_context(
-            time_base,
-            pulse_step,
-            pulse_time_step,
-            pulse_pattern_length,
-        )?;
+        callback.set_pattern_context(time_base, pulse_step, pulse_time_step)?;
         let pulse = None;
         let pulse_iter = None;
         Ok(Self {
@@ -62,12 +56,8 @@ impl ScriptedPattern {
         // reset timeout
         self.timeout_hook.reset();
         // update context
-        let pulse_pattern_length = self.pulse.as_ref().map(|p| p.len()).unwrap_or(1);
-        self.callback.set_context_pulse_step(
-            self.pulse_step,
-            self.pulse_time_step,
-            pulse_pattern_length,
-        )?;
+        self.callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
         // invoke callback and evaluate the result
         Ok(Some(pattern_pulse_from_value(&self.callback.call()?)?))
     }
@@ -178,13 +168,11 @@ impl Pattern for ScriptedPattern {
         // reset step counter
         self.pulse_step = 0;
         self.pulse_time_step = 0.0;
-        let pulse_pattern_length = 1;
         // update step in context
-        if let Err(err) = self.callback.set_context_pulse_step(
-            self.pulse_step,
-            self.pulse_time_step,
-            pulse_pattern_length,
-        ) {
+        if let Err(err) = self
+            .callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)
+        {
             self.callback.handle_error(&err);
         }
         // reset function

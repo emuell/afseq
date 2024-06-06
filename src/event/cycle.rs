@@ -102,12 +102,7 @@ impl EventIter for CycleEventIter {
         // nothing to do
     }
 
-    fn run(
-        &mut self,
-        _pulse: PulseIterItem,
-        _pulse_pattern_length: usize,
-        emit_event: bool,
-    ) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         if emit_event {
             Some(self.generate_events())
         } else {
