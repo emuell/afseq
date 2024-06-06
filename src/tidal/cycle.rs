@@ -21,17 +21,18 @@ enum Step {
     Stack(Stack),
     Choices(Choices),
     Expression(Expression),
+    SingleExpression(SingleExpression),
     Bjorklund(Bjorklund),
     Repeat,
 }
 
 impl Step {
-    fn parse_single(single: Pair<Rule>) -> Result<Step, String> {
+    fn parse_single(single: Pair<Rule>) -> Result<Single, String> {
         match single.into_inner().next() {
             Some(pair) => {
                 let string = pair.as_str().to_string();
                 let value = Value::parse(pair)?;
-                Ok(Step::Single(Single { string, value }))
+                Ok(Single { value, string })
             }
             None => Err("empty single".to_string()),
         }
@@ -64,6 +65,7 @@ impl Step {
             Step::Choices(cs) => cs.choices.iter().collect(),
             Step::Stack(st) => st.stack.iter().collect(),
             Step::Expression(e) => vec![&e.left, &e.right],
+            Step::SingleExpression(e) => vec![&e.left],
             Step::Bjorklund(b) => {
                 if let Some(rotation) = &b.rotation {
                     vec![&b.left, &b.steps, &b.pulses, &**rotation]
@@ -84,6 +86,7 @@ impl Step {
             Step::Choices(cs) => cs.choices.iter_mut().collect(),
             Step::Stack(st) => st.stack.iter_mut().collect(),
             Step::Expression(e) => vec![&mut e.left, &mut e.right],
+            Step::SingleExpression(e) => vec![&mut e.left],
             Step::Bjorklund(b) => {
                 if let Some(rotation) = &mut b.rotation {
                     vec![&mut b.left, &mut b.steps, &mut b.pulses, &mut **rotation]
@@ -106,36 +109,6 @@ impl Single {
         Single {
             value: Value::Rest,
             string: String::from("~"),
-        }
-    }
-    fn to_integer(&self) -> Option<i32> {
-        match &self.value {
-            Value::Rest => None,
-            Value::Hold => None,
-            Value::Name(_n) => None,
-            Value::Integer(i) => Some(*i),
-            Value::Float(f) => Some(*f as i32),
-            Value::Pitch(n) => Some(n.note as i32),
-        }
-    }
-    fn to_target(&self) -> Target {
-        match &self.value {
-            Value::Rest => Target::None,
-            Value::Hold => Target::None,
-            Value::Name(n) => Target::Name(n.clone()),
-            Value::Integer(i) => Target::Index(*i),
-            Value::Float(f) => Target::Index(*f as i32),
-            Value::Pitch(_n) => Target::Name(self.string.clone()), // TODO might not be the best conversion idea
-        }
-    }
-    fn to_chance(&self) -> Option<f64> {
-        match &self.value {
-            Value::Rest => None,
-            Value::Hold => None,
-            Value::Name(_n) => None,
-            Value::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
-            Value::Float(f) => Some(f.clamp(0.0, 1.0)),
-            Value::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
         }
     }
 }
@@ -171,31 +144,59 @@ struct Stack {
 #[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Fast(),      // *
-    Target(),    // :
-    Degrade(),   // ?
-    Replicate(), // !
 }
-// TODO: Weight(), // @
 // TODO: Slow(),   // /
 
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Operator, String> {
         match pair.as_rule() {
             Rule::op_fast => Ok(Operator::Fast()),
-            Rule::op_target => Ok(Operator::Target()),
-            Rule::op_degrade => Ok(Operator::Degrade()),
-            Rule::op_replicate => Ok(Operator::Replicate()),
             _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
+enum SingleOperator {
+    Target(),    // :
+    Degrade(),   // ?
+    Replicate(), // !
+    Weight(),    // @
+}
+impl SingleOperator {
+    fn parse(pair: Pair<Rule>) -> Result<SingleOperator, String> {
+        match pair.as_rule() {
+            Rule::op_target => Ok(SingleOperator::Target()),
+            Rule::op_degrade => Ok(SingleOperator::Degrade()),
+            Rule::op_replicate => Ok(SingleOperator::Replicate()),
+            Rule::op_weight => Ok(SingleOperator::Weight()),
+            _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
+        }
+    }
+    fn default_value(&self) -> Value {
+        match self {
+            SingleOperator::Weight() | SingleOperator::Replicate() => Value::Integer(2),
+            SingleOperator::Degrade() => Value::Float(0.5),
+            SingleOperator::Target() => Value::Rest
+        }
+    }
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
 struct Expression {
     operator: Operator,
-    right: Box<Step>,
     left: Box<Step>,
+    right: Box<Step>,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+struct SingleExpression {
+    operator: SingleOperator,
+    left: Box<Step>,
+    right: Value,
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 struct Bjorklund {
@@ -303,6 +304,37 @@ impl Value {
             Rule::pitch => Ok(Value::Pitch(Pitch::parse(pair))),
             Rule::name => Ok(Value::Name(pair.as_str().to_string())),
             _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
+        }
+    }
+    fn to_target(&self) -> Target {
+        match &self {
+            Value::Rest => Target::None,
+            Value::Hold => Target::None,
+            Value::Name(n) => Target::Name(n.clone()),
+            Value::Integer(i) => Target::Index(*i),
+            Value::Float(f) => Target::Index(*f as i32),
+            Value::Pitch(p) => Target::Name(format!("{:?}", p)), // TODO might not be the best conversion idea
+        }
+    }
+    fn to_integer(&self) -> Option<i32> {
+        match &self {
+            Value::Rest => None,
+            Value::Hold => None,
+            Value::Name(_n) => None,
+            Value::Integer(i) => Some(*i),
+            Value::Float(f) => Some(*f as i32),
+            Value::Pitch(n) => Some(n.note as i32),
+        }
+    }
+    
+    fn to_chance(&self) -> Option<f64> {
+        match &self {
+            Value::Rest => None,
+            Value::Hold => None,
+            Value::Name(_n) => None,
+            Value::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
+            Value::Float(f) => Some(f.clamp(0.0, 1.0)),
+            Value::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
         }
     }
 }
@@ -716,22 +748,52 @@ impl Cycle {
         Err(format!("invalid polymeter\n{:?}", pair))
     }
 
+    fn push_applied(steps: &mut Vec<Step>, step: Step) {
+        match &step {
+            Step::Repeat => {
+                if let Some(last) = steps.last() {
+                    steps.push(last.clone())
+                }else{
+                    steps.push(Step::Single(Single::default()))
+                    // return Err(String::from("repeat must have a preceding value"))
+                }
+            }
+            Step::SingleExpression(e ) => {
+                match e.operator {
+                    SingleOperator::Replicate() => {
+                        steps.push(e.left.as_ref().clone());
+                        if let Some(repeats) = e.right.to_integer() {
+                            if repeats > 0 {
+                                for _i in 1..repeats {
+                                    steps.push(e.left.as_ref().clone())
+                                }
+                            }
+                        }
+                    }
+                    SingleOperator::Weight() => {
+                        steps.push(e.left.as_ref().clone());
+                        if let Some(repeats) = e.right.to_integer() {
+                            if repeats > 0 {
+                                for _i in 1..repeats {
+                                    steps.push(Step::Single(Single { value: Value::Hold, string: "_".to_string()}))
+                                }
+                            }
+                        }
+                    }
+                    _ => steps.push(step)
+                }
+            }
+            _ => steps.push(step)
+        }
+    }
+
     // helper to convert a section rule to a vector of Steps
     fn parse_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
         let mut steps: Vec<Step> = vec![];
         for pair in pair.into_inner() {
             match Cycle::parse_step(pair) {
-                Ok(s) => match s {
-                    Step::Repeat => {
-                        if let Some(last) = steps.last() {
-                            steps.push(last.clone())
-                        }else{
-                            steps.push(Step::Single(Single::default()))
-                            // return Err(String::from("repeat must have a preceding value"))
-                        }
-                    }
-                    _ => steps.push(s)
-                }
+                Ok(s) => 
+                    Cycle::push_applied(&mut steps, s),
                 Err(s) => return Err(format!("failed to parse section\n{:?}", s)),
             }
         }
@@ -745,7 +807,7 @@ impl Cycle {
                 Rule::repeat => Ok(vec![Step::Repeat]),
                 Rule::single => {
                     let single = Step::parse_single(inner)?;
-                    Ok(vec![single])
+                    Ok(vec![Step::Single(single)])
                 }
                 Rule::section => Cycle::parse_section(inner),
                 Rule::choices => {
@@ -753,7 +815,7 @@ impl Cycle {
                     for p in inner.clone().into_inner() {
                         if let Some(step) = p.into_inner().next() {
                             let choice = Cycle::parse_step(step)?;
-                            choices.push(choice)
+                            Cycle::push_applied(&mut choices, choice)
                         } else {
                             return Err(format!("empty choice\n{:?}", inner));
                         }
@@ -772,7 +834,10 @@ impl Cycle {
     fn parse_step(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.as_rule() {
             Rule::repeat => Ok(Step::Repeat),
-            Rule::single => Step::parse_single(pair),
+            Rule::single => {
+                let single = Step::parse_single(pair)?;
+                Ok(Step::Single(single))
+            }
             Rule::subdivision | Rule::mini => {
                 if let Some(first) = pair.clone().into_inner().next() {
                     match first.as_rule() {
@@ -821,6 +886,43 @@ impl Cycle {
                 // using Cycle::extract_section or Cycle::parse_section
                 Err(format!("unexpected pair\n{:?}", pair))
             }
+            Rule::single_expr => {
+                let mut inner = pair.clone().into_inner();
+                match inner.next() {
+                    None => Err(format!("empty expression\n{:?}", pair)),
+                    Some(left_pair) => {
+                        let left = Cycle::parse_step(left_pair)?;
+                        match inner.next() {
+                            None => Err(format!("incomplete expression\n{:?}", pair)),
+                            Some(op) => {
+                                let operator = SingleOperator::parse(op.clone())?;
+                                let mut inner = op.into_inner();
+                                match inner.next() {
+                                    None =>
+                                        Ok(Step::SingleExpression(SingleExpression {
+                                            left: Box::new(left),
+                                            right: operator.default_value(),
+                                            operator
+                                        })),
+                                    Some(right_pair) => {
+                                        let right = Step::parse_single(right_pair.clone())?;
+                                        Ok(Step::SingleExpression(SingleExpression {
+                                            left: Box::new(left),
+                                            right: if matches!(operator, SingleOperator::Target()) && matches!(right.value, Value::Pitch(_)) {
+                                                println!("matching target with pitch!!");
+                                                Value::Name(right_pair.as_str().to_string())
+                                            } else {
+                                                right.value
+                                            },
+                                            operator,
+                                        }))
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
             Rule::expr => {
                 let mut inner = pair.clone().into_inner();
                 match inner.next() {
@@ -854,26 +956,11 @@ impl Cycle {
                                     let operator = Operator::parse(op.clone())?;
                                     let mut inner = op.into_inner();
                                     match inner.next() {
-                                        None => match operator {
-                                            Operator::Degrade() => {
-                                                Ok(Step::Expression(Expression {
-                                                    left: Box::new(left),
-                                                    right: Box::new(Step::Single(
-                                                        Single {
-                                                            value: Value::Float(0.5),
-                                                            string: "0.5".to_string()
-                                                        }
-                                                    )),
-                                                    operator
-                                                }))
-                                            }
-                                            _ => {
-                                                Err(format!(
-                                                    "missing right hand side in expression\n{:?}",
-                                                    inner
-                                                ))
-                                            }
-                                        }
+                                        None => 
+                                            Err(format!(
+                                                "missing right hand side in expression\n{:?}",
+                                                inner
+                                            )),
                                         Some(right_pair) => {
                                             let right = Cycle::parse_step(right_pair)?;
                                             match right {
@@ -982,6 +1069,30 @@ impl Cycle {
                     })
                 }
             }
+            Step::SingleExpression(e) => {
+                match e.operator {
+                    SingleOperator::Target() => {
+                        let mut out = Cycle::output(e.left.as_mut(), rng);
+                        out.mutate_events(&mut |event| event.target = e.right.to_target());
+                        out
+                    }
+                    SingleOperator::Degrade() => {
+                        let mut out = Cycle::output(e.left.as_mut(), rng);
+                        out.mutate_events(&mut |event: &mut Event| {
+                            if let Some(chance) = e.right.to_chance() {
+                                if chance < rng.gen_range(0.0..1.0) {
+                                    event.value = Value::Rest
+                                }
+                            }
+                        });
+                        out
+                    }
+                    _ => {
+                        // unreachable, these expressions were immediately applied in Cycle::push_applied
+                        Events::empty()
+                    }
+                }
+            }
             Step::Expression(e) => {
                 match e.operator {
                     Operator::Fast() => {
@@ -990,7 +1101,7 @@ impl Cycle {
                         // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => {
-                                if let Some(mult) = s.to_integer() {
+                                if let Some(mult) = s.value.to_integer() {
                                     for _i in 0..mult {
                                         events.push(Cycle::output(&mut e.left, rng))
                                     }
@@ -1002,56 +1113,6 @@ impl Cycle {
                         Events::Multi(MultiEvents {
                             span: Span::default(),
                             length: Fraction::one(),
-                            events,
-                        })
-                    }
-                    Operator::Target() => {
-                        let mut out = Cycle::output(e.left.as_mut(), rng);
-                        #[allow(clippy::single_match)]
-                        // TODO support something other than Step::Single as the right hand side
-                        match e.right.as_ref() {
-                            Step::Single(s) => out.mutate_events(&mut |e| e.target = s.to_target()),
-                            _ => (),
-                        }
-                        out
-                    }
-                    Operator::Degrade() => {
-                        let mut out = Cycle::output(e.left.as_mut(), rng);
-                        #[allow(clippy::single_match)]
-                        // TODO support something other than Step::Single as the right hand side
-                        match e.right.as_ref() {
-                            Step::Single(s) => out.mutate_events(&mut |e: &mut Event| {
-                                if let Some(chance) = s.to_chance() {
-                                    if chance < rng.gen_range(0.0..1.0) {
-                                        e.value = Value::Rest
-                                    }
-                                }
-                            }),
-                            _ => (),
-                        }
-                        out
-                    }
-                    Operator::Replicate() => {
-                        let mut events = vec![];
-                        let mut length = Fraction::from(1);
-                        #[allow(clippy::single_match)]
-                        // TODO support something other than Step::Single as the right hand side
-                        match e.right.as_ref() {
-                            Step::Single(s) => {
-                                if let Some(mult) = s.to_integer() {
-                                    length = Fraction::from(mult);
-                                    let out = Cycle::output(&mut e.left, rng);
-                                    for _i in 0..mult {
-                                        events.push(out.clone())
-                                    }
-                                }
-                            }
-                            _ => (),
-                        }
-                        Events::subdivide_lengths(&mut events);
-                        Events::Multi(MultiEvents {
-                            span: Span::default(),
-                            length,
                             events,
                         })
                     }
@@ -1068,14 +1129,14 @@ impl Cycle {
                                 let rotation = match &b.rotation {
                                     Some(r) => match r.as_ref() {
                                         Step::Single(rotation_single) => {
-                                            rotation_single.to_integer()
+                                            rotation_single.value.to_integer()
                                         }
                                         _ => None, // TODO support something other than Step::Single as rotation
                                     },
                                     None => None,
                                 };
-                                if let Some(steps) = steps_single.to_integer() {
-                                    if let Some(pulses) = pulses_single.to_integer() {
+                                if let Some(steps) = steps_single.value.to_integer() {
+                                    if let Some(pulses) = pulses_single.value.to_integer() {
                                         let out = Cycle::output(&mut b.left, rng);
                                         for pulse in euclidean(
                                             steps.max(0) as u32,
@@ -1228,6 +1289,7 @@ impl Cycle {
             Step::Choices(cs) => format!("{} |{}|", "Choices", cs.choices.len()),
             Step::Stack(st) => format!("{} ({})", "Stack", st.stack.len()),
             Step::Expression(e) => format!("Expression {:?}", e.operator),
+            Step::SingleExpression(e) => format!("SingleExpression {:?} : {:?}", e.operator, e.right),
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };
         println!("{} {}", Self::indent_lines(level), name);
@@ -1644,6 +1706,11 @@ mod test {
         assert_eq!(
             Cycle::from("[a b] ! ! <a b c> !", None)?.generate(),
             Cycle::from("[a b] [a b] [a b] <a b c> <a b c>", None)?.generate()
+        );
+
+        assert_eq!(
+            Cycle::from("{a b!2 c}%3", None)?.generate(),
+            Cycle::from("{a b b c}%3", None)?.generate()
         );
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");

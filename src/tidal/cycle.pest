@@ -32,17 +32,6 @@ repeat = { "!" }
 /// possible literals for single steps
 single = { hold | rest | number | pitch | name }
 
-/// operators
-op_fast      = ${ "*" ~ parameter }
-op_target    = ${ ":" ~ parameter }
-op_degrade   = ${ "?" ~ parameter? }
-op_replicate = ${ "!" ~ parameter }
-op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
-// op_weight    = ${ ("@") ~ parameter }
-// op_slow      = ${ "/" ~ parameter }
-// op_range     = { ".." ~ parameter } // ???
-op = _{ op_fast | op_target | op_degrade | op_replicate | op_bjorklund }
-
 /// groups
 subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
 alternating     = { "<" ~ (stack | section)? ~ ">" }
@@ -56,13 +45,29 @@ group     = _{ subdivision | alternating | polymeter }
 /// parameter for expressions with operators
 parameter = _{ single }
 
-expr      = { (single | group) ~ op+ }
+// target       = { (ASCII_ALPHANUMERIC | "_")+ }
+
+/// operators
+op_replicate = ${ "!" ~ single }
+op_weight    = ${ "@" ~ single? }
+op_degrade   = ${ "?" ~ single? }
+op_target    = ${ ":" ~ single }
+
+op_fast      = ${ "*" ~ parameter }
+op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
+// op_slow      = ${ "/" ~ parameter }
+// op_range     = { ".." ~ parameter } // ???
+single_op = _{op_target | op_degrade | op_replicate | op_weight}
+op = _{ op_fast | op_bjorklund }
+
+expr        = { (single | group) ~ op+ }
+single_expr = { (single | group) ~ single_op+ }
 
 /// helper container that splits steps into sections
-section   = { (expr | single | repeat | group)+ }
+section   = { (single_expr | expr | single | repeat | group)+ }
 
 /// a single choice inside a choice list
-choice    = { expr | single | group }
+choice    = { single_expr | expr | single | group }
 /// at least 2 choices, can only be inside subdivisions or the root
 choices   = { (choice) ~ ("|" ~ choice)+ }
 
