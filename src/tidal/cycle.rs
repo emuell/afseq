@@ -1091,7 +1091,7 @@ impl Cycle {
     }
 
     // recursively output events for the entire cycle based on some state (random seed)
-    fn output(step: &mut Step, rng: &mut Xoshiro256PlusPlus, cycle: usize) -> Events {
+    fn output(step: &Step, rng: &mut Xoshiro256PlusPlus, cycle: usize) -> Events {
         match step {
             // repeats only make it here if they had no preceding value
             Step::Repeat => Events::empty(),
@@ -1108,7 +1108,7 @@ impl Cycle {
                     Events::empty()
                 } else {
                     let mut events = vec![];
-                    for s in &mut sd.steps {
+                    for s in &sd.steps {
                         let e = Cycle::output(s, rng, cycle);
                         events.push(e)
                         // events.extend(output_events(s, rng))
@@ -1130,7 +1130,7 @@ impl Cycle {
                     let current = cycle % length;
                     // let current = a.current % a.steps.len();
                     // a.current += 1;
-                    if let Some(step) = a.steps.get_mut(current) {
+                    if let Some(step) = a.steps.get(current) {
                         Cycle::output(step, rng, cycle / length)
                     } else {
                         Events::empty() // this can never happen
@@ -1139,7 +1139,7 @@ impl Cycle {
             }
             Step::Choices(cs) => {
                 let choice = rng.gen_range(0..cs.choices.len());
-                Cycle::output(&mut cs.choices[choice], rng, cycle) // TODO
+                Cycle::output(&cs.choices[choice], rng, cycle) // TODO
             }
             Step::Polymeter(pm) => {
                 if pm.steps.is_empty() {
@@ -1153,7 +1153,7 @@ impl Cycle {
                     for i in 0..pm.count {
                         let index = (offset + i) % size;
                         let inner_cycle = Polymeter::get_inner_cycle_at(size, pm.count, cycle, index);
-                        events.push(Cycle::output(&mut pm.steps[index], rng, inner_cycle))
+                        events.push(Cycle::output(&pm.steps[index], rng, inner_cycle))
                     }
 
                     // pm.offset += pm.count;
@@ -1172,7 +1172,7 @@ impl Cycle {
                     Events::empty()
                 } else {
                     let mut channels = vec![];
-                    for s in &mut st.stack {
+                    for s in &st.stack {
                         channels.push(Cycle::output(s, rng, cycle))
                     }
                     Events::Poly(PolyEvents {
@@ -1185,12 +1185,12 @@ impl Cycle {
             Step::SingleExpression(e) => {
                 match e.operator {
                     SingleOperator::Target() => {
-                        let mut out = Cycle::output(e.left.as_mut(), rng, cycle);
+                        let mut out = Cycle::output(e.left.as_ref(), rng, cycle);
                         out.mutate_events(&mut |event| event.target = e.right.to_target());
                         out
                     }
                     SingleOperator::Degrade() => {
-                        let mut out = Cycle::output(e.left.as_mut(), rng, cycle);
+                        let mut out = Cycle::output(e.left.as_ref(), rng, cycle);
                         out.mutate_events(&mut |event: &mut Event| {
                             if let Some(chance) = e.right.to_chance() {
                                 if chance < rng.gen_range(0.0..1.0) {
@@ -1216,7 +1216,7 @@ impl Cycle {
                             Step::Single(s) => {
                                 if let Some(mult) = s.value.to_integer() {
                                     for _i in 0..mult {
-                                        events.push(Cycle::output(&mut e.left, rng, cycle))
+                                        events.push(Cycle::output(e.left.as_ref(), rng, cycle))
                                     }
                                 }
                             }
@@ -1250,7 +1250,7 @@ impl Cycle {
                                 };
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
-                                        let out = Cycle::output(&mut b.left, rng, cycle);
+                                        let out = Cycle::output(b.left.as_ref(), rng, cycle);
                                         for pulse in euclidean(
                                             steps.max(0) as u32,
                                             pulses.max(0) as u32,
@@ -1316,7 +1316,7 @@ impl Cycle {
     // parse the root pair of the pest AST into a Subdivision
     // then update the spans of all the generated steps
     pub fn generate(&mut self) -> Vec<Vec<Event>> {
-        let mut events = Cycle::output(&mut self.root, &mut self.rng, self.iteration);
+        let mut events = Cycle::output(&self.root, &mut self.rng, self.iteration);
         Cycle::transform_spans(&mut events, &Span::default());
         let mut channels = vec![];
         events.flatten(&mut channels, 0);
