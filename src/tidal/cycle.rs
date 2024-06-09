@@ -419,6 +419,7 @@ pub struct Span {
     start: Fraction,
     end: Fraction,
 }
+use fraction::ToPrimitive;
 
 impl Span {
     fn new(start: Fraction, end: Fraction) -> Self {
@@ -431,6 +432,27 @@ impl Span {
         Span {
             start,
             end: start + outer.length() * self.length(),
+        }
+    }
+
+    fn whole_range(&self) -> std::ops::Range<usize> {
+        let start = self.start.floor().to_usize().unwrap_or_default();
+        let end = self.end.ceil().to_usize().unwrap_or_default();
+        start..end
+    }
+
+    fn overlaps(&self, span: &Span) -> bool {
+        (self.start <= span.start && span.start < self.end) || (self.start < span.end && span.end <= self.end)
+    }
+
+    /// Limit self to not extend beyond the target span
+    /// this function assumes self.overlaps(span) is true
+    fn crop(&mut self, span: &Span) {
+        if self.start < span.start {
+            self.start = span.start;
+        }
+        if self.end > span.end {
+            self.end = span.end
         }
     }
 
@@ -612,7 +634,7 @@ impl Events {
         })
     }
 
-    // only applied for Subdivision and Polymeter groups
+    /// Fits a list of events into a Span of 0..1
     fn subdivide_lengths(events: &mut Vec<Events>) {
         let mut length = Fraction::zero();
         for e in &mut *events {
@@ -645,6 +667,63 @@ impl Events {
         }
     }
 
+    fn set_span(&mut self, span: Span) {
+        match self {
+            Events::Single(s) => s.span = span.clone(),
+            Events::Multi(s) => s.span = span.clone(),
+            Events::Poly(s) => s.span = span.clone(),
+        }
+    }
+
+    fn filter_mut<F>(&mut self, predicate: &mut F) -> bool
+    where
+        F: FnMut(&mut Event) -> bool,
+    {
+        match self {
+            Events::Multi(m) => {
+                let mut filtered = vec![];
+                for e in &mut m.events {
+                    match e {
+                        Events::Single(s) => {
+                            if predicate(s) { 
+                                filtered.push(e.clone()) 
+                            }
+                        }
+                        _ => {
+                            if e.filter_mut(predicate) {
+                                filtered.push(e.clone())
+                            }
+                        }
+                    }
+                }
+                m.events = filtered;
+                !m.events.is_empty() 
+            }
+            Events::Poly(p) => {
+                let mut filtered = vec![];
+                for e in &mut p.channels {
+                    if e.filter_mut(predicate) {
+                        filtered.push(e.clone())
+                    }
+                }
+                p.channels = filtered;
+                !p.channels.is_empty()
+            }
+            Events::Single(_) => true
+        }
+    }
+
+    fn crop(&mut self, span: &Span) {
+        self.filter_mut(&mut |e| {
+            if span.overlaps(&e.span) {
+                e.span.crop(span);
+                true
+            } else {
+                false
+            }
+        });
+    }
+
     fn mutate_events<F>(&mut self, fun: &mut F)
     where
         F: FnMut(&mut Event),
@@ -666,6 +745,34 @@ impl Events {
         }
     }
 
+
+    /// recursively transform the spans of events from relative time to absolute
+    fn transform_spans(&mut self, span: &Span) {
+        let unit = span.length();
+        match self {
+            Events::Single(s) => {
+                s.length *= unit;
+                s.span = s.span.transform(span);
+            }
+            Events::Multi(m) => {
+                m.length *= unit;
+                m.span = m.span.transform(span);
+
+                for e in &mut m.events {
+                    e.transform_spans(&m.span);
+                }
+            }
+            Events::Poly(p) => {
+                p.length *= unit;
+                p.span = p.span.transform(span);
+                for e in &mut p.channels {
+                    e.transform_spans(&p.span);
+                }
+            }
+        }
+    }
+
+    /// Recursively collapses Multi and Poly Events into vectors of Single Events
     fn flatten(&self, channels: &mut Vec<Vec<Event>>, channel: usize) {
         if channels.len() <= channel {
             channels.push(vec![])
@@ -724,13 +831,37 @@ impl Events {
         result
     }
 
-    // merge holds then rests separately to avoid collapsing rests and holding notes before them
+    /// Removes Holds by extending preceding events and filters out Rests
     fn merge(&self, channels: &mut [Vec<Event>]) -> Vec<Vec<Event>> {
+        // merge hold and rests separately to avoid collapsing rests and holding notes before them
         channels
             .iter_mut()
             .map(|e| Self::merge_holds(e))
             .map(|e| Self::merge_rests(&e))
             .collect()
+    }
+
+    fn export(&mut self) -> Vec<Vec<Event>> {
+        let mut channels = vec![];
+        self.flatten(&mut channels, 0);
+        self.merge(&mut channels);
+
+        #[cfg(test)]
+        {
+            println!("\nOUTPUT {}", 0);
+            // println!("\nOUTPUT {}", self.iteration);
+            let channel_count = channels.len();
+            for (ci, channel) in channels.iter().enumerate() {
+                if channel_count > 1 {
+                    println!(" /{}", ci);
+                }
+                for (i, event) in channel.iter().enumerate() {
+                    println!("  │{:02}│ {}", i, event);
+                }
+            }
+        }
+
+        channels
     }
 }
 
@@ -1090,6 +1221,23 @@ impl Cycle {
         }
     }
 
+    fn output_at(step: &Step, rng: &mut Xoshiro256PlusPlus, span: &Span) -> Events {
+        let range = span.whole_range();
+        let cycles = range
+            .map(|cycle| {
+                let mut events = Cycle::output(step, rng, cycle);
+                events.transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
+                events
+            }).collect();
+        let mut events = Events::Multi(MultiEvents {
+            span: span.clone(),
+            length: span.length(),
+            events: cycles
+        });
+        events.crop(span);
+        events
+    }
+
     // recursively output events for the entire cycle based on some state (random seed)
     fn output(step: &Step, rng: &mut Xoshiro256PlusPlus, cycle: usize) -> Events {
         match step {
@@ -1280,32 +1428,6 @@ impl Cycle {
         }
     }
 
-    // recursively transform the spans of events from relative time to absolute
-    fn transform_spans(events: &mut Events, span: &Span) {
-        let unit = span.length();
-        match events {
-            Events::Single(s) => {
-                s.length *= unit;
-                s.span = s.span.transform(span);
-            }
-            Events::Multi(m) => {
-                m.length *= unit;
-                m.span = m.span.transform(span);
-
-                for e in &mut m.events {
-                    Cycle::transform_spans(e, &m.span);
-                }
-            }
-            Events::Poly(p) => {
-                p.length *= unit;
-                p.span = p.span.transform(span);
-                for e in &mut p.channels {
-                    Cycle::transform_spans(e, &p.span);
-                }
-            }
-        }
-    }
-
     // reset state to initial state
     pub fn reset(&mut self) {
         self.iteration = 0;
@@ -1317,27 +1439,9 @@ impl Cycle {
     // then update the spans of all the generated steps
     pub fn generate(&mut self) -> Vec<Vec<Event>> {
         let mut events = Cycle::output(&self.root, &mut self.rng, self.iteration);
-        Cycle::transform_spans(&mut events, &Span::default());
-        let mut channels = vec![];
-        events.flatten(&mut channels, 0);
-        events.merge(&mut channels);
-
-        #[cfg(test)]
-        {
-            println!("\nOUTPUT {}", self.iteration);
-            let channel_count = channels.len();
-            for (ci, channel) in channels.iter().enumerate() {
-                if channel_count > 1 {
-                    println!(" /{}", ci);
-                }
-                for (i, event) in channel.iter().enumerate() {
-                    println!("  │{:02}│ {}", i, event);
-                }
-            }
-        }
-
         self.iteration += 1;
-        channels
+        events.transform_spans( &Span::default());
+        events.export()
     }
 
     pub fn is_stateful(&self) -> bool {
@@ -1841,6 +1945,16 @@ mod test {
             Cycle::from("-5..-8", None)?.generate(),
             Cycle::from("-5 -6 -7 -8", None)?.generate(),
         );
+
+        assert!(
+            Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
+                .overlaps(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
+        let mut cycle = Cycle::from("0 1 2 3", None)?;
+        let mut output = Cycle::output_at(
+            &cycle.root, 
+            &mut cycle.rng, 
+            &Span::new(F::new(0u8, 1u8), F::new(5u8, 2u8)));
+        output.export();
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
