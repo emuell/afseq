@@ -55,11 +55,10 @@ op_degrade   = ${ "?" ~ single? }
 op_target    = ${ ":" ~ single }
 
 op_fast      = ${ "*" ~ parameter }
+op_slow      = ${ "/" ~ parameter }
 op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
-// op_slow      = ${ "/" ~ parameter }
-// op_range     = { ".." ~ parameter } // ???
 single_op = _{op_target | op_degrade | op_replicate | op_weight}
-op = _{ op_fast | op_bjorklund }
+op = _{ op_fast | op_slow | op_bjorklund }
 
 expr        = { (single | group) ~ op+ }
 single_expr = { (single | group) ~ single_op+ }

@@ -213,13 +213,14 @@ struct Stack {
 #[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Fast(),      // *
+    Slow(),   // /
 }
-// TODO: Slow(),   // /
 
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Operator, String> {
         match pair.as_rule() {
             Rule::op_fast => Ok(Operator::Fast()),
+            Rule::op_slow => Ok(Operator::Slow()),
             _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
         }
     }
@@ -1418,14 +1419,18 @@ impl Cycle {
             }
             Step::Expression(e) => {
                 match e.operator {
-                    Operator::Fast() => {
+                    Operator::Fast() | Operator::Slow() => {
                         let mut events = Events::empty();
                         #[allow(clippy::single_match)]
                         // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => {
-                                if let Some(mult) = s.value.to_float() {
-                                    let span = Span::new(Fraction::from((cycle as f64) * mult), Fraction::from(((cycle + 1) as f64) * mult));
+                                if let Some(right) = s.value.to_float() {
+                                    let mult = if e.operator == Operator::Slow() 
+                                        { 1.0 / right } else { right };
+                                    let span = Span::new(
+                                        Fraction::from((cycle as f64) * mult), 
+                                        Fraction::from(((cycle + 1) as f64) * mult));
                                     events = Cycle::output_span(
                                         e.left.as_ref(), 
                                         rng, 
@@ -1931,6 +1936,39 @@ mod test {
                     Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)).with_int(1),
                     Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_note(11, 4),
                     Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_note(11, 4),
+                ]],
+            ],
+        )?;
+
+
+        assert_cycles(
+            "[0 1]/2",
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 1u8)).with_int(0),
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 1u8)).with_int(1),
+                ]],
+            ],
+        )?;
+
+        assert_cycles(
+            "[0 1]*2.5",
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 5u8)).with_int(0),
+                    Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)).with_int(1),
+                    Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)).with_int(0),
+                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)).with_int(1),
+                    Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)).with_int(0),
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 5u8)).with_int(1),
+                    Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)).with_int(0),
+                    Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)).with_int(1),
+                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)).with_int(0),
+                    Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)).with_int(1),
                 ]],
             ],
         )?;
