@@ -401,6 +401,17 @@ impl Value {
             Value::Pitch(n) => Some(n.note as i32),
         }
     }
+
+    fn to_float(&self) -> Option<f64> {
+        match &self {
+            Value::Rest => None,
+            Value::Hold => None,
+            Value::Name(_n) => None,
+            Value::Integer(i) => Some(*i as f64),
+            Value::Float(f) => Some(*f),
+            Value::Pitch(n) => Some(n.note as f64),
+        }
+    }
     
     fn to_chance(&self) -> Option<f64> {
         match &self {
@@ -434,6 +445,14 @@ impl Span {
             end: start + outer.length() * self.length(),
         }
     }
+
+    /// transforms the span to 0..1 based on an outer span
+    /// assumes self is inside outer
+    fn normalize(&mut self, outer: &Span) {
+        let outer_length = outer.length();
+        self.start = (self.start - outer.start) / outer_length;
+        self.end = (self.end - outer.start) / outer_length;
+    } 
 
     fn whole_range(&self) -> std::ops::Range<usize> {
         let start = self.start.floor().to_usize().unwrap_or_default();
@@ -667,14 +686,6 @@ impl Events {
         }
     }
 
-    fn set_span(&mut self, span: Span) {
-        match self {
-            Events::Single(s) => s.span = span.clone(),
-            Events::Multi(s) => s.span = span.clone(),
-            Events::Poly(s) => s.span = span.clone(),
-        }
-    }
-
     fn filter_mut<F>(&mut self, predicate: &mut F) -> bool
     where
         F: FnMut(&mut Event) -> bool,
@@ -746,7 +757,7 @@ impl Events {
     }
 
 
-    /// recursively transform the spans of events from relative time to absolute
+    /// recursively transform the spans of events from 0..1 to a given span
     fn transform_spans(&mut self, span: &Span) {
         let unit = span.length();
         match self {
@@ -769,6 +780,34 @@ impl Events {
                     e.transform_spans(&p.span);
                 }
             }
+        }
+    }
+
+    /// recursively transform the spans of events to 0..1 range
+    fn normalize_spans(&mut self, span: &Span) {
+        match self {
+            Events::Single(s) => {
+                s.span.normalize(span);
+                s.length = s.span.length();
+            }
+            Events::Multi(m) => {
+                for e in &mut m.events {
+                    e.normalize_spans(&m.span);
+                }
+
+                m.span.normalize(span);
+                m.length = m.span.length();
+
+
+            }
+            Events::Poly(p) => {
+                for e in &mut p.channels {
+                    e.normalize_spans(span);
+                }
+                p.span.normalize(span);
+                p.length = p.span.length();
+            }
+
         }
     }
 
@@ -863,7 +902,26 @@ impl Events {
 
         channels
     }
+
+    fn print(&self) {
+        match self {
+            Events::Single(s) => println!("[{}] {}", s.length, s),
+            Events::Multi(m) => {
+                println!("multi {} -> {} [{}]", m.span.start, m.span.end, m.length);
+                for e in &m.events {
+                    e.print()
+                }
+            }
+            Events::Poly(p) => {
+                println!("multi {} -> {} [{}]", p.span.start, p.span.end, p.length);
+                for e in &p.channels {
+                    e.print()
+                }
+            }
+        }
+    }
 }
+
 
 // -------------------------------------------------------------------------------------------------
 
@@ -1221,7 +1279,7 @@ impl Cycle {
         }
     }
 
-    fn output_at(step: &Step, rng: &mut Xoshiro256PlusPlus, span: &Span) -> Events {
+    fn output_span(step: &Step, rng: &mut Xoshiro256PlusPlus, span: &Span) -> Events {
         let range = span.whole_range();
         let cycles = range
             .map(|cycle| {
@@ -1261,6 +1319,10 @@ impl Cycle {
                         events.push(e)
                         // events.extend(output_events(s, rng))
                     }
+                    // for e in &events {
+                    //     e.print()
+                    // }
+                    
                     // only applied for Subdivision and Polymeter groups
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
@@ -1357,25 +1419,23 @@ impl Cycle {
             Step::Expression(e) => {
                 match e.operator {
                     Operator::Fast() => {
-                        let mut events = vec![];
+                        let mut events = Events::empty();
                         #[allow(clippy::single_match)]
                         // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
                             Step::Single(s) => {
-                                if let Some(mult) = s.value.to_integer() {
-                                    for _i in 0..mult {
-                                        events.push(Cycle::output(e.left.as_ref(), rng, cycle))
-                                    }
+                                if let Some(mult) = s.value.to_float() {
+                                    let span = Span::new(Fraction::from((cycle as f64) * mult), Fraction::from(((cycle + 1) as f64) * mult));
+                                    events = Cycle::output_span(
+                                        e.left.as_ref(), 
+                                        rng, 
+                                        &span);
+                                    events.normalize_spans(&span);
                                 }
                             }
                             _ => (),
                         }
-                        Events::subdivide_lengths(&mut events);
-                        Events::Multi(MultiEvents {
-                            span: Span::default(),
-                            length: Fraction::one(),
-                            events,
-                        })
+                        events
                     }
                 }
             }
@@ -1949,12 +2009,8 @@ mod test {
         assert!(
             Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
                 .overlaps(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
-        let mut cycle = Cycle::from("0 1 2 3", None)?;
-        let mut output = Cycle::output_at(
             &cycle.root, 
             &mut cycle.rng, 
-            &Span::new(F::new(0u8, 1u8), F::new(5u8, 2u8)));
-        output.export();
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
