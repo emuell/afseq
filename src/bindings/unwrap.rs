@@ -849,8 +849,9 @@ pub(crate) fn event_iter_from_value(
                 let sequence = userdata.borrow::<SequenceUserData>()?;
                 Ok(Box::new(sequence.notes.clone().to_event_sequence()))
             } else if userdata.is::<CycleUserData>() {
-                let cycle_userdata = userdata.borrow::<CycleUserData>()?;
-                Ok(Box::new(CycleEventIter::new(cycle_userdata.cycle.clone())))
+                let userdata = userdata.borrow::<CycleUserData>()?;
+                let event_iter = CycleEventIter::new(userdata.cycle.clone());
+                Ok(Box::new(event_iter.with_mappings(&userdata.mappings)))
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",

@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use fraction::Fraction;
 
@@ -17,12 +17,14 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct CycleEventIter {
     cycle: Cycle,
+    mappings: HashMap<String, Option<NoteEvent>>,
 }
 
 impl CycleEventIter {
-    /// Create a new cycle event iter from the given precompiled cycle
+    /// Create a new cycle event iter from the given precompiled cycle.
     pub(crate) fn new(cycle: Cycle) -> Self {
-        Self { cycle }
+        let mappings = HashMap::new();
+        Self { cycle, mappings }
     }
 
     /// Try creating a new cycle event iter from the given mini notation string.
@@ -40,6 +42,15 @@ impl CycleEventIter {
         Ok(Self::new(Cycle::from(input, seed)?))
     }
 
+    /// Return a new cycle with the given value mappings applied.
+    pub fn with_mappings<S: Into<String> + Clone>(self, map: &[(S, Option<NoteEvent>)]) -> Self {
+        let mut mappings = HashMap::new();
+        for (k, v) in map.iter().cloned() {
+            mappings.insert(k.into(), v);
+        }
+        Self { mappings, ..self }
+    }
+
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
     fn generate_events(&mut self) -> Vec<EventIterItem> {
@@ -49,19 +60,36 @@ impl CycleEventIter {
             for event in channel.into_iter() {
                 let start = event.span().start();
                 let length = event.span().length();
+                let mut note_event = {
+                    if let Some(mapped_note_event) = self.mappings.get(event.string()) {
+                        // apply custom note mapping
+                        mapped_note_event.clone()
+                    } else {
+                        // else try to convert value to a note
+                        match event.value() {
+                            CycleValue::Hold => None,
+                            CycleValue::Rest => new_note(Note::OFF),
+                            CycleValue::Float(_) => None,
+                            CycleValue::Integer(i) => {
+                                new_note(Note::from((*i).clamp(0, 0x7f) as u8))
+                            }
+                            CycleValue::Pitch(p) => new_note(Note::from(p.midi_note())),
+                            CycleValue::Name(_) => None,
+                        }
+                    }
+                };
+                // inject target instrument, if present
                 let instrument = match event.target() {
                     CycleTarget::None => None,
-                    CycleTarget::Index(i) => Some(InstrumentId::from(i as usize)),
+                    CycleTarget::Index(i) => Some(InstrumentId::from(*i as usize)),
                     CycleTarget::Name(_) => None, // unsupported
                 };
-                let note_event = match event.value() {
-                    CycleValue::Hold => None,
-                    CycleValue::Rest => new_note((Note::OFF, instrument)),
-                    CycleValue::Float(_) => None, // unsupported
-                    CycleValue::Integer(i) => new_note((Note::from(i as u8), instrument)),
-                    CycleValue::Pitch(p) => new_note((Note::from(p.midi_note()), instrument)),
-                    CycleValue::Name(_) => None, // TODO
-                };
+                if let Some(instrument) = instrument {
+                    if let Some(note_event) = &mut note_event {
+                        note_event.instrument = Some(instrument);
+                    }
+                }
+                // insert new event
                 if let Some(note_event) = note_event {
                     match timed_note_events.binary_search_by(|(time, _, _)| time.cmp(&start)) {
                         Ok(pos) => {
