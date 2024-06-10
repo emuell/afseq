@@ -1,13 +1,12 @@
 //! Lua bindings for the entire crate.
 
-use std::{cell::RefCell, env, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use lazy_static::lazy_static;
 
-use mlua::chunk;
 use mlua::prelude::*;
 
 use self::{
@@ -82,13 +81,6 @@ pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
         LuaOptions::default(),
     )
     .expect("Failed to create a new lua engine");
-    // add cwd/lib to package path
-    let cwd = env::current_dir()
-        .unwrap_or(".".into())
-        .to_string_lossy()
-        .to_string();
-    lua.load(chunk!(package.path = $cwd.."/assets/lib/?.lua;"..package.path))
-        .exec()?;
     // install a timeout hook
     let timeout_hook = LuaTimeoutHook::new(&lua);
     // create new app data
