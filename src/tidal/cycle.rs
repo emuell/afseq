@@ -1,3 +1,4 @@
+#[cfg(test)]
 use core::fmt::Display;
 
 use pest::{iterators::Pair, Parser};
@@ -91,29 +92,39 @@ impl Cycle {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default)]
 pub struct Event {
     length: Fraction,
     span: Span,
     value: Value,
-    target: Target, // value for instruments
+    string: String,
+    target: Target,
 }
 
 impl Event {
-    pub fn value(&self) -> Value {
-        self.value.clone()
+    /// The step's original parsed value.
+    pub fn value(&self) -> &Value {
+        &self.value
     }
 
-    pub fn span(&self) -> Span {
-        self.span.clone()
+    /// The step's original value string, unparsed.
+    pub fn string(&self) -> &str {
+        &self.string
     }
 
-    pub fn length(&self) -> Fraction {
-        self.length
+    /// The step's time span.
+    pub fn span(&self) -> &Span {
+        &self.span
     }
 
-    pub fn target(&self) -> Target {
-        self.target.clone()
+    /// The step's length.
+    pub fn length(&self) -> &Fraction {
+        &self.length
+    }
+
+    /// The step's optional value target.
+    pub fn target(&self) -> &Target {
+        &self.target
     }
 }
 
@@ -225,13 +236,13 @@ impl Step {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct Single {
     value: Value,
     string: String,
 }
 
-impl Single {
+impl Default for Single {
     fn default() -> Self {
         Single {
             value: Value::Rest,
@@ -404,6 +415,32 @@ impl Pitch {
     }
 }
 
+#[cfg(test)]
+impl Display for Pitch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = match self.note {
+            0 => "c",
+            1 => "c#",
+            2 => "d",
+            3 => "d#",
+            4 => "e",
+            5 => "f",
+            6 => "f#",
+            7 => "g",
+            8 => "g#",
+            9 => "a",
+            10 => "a#",
+            11 => "b",
+            _ => "",
+        };
+        if self.octave == 4 {
+            f.write_str(n)
+        } else {
+            f.write_fmt(format_args!("{}{}", n, self.octave))
+        }
+    }
+}
+
 impl Value {
     fn to_target(&self) -> Target {
         match &self {
@@ -449,8 +486,7 @@ impl Value {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-
+#[cfg(test)]
 impl Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -531,6 +567,7 @@ impl Event {
                 start,
                 end: start + length,
             },
+            string: "~".to_string(),
             value: Value::Rest,
             target: Target::None,
         }
@@ -538,8 +575,10 @@ impl Event {
 
     #[cfg(test)]
     fn with_note(&self, note: u8, octave: u8) -> Self {
+        let pitch = Pitch { note, octave };
         Self {
-            value: Value::Pitch(Pitch { note, octave }),
+            value: Value::Pitch(pitch.clone()),
+            string: pitch.to_string(),
             ..self.clone()
         }
     }
@@ -548,14 +587,16 @@ impl Event {
     fn with_int(&self, i: i32) -> Self {
         Self {
             value: Value::Integer(i),
+            string: i.to_string(),
             ..self.clone()
         }
     }
 
     #[cfg(test)]
-    fn with_name(&self, n: &str) -> Self {
+    fn with_name(&self, n: &'static str) -> Self {
         Self {
-            value: Value::Name(n.to_string()),
+            value: Value::Name(String::from(n)),
+            string: n.to_string(),
             ..self.clone()
         }
     }
@@ -564,6 +605,7 @@ impl Event {
     fn with_float(&self, f: f64) -> Self {
         Self {
             value: Value::Float(f),
+            string: f.to_string(),
             ..self.clone()
         }
     }
@@ -582,14 +624,22 @@ impl Event {
     }
 }
 
+impl PartialEq<Event> for Event {
+    fn eq(&self, other: &Event) -> bool {
+        // Don't compare self.string: compare interpreted values and target only.
+        self.length == other.length
+            && self.span == other.span
+            && self.value == other.value
+            && self.target == other.target
+    }
+}
+
+#[cfg(test)]
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "{:.3} -> {:.3} | {:?} {}",
-            self.span.start,
-            self.span.end,
-            self.value,
-            self.target // self.span.start, self.span.end, self.value
+            self.span.start, self.span.end, self.value, self.target
         ))
     }
 }
@@ -620,6 +670,7 @@ impl Events {
         Events::Single(Event {
             length: Fraction::one(),
             span: Span::default(),
+            string: "~".to_string(),
             value: Value::Rest,
             target: Target::None,
         })
@@ -871,6 +922,7 @@ impl Events {
         channels
     }
 
+    #[cfg(test)]
     #[allow(dead_code)] // TODO remove this once the "step * step" is done
     fn print(&self) {
         match self {
@@ -1321,6 +1373,7 @@ impl Cycle {
                 length: Fraction::one(),
                 target: Target::None,
                 span: Span::default(),
+                string: s.string.clone(),
                 value: s.value.clone(),
             }),
             Step::Subdivision(sd) => {
