@@ -608,11 +608,11 @@ impl Events {
 
     // merge holds then rests separately to avoid collapsing rests and holding notes before them
     fn merge(&self, channels: &mut [Vec<Event>]) {
-        for event in &mut *channels {
-            *event = Self::merge_holds(event);
+        for events in &mut *channels {
+            *events = Self::merge_holds(events);
         }
-        for event in channels {
-            *event = Self::merge_rests(event);
+        for events in channels {
+            *events = Self::merge_rests(events);
         }
     }
 }
