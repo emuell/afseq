@@ -33,11 +33,11 @@ repeat = { "!" }
 single = { hold | rest | number | pitch | name }
 
 /// groups
-subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
-alternating     = { "<" ~ (stack | section)? ~ ">" }
+subdivision     = { "[" ~ (stack | split | choices | section)? ~ "]" }
+alternating     = { "<" ~ (stack | split | section)? ~ ">" }
 
 polymeter_tail  = { "%" ~  single }
-polymeter       = { "{" ~ (stack | section)? ~ "}" ~ polymeter_tail? }
+polymeter       = { "{" ~ (stack | split | section)? ~ "}" ~ polymeter_tail? }
 
 group     = _{ subdivision | alternating | polymeter }
 
@@ -72,10 +72,10 @@ choice    = { single_expr | expr | range_expr | single | group }
 choices   = { (choice) ~ ("|" ~ choice)+ }
 
 /// parallel sections of events found inside groups
-stack     = { (section) ~ ("," ~ section)+ }
+stack     = { (split | section) ~ ("," ~ (split | section))+ }
 
 // TODO shorthand for nested subdivisions
-// split          = { (section) ~ ("." ~ section)+ }
+split          = { (section) ~ ("." ~ section)+ }
 
 /// the root of the cycle
-mini = { SOI ~ ( stack | choices | section) ~ EOI }
+mini = { SOI ~ ( stack | split | choices | section) ~ EOI }
