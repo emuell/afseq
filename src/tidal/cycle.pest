@@ -36,8 +36,7 @@ single = { hold | rest | number | pitch | name }
 subdivision     = { "[" ~ (stack | choices | section)? ~ "]" }
 alternating     = { "<" ~ (stack | section)? ~ ">" }
 
-polymeter_count = { (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ !(ASCII_ALPHANUMERIC | "."))}
-polymeter_tail  = { "%" ~  polymeter_count}
+polymeter_tail  = { "%" ~  single }
 polymeter       = { "{" ~ (stack | section)? ~ "}" ~ polymeter_tail? }
 
 group     = _{ subdivision | alternating | polymeter }
@@ -75,7 +74,7 @@ choices   = { (choice) ~ ("|" ~ choice)+ }
 /// parallel sections of events found inside groups
 stack     = { (section) ~ ("," ~ section)+ }
 
-// shorthand for subdivisions
+// TODO shorthand for nested subdivisions
 // split          = { (section) ~ ("." ~ section)+ }
 
 /// the root of the cycle

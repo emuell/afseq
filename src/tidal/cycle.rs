@@ -128,7 +128,7 @@ struct Subdivision {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Polymeter {
-    count: usize,
+    count: Box<Step>,
     steps: Vec<Step>,
 }
 use std::cmp::Ordering;
@@ -182,7 +182,7 @@ impl Polymeter {
         else { count }
     }
 
-    fn get_inner_cycle_at(size: usize, count: usize, cycle: usize, index: usize) -> usize {
+    fn get_inner_cycle_at(size: usize, count: usize, cycle: usize, index: usize, occurrences: &[Vec<usize>]) -> usize {
         let vars = Polymeter::count_variations(size, count);
         if vars == 1 { return cycle }
 
@@ -193,10 +193,7 @@ impl Polymeter {
 
         if partial_cycles == 0 { return full_occurrences * full_cycles }
 
-        let variations = Polymeter::variations(size, count);
-        let occurences = Polymeter::occurrences(size, &variations);
-
-        (full_cycles * full_occurrences) + Polymeter::partial_occurrences(&occurences, cycle, index) - 1
+        (full_cycles * full_occurrences) + Polymeter::partial_occurrences(occurrences, cycle, index) - 1
     }
 }
 
@@ -971,12 +968,25 @@ impl Cycle {
         Ok(Step::Stack(stack))
     }
 
+    fn validate_multiplier_step(step: Step) -> Result<Step, String> {
+        match &step {
+            Step::Single(s) => {
+                match s.value {
+                    Value::Integer(_) | Value::Float(_) => Ok(step),
+                    _ => Err(format!("invalid multiplier: {:?}", step)) 
+                }
+            }
+            _ => Err(format!("invalid multiplier: {:?}", step)) 
+        }
+    }
+
     // TODO allow for polymeter count other than usize
-    fn parse_polymeter_tail(pair: Pair<Rule>) -> Result<usize, String> {
+    fn parse_polymeter_tail(pair: Pair<Rule>) -> Result<Step, String> {
         if let Some(count) = pair.clone().into_inner().next() {
-            Ok(count.as_str().parse::<usize>().unwrap_or(1))
+            Self::parse_step(count).and_then(Self::validate_multiplier_step)
+            // Ok(count.as_str().parse::<usize>().unwrap_or(1))
         } else {
-            Err(format!("invalid polymeter tail type '{}'", pair.as_str()))
+            Err(format!("missing polymeter count '{}'", pair.as_str()))
         }
     }
 
@@ -1107,7 +1117,7 @@ impl Cycle {
                 }
             }
             Rule::polymeter => {
-                let mut count: Option<usize> = None;
+                let mut count: Option<Step> = None;
                 let mut steps: Option<Vec<Step>> = None;
                 let mut stack: Option<Vec<Vec<Step>>> = None;
                 
@@ -1132,7 +1142,7 @@ impl Cycle {
                         // a regular polymeter with explicit count
                         Ok(Step::Polymeter(Polymeter {
                             steps,
-                            count,
+                            count: Box::new(count),
                         }))
                     }
                     (Some(count), Some(stack), _) => {
@@ -1141,7 +1151,7 @@ impl Cycle {
                         for steps in stack {
                             s.stack.push(Step::Polymeter(Polymeter {
                                 steps,
-                                count,
+                                count: Box::new(count.clone()),
                             }));
                         }
                         Ok(Step::Stack(s))
@@ -1158,7 +1168,10 @@ impl Cycle {
                                 for steps in stack {
                                     s.stack.push(Step::Polymeter(Polymeter {
                                         steps,
-                                        count,
+                                        count: Box::new(
+                                            Step::Single(Single { 
+                                                value: Value::Integer(count as i32), 
+                                                string: count.to_string() })), 
                                     }));
                                 }
                                 Ok(Step::Stack(s))
@@ -1359,15 +1372,23 @@ impl Cycle {
                     let mut events = vec![];
                     let size = pm.steps.len();
                     // let offset = pm.offset;
-                    let offset = (cycle % Polymeter::count_variations(size, pm.count)) * pm.count;
+                    // TODO implement other multipliers
+                    let count: usize = match pm.count.as_ref() {
+                        Step::Single(s) => {
+                            s.value.to_integer().unwrap_or(1) as usize
+                        }
+                        _ => 1
+                    };
+                    let offset = (cycle % Polymeter::count_variations(size, count)) * count;
+                    let occurrences = Polymeter::occurrences(size, &Polymeter::variations(size, count));
 
-                    for i in 0..pm.count {
+                    for i in 0..count {
                         let index = (offset + i) % size;
-                        let inner_cycle = Polymeter::get_inner_cycle_at(size, pm.count, cycle, index);
+                        let inner_cycle = Polymeter::get_inner_cycle_at(size, count, cycle, index, &occurrences);
                         events.push(Cycle::output(&pm.steps[index], rng, inner_cycle))
                     }
 
-                    // pm.offset += pm.count;
+                    // pm.offset += count;
 
                     // only applied for Subdivision and Polymeter groups
                     Events::subdivide_lengths(&mut events);
@@ -1568,7 +1589,7 @@ impl Cycle {
             },
             Step::Subdivision(sd) => format!("Subdivision [{}]", sd.steps.len()),
             Step::Alternating(a) => format!("Alternating <{}>", a.steps.len()),
-            Step::Polymeter(pm) => format!("Polymeter {{{}%{}}}", pm.steps.len(), pm.count),
+            Step::Polymeter(pm) => format!("Polymeter {{{}}}", pm.steps.len()),//, pm.count),
             Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
             Step::Expression(e) => format!("Expression {:?}", e.operator),
