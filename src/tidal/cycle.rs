@@ -414,14 +414,6 @@ impl Event {
     }
 
     #[cfg(test)]
-    fn with_hold(&self) -> Self {
-        Self {
-            value: Value::Hold,
-            ..self.clone()
-        }
-    }
-
-    #[cfg(test)]
     fn with_float(&self, f: f64) -> Self {
         Self {
             value: Value::Float(f),
@@ -579,7 +571,7 @@ impl Events {
 
     // filter out holds while extending preceding events
     fn merge_holds(events: &[Event]) -> Vec<Event> {
-        let mut result: Vec<Event> = vec![];
+        let mut result: Vec<Event> = Vec::with_capacity(events.len());
         for e in events {
             match e.value {
                 Value::Hold => {
@@ -594,16 +586,16 @@ impl Events {
     }
 
     // filter out consecutive rests
-    // so any remaining rest can be converted to a note-off later
+    // so any remaining rest can be converted to a single note-off later
     // rests at the beginning of a pattern also get dropped
     fn merge_rests(events: &[Event]) -> Vec<Event> {
-        let mut result: Vec<Event> = vec![];
+        let mut result: Vec<Event> = Vec::with_capacity(events.len());
         for e in events {
             match e.value {
                 Value::Rest => {
-                    if let Some(last) = result.last() {
+                    if let Some(last) = result.last_mut() {
                         match last.value {
-                            Value::Rest => {}
+                            Value::Rest => last.extend(e),
                             _ => result.push(e.clone()),
                         }
                     }
@@ -615,12 +607,13 @@ impl Events {
     }
 
     // merge holds then rests separately to avoid collapsing rests and holding notes before them
-    fn merge(&self, channels: &mut [Vec<Event>]) -> Vec<Vec<Event>> {
-        channels
-            .iter_mut()
-            .map(|e| Self::merge_holds(e))
-            .map(|e| Self::merge_rests(&e))
-            .collect()
+    fn merge(&self, channels: &mut [Vec<Event>]) {
+        for event in &mut *channels {
+            *event = Self::merge_holds(event);
+        }
+        for event in channels {
+            *event = Self::merge_rests(event);
+        }
     }
 }
 
@@ -1291,18 +1284,17 @@ mod test {
         );
         assert_eq!(
             Cycle::from("[R [e [n o]]] , [[[i s] e ] _]", None)?.generate(),
-            [
-                [
+            vec![
+                vec![
                     Event::at(F::from(0), F::new(1u8, 2u8)).with_name("R"),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8)).with_note(4, 4),
                     Event::at(F::new(3u8, 4u8), F::new(1u8, 8u8)).with_name("n"),
                     Event::at(F::new(7u8, 8u8), F::new(1u8, 8u8)).with_name("o"),
                 ],
-                [
+                vec![
                     Event::at(F::from(0), F::new(1u8, 8u8)).with_name("i"),
                     Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)).with_name("s"),
-                    Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_note(4, 4),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_hold(),
+                    Event::at(F::new(1u8, 4u8), F::new(3u8, 4u8)).with_note(4, 4),
                 ],
             ]
         );
@@ -1325,12 +1317,10 @@ mod test {
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(11, 4),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(0, 4),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(0, 4)
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(11, 4),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(11, 4)
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8)).with_note(9, 0),
@@ -1417,11 +1407,8 @@ mod test {
             Cycle::from("[1 middle _] {}%42 [] <>", None)?.generate(),
             [[
                 Event::at(F::from(0), F::new(1u8, 12u8)).with_int(1),
-                Event::at(F::new(1u8, 12u8), F::new(1u8, 12u8)).with_name("middle"),
-                Event::at(F::new(2u8, 12u8), F::new(1u8, 12u8)).with_hold(),
-                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)),
-                Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)),
-                Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)),
+                Event::at(F::new(1u8, 12u8), F::new(1u8, 6u8)).with_name("middle"),
+                Event::at(F::new(1u8, 4u8), F::new(3u8, 4u8)),
             ]]
         );
 
@@ -1480,14 +1467,11 @@ mod test {
                 ],
                 vec![
                     Event::at(F::from(0), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(1u8, 11u8), F::new(1u8, 11u8)),
-                    Event::at(F::new(2u8, 11u8), F::new(1u8, 11u8)),
+                    Event::at(F::new(1u8, 11u8), F::new(2u8, 11u8)),
                     Event::at(F::new(3u8, 11u8), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(4u8, 11u8), F::new(1u8, 11u8)),
-                    Event::at(F::new(5u8, 11u8), F::new(1u8, 11u8)),
+                    Event::at(F::new(4u8, 11u8), F::new(2u8, 11u8)),
                     Event::at(F::new(6u8, 11u8), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(7u8, 11u8), F::new(1u8, 11u8)),
-                    Event::at(F::new(8u8, 11u8), F::new(1u8, 11u8)),
+                    Event::at(F::new(7u8, 11u8), F::new(2u8, 11u8)),
                     Event::at(F::new(9u8, 11u8), F::new(1u8, 11u8)).with_name("outside"),
                     Event::at(F::new(10u8, 11u8), F::new(1u8, 11u8)),
                 ],
@@ -1507,8 +1491,7 @@ mod test {
                     Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(2)
                         .with_target(Target::Name("a".to_string())),
-                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)),
+                    Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 10u8)).with_int(10),
@@ -1520,8 +1503,7 @@ mod test {
                     Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(20)
                         .with_target(Target::Name("a".to_string())),
-                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)),
+                    Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
                 ]],
             ],
         )?;
@@ -1564,11 +1546,8 @@ mod test {
         assert_eq!(
             Cycle::from("c(3,8,9)", None)?.generate(),
             [[
-                Event::at(F::from(0), F::new(1u8, 8u8)),
-                Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)),
                 Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
-                Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)),
-                Event::at(F::new(4u8, 8u8), F::new(1u8, 8u8)),
+                Event::at(F::new(3u8, 8u8), F::new(1u8, 4u8)),
                 Event::at(F::new(5u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
                 Event::at(F::new(6u8, 8u8), F::new(1u8, 8u8)),
                 Event::at(F::new(7u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
