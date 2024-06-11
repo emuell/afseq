@@ -987,9 +987,9 @@ impl Cycle {
     fn parse_section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
         let mut steps: Vec<Step> = vec![];
         for pair in pair.into_inner() {
-            match Cycle::parse_step(pair) {
+            match Self::parse_step(pair) {
                 Ok(s) => 
-                    Cycle::push_applied(&mut steps, s),
+                    Self::push_applied(&mut steps, s),
                 Err(s) => return Err(format!("failed to parse section\n{:?}", s)),
             }
         }
@@ -1007,13 +1007,13 @@ impl Cycle {
                 Ok(vec![Step::Single(single)])
             }
             Rule::split => Self::parse_split(inner),
-            Rule::section => Cycle::parse_section(inner),
+            Rule::section => Self::parse_section(inner),
             Rule::choices => {
                 let mut choices: Vec<Step> = vec![];
                 for p in inner.clone().into_inner() {
                     if let Some(step) = p.into_inner().next() {
-                        let choice = Cycle::parse_step(step)?;
-                        Cycle::push_applied(&mut choices, choice)
+                        let choice = Self::parse_step(step)?;
+                        Self::push_applied(&mut choices, choice)
                     } else {
                         return Err(format!("empty choice\n{:?}", inner));
                     }
@@ -1035,10 +1035,10 @@ impl Cycle {
             Rule::subdivision | Rule::mini => {
                 if let Some(first) = pair.clone().into_inner().next() {
                     match first.as_rule() {
-                        Rule::stack => Cycle::parse_stack(first, pair),
+                        Rule::stack => Self::parse_stack(first, pair),
                         _ => {
                             Ok(Step::Subdivision(Subdivision {
-                                steps: Cycle::extract_section(pair).unwrap_or_default(),
+                                steps: Self::extract_section(pair).unwrap_or_default(),
                             }))
                         }
                     }
@@ -1049,9 +1049,9 @@ impl Cycle {
             Rule::alternating => {
                 if let Some(first) = pair.clone().into_inner().next() {
                     match first.as_rule() {
-                        Rule::stack => Cycle::parse_stack(first, pair),
+                        Rule::stack => Self::parse_stack(first, pair),
                         _ => {
-                            let steps = Cycle::extract_section(pair).unwrap_or_default();
+                            let steps = Self::extract_section(pair).unwrap_or_default();
                             Ok(Step::Alternating(Alternating { steps }))
                         }
                     }
@@ -1067,16 +1067,16 @@ impl Cycle {
                 for p in pair.clone().into_inner() {
                     match p.as_rule() {
                         Rule::polymeter_tail => {
-                            count = Cycle::parse_polymeter_tail(p).ok()
+                            count = Self::parse_polymeter_tail(p).ok()
                         }
                         Rule::stack => {
-                            stack = Cycle::parse_sections_or_splits_in_stack(p).ok()
+                            stack = Self::parse_sections_or_splits_in_stack(p).ok()
                         }
                         Rule::split => {
                             steps = Self::parse_split(p).ok()
                         }
                         _ => {
-                            steps = Cycle::parse_section(p).ok()
+                            steps = Self::parse_section(p).ok()
                         }
                     }
                 }
@@ -1146,7 +1146,7 @@ impl Cycle {
             Rule::stack | Rule::section | Rule::choices | Rule::split => {
                 // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
                 // sections and choices are always immediately handled within other rules
-                // using Cycle::extract_section or Cycle::parse_section
+                // using Self::extract_section or Self::parse_section
                 Err(format!("unexpected pair\n{:?}", pair))
             }
             Rule::range_expr => {
@@ -1167,7 +1167,7 @@ impl Cycle {
                 let mut inner = pair.clone().into_inner();
                 let left = inner.next()
                     .ok_or_else(|| format!("empty expression\n{:?}", pair))
-                    .and_then(Cycle::parse_step)?;
+                    .and_then(Self::parse_step)?;
 
                 let op_pair = inner.next()
                     .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
@@ -1196,8 +1196,8 @@ impl Cycle {
                 let mut inner = pair.clone().into_inner();
                 let left = inner.next()
                     .ok_or_else(|| format!("empty expression\n{:?}", pair))
-                    .and_then(Cycle::parse_step)?;
-                // let left = Cycle::parse_step(left_pair)?;
+                    .and_then(Self::parse_step)?;
+                // let left = Self::parse_step(left_pair)?;
 
                 let op_pair = inner.next()
                     .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
@@ -1207,13 +1207,13 @@ impl Cycle {
 
                         let pulses = inner.next()
                             .ok_or_else(|| format!("no pulse in bjorklund\n{:?}", pair))
-                            .and_then(Cycle::parse_step)?;
+                            .and_then(Self::parse_step)?;
 
                         let steps = inner.next()
                             .ok_or_else(|| format!("no steps in bjorklund\n{:?}", pair))
-                            .and_then(Cycle::parse_step)?;
+                            .and_then(Self::parse_step)?;
 
-                        let rotate = inner.next().map(Cycle::parse_step).transpose()?;
+                        let rotate = inner.next().map(Self::parse_step).transpose()?;
 
                         Ok(Step::Bjorklund(Bjorklund {
                             left: Box::new(left),
@@ -1227,7 +1227,7 @@ impl Cycle {
                         let mut inner = op_pair.into_inner();
                         let right = inner.next()
                             .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
-                            .and_then(Cycle::parse_step)?;
+                            .and_then(Self::parse_step)?;
                         match right {
                             Step::Single(_) =>{
                                 let expr = Step::Expression(Expression {
@@ -1250,7 +1250,7 @@ impl Cycle {
         let range = span.whole_range();
         let cycles = range
             .map(|cycle| {
-                let mut events = Cycle::output(step, rng, cycle);
+                let mut events = Self::output(step, rng, cycle);
                 events.transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
                 events
             }).collect();
@@ -1267,7 +1267,7 @@ impl Cycle {
         let span = Span::new(
             Fraction::from(cycle) * mult, 
             Fraction::from(cycle + 1) * mult);
-        let mut events = Cycle::output_span(
+        let mut events = Self::output_span(
             step, 
             rng, 
             &span);
@@ -1294,7 +1294,7 @@ impl Cycle {
                 } else {
                     let mut events = vec![];
                     for s in &sd.steps {
-                        let e = Cycle::output(s, rng, cycle);
+                        let e = Self::output(s, rng, cycle);
                         events.push(e)
                     }
 
@@ -1313,7 +1313,7 @@ impl Cycle {
                     let length = a.steps.len();
                     let current = cycle % length;
                     if let Some(step) = a.steps.get(current) {
-                        Cycle::output(step, rng, cycle / length)
+                        Self::output(step, rng, cycle / length)
                     } else {
                         Events::empty() // unreachable
                     }
@@ -1321,7 +1321,7 @@ impl Cycle {
             }
             Step::Choices(cs) => {
                 let choice = rng.gen_range(0..cs.choices.len());
-                Cycle::output(&cs.choices[choice], rng, cycle) // TODO
+                Self::output(&cs.choices[choice], rng, cycle) // TODO
             }
             Step::Polymeter(pm) => {
                 let step = pm.steps.as_ref();
@@ -1341,7 +1341,7 @@ impl Cycle {
                 } else {
                     let mut channels = vec![];
                     for s in &st.stack {
-                        channels.push(Cycle::output(s, rng, cycle))
+                        channels.push(Self::output(s, rng, cycle))
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
@@ -1353,12 +1353,12 @@ impl Cycle {
             Step::SingleExpression(e) => {
                 match e.operator {
                     SingleOperator::Target() => {
-                        let mut out = Cycle::output(e.left.as_ref(), rng, cycle);
+                        let mut out = Self::output(e.left.as_ref(), rng, cycle);
                         out.mutate_events(&mut |event| event.target = e.right.to_target());
                         out
                     }
                     SingleOperator::Degrade() => {
-                        let mut out = Cycle::output(e.left.as_ref(), rng, cycle);
+                        let mut out = Self::output(e.left.as_ref(), rng, cycle);
                         out.mutate_events(&mut |event: &mut Event| {
                             if let Some(chance) = e.right.to_chance() {
                                 if chance < rng.gen_range(0.0..1.0) {
@@ -1369,7 +1369,7 @@ impl Cycle {
                         out
                     }
                     _ => {
-                        // unreachable, these expressions were immediately applied in Cycle::push_applied
+                        // unreachable, these expressions were immediately applied in Self::push_applied
                         Events::empty()
                     }
                 }
@@ -1413,7 +1413,7 @@ impl Cycle {
                                 };
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
-                                        let out = Cycle::output(b.left.as_ref(), rng, cycle);
+                                        let out = Self::output(b.left.as_ref(), rng, cycle);
                                         for pulse in euclidean(
                                             steps.max(0) as u32,
                                             pulses.max(0) as u32,
@@ -1452,7 +1452,7 @@ impl Cycle {
     // parse the root pair of the pest AST into a Subdivision
     // then update the spans of all the generated steps
     pub fn generate(&mut self) -> Vec<Vec<Event>> {
-        let mut events = Cycle::output(&self.root, &mut self.rng, self.iteration);
+        let mut events = Self::output(&self.root, &mut self.rng, self.iteration);
         self.iteration += 1;
         events.transform_spans( &Span::default());
         events.export()
@@ -1471,7 +1471,7 @@ impl Cycle {
                         println!("\nTREE");
                         Self::print_pairs(&mini, 0);
                     }
-                    let root = Cycle::parse_step(mini)?;
+                    let root = Self::parse_step(mini)?;
                     let rng =
                         Xoshiro256PlusPlus::from_seed(seed.unwrap_or_else(|| thread_rng().gen()));
                     let iteration = 0;
