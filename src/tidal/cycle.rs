@@ -39,22 +39,6 @@ impl Step {
         }
     }
 
-    // recursively reset the step to its initial state
-    fn reset(&mut self) {
-        // match self {
-        //     // Step::Alternating(a) => {
-        //     //     a.current = 0;
-        //     // }
-        //     // Step::Polymeter(pm) => {
-        //     //     pm.offset = 0;
-        //     // }
-        //     _ => (),
-        // }
-        // for step in self.inner_steps_mut() {
-        //     step.reset()
-        // }
-    }
-
     #[allow(dead_code)]
     fn inner_steps(&self) -> Vec<&Step> {
         match self {
@@ -1213,9 +1197,9 @@ impl Cycle {
 
             Rule::single_expr => {
                 let mut inner = pair.clone().into_inner();
-                let left_pair = inner.next()
-                    .ok_or_else(|| format!("empty expression\n{:?}", pair))?;
-                let left = Cycle::parse_step(left_pair)?;
+                let left = inner.next()
+                    .ok_or_else(|| format!("empty expression\n{:?}", pair))
+                    .and_then(Cycle::parse_step)?;
 
                 let op_pair = inner.next()
                     .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
@@ -1242,9 +1226,10 @@ impl Cycle {
             }
             Rule::expr => {
                 let mut inner = pair.clone().into_inner();
-                let left_pair = inner.next()
-                    .ok_or_else(|| format!("empty expression\n{:?}", pair))?;
-                let left = Cycle::parse_step(left_pair)?;
+                let left = inner.next()
+                    .ok_or_else(|| format!("empty expression\n{:?}", pair))
+                    .and_then(Cycle::parse_step)?;
+                // let left = Cycle::parse_step(left_pair)?;
 
                 let op_pair = inner.next()
                     .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
@@ -1252,13 +1237,13 @@ impl Cycle {
                     Rule::op_bjorklund => {
                         let mut inner = op_pair.into_inner();
 
-                        let pulse_pair = inner.next()
-                            .ok_or_else(|| format!("no pulse in bjorklund\n{:?}", pair))?;
-                        let pulses = Cycle::parse_step(pulse_pair)?;
+                        let pulses = inner.next()
+                            .ok_or_else(|| format!("no pulse in bjorklund\n{:?}", pair))
+                            .and_then(Cycle::parse_step)?;
 
-                        let steps_pair = inner.next()
-                            .ok_or_else(|| format!("no steps in bjorklund\n{:?}", pair))?;
-                        let steps = Cycle::parse_step(steps_pair)?;
+                        let steps = inner.next()
+                            .ok_or_else(|| format!("no steps in bjorklund\n{:?}", pair))
+                            .and_then(Cycle::parse_step)?;
 
                         let rotate = inner.next().map(Cycle::parse_step).transpose()?;
 
@@ -1272,9 +1257,9 @@ impl Cycle {
                     _ => {
                         let operator = Operator::parse(op_pair.clone())?;
                         let mut inner = op_pair.into_inner();
-                        let right_pair = inner.next()
-                            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))?;
-                        let right = Cycle::parse_step(right_pair)?;
+                        let right = inner.next()
+                            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
+                            .and_then(Cycle::parse_step)?;
                         match right {
                             Step::Single(_) =>{
                                 let expr = Step::Expression(Expression {
@@ -1517,7 +1502,6 @@ impl Cycle {
     // reset state to initial state
     pub fn reset(&mut self) {
         self.iteration = 0;
-        self.root.reset();
         self.rng = Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
     }
 
