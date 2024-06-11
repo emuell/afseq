@@ -2047,8 +2047,7 @@ mod test {
         assert!(
             Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
                 .overlaps(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
-            &cycle.root, 
-            &mut cycle.rng, 
+
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
