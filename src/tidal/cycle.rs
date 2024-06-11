@@ -61,28 +61,6 @@ impl Step {
             }
         }
     }
-
-    // fn inner_steps_mut(&mut self) -> Vec<&mut Step> {
-    //     match self {
-    //         Step::Repeat => vec![],
-    //         Step::Range(_) => vec![],
-    //         Step::Single(_s) => vec![],
-    //         Step::Alternating(a) => a.steps.iter_mut().collect(),
-    //         Step::Polymeter(pm) => pm.steps.iter_mut().collect(),
-    //         Step::Subdivision(sd) => sd.steps.iter_mut().collect(),
-    //         Step::Choices(cs) => cs.choices.iter_mut().collect(),
-    //         Step::Stack(st) => st.stack.iter_mut().collect(),
-    //         Step::Expression(e) => vec![&mut e.left, &mut e.right],
-    //         Step::SingleExpression(e) => vec![&mut e.left],
-    //         Step::Bjorklund(b) => {
-    //             if let Some(rotation) = &mut b.rotation {
-    //                 vec![&mut b.left, &mut b.steps, &mut b.pulses, &mut **rotation]
-    //             } else {
-    //                 vec![&mut b.left, &mut b.steps, &mut b.pulses]
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -819,6 +797,7 @@ impl Events {
         channels
     }
 
+    #[allow(dead_code)] // TODO remove this once the "step * step" is done
     fn print(&self) {
         match self {
             Events::Single(s) => println!("[{}] {}", s.length, s),
