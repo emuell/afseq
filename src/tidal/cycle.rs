@@ -45,7 +45,7 @@ impl Step {
             Step::Repeat => vec![],
             Step::Single(_s) => vec![],
             Step::Alternating(a) => a.steps.iter().collect(),
-            Step::Polymeter(pm) => pm.steps.iter().collect(),
+            Step::Polymeter(pm) => pm.steps.as_ref().inner_steps(),
             Step::Subdivision(sd) => sd.steps.iter().collect(),
             Step::Choices(cs) => cs.choices.iter().collect(),
             Step::Stack(st) => st.stack.iter().collect(),
@@ -113,71 +113,13 @@ struct Subdivision {
 #[derive(Clone, Debug, PartialEq)]
 struct Polymeter {
     count: Box<Step>,
-    steps: Vec<Step>,
+    steps: Box<Step>,
 }
-use std::cmp::Ordering;
 
 impl Polymeter {
-    fn count_variations(size: usize, count: usize) -> usize {
-        match size.cmp(&count) {
-            Ordering::Equal => 1,
-            Ordering::Less => size,
-            Ordering::Greater => {
-                if size % count == 0 { size / count } else { size } 
-            }
-        }
-    }
-    
-    fn variations(size: usize, count: usize) -> Vec<Vec<usize>> {
-        let vars = Polymeter::count_variations(size, count);
-        let first: Vec<usize> = (0..size).collect();
-
-        (0..vars)
-            .map(|i| {
-                (0..count)
-                    .map(|j| first[(i * count + j) % size])
-                    .collect()
-            })
-            .collect()
-    }
-
-    fn occurrences(size: usize, variations: &[Vec<usize>]) -> Vec<Vec<usize>> {
-        variations.iter().map(|vs| {
-            let mut o = vec![0; size];
-             for &i in vs {
-                o[i] += 1;
-            }
-            o
-        }).collect()
-    }
-
-    fn partial_occurrences(occurrences: &[Vec<usize>], cycle: usize, index: usize) -> usize {
-        let vars = occurrences.len();
-        let partial_cycles = (cycle % vars) + 1;
-        let mut count = 0;
-        for item in occurrences.iter().take(partial_cycles) {
-            count += item[index]
-        }
-        count
-    }
-
-    fn full_occurrences(size: usize, count: usize) -> usize {
-        if size == count || count == 1 || (size % count == 0) { 1 }
-        else { count }
-    }
-
-    fn get_inner_cycle_at(size: usize, count: usize, cycle: usize, index: usize, occurrences: &[Vec<usize>]) -> usize {
-        let vars = Polymeter::count_variations(size, count);
-        if vars == 1 { return cycle }
-
-        let full_cycles = cycle / vars;
-        let full_occurrences = Polymeter::full_occurrences(size, count);
-
-        let partial_cycles = cycle % vars;
-
-        if partial_cycles == 0 { return full_occurrences * full_cycles }
-
-        (full_cycles * full_occurrences) + Polymeter::partial_occurrences(occurrences, cycle, index) - 1
+    fn length(&self) -> usize {
+        if let Step::Subdivision(s) = self.steps.as_ref() { s.steps.len() }
+        else { 1 } // unreachable
     }
 }
 
@@ -1125,7 +1067,9 @@ impl Cycle {
                     (Some(count), None, Some(steps)) => {
                         // a regular polymeter with explicit count
                         Ok(Step::Polymeter(Polymeter {
-                            steps,
+                            steps: Box::new(Step::Subdivision(Subdivision{
+                                steps
+                            })),
                             count: Box::new(count),
                         }))
                     }
@@ -1134,7 +1078,9 @@ impl Cycle {
                         let mut s = Stack { stack: vec![] };
                         for steps in stack {
                             s.stack.push(Step::Polymeter(Polymeter {
-                                steps,
+                                steps: Box::new(Step::Subdivision(Subdivision{
+                                    steps
+                                })),
                                 count: Box::new(count.clone()),
                             }));
                         }
@@ -1151,7 +1097,9 @@ impl Cycle {
                                 let mut s = Stack { stack: vec![] };
                                 for steps in stack {
                                     s.stack.push(Step::Polymeter(Polymeter {
-                                        steps,
+                                        steps: Box::new(Step::Subdivision(Subdivision{
+                                            steps
+                                        })),
                                         count: Box::new(
                                             Step::Single(Single { 
                                                 value: Value::Integer(count as i32), 
@@ -1295,6 +1243,18 @@ impl Cycle {
         events
     }
 
+    fn output_multiplied(step: &Step, rng: &mut Xoshiro256PlusPlus, cycle: usize, mult: Fraction) -> Events {
+        let span = Span::new(
+            Fraction::from(cycle) * mult, 
+            Fraction::from(cycle + 1) * mult);
+        let mut events = Cycle::output_span(
+            step, 
+            rng, 
+            &span);
+        events.normalize_spans(&span);
+        events
+    }
+
     // recursively output events for the entire cycle based on some state (random seed)
     fn output(step: &Step, rng: &mut Xoshiro256PlusPlus, cycle: usize) -> Events {
         match step {
@@ -1316,13 +1276,8 @@ impl Cycle {
                     for s in &sd.steps {
                         let e = Cycle::output(s, rng, cycle);
                         events.push(e)
-                        // events.extend(output_events(s, rng))
                     }
-                    // for e in &events {
-                    //     e.print()
-                    // }
-                    
-                    // only applied for Subdivision and Polymeter groups
+
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
                         span: Span::default(),
@@ -1337,12 +1292,10 @@ impl Cycle {
                 } else {
                     let length = a.steps.len();
                     let current = cycle % length;
-                    // let current = a.current % a.steps.len();
-                    // a.current += 1;
                     if let Some(step) = a.steps.get(current) {
                         Cycle::output(step, rng, cycle / length)
                     } else {
-                        Events::empty() // this can never happen
+                        Events::empty() // unreachable
                     }
                 }
             }
@@ -1351,38 +1304,16 @@ impl Cycle {
                 Cycle::output(&cs.choices[choice], rng, cycle) // TODO
             }
             Step::Polymeter(pm) => {
-                if pm.steps.is_empty() {
-                    Events::empty()
-                } else {
-                    let mut events = vec![];
-                    let size = pm.steps.len();
-                    // let offset = pm.offset;
-                    // TODO implement other multipliers
-                    let count: usize = match pm.count.as_ref() {
-                        Step::Single(s) => {
-                            s.value.to_integer().unwrap_or(1) as usize
-                        }
-                        _ => 1
-                    };
-                    let offset = (cycle % Polymeter::count_variations(size, count)) * count;
-                    let occurrences = Polymeter::occurrences(size, &Polymeter::variations(size, count));
-
-                    for i in 0..count {
-                        let index = (offset + i) % size;
-                        let inner_cycle = Polymeter::get_inner_cycle_at(size, count, cycle, index, &occurrences);
-                        events.push(Cycle::output(&pm.steps[index], rng, inner_cycle))
+                let step = pm.steps.as_ref();
+                let length = pm.length();
+                let count: usize = match pm.count.as_ref() {
+                    Step::Single(s) => {
+                        s.value.to_integer().unwrap_or(1) as usize
                     }
-
-                    // pm.offset += count;
-
-                    // only applied for Subdivision and Polymeter groups
-                    Events::subdivide_lengths(&mut events);
-                    Events::Multi(MultiEvents {
-                        span: Span::default(),
-                        length: Fraction::one(),
-                        events,
-                    })
-                }
+                    _ => 1
+                };
+                let mult = Fraction::from(count) / Fraction::from(length);
+                Self::output_multiplied(step, rng, cycle, mult)
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1426,7 +1357,6 @@ impl Cycle {
             Step::Expression(e) => {
                 match e.operator {
                     Operator::Fast() | Operator::Slow() => {
-                        let mut events = Events::empty();
                         #[allow(clippy::single_match)]
                         // TODO support something other than Step::Single as the right hand side
                         match e.right.as_ref() {
@@ -1434,19 +1364,13 @@ impl Cycle {
                                 if let Some(right) = s.value.to_float() {
                                     let mult = if e.operator == Operator::Slow() 
                                         { 1.0 / right } else { right };
-                                    let span = Span::new(
-                                        Fraction::from((cycle as f64) * mult), 
-                                        Fraction::from(((cycle + 1) as f64) * mult));
-                                    events = Cycle::output_span(
-                                        e.left.as_ref(), 
-                                        rng, 
-                                        &span);
-                                    events.normalize_spans(&span);
+                                    Self::output_multiplied(e.left.as_ref(), rng, cycle, Fraction::from(mult))
+                                } else {
+                                    Events::empty()
                                 }
                             }
-                            _ => (),
+                            _ => Events::empty(),
                         }
-                        events
                     }
                 }
             }
@@ -1573,7 +1497,7 @@ impl Cycle {
             },
             Step::Subdivision(sd) => format!("Subdivision [{}]", sd.steps.len()),
             Step::Alternating(a) => format!("Alternating <{}>", a.steps.len()),
-            Step::Polymeter(pm) => format!("Polymeter {{{}}}", pm.steps.len()),//, pm.count),
+            Step::Polymeter(pm) => format!("Polymeter {{{}}}", pm.length()),//, pm.count),
             Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
             Step::Expression(e) => format!("Expression {:?}", e.operator),
