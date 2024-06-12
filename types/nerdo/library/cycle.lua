@@ -6,18 +6,16 @@
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to 'emit' functions.
+---Context passed to 'cycle:map` functions.
 ---@class CycleMapContext : TimeContext
 ---
 ---channel/voice index within the cycle. each channel in the cycle gets emitted and thus mapped
 ---separately, starting with the first channel index 1.
 ---@field channel integer
----Continues step counter for each channel, incrementing with each new value in the cycle.
----Unlike `pulse_step` this does not include holds so it basically counts how often the map
----function already got called.
----Starts from 1 when the rhythm starts running or after it got reset.
+---Continues step counter for each channel, incrementing with each new mapped value in the cycle.
+---Starts from 1 when the cycle starts running or after it got reset.
 ---@field step integer
----step length fraction within the cycle
+---step length fraction within the cycle, where 1 is the total duration of a single cycle run.
 ---@field step_length number
 
 ----------------------------------------------------------------------------------------------------
