@@ -191,12 +191,10 @@ mod test {
                     assert(context.beats_per_min, 120)
                     assert(context.beats_per_bar, 4)
                     assert(context.samples_per_sec, 44100)
-                    if value ~= nil then -- TODO!
-                      if value == "wurst" then 
-                        return "c#4"
-                      else
-                        return value..4 
-                      end
+                    if value == "wurst" then
+                      return "c#4"
+                    else
+                      return value..4
                     end
                 end)"#,
         )?;
