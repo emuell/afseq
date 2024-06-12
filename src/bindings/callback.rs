@@ -49,6 +49,18 @@ pub fn clear_lua_callback_errors() {
         .clear();
 }
 
+/// Add/signal a new Lua callback errors.
+///
+/// ### Panics
+/// Panics if accessing the global lua callback error vector failed.
+pub fn add_lua_callback_error(name: &str, err: &LuaError) {
+    log::warn!("Lua callback '{}' failed to evaluate:\n{}", name, err);
+    LUA_CALLBACK_ERRORS
+        .write()
+        .expect("Failed to lock Lua callback error vector")
+        .push(err.clone());
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Lazily evaluates a lua function the first time it's called, to either use it as a iterator,
@@ -77,12 +89,17 @@ pub(crate) struct LuaCallback {
 }
 
 impl LuaCallback {
+    /// Create a new Callback from an unowned lua function.
     pub fn new(lua: &Lua, function: LuaFunction) -> LuaResult<Self> {
+        Self::with_owned(lua, function.into_owned())
+    }
+
+    /// Create a new Callback from an owned lua function.
+    pub fn with_owned(lua: &Lua, function: LuaOwnedFunction) -> LuaResult<Self> {
         // create an empty context and memorize the function without calling it
         let context = lua.create_table()?.into_owned();
-        let environment = function.environment().map(LuaTable::into_owned);
+        let environment = function.to_ref().environment().map(LuaTable::into_owned);
         let generator = None;
-        let function = function.into_owned();
         let initialized = false;
         Ok(Self {
             environment,
@@ -138,7 +155,21 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets the emitter context for the callback. Only used for function callbacks.
+    /// Sets the cycle context step value for the callback.
+    pub fn set_context_cycle_step(
+        &mut self,
+        channel: usize,
+        step: usize,
+        step_length: f64,
+    ) -> LuaResult<()> {
+        let table = self.context.to_ref();
+        table.raw_set("channel", channel + 1)?;
+        table.raw_set("step", step + 1)?;
+        table.raw_set("step_length", step_length)?;
+        Ok(())
+    }
+
+    /// Sets the emitter context for the callback.
     pub fn set_pattern_context(
         &mut self,
         time_base: &BeatTimeBase,
@@ -150,7 +181,7 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets the gate context for the callback. Only used for function callbacks.
+    /// Sets the gate context for the callback.
     pub fn set_gate_context(
         &mut self,
         time_base: &BeatTimeBase,
@@ -163,7 +194,7 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets the emitter context for the callback. Only used for function callbacks.
+    /// Sets the emitter context for the callback.
     pub fn set_emitter_context(
         &mut self,
         time_base: &BeatTimeBase,
@@ -172,13 +203,21 @@ impl LuaCallback {
         pulse_time_step: f64,
         step: usize,
     ) -> LuaResult<()> {
-        self.set_gate_context(
-            time_base,
-            pulse,
-            pulse_step,
-            pulse_time_step,
-        )?;
+        self.set_gate_context(time_base, pulse, pulse_step, pulse_time_step)?;
         self.set_context_step(step)?;
+        Ok(())
+    }
+
+    /// Sets the cycle context for the callback.
+    pub fn set_cycle_context(
+        &mut self,
+        time_base: &BeatTimeBase,
+        channel: usize,
+        step: usize,
+        step_length: f64,
+    ) -> LuaResult<()> {
+        self.set_context_time_base(time_base)?;
+        self.set_context_cycle_step(channel, step, step_length)?;
         Ok(())
     }
 
@@ -193,42 +232,23 @@ impl LuaCallback {
 
     /// Invoke the Lua function callback or generator.
     pub fn call(&mut self) -> LuaResult<LuaValue> {
-        if !self.initialized {
-            self.initialized = true;
-            let function = self.function.clone();
-            let result = function.call::<_, LuaValue>(self.context.to_ref())?;
-            if let Some(inner_function) = result.as_function() {
-                // function returned a function -> is an iterator. use inner function instead.
-                let function_environment = self
-                    .function
-                    .to_ref()
-                    .environment()
-                    .map(LuaTable::into_owned);
-                let function_generator = Some(self.function.clone());
-                self.environment = function_environment;
-                self.generator = function_generator;
-                self.function = inner_function.clone().into_owned();
-            } else {
-                // function returned not a function. use this function directly.
-                self.environment = None;
-                self.generator = None;
-            }
-        }
+        self.initialize_function()?;
         self.function.call(self.context.to_ref())
+    }
+
+    /// Invoke the Lua function callback or generator with an additional argument.
+    pub fn call_with_arg<'lua, A>(&'lua mut self, arg: A) -> LuaResult<LuaValue<'lua>>
+    where
+        A: IntoLua<'lua>,
+    {
+        self.initialize_function()?;
+        self.function.call((self.context.to_ref(), arg))
     }
 
     /// Report a Lua callback errors. The error will be logged and usually cleared after
     /// the next callback call.
     pub fn handle_error(&self, err: &LuaError) {
-        log::warn!(
-            "Lua callback '{}' failed to evaluate:\n{}",
-            self.name(),
-            err
-        );
-        LUA_CALLBACK_ERRORS
-            .write()
-            .expect("Failed to lock Lua callback error vector")
-            .push(err.clone());
+        add_lua_callback_error(&self.name(), err)
     }
 
     /// Reset the callback function or iterator to its initial state.
@@ -254,6 +274,37 @@ impl LuaCallback {
                         value.type_name()
                     )));
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Lazy initialization of the function callback.
+    //
+    // TODO: remove the doubled, initial self.function.call here!
+    // result should be consumed by call_with_arg or call but currently
+    // can't be because of borrowing issues...
+    // see https://stackoverflow.com/questions/73641155/how-to-force-rust-to-drop-a-mutable-borrow
+    pub fn initialize_function(&mut self) -> LuaResult<()> {
+        if !self.initialized {
+            self.initialized = true;
+            let function = self.function.clone();
+            let result = function.call::<_, LuaValue>(self.context.to_ref())?;
+            if let Some(inner_function) = result.as_function() {
+                // function returned a function -> is an iterator. use inner function instead.
+                let function_environment = self
+                    .function
+                    .to_ref()
+                    .environment()
+                    .map(LuaTable::into_owned);
+                let function_generator = Some(self.function.clone());
+                self.environment = function_environment;
+                self.generator = function_generator;
+                self.function = inner_function.clone().into_owned();
+            } else {
+                // function returned not a function. use this function directly.
+                self.environment = None;
+                self.generator = None;
             }
         }
         Ok(())
