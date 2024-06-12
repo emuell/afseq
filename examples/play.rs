@@ -71,31 +71,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // generate a few phrases
+    let cycle =
+        new_cycle_event("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")?
+            .with_mappings(&[("bd", new_note("c4")), ("bd2", new_note(("c4", None, 0.5)))]);
+
     let kick_pattern = beat_time
-        .every_nth_beat(1.0)
+        .every_nth_beat(16.0)
         .with_instrument(KICK)
-        .with_pattern(
-            vec![
-                Pulse::from(1.0),
-                Pulse::from(vec![0.0, 1.0]),
-                Pulse::from(0.0),
-                Pulse::from(0.0),
-                Pulse::from(1.0),
-                Pulse::from(vec![0.0, 1.0]),
-                Pulse::from(0.0),
-                Pulse::from(0.0),
-                Pulse::from(1.0),
-                Pulse::from(vec![0.0, 1.0]),
-                Pulse::from(0.0),
-                Pulse::from(0.0),
-                Pulse::from(1.0),
-                Pulse::from(vec![0.0, 1.0]),
-                Pulse::from(vec![0.0, 1.0]),
-                Pulse::from(vec![0.0, 1.0, 0.0, 0.0]),
-            ]
-            .to_pattern(),
-        )
-        .trigger(new_note_event("C_5"));
+        .trigger(cycle);
 
     let snare_pattern = beat_time
         .every_nth_beat(2.0)
