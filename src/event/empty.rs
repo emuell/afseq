@@ -4,7 +4,7 @@ use crate::{event::EventIter, BeatTimeBase, EventIterItem, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits an empty, None [`Event`].
+/// Continuously emits empty [`EventIterItem`]S.
 #[derive(Clone, Debug)]
 pub struct EmptyEventIter {}
 

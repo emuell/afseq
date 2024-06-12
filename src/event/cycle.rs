@@ -97,10 +97,12 @@ impl CycleNoteEvents {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits a vector of [`Event`]S from a Tidal [`Cycle`].
+/// Emits a vector of [`EventIterItem`] from a Tidal [`Cycle`].
 ///
 /// Channels from cycle are merged down into note events on different voices.
-/// Float and String targets are currently unsupported and will result into None events.
+/// Values in cycles can be mapped to notes with an optional mapping table.
+///
+/// See also [`ScriptedCycleEventIter`](`super::scripted_cycle::ScriptedCycleEventIter`)
 #[derive(Clone, Debug)]
 pub struct CycleEventIter {
     cycle: Cycle,

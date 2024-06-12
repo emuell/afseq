@@ -12,7 +12,7 @@ type EventMapFn = dyn FnMut(Event) -> Event + 'static;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Endlessly emits [`Event`] which's value can be mutated in each iter step
+/// Continuously emits [`EventIterItem`] which's value can be mutated in each iter step
 /// with a custom closure.
 ///
 /// NB: This event iter can not be cloned. `clone_dyn` thus will cause a panic!

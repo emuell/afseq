@@ -13,7 +13,11 @@ use crate::tidal::{Cycle, Event as CycleEvent, Value as CycleValue};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits a vector of [`Event`]S from a Tidal [`Cycle`] with optional mapping callbacks from scripts.
+/// Emits a vector of [`EventIterItem`] from a Tidal [`Cycle`].
+///
+/// Channels from cycle are merged down into note events on different voices.
+/// Values in cycles can be mapped to notes with an optional mapping table or
+/// callbacks from from scripts.
 ///
 /// See also [`CycleEventIter`](`super::cycle::CycleEventIter`)
 #[derive(Clone, Debug)]
