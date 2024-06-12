@@ -6,10 +6,29 @@
 
 ----------------------------------------------------------------------------------------------------
 
+---Context passed to 'emit' functions.
+---@class CycleMapContext : TimeContext
+---
+---channel/voice index within the cycle. each channel in the cycle gets emitted and thus mapped
+---separately, starting with the first channel index 1.
+---@field channel integer
+---Continues step counter for each channel, incrementing with each new value in the cycle.
+---Unlike `pulse_step` this does not include holds so it basically counts how often the map
+---function already got called.
+---Starts from 1 when the rhythm starts running or after it got reset.
+---@field step integer
+---step length fraction within the cycle
+---@field step_length number
+
+----------------------------------------------------------------------------------------------------
+
 ---@class Cycle
 local Cycle = {}
 
 ----------------------------------------------------------------------------------------------------
+
+---@alias MapFunction fun(context: CycleMapContext, value: string):NoteValue
+---@alias MapGenerator fun(context: CycleMapContext, value: string):MapFunction
 
 ---Map names in in the cycle to custom note events.
 ---
@@ -18,18 +37,36 @@ local Cycle = {}
 ---they are not mapped explicitely.
 ---
 ---Chords such as "c4'major" are not (yet) supported as values.
----@param map { [string]: NoteValue}
+---@param map { [string]: NoteValue }
 ---@return Cycle
 ---### examples:
 ---```lua
+-----Using a fixed mapping table
 ---cycle("bd [bd sn]"):map({
 ---  bd = "c4",
 ---  sn = "e4 #1 v0.2"
 ---})
+-----Using a fixed mapping table with targets
 ---cycle("bd:1 <bd:5, bd:7>"):map({
 ---  bd = { key = "c4", volume = 0.5 }, -- instrument #1,5,7 will be set as specified
 ---})
+-----Using a dynamic map function
+---cycle("4 5 4 <5 [4|6]>"):map(function(context, value)
+---  -- emit a random note with 'value' as octave
+---  return math.random(0, 11) + value * 12
+---end)
+-----Using a dynamic map function generator
+---cycle("4 5 4 <4 [5|7]>"):map(function(context)
+---  local notes = scale("c", "minor").notes
+---  return function(context, value)
+---    -- emit a cmin note arp with 'value' as octave
+---    local note = notes[math.imod(context.step, #notes)]
+---    local octave = tonumber(value)
+---    return { key = note + octave * 12 }
+---  end
+---end)
 ---```
+---@overload fun(self, function: MapFunction|MapGenerator)
 function Cycle:map(map) end
 
 ----------------------------------------------------------------------------------------------------
@@ -54,7 +91,7 @@ function Cycle:map(map) end
 ---cycle("c4(3,8) e4(5,8) g4(7,8)")
 -----Polyrhythm
 ---cycle("{c4 e4 g4 b4}%2, {f4 d4 a4}%4")
------Custom name mappings
+-----Map custom identifiers to notes
 ---cycle("bd(3,8)"):map({ bd = "c4 #1" })
 --- ```
 function cycle(input) end

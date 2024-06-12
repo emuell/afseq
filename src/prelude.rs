@@ -53,9 +53,9 @@ pub use super::{
         clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors,
         new_rhythm_from_file, new_rhythm_from_string,
     },
-    event::scripted::ScriptedEventIter,
-    pattern::scripted::ScriptedPattern,
+    event::{scripted::ScriptedEventIter, scripted_cycle::ScriptedCycleEventIter},
     gate::scripted::ScriptedGate,
+    pattern::scripted::ScriptedPattern,
 };
 
 #[cfg(feature = "player")]
