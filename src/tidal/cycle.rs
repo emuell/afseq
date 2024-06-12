@@ -362,8 +362,12 @@ impl Span {
         start..end
     }
 
-    fn overlaps(&self, span: &Span) -> bool {
-        (self.start <= span.start && span.start < self.end) || (self.start < span.end && span.end <= self.end)
+    // fn overlaps(&self, span: &Span) -> bool {
+    //     (self.start <= span.start && span.start < self.end) || (self.start < span.end && span.end <= self.end)
+    // }
+
+    fn includes(&self, span: &Span) -> bool {
+        self.start <= span.start && span.start < self.end
     }
 
     /// Limit self to not extend beyond the target span
@@ -620,7 +624,7 @@ impl Events {
 
     fn crop(&mut self, span: &Span) {
         self.filter_mut(&mut |e| {
-            if span.overlaps(&e.span) {
+            if span.includes(&e.span) {
                 e.span.crop(span);
                 true
             } else {
@@ -1983,16 +1987,28 @@ mod test {
             "<[a b] [c d] [f g h]>",
         )?;
 
-
+        assert_cycles("[0 1 2]/2", 
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::new(2u8, 3u8)).with_int(0),
+                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                ]],
+                vec![vec![
+                    Event::at(F::new(1u8, 3u8), F::new(2u8, 3u8)).with_int(2),
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(2u8, 3u8)).with_int(0),
+                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                ]],
+            ]
+        )?;
 
         assert!(
             Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
-                .overlaps(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
-
+                .includes(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
-        // assert!(Cycle::from("-2.3..4.", None).is_err());
         assert!(Cycle::from("a b c [d", None).is_err());
         assert!(Cycle::from("a b/ c [d", None).is_err());
         assert!(Cycle::from("a b--- c [d", None).is_err());
@@ -2004,8 +2020,6 @@ mod test {
         assert!(Cycle::from("(a, b)", None).is_err());
         assert!(Cycle::from("#(12, 32)", None).is_err());
         assert!(Cycle::from("#c $", None).is_err());
-        // assert!(Cycle::from("1.. 2 3", None).is_err());
-        // assert!(Cycle::from("1 ..2 3", None).is_err());
 
         Ok(())
     }
