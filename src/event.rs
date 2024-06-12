@@ -21,6 +21,8 @@ pub mod fixed;
 pub mod mutated;
 #[cfg(feature = "scripting")]
 pub mod scripted;
+#[cfg(feature = "scripting")]
+pub mod scripted_cycle;
 
 // -------------------------------------------------------------------------------------------------
 

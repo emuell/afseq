@@ -850,8 +850,21 @@ pub(crate) fn event_iter_from_value(
                 Ok(Box::new(sequence.notes.clone().to_event_sequence()))
             } else if userdata.is::<CycleUserData>() {
                 let userdata = userdata.borrow::<CycleUserData>()?;
-                let event_iter = CycleEventIter::new(userdata.cycle.clone());
-                Ok(Box::new(event_iter.with_mappings(&userdata.mappings)))
+                let cycle = userdata.cycle.clone();
+                if let Some(mapping_function) = userdata.mapping_function.clone() {
+                    let mapping_callback = LuaCallback::with_owned(lua, mapping_function)?;
+                    let event_iter = ScriptedCycleEventIter::with_mapping_callback(
+                        cycle,
+                        timeout_hook,
+                        mapping_callback,
+                        time_base,
+                    )?;
+                    Ok(Box::new(event_iter))
+                } else {
+                    let mappings = userdata.mappings.clone();
+                    let event_iter = ScriptedCycleEventIter::with_mappings(cycle, mappings);
+                    Ok(Box::new(event_iter))
+                }
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",

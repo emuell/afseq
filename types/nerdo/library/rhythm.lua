@@ -19,13 +19,19 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----------------------------------------------------------------------------------------------------
 
 ---Context passed to `pattern` functions.
----@class PatternContext : TriggerContext
+---@class TimeContext : TriggerContext
+---
 -----Project's tempo in beats per minutes.
 ---@field beats_per_min number
 -----Project's beats per bar setting.
 ---@field beats_per_bar integer
 -----Project's sample rate in samples per second.
 ---@field samples_per_sec integer
+
+----------------------------------------------------------------------------------------------------
+
+---Context passed to `pattern` functions.
+---@class PatternContext : TimeContext
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
 ---Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
