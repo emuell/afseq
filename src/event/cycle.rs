@@ -4,9 +4,96 @@ use fraction::Fraction;
 
 use crate::{
     event::{new_note, Event, EventIter, EventIterItem, InstrumentId, NoteEvent},
-    tidal::{Cycle, Target as CycleTarget, Value as CycleValue},
+    tidal::{Cycle, Event as CycleEvent, Target as CycleTarget, Value as CycleValue},
     BeatTimeBase, Note, PulseIterItem,
 };
+
+// -------------------------------------------------------------------------------------------------
+
+/// Default conversion of a cycle event value to an optional NoteEvent, as used by [`EventIter`].
+impl From<&CycleValue> for Option<NoteEvent> {
+    fn from(value: &CycleValue) -> Self {
+        match value {
+            CycleValue::Hold => None,
+            CycleValue::Rest => new_note(Note::OFF),
+            CycleValue::Float(_f) => None,
+            CycleValue::Integer(i) => new_note(Note::from((*i).clamp(0, 0x7f) as u8)),
+            CycleValue::Pitch(p) => new_note(Note::from(p.midi_note())),
+            CycleValue::Name(s) => {
+                if s.eq_ignore_ascii_case("off") {
+                    new_note(Note::OFF)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+/// Default conversion of a cycle target to an optional instrument id, as used by [`EventIter`].
+impl From<&CycleTarget> for Option<InstrumentId> {
+    fn from(value: &CycleTarget) -> Self {
+        match value {
+            CycleTarget::None => None,
+            CycleTarget::Index(i) => Some(InstrumentId::from(*i as usize)),
+            CycleTarget::Name(_) => None, // unsupported
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Helper struct to convert time tagged events from Cycle into a `Vec<EventIterItem>`
+pub(crate) struct CycleNoteEvents {
+    events: Vec<(Fraction, Fraction, Vec<Option<NoteEvent>>)>,
+}
+
+impl CycleNoteEvents {
+    /// Create a new, empty list of events.
+    pub fn new() -> Self {
+        Self { events: vec![] }
+    }
+
+    /// Add a new cycle channel item.
+    pub fn add(
+        &mut self,
+        channel: usize,
+        start: Fraction,
+        length: Fraction,
+        note_event: NoteEvent,
+    ) {
+        match self
+            .events
+            .binary_search_by(|(time, _, _)| time.cmp(&start))
+        {
+            Ok(pos) => {
+                // use max length of all notes in stack
+                let note_length = &mut self.events[pos].1;
+                *note_length = (*note_length).max(length);
+                // add note to existing time stack
+                let note_events = &mut self.events[pos].2;
+                note_events.resize(channel + 1, None);
+                note_events[channel] = Some(note_event);
+            }
+            Err(pos) => self
+                .events
+                .insert(pos, (start, length, vec![Some(note_event)])),
+        }
+    }
+
+    /// Convert to a list of NoteEvents.
+    pub fn into_event_iter_items(self) -> Vec<EventIterItem> {
+        let mut events: Vec<EventIterItem> = Vec::with_capacity(self.events.len());
+        for (start_time, length, note_events) in self.events.into_iter() {
+            events.push(EventIterItem::new_with_fraction(
+                Event::NoteEvents(note_events),
+                start_time,
+                length,
+            ));
+        }
+        events
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -51,73 +138,42 @@ impl CycleEventIter {
         Self { mappings, ..self }
     }
 
+    /// Generate a note event from a single cycle event, applying mappings if necessary
+    fn note_event(&mut self, event: CycleEvent) -> Option<NoteEvent> {
+        let mut note_event = {
+            if let Some(mapped_note_event) = self.mappings.get(event.string()) {
+                // apply custom note mapping
+                mapped_note_event.clone()
+            } else {
+                // else try to convert value to a note
+                event.value().into()
+            }
+        };
+        // inject target instrument, if present
+        if let Some(instrument) = event.target().into() {
+            if let Some(note_event) = &mut note_event {
+                note_event.instrument = Some(instrument);
+            }
+        }
+        note_event
+    }
+
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
     fn generate_events(&mut self) -> Vec<EventIterItem> {
-        // convert cycle channel items to a list of note events, sorted by time
-        let mut timed_note_events: Vec<(Fraction, Fraction, Vec<Option<NoteEvent>>)> = Vec::new();
-        for (channel_index, channel) in self.cycle.generate().into_iter().enumerate() {
-            for event in channel.into_iter() {
+        let mut timed_note_events = CycleNoteEvents::new();
+        // convert possibly mapped cycle channel items to a list of note events
+        for (channel_index, channel_events) in self.cycle.generate().into_iter().enumerate() {
+            for event in channel_events.into_iter() {
                 let start = event.span().start();
                 let length = event.span().length();
-                let mut note_event = {
-                    if let Some(mapped_note_event) = self.mappings.get(event.string()) {
-                        // apply custom note mapping
-                        mapped_note_event.clone()
-                    } else {
-                        // else try to convert value to a note
-                        match event.value() {
-                            CycleValue::Hold => None,
-                            CycleValue::Rest => new_note(Note::OFF),
-                            CycleValue::Float(_) => None,
-                            CycleValue::Integer(i) => {
-                                new_note(Note::from((*i).clamp(0, 0x7f) as u8))
-                            }
-                            CycleValue::Pitch(p) => new_note(Note::from(p.midi_note())),
-                            CycleValue::Name(_) => None,
-                        }
-                    }
-                };
-                // inject target instrument, if present
-                let instrument = match event.target() {
-                    CycleTarget::None => None,
-                    CycleTarget::Index(i) => Some(InstrumentId::from(*i as usize)),
-                    CycleTarget::Name(_) => None, // unsupported
-                };
-                if let Some(instrument) = instrument {
-                    if let Some(note_event) = &mut note_event {
-                        note_event.instrument = Some(instrument);
-                    }
-                }
-                // insert new event
-                if let Some(note_event) = note_event {
-                    match timed_note_events.binary_search_by(|(time, _, _)| time.cmp(&start)) {
-                        Ok(pos) => {
-                            // use max length of all notes in stack
-                            let note_length = &mut timed_note_events[pos].1;
-                            *note_length = (*note_length).max(length);
-                            // add note to existing time stack
-                            let note_events = &mut timed_note_events[pos].2;
-                            note_events.resize(channel_index + 1, None);
-                            note_events[channel_index] = Some(note_event);
-                        }
-                        Err(pos) => {
-                            timed_note_events.insert(pos, (start, length, vec![Some(note_event)]))
-                        }
-                    }
+                if let Some(note_event) = self.note_event(event) {
+                    timed_note_events.add(channel_index, start, length, note_event);
                 }
             }
         }
-        // convert to a list of NoteEvents, applying start time as note delay
-        let mut events: Vec<EventIterItem> = Vec::with_capacity(timed_note_events.len());
-        for (start_time, length, note_events) in timed_note_events.into_iter() {
-            events.push(EventIterItem::new_with_fraction(
-                Event::NoteEvents(note_events),
-                start_time,
-                length,
-            ));
-        }
-        events
+        // convert timed note events into EventIterItems
+        timed_note_events.into_event_iter_items()
     }
 }
 
