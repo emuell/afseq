@@ -232,17 +232,42 @@ impl LuaCallback {
 
     /// Invoke the Lua function callback or generator.
     pub fn call(&mut self) -> LuaResult<LuaValue> {
-        self.initialize_function()?;
-        self.function.call(self.context.to_ref())
+        self.call_with_arg(LuaValue::Nil)
     }
 
     /// Invoke the Lua function callback or generator with an additional argument.
-    pub fn call_with_arg<'lua, A>(&'lua mut self, arg: A) -> LuaResult<LuaValue<'lua>>
-    where
-        A: IntoLua<'lua>,
-    {
-        self.initialize_function()?;
-        self.function.call((self.context.to_ref(), arg))
+    pub fn call_with_arg<'lua, A: IntoLua<'lua> + Clone>(
+        &'lua mut self,
+        arg: A,
+    ) -> LuaResult<LuaValue<'lua>> {
+        if self.initialized {
+            self.function.call((self.context.to_ref(), arg))
+        } else {
+            self.initialized = true;
+            let result = {
+                // HACK: don't borrow self here, so we can borrow mut again to assign the generator function
+                // see https://stackoverflow.com/questions/73641155/how-to-force-rust-to-drop-a-mutable-borrow
+                let function = unsafe { &*(&self.function as *const LuaOwnedFunction) };
+                function.call::<_, LuaValue>((self.context.to_ref(), arg.clone()))?
+            };
+            if let Some(inner_function) = result.as_function().cloned().map(|f| f.into_owned()) {
+                // function returned a function -> is a generator. use the inner function instead.
+                let environment = self
+                    .function
+                    .to_ref()
+                    .environment()
+                    .map(LuaTable::into_owned);
+                self.environment = environment;
+                self.generator = Some(std::mem::replace(&mut self.function, inner_function));
+                self.function
+                    .call::<_, LuaValue>((self.context.to_ref(), arg))
+            } else {
+                // function returned some value. use this function directly.
+                self.environment = None;
+                self.generator = None;
+                Ok(result)
+            }
+        }
     }
 
     /// Report a Lua callback errors. The error will be logged and usually cleared after
@@ -274,37 +299,6 @@ impl LuaCallback {
                         value.type_name()
                     )));
                 }
-            }
-        }
-        Ok(())
-    }
-
-    /// Lazy initialization of the function callback.
-    //
-    // TODO: remove the doubled, initial self.function.call here!
-    // result should be consumed by call_with_arg or call but currently
-    // can't be because of borrowing issues...
-    // see https://stackoverflow.com/questions/73641155/how-to-force-rust-to-drop-a-mutable-borrow
-    pub fn initialize_function(&mut self) -> LuaResult<()> {
-        if !self.initialized {
-            self.initialized = true;
-            let function = self.function.clone();
-            let result = function.call::<_, LuaValue>(self.context.to_ref())?;
-            if let Some(inner_function) = result.as_function() {
-                // function returned a function -> is an iterator. use inner function instead.
-                let function_environment = self
-                    .function
-                    .to_ref()
-                    .environment()
-                    .map(LuaTable::into_owned);
-                let function_generator = Some(self.function.clone());
-                self.environment = function_environment;
-                self.generator = function_generator;
-                self.function = inner_function.clone().into_owned();
-            } else {
-                // function returned not a function. use this function directly.
-                self.environment = None;
-                self.generator = None;
             }
         }
         Ok(())
