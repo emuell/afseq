@@ -7,7 +7,7 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
-/// Endlessly emits a single, fixed [`Event`].
+/// Continuously emits a single, fixed [`EventIterItem`].
 #[derive(Clone, Debug)]
 pub struct FixedEventIter {
     events: Vec<Event>,
