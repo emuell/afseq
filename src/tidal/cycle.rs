@@ -170,8 +170,8 @@ enum Step {
     Polymeter(Polymeter),
     Stack(Stack),
     Choices(Choices),
-    Expression(Expression),
-    SingleExpression(SingleExpression),
+    DynamicExpression(DynamicExpression),
+    StaticExpression(StaticExpression),
     Bjorklund(Bjorklund),
     Range(Range),
     Repeat,
@@ -188,8 +188,8 @@ impl Step {
             Step::Subdivision(sd) => sd.steps.iter().collect(),
             Step::Choices(cs) => cs.choices.iter().collect(),
             Step::Stack(st) => st.stack.iter().collect(),
-            Step::Expression(e) => vec![&e.left, &e.right],
-            Step::SingleExpression(e) => vec![&e.left],
+            Step::DynamicExpression(e) => vec![&e.left, &e.right],
+            Step::StaticExpression(e) => vec![&e.left],
             Step::Range(_) => vec![],
             Step::Bjorklund(b) => {
                 if let Some(rotation) = &b.rotation {
@@ -269,57 +269,61 @@ struct Stack {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Operator {
-    Fast(), // *
-    Slow(), // /
-}
-
-impl Operator {
-    fn parse(pair: Pair<Rule>) -> Result<Operator, String> {
-        match pair.as_rule() {
-            Rule::op_fast => Ok(Operator::Fast()),
-            Rule::op_slow => Ok(Operator::Slow()),
-            _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
-        }
-    }
+enum DynamicOp {
+    Fast(),      // *
+    Slow(),      // /
+    Bjorklund(), // (p,s,r)
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum SingleOperator {
+enum StaticOp {
     Target(),    // :
     Degrade(),   // ?
     Replicate(), // !
     Weight(),    // @
 }
-impl SingleOperator {
-    fn parse(pair: Pair<Rule>) -> Result<SingleOperator, String> {
-        match pair.as_rule() {
-            Rule::op_target => Ok(SingleOperator::Target()),
-            Rule::op_degrade => Ok(SingleOperator::Degrade()),
-            Rule::op_replicate => Ok(SingleOperator::Replicate()),
-            Rule::op_weight => Ok(SingleOperator::Weight()),
-            _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
-        }
-    }
+
+impl StaticOp {
     fn default_value(&self) -> Value {
         match self {
-            SingleOperator::Weight() | SingleOperator::Replicate() => Value::Integer(2),
-            SingleOperator::Degrade() => Value::Float(0.5),
-            SingleOperator::Target() => Value::Rest,
+            StaticOp::Weight() | StaticOp::Replicate() => Value::Integer(2),
+            StaticOp::Degrade() => Value::Float(0.5),
+            StaticOp::Target() => Value::Rest,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct Expression {
-    operator: Operator,
+enum Operator {
+    Static(StaticOp),
+    Dynamic(DynamicOp),
+}
+
+impl Operator {
+    fn parse(pair: Pair<Rule>) -> Result<Self, String> {
+        match pair.as_rule() {
+            Rule::op_target => Ok(Self::Static(StaticOp::Target())),
+            Rule::op_degrade => Ok(Self::Static(StaticOp::Degrade())),
+            Rule::op_replicate => Ok(Self::Static(StaticOp::Replicate())),
+            Rule::op_weight => Ok(Self::Static(StaticOp::Weight())),
+            Rule::op_fast => Ok(Self::Dynamic(DynamicOp::Fast())),
+            Rule::op_slow => Ok(Self::Dynamic(DynamicOp::Slow())),
+            Rule::op_bjorklund => Ok(Self::Dynamic(DynamicOp::Bjorklund())),
+            _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct DynamicExpression {
+    op: DynamicOp,
     left: Box<Step>,
     right: Box<Step>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct SingleExpression {
-    operator: SingleOperator,
+struct StaticExpression {
+    op: StaticOp,
     left: Box<Step>,
     right: Value,
 }
@@ -885,6 +889,27 @@ struct CycleParser {}
 
 /// the errors here should be unreachable unless there is a bug in the pest grammar
 impl CycleParser {
+    /// recursively parse a pair as a Step
+    fn step(pair: Pair<Rule>) -> Result<Step, String> {
+        match pair.as_rule() {
+            Rule::stack | Rule::section | Rule::choices | Rule::split => {
+                // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
+                // sections and choices are always immediately handled within other rules
+                // using Self::extract_section or Self::section
+                Err(format!("unexpected pair\n{:?}", pair))
+            }
+            Rule::subdivision | Rule::mini => Self::group(pair, Step::subdivision),
+            Rule::alternating => Self::group(pair, Step::alternating),
+            Rule::polymeter => Self::polymeter(pair),
+            Rule::single => Self::single(pair),
+            Rule::repeat => Ok(Step::Repeat),
+            Rule::range => Self::range(pair),
+            Rule::expression => Self::expression(pair),
+            _ => Err(format!("rule not implemented\n{:?}", pair)),
+        }
+    }
+
+    /// parse a pair inside a single as a value
     fn value(pair: Pair<Rule>) -> Result<Value, String> {
         match pair.as_rule() {
             Rule::number => {
@@ -906,6 +931,17 @@ impl CycleParser {
             _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
         }
     }
+
+    fn single(pair: Pair<Rule>) -> Result<Step, String> {
+        match pair.into_inner().next() {
+            Some(pair) => Ok(Step::Single(Single {
+                string: pair.as_str().to_string(),
+                value: Self::value(pair)?,
+            })),
+            None => Err("empty single".to_string()),
+        }
+    }
+
     /// transform static steps into their final form and push them onto a list
     fn push_applied(steps: &mut Vec<Step>, step: Step) {
         match &step {
@@ -916,8 +952,8 @@ impl CycleParser {
                     steps.push(Step::Single(Single::default()))
                 }
             }
-            Step::SingleExpression(e) => match e.operator {
-                SingleOperator::Replicate() => {
+            Step::StaticExpression(e) => match e.op {
+                StaticOp::Replicate() => {
                     steps.push(e.left.as_ref().clone());
                     if let Some(repeats) = e.right.to_integer() {
                         if repeats > 0 {
@@ -927,7 +963,7 @@ impl CycleParser {
                         }
                     }
                 }
-                SingleOperator::Weight() => {
+                StaticOp::Weight() => {
                     steps.push(e.left.as_ref().clone());
                     if let Some(repeats) = e.right.to_integer() {
                         if repeats > 0 {
@@ -1092,46 +1128,19 @@ impl CycleParser {
         }
     }
 
-    fn bjorklund(pair: Pair<Rule>, left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
-        let mut inner = op_pair.into_inner();
-
-        let pulses = inner
-            .next()
-            .ok_or_else(|| format!("no pulse in bjorklund\n{:?}", pair))
-            .and_then(Self::step)?;
-
-        let steps = inner
-            .next()
-            .ok_or_else(|| format!("no steps in bjorklund\n{:?}", pair))
-            .and_then(Self::step)?;
-
-        let rotate = inner.next().map(Self::step).transpose()?;
-
-        Ok(Step::Bjorklund(Bjorklund {
-            left: Box::new(left),
-            pulses: Box::new(pulses),
-            steps: Box::new(steps),
-            rotation: rotate.map(Box::new),
-        }))
-    }
-
-    fn mult_expression(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
-        let operator = Operator::parse(op_pair.clone())?;
-        let mut inner = op_pair.into_inner();
-        let right = inner
-            .next()
-            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
-            .and_then(Self::step)?;
-        match right {
-            Step::Single(_) => {
-                let expr = Step::Expression(Expression {
-                    left: Box::new(left),
-                    right: Box::new(right),
-                    operator,
-                });
-                Ok(expr)
+    // helper to parse subdivision and alternating groups
+    fn group(pair: Pair<Rule>, fun: fn(Vec<Step>) -> Step) -> Result<Step, String> {
+        if let Some(first) = pair.clone().into_inner().next() {
+            match first.as_rule() {
+                Rule::stack => Self::stack(first).map(|channels| {
+                    Step::Stack(Stack {
+                        stack: channels.into_iter().map(fun).collect(),
+                    })
+                }),
+                _ => Ok(fun(Self::inner_steps(pair)?)),
             }
-            _ => Err("only single values are supported on the right hand side".to_string()),
+        } else {
+            Ok(Step::rest())
         }
     }
 
@@ -1159,106 +1168,91 @@ impl CycleParser {
         Ok(Step::Range(Range { start, end }))
     }
 
-    fn single(pair: Pair<Rule>) -> Result<Step, String> {
-        match pair.into_inner().next() {
-            Some(pair) => Ok(Step::Single(Single {
-                string: pair.as_str().to_string(),
-                value: Self::value(pair)?,
+    fn bjorklund(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let mut inner = op_pair.clone().into_inner();
+
+        let steps = inner
+            .next()
+            .ok_or_else(|| format!("no steps in bjorklund\n{:?}", op_pair))
+            .and_then(Self::step)?;
+
+        let pulses = inner
+            .next()
+            .ok_or_else(|| format!("no pulse in bjorklund\n{:?}", op_pair))
+            .and_then(Self::step)?;
+
+        let rotate = inner.next().map(Self::step).transpose()?;
+
+        Ok(Step::Bjorklund(Bjorklund {
+            left: Box::new(left),
+            pulses: Box::new(pulses),
+            steps: Box::new(steps),
+            rotation: rotate.map(Box::new),
+        }))
+    }
+
+    fn speed_expression(left: Step, op: DynamicOp, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let mut inner = op_pair.into_inner();
+        let right = inner
+            .next()
+            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
+            .and_then(Self::step)?;
+        match right {
+            Step::Single(_) => Ok(Step::DynamicExpression(DynamicExpression {
+                left: Box::new(left),
+                right: Box::new(right),
+                op,
             })),
-            None => Err("empty single".to_string()),
+            _ => Err("only single values are supported on the right hand side".to_string()),
         }
     }
 
-    // helper to parse subdivision and alternating groups
-    fn group(pair: Pair<Rule>, fun: fn(Vec<Step>) -> Step) -> Result<Step, String> {
-        if let Some(first) = pair.clone().into_inner().next() {
-            match first.as_rule() {
-                Rule::stack => Self::stack(first).map(|channels| {
-                    Step::Stack(Stack {
-                        stack: channels.into_iter().map(fun).collect(),
-                    })
-                }),
-                _ => Ok(fun(Self::inner_steps(pair)?)),
-            }
-        } else {
-            Ok(Step::rest())
+    fn dynamic_expression(left: Step, op: DynamicOp, op_pair: Pair<Rule>) -> Result<Step, String> {
+        match op {
+            DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair),
+            _ => Self::speed_expression(left, op, op_pair),
         }
     }
 
-    fn single_righthand(operator: SingleOperator, pair: Pair<Rule>) -> Result<Value, String> {
-        if let Some(right) = pair.into_inner().next() {
-            // let right = Self::single(right.clone())?;
-            let value_pair = right
+    fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
+        let right = if let Some(right_pair) = pair.into_inner().next() {
+            let value_pair = right_pair
                 .clone()
                 .into_inner()
                 .next()
-                .ok_or_else(|| format!("invalid right hand {:?}", right))?;
+                .ok_or_else(|| format!("invalid right hand {:?}", right_pair))?;
             let value = Self::value(value_pair)?;
-            if matches!(operator, SingleOperator::Target()) && matches!(value, Value::Pitch(_)) {
-                Ok(Value::Name(right.as_str().to_string()))
+            if matches!(op, StaticOp::Target()) && matches!(value, Value::Pitch(_)) {
+                Value::Name(right_pair.as_str().to_string())
             } else {
-                Ok(value)
+                value
             }
         } else {
-            Ok(operator.default_value())
-        }
-    }
+            op.default_value()
+        };
 
-    fn single_expression(pair: Pair<Rule>) -> Result<Step, String> {
-        let mut inner = pair.clone().into_inner();
-        let left = inner
-            .next()
-            .ok_or_else(|| format!("empty expression\n{:?}", pair))
-            .and_then(Self::step)?;
-
-        let op_pair = inner
-            .next()
-            .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
-        let operator = SingleOperator::parse(op_pair.clone())?;
-
-        Ok(Step::SingleExpression(SingleExpression {
+        Ok(Step::StaticExpression(StaticExpression {
             left: Box::new(left),
-            right: Self::single_righthand(operator.clone(), op_pair)?,
-            operator,
+            right,
+            op,
         }))
     }
 
     fn expression(pair: Pair<Rule>) -> Result<Step, String> {
         let mut inner = pair.clone().into_inner();
+
         let left = inner
             .next()
             .ok_or_else(|| format!("empty expression\n{:?}", pair))
             .and_then(Self::step)?;
-        // let left = Self::step(left_pair)?;
 
         let op_pair = inner
             .next()
             .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
-        match op_pair.as_rule() {
-            Rule::op_bjorklund => Self::bjorklund(pair, left, op_pair),
-            _ => Self::mult_expression(left, op_pair),
-        }
-    }
 
-    // recursively parse a pair as a Step
-    // errors here should be unreachable unless there is a bug in the pest grammar
-    fn step(pair: Pair<Rule>) -> Result<Step, String> {
-        match pair.as_rule() {
-            Rule::stack | Rule::section | Rule::choices | Rule::split => {
-                // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
-                // sections and choices are always immediately handled within other rules
-                // using Self::extract_section or Self::section
-                Err(format!("unexpected pair\n{:?}", pair))
-            }
-            Rule::subdivision | Rule::mini => Self::group(pair, Step::subdivision),
-            Rule::alternating => Self::group(pair, Step::alternating),
-            Rule::polymeter => Self::polymeter(pair),
-            Rule::single => Self::single(pair),
-            Rule::repeat => Ok(Step::Repeat),
-            Rule::range_expr => Self::range(pair),
-            Rule::single_expr => Self::single_expression(pair),
-            Rule::expr => Self::expression(pair),
-            _ => Err(format!("rule not implemented\n{:?}", pair)),
+        match Operator::parse(op_pair.clone())? {
+            Operator::Static(op) => Self::static_expression(left, op, op_pair),
+            Operator::Dynamic(op) => Self::dynamic_expression(left, op, op_pair),
         }
     }
 }
@@ -1385,14 +1379,14 @@ impl Cycle {
                     })
                 }
             }
-            Step::SingleExpression(e) => {
-                match e.operator {
-                    SingleOperator::Target() => {
+            Step::StaticExpression(e) => {
+                match e.op {
+                    StaticOp::Target() => {
                         let mut out = Self::output(e.left.as_ref(), state, cycle);
                         out.mutate_events(&mut |event| event.target = e.right.to_target());
                         out
                     }
-                    SingleOperator::Degrade() => {
+                    StaticOp::Degrade() => {
                         let mut out = Self::output(e.left.as_ref(), state, cycle);
                         out.mutate_events(&mut |event: &mut Event| {
                             if let Some(chance) = e.right.to_chance() {
@@ -1410,32 +1404,23 @@ impl Cycle {
                     }
                 }
             }
-            Step::Expression(e) => {
-                match e.operator {
-                    Operator::Fast() | Operator::Slow() => {
-                        #[allow(clippy::single_match)]
-                        // TODO support something other than Step::Single as the right hand side
-                        match e.right.as_ref() {
-                            Step::Single(s) => {
-                                if let Some(right) = s.value.to_float() {
-                                    let mult = if e.operator == Operator::Slow() {
-                                        1.0 / right
-                                    } else {
-                                        right
-                                    };
-                                    Self::output_multiplied(
-                                        e.left.as_ref(),
-                                        state,
-                                        cycle,
-                                        Fraction::from(mult),
-                                    )
-                                } else {
-                                    Events::empty()
-                                }
-                            }
-                            _ => Events::empty(),
+            Step::DynamicExpression(e) => {
+                #[allow(clippy::single_match)]
+                // TODO support something other than Step::Single as the right hand side
+                match e.right.as_ref() {
+                    Step::Single(s) => {
+                        if let Some(right) = s.value.to_float() {
+                            let mult = Fraction::from(if e.op == DynamicOp::Slow() {
+                                1.0 / right
+                            } else {
+                                right
+                            });
+                            Self::output_multiplied(e.left.as_ref(), state, cycle, mult)
+                        } else {
+                            Events::empty()
                         }
                     }
+                    _ => Events::empty(),
                 }
             }
             Step::Bjorklund(b) => {
@@ -1443,9 +1428,9 @@ impl Cycle {
                 #[allow(clippy::single_match)]
                 // TODO support something other than Step::Single as the right hand side
                 match b.pulses.as_ref() {
-                    Step::Single(steps_single) => {
+                    Step::Single(pulses_single) => {
                         match b.steps.as_ref() {
-                            Step::Single(pulses_single) => {
+                            Step::Single(steps_single) => {
                                 let rotation = match &b.rotation {
                                     None => None,
                                     Some(r) => match r.as_ref() {
@@ -1510,9 +1495,9 @@ impl Cycle {
             Step::Polymeter(pm) => format!("Polymeter {{{}}}", pm.length()), //, pm.count),
             Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
-            Step::Expression(e) => format!("Expression {:?}", e.operator),
-            Step::SingleExpression(e) => {
-                format!("SingleExpression {:?} : {:?}", e.operator, e.right)
+            Step::DynamicExpression(e) => format!("Expression {:?}", e.op),
+            Step::StaticExpression(e) => {
+                format!("SingleExpression {:?} : {:?}", e.op, e.right)
             }
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };

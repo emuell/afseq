@@ -56,18 +56,16 @@ op_target    = ${ ":" ~ single }
 op_fast      = ${ "*" ~ parameter }
 op_slow      = ${ "/" ~ parameter }
 op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
-single_op = _{op_target | op_degrade | op_replicate | op_weight}
-op = _{ op_fast | op_slow | op_bjorklund }
+op           = _{ op_target | op_degrade | op_replicate | op_weight | op_fast | op_slow | op_bjorklund }
 
-expr        = { (single | group) ~ op+ }
-single_expr = { (single | group) ~ single_op+ }
-range_expr  = ${ integer ~ ".." ~ integer }
+expression  = { (single | group) ~ op+ }
+range       = ${ integer ~ ".." ~ integer }
 
 /// helper container that splits steps into sections
-section   = { (single_expr | expr | range_expr | single | repeat | group)+ }
+section   = { ( expression | range | single | repeat | group)+ }
 
 /// a single choice inside a choice list
-choice    = { single_expr | expr | range_expr | single | group }
+choice    = {  expression | range | single | group }
 /// at least 2 choices, can only be inside subdivisions or the root
 choices   = { (choice) ~ ("|" ~ choice)+ }
 
