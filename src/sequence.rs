@@ -161,9 +161,3 @@ impl RhythmIter for Sequence {
             .map(|event| event.with_offset(self.sample_offset))
     }
 }
-
-/// Allow sending sequences accross threads: We only do so, to allow building sequences outside
-/// the thread they are played in, and never reuse phrases from other already running sequences.
-///
-/// So this is **safe as long as new sequences only reference phrases within itself**.
-unsafe impl Send for Sequence {}
