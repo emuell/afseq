@@ -206,6 +206,15 @@ impl Step {
     fn subdivision(steps: Vec<Step>) -> Self {
         Self::Subdivision(Subdivision { steps })
     }
+    fn alternating(steps: Vec<Step>) -> Self {
+        Self::Alternating(Alternating { steps })
+    }
+    fn polymeter(steps: Vec<Step>, count: Step) -> Self {
+        Step::Polymeter(Polymeter {
+            steps: Box::new(Step::subdivision(steps)),
+            count: Box::new(count),
+        })
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -953,40 +962,44 @@ impl CycleParser {
     fn section(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
         let mut steps: Vec<Step> = vec![];
         for pair in pair.into_inner() {
-            match Self::step(pair) {
-                Ok(s) => Self::push_applied(&mut steps, s),
-                Err(s) => return Err(format!("failed to parse section\n{:?}", s)),
-            }
+            let step = Self::step(pair)?;
+            Self::push_applied(&mut steps, step);
         }
         Ok(steps)
     }
 
     fn split(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
-        let mut steps = vec![];
-        for p in pair.into_inner() {
-            let sub_steps = Self::section(p)?;
-            steps.push(Step::subdivision(sub_steps))
-        }
-        Ok(steps)
+        pair.into_inner()
+            .map(|p| Self::section(p).map(Step::subdivision))
+            .collect()
     }
 
-    // stacks can only appear inside groups like Subdivision, Alternating or Polymeter
-    // they will have a stack of steps with their parent's type inside
-    fn sections_or_splits_in_stack(pair: Pair<Rule>) -> Result<Vec<Vec<Step>>, String> {
-        let mut channels = vec![];
-        for p in pair.into_inner() {
-            let steps = match p.as_rule() {
+    // stacks will always have a non-empty list of sections or splits inside them
+    fn stack(pair: Pair<Rule>) -> Result<Vec<Vec<Step>>, String> {
+        pair.into_inner()
+            .map(|p| match p.as_rule() {
                 Rule::section => Self::section(p),
                 Rule::split => Self::split(p),
                 _ => Err(format!("unexpected rule in stack\n{:?}", p)),
-            }?;
-            channels.push(steps);
+            })
+            .collect()
+    }
+
+    fn choices(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
+        let mut choices: Vec<Step> = vec![];
+        for p in pair.clone().into_inner() {
+            let step = p
+                .into_inner()
+                .next()
+                .ok_or_else(|| format!("empty choice\n{:?}", pair))?;
+            let choice = Self::step(step)?;
+            Self::push_applied(&mut choices, choice)
         }
-        Ok(channels)
+        Ok(vec![Step::Choices(Choices { choices })])
     }
 
     // helper to convert a section or single to a vector of Steps
-    fn section_vec(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
+    fn inner_steps(pair: Pair<Rule>) -> Result<Vec<Step>, String> {
         let inner = pair
             .clone()
             .into_inner()
@@ -1000,38 +1013,9 @@ impl CycleParser {
             }
             Rule::split => Self::split(inner),
             Rule::section => Self::section(inner),
-            Rule::choices => {
-                let mut choices: Vec<Step> = vec![];
-                for p in inner.clone().into_inner() {
-                    if let Some(step) = p.into_inner().next() {
-                        let choice = Self::step(step)?;
-                        Self::push_applied(&mut choices, choice)
-                    } else {
-                        return Err(format!("empty choice\n{:?}", inner));
-                    }
-                }
-                Ok(vec![Step::Choices(Choices { choices })])
-            }
+            Rule::choices => Self::choices(inner),
             _ => Err(format!("unexpected rule in section\n{:?}", inner)),
         }
-    }
-
-    fn stack(pair: Pair<Rule>, parent: Pair<Rule>) -> Result<Step, String> {
-        let mut stack = Stack { stack: vec![] };
-        match parent.as_rule() {
-            Rule::alternating => {
-                for steps in Self::sections_or_splits_in_stack(pair)? {
-                    stack.stack.push(Step::Alternating(Alternating { steps }))
-                }
-            }
-            Rule::subdivision | Rule::mini => {
-                for steps in Self::sections_or_splits_in_stack(pair)? {
-                    stack.stack.push(Step::subdivision(steps))
-                }
-            }
-            _ => return Err(format!("invalid parent to stack\n{:?}", parent)),
-        }
-        Ok(Step::Stack(stack))
     }
 
     // TODO allow for polymeter count other than single
@@ -1057,7 +1041,7 @@ impl CycleParser {
         for p in pair.clone().into_inner() {
             match p.as_rule() {
                 Rule::polymeter_tail => count = Self::polymeter_tail(p).ok(),
-                Rule::stack => stack = Self::sections_or_splits_in_stack(p).ok(),
+                Rule::stack => stack = Self::stack(p).ok(),
                 Rule::split => steps = Self::split(p).ok(),
                 _ => steps = Self::section(p).ok(),
             }
@@ -1066,21 +1050,16 @@ impl CycleParser {
         match (count, stack, steps) {
             (Some(count), None, Some(steps)) => {
                 // a regular polymeter with explicit count
-                Ok(Step::Polymeter(Polymeter {
-                    steps: Box::new(Step::subdivision(steps)),
-                    count: Box::new(count),
-                }))
+                Ok(Step::polymeter(steps, count))
             }
             (Some(count), Some(stack), _) => {
                 // sections in a stack with explicit count will all have that
-                let mut s = Stack { stack: vec![] };
-                for steps in stack {
-                    s.stack.push(Step::Polymeter(Polymeter {
-                        steps: Box::new(Step::subdivision(steps)),
-                        count: Box::new(count.clone()),
-                    }));
-                }
-                Ok(Step::Stack(s))
+                Ok(Step::Stack(Stack {
+                    stack: stack
+                        .into_iter()
+                        .map(|steps| Step::polymeter(steps, count.clone()))
+                        .collect(),
+                }))
             }
             (None, Some(stack), _) => {
                 if let Some(first) = stack.first() {
@@ -1089,18 +1068,17 @@ impl CycleParser {
                         // unreachable, a stack will always have more than one sections with each having at least one item
                         Err(format!("invalid stack {:?}", stack))
                     } else {
+                        let count = Step::Single(Single {
+                            value: Value::Integer(count as i32),
+                            string: count.to_string(),
+                        });
                         // if there is a stack but no count, the first section will determine the count of the rest
-                        let mut s = Stack { stack: vec![] };
-                        for steps in stack {
-                            s.stack.push(Step::Polymeter(Polymeter {
-                                steps: Box::new(Step::subdivision(steps)),
-                                count: Box::new(Step::Single(Single {
-                                    value: Value::Integer(count as i32),
-                                    string: count.to_string(),
-                                })),
-                            }));
-                        }
-                        Ok(Step::Stack(s))
+                        Ok(Step::Stack(Stack {
+                            stack: stack
+                                .into_iter()
+                                .map(|steps| Step::polymeter(steps, count.clone()))
+                                .collect(),
+                        }))
                     }
                 } else {
                     // unreachable, empty stacks won't make it through parsing
@@ -1181,41 +1159,48 @@ impl CycleParser {
         Ok(Step::Range(Range { start, end }))
     }
 
-    fn subdivision(pair: Pair<Rule>) -> Result<Step, String> {
-        if let Some(first) = pair.clone().into_inner().next() {
-            match first.as_rule() {
-                Rule::stack => Self::stack(first, pair),
-                _ => Ok(Step::Subdivision(Subdivision {
-                    steps: Self::section_vec(pair).unwrap_or_default(),
-                })),
-            }
-        } else {
-            Ok(Step::rest())
-        }
-    }
-
     fn single(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.into_inner().next() {
-            Some(pair) => {
-                let string = pair.as_str().to_string();
-                let value = Self::value(pair)?;
-                Ok(Step::Single(Single { value, string }))
-            }
+            Some(pair) => Ok(Step::Single(Single {
+                string: pair.as_str().to_string(),
+                value: Self::value(pair)?,
+            })),
             None => Err("empty single".to_string()),
         }
     }
 
-    fn alternating(pair: Pair<Rule>) -> Result<Step, String> {
+    // helper to parse subdivision and alternating groups
+    fn group(pair: Pair<Rule>, fun: fn(Vec<Step>) -> Step) -> Result<Step, String> {
         if let Some(first) = pair.clone().into_inner().next() {
             match first.as_rule() {
-                Rule::stack => Self::stack(first, pair),
-                _ => {
-                    let steps = Self::section_vec(pair).unwrap_or_default();
-                    Ok(Step::Alternating(Alternating { steps }))
-                }
+                Rule::stack => Self::stack(first).map(|channels| {
+                    Step::Stack(Stack {
+                        stack: channels.into_iter().map(fun).collect(),
+                    })
+                }),
+                _ => Ok(fun(Self::inner_steps(pair)?)),
             }
         } else {
             Ok(Step::rest())
+        }
+    }
+
+    fn single_righthand(operator: SingleOperator, pair: Pair<Rule>) -> Result<Value, String> {
+        if let Some(right) = pair.into_inner().next() {
+            // let right = Self::single(right.clone())?;
+            let value_pair = right
+                .clone()
+                .into_inner()
+                .next()
+                .ok_or_else(|| format!("invalid right hand {:?}", right))?;
+            let value = Self::value(value_pair)?;
+            if matches!(operator, SingleOperator::Target()) && matches!(value, Value::Pitch(_)) {
+                Ok(Value::Name(right.as_str().to_string()))
+            } else {
+                Ok(value)
+            }
+        } else {
+            Ok(operator.default_value())
         }
     }
 
@@ -1231,34 +1216,11 @@ impl CycleParser {
             .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
         let operator = SingleOperator::parse(op_pair.clone())?;
 
-        if let Some(right_pair) = op_pair.into_inner().next() {
-            // let right = Self::single(right_pair.clone())?;
-            let value_pair = right_pair
-                .clone()
-                .into_inner()
-                .next()
-                .ok_or_else(|| format!("invalid right hand {:?}", right_pair))?;
-            let value = Self::value(value_pair)?;
-            let right = if matches!(operator, SingleOperator::Target())
-                && matches!(value, Value::Pitch(_))
-            {
-                Value::Name(right_pair.as_str().to_string())
-            } else {
-                value
-            };
-            Ok(Step::SingleExpression(SingleExpression {
-                left: Box::new(left),
-                right,
-                operator,
-            }))
-        } else {
-            // there was no value on the right hand side
-            Ok(Step::SingleExpression(SingleExpression {
-                left: Box::new(left),
-                right: operator.default_value(),
-                operator,
-            }))
-        }
+        Ok(Step::SingleExpression(SingleExpression {
+            left: Box::new(left),
+            right: Self::single_righthand(operator.clone(), op_pair)?,
+            operator,
+        }))
     }
 
     fn expression(pair: Pair<Rule>) -> Result<Step, String> {
@@ -1288,8 +1250,8 @@ impl CycleParser {
                 // using Self::extract_section or Self::section
                 Err(format!("unexpected pair\n{:?}", pair))
             }
-            Rule::subdivision | Rule::mini => Self::subdivision(pair),
-            Rule::alternating => Self::alternating(pair),
+            Rule::subdivision | Rule::mini => Self::group(pair, Step::subdivision),
+            Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
             Rule::single => Self::single(pair),
             Rule::repeat => Ok(Step::Repeat),
@@ -1396,7 +1358,7 @@ impl Cycle {
             }
             Step::Choices(cs) => {
                 let choice = state.rng.gen_range(0..cs.choices.len());
-                Self::output(&cs.choices[choice], state, cycle) // TODO
+                Self::output(&cs.choices[choice], state, cycle) // TODO seed the rng properly
             }
             Step::Polymeter(pm) => {
                 let step = pm.steps.as_ref();
@@ -1434,6 +1396,7 @@ impl Cycle {
                         let mut out = Self::output(e.left.as_ref(), state, cycle);
                         out.mutate_events(&mut |event: &mut Event| {
                             if let Some(chance) = e.right.to_chance() {
+                                // TODO seed the rng properly
                                 if chance < state.rng.gen_range(0.0..1.0) {
                                     event.value = Value::Rest
                                 }
@@ -1520,7 +1483,7 @@ impl Cycle {
                     length: Fraction::one(),
                     events,
                 })
-            } // _ => Events::Single(SingleEvent::default())
+            }
         }
     }
 
