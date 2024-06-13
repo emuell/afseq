@@ -13,6 +13,155 @@ use crate::pattern::euclidean::euclidean;
 
 // -------------------------------------------------------------------------------------------------
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cycle {
+    root: Step,
+    input: String,
+    seed: Option<[u8; 32]>,
+    state: CycleState,
+}
+
+impl Cycle {
+    // reset state to initial state
+    pub fn reset(&mut self) {
+        self.state.iteration = 0;
+        self.state.rng =
+            Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
+    }
+
+    // parse the root pair of the pest AST into a Subdivision
+    // then update the spans of all the generated steps
+    pub fn generate(&mut self) -> Vec<Vec<Event>> {
+        let cycle = self.state.iteration;
+        self.state.events = 0;
+        self.state.step = 0;
+        let mut events = Self::output(&self.root, &mut self.state, cycle);
+        self.state.iteration += 1;
+        events.transform_spans(&Span::default());
+        events.export()
+    }
+
+    pub fn is_stateful(&self) -> bool {
+        ['<', '{', '|', '?'].iter().any(|&c| self.input.contains(c))
+    }
+
+    pub fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
+        match CycleParser::parse(Rule::mini, input) {
+            Ok(mut tree) => {
+                if let Some(mini) = tree.next() {
+                    #[cfg(test)]
+                    {
+                        println!("\nTREE");
+                        Self::print_pairs(&mini, 0);
+                    }
+                    let input = input.to_string();
+                    let root = CycleParser::step(mini)?;
+                    let state = CycleState {
+                        step: 0,
+                        events: 0,
+                        iteration: 0,
+                        rng: Xoshiro256PlusPlus::from_seed(
+                            seed.unwrap_or_else(|| thread_rng().gen()),
+                        ),
+                    };
+                    let cycle = Self {
+                        input,
+                        seed,
+                        root,
+                        state,
+                    };
+                    #[cfg(test)]
+                    {
+                        println!("\nCYCLE");
+                        cycle.print();
+                    }
+                    Ok(cycle)
+                } else {
+                    Err("couldn't parse input".to_string())
+                }
+            }
+            Err(err) => Err(format!("{}", err)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Event {
+    length: Fraction,
+    span: Span,
+    value: Value,
+    target: Target, // value for instruments
+}
+
+impl Event {
+    pub fn value(&self) -> Value {
+        self.value.clone()
+    }
+
+    pub fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    pub fn length(&self) -> Fraction {
+        self.length
+    }
+
+    pub fn target(&self) -> Target {
+        self.target.clone()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Span {
+    start: Fraction,
+    end: Fraction,
+}
+
+impl Span {
+    pub fn start(&self) -> Fraction {
+        self.start
+    }
+
+    pub fn end(&self) -> Fraction {
+        self.end
+    }
+
+    pub fn length(&self) -> Fraction {
+        self.end - self.start
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum Value {
+    #[default]
+    Rest,
+    Hold,
+    Float(f64),
+    Integer(i32),
+    Pitch(Pitch),
+    Name(String),
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum Target {
+    #[default]
+    None,
+    Index(i32),
+    Name(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pitch {
+    note: u8,
+    octave: u8,
+}
+
+impl Pitch {
+    pub fn midi_note(&self) -> u8 {
+        (self.octave as u32 * 12 + self.note as u32).min(0x7f) as u8
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Step {
     Single(Single),
@@ -182,12 +331,6 @@ struct Range {
 
 // -------------------------------------------------------------------------------------------------
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Pitch {
-    note: u8,
-    octave: u8,
-}
-
 impl Pitch {
     fn parse(pair: Pair<Rule>) -> Pitch {
         let mut pitch = Pitch { note: 0, octave: 4 };
@@ -226,10 +369,6 @@ impl Pitch {
         pitch
     }
 
-    pub fn midi_note(&self) -> u8 {
-        (self.octave as u32 * 12 + self.note as u32).min(0x7f) as u8
-    }
-
     fn as_note_value(note: char) -> Option<u8> {
         match note {
             'c' => Some(0),
@@ -242,17 +381,6 @@ impl Pitch {
             _ => None,
         }
     }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub enum Value {
-    #[default]
-    Rest,
-    Hold,
-    Float(f64),
-    Integer(i32),
-    Pitch(Pitch),
-    Name(String),
 }
 
 impl Value {
@@ -298,12 +426,6 @@ impl Value {
             Value::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Span {
-    start: Fraction,
-    end: Fraction,
 }
 
 impl Span {
@@ -352,18 +474,6 @@ impl Span {
             self.end = span.end
         }
     }
-
-    pub fn start(&self) -> Fraction {
-        self.start
-    }
-
-    pub fn end(&self) -> Fraction {
-        self.end
-    }
-
-    pub fn length(&self) -> Fraction {
-        self.end - self.start
-    }
 }
 
 impl Default for Span {
@@ -373,14 +483,6 @@ impl Default for Span {
             end: Fraction::one(),
         }
     }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub enum Target {
-    #[default]
-    None,
-    Index(i32),
-    Name(String),
 }
 
 impl Display for Target {
@@ -397,13 +499,6 @@ impl Display for Target {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Event {
-    length: Fraction,
-    span: Span,
-    value: Value,
-    target: Target, // value for instruments
-}
 impl Event {
     #[cfg(test)]
     fn at(start: Fraction, length: Fraction) -> Self {
@@ -461,22 +556,6 @@ impl Event {
     fn extend(&mut self, next: &Event) {
         self.length += next.length;
         self.span.end = next.span.end
-    }
-
-    pub fn value(&self) -> Value {
-        self.value.clone()
-    }
-
-    pub fn span(&self) -> Span {
-        self.span.clone()
-    }
-
-    pub fn length(&self) -> Fraction {
-        self.length
-    }
-
-    pub fn target(&self) -> Target {
-        self.target.clone()
     }
 }
 
@@ -795,14 +874,6 @@ impl Events {
 #[grammar = "tidal/cycle.pest"]
 struct CycleParser {}
 
-#[derive(Debug, Clone, PartialEq)]
-struct CycleState {
-    iteration: u32,
-    rng: Xoshiro256PlusPlus,
-    step: u32,
-    events: u32,
-}
-
 /// the errors here should be unreachable unless there is a bug in the pest grammar
 impl CycleParser {
     fn value(pair: Pair<Rule>) -> Result<Value, String> {
@@ -963,21 +1034,16 @@ impl CycleParser {
         Ok(Step::Stack(stack))
     }
 
-    fn validate_multiplier_step(step: Step) -> Result<Step, String> {
-        match &step {
-            Step::Single(s) => match s.value {
-                Value::Integer(_) | Value::Float(_) => Ok(step),
-                _ => Err(format!("invalid multiplier: {:?}", step)),
-            },
-            _ => Err(format!("invalid multiplier: {:?}", step)),
-        }
-    }
-
-    // TODO allow for polymeter count other than usize
+    // TODO allow for polymeter count other than single
     fn polymeter_tail(pair: Pair<Rule>) -> Result<Step, String> {
         if let Some(count) = pair.clone().into_inner().next() {
-            Self::step(count).and_then(Self::validate_multiplier_step)
-            // Ok(count.as_str().parse::<usize>().unwrap_or(1))
+            Self::step(count).and_then(|step| match &step {
+                Step::Single(s) => match s.value {
+                    Value::Integer(_) | Value::Float(_) => Ok(step),
+                    _ => Err(format!("invalid multiplier: {:?}", step)),
+                },
+                _ => Err(format!("invalid multiplier: {:?}", step)),
+            })
         } else {
             Err(format!("missing polymeter count '{}'", pair.as_str()))
         }
@@ -1235,12 +1301,14 @@ impl CycleParser {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct Cycle {
-    root: Step,
-    input: String,
-    seed: Option<[u8; 32]>,
-    state: CycleState,
+struct CycleState {
+    iteration: u32,
+    rng: Xoshiro256PlusPlus,
+    step: u32,
+    events: u32,
 }
 
 impl Cycle {
@@ -1453,68 +1521,6 @@ impl Cycle {
                     events,
                 })
             } // _ => Events::Single(SingleEvent::default())
-        }
-    }
-
-    // reset state to initial state
-    pub fn reset(&mut self) {
-        self.state.iteration = 0;
-        self.state.rng =
-            Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
-    }
-
-    // parse the root pair of the pest AST into a Subdivision
-    // then update the spans of all the generated steps
-    pub fn generate(&mut self) -> Vec<Vec<Event>> {
-        let cycle = self.state.iteration;
-        self.state.events = 0;
-        self.state.step = 0;
-        let mut events = Self::output(&self.root, &mut self.state, cycle);
-        self.state.iteration += 1;
-        events.transform_spans(&Span::default());
-        events.export()
-    }
-
-    pub fn is_stateful(&self) -> bool {
-        ['<', '{', '|', '?'].iter().any(|&c| self.input.contains(c))
-    }
-
-    pub fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
-        match CycleParser::parse(Rule::mini, input) {
-            Ok(mut tree) => {
-                if let Some(mini) = tree.next() {
-                    #[cfg(test)]
-                    {
-                        println!("\nTREE");
-                        Self::print_pairs(&mini, 0);
-                    }
-                    let input = input.to_string();
-                    let root = CycleParser::step(mini)?;
-                    let state = CycleState {
-                        step: 0,
-                        events: 0,
-                        iteration: 0,
-                        rng: Xoshiro256PlusPlus::from_seed(
-                            seed.unwrap_or_else(|| thread_rng().gen()),
-                        ),
-                    };
-                    let cycle = Self {
-                        input,
-                        seed,
-                        root,
-                        state,
-                    };
-                    #[cfg(test)]
-                    {
-                        println!("\nCYCLE");
-                        cycle.print();
-                    }
-                    Ok(cycle)
-                } else {
-                    Err("couldn't parse input".to_string())
-                }
-            }
-            Err(err) => Err(format!("{}", err)),
         }
     }
 
