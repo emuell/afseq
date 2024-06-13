@@ -133,7 +133,8 @@ impl ScriptedCycleEventIter {
         }
         // convert possibly mapped cycle channel items to a list of note events
         let mut timed_note_events = CycleNoteEvents::new();
-        for (channel_index, channel_events) in self.cycle.generate().into_iter().enumerate() {
+        let events = self.cycle.generate().unwrap_or_default();
+        for (channel_index, channel_events) in events.into_iter().enumerate() {
             for (event_index, event) in channel_events.into_iter().enumerate() {
                 let start = event.span().start();
                 let length = event.span().length();

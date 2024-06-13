@@ -165,7 +165,8 @@ impl CycleEventIter {
     fn generate_events(&mut self) -> Vec<EventIterItem> {
         let mut timed_note_events = CycleNoteEvents::new();
         // convert possibly mapped cycle channel items to a list of note events
-        for (channel_index, channel_events) in self.cycle.generate().into_iter().enumerate() {
+        let events = self.cycle.generate().unwrap_or_default();
+        for (channel_index, channel_events) in events.into_iter().enumerate() {
             for event in channel_events.into_iter() {
                 let start = event.span().start();
                 let length = event.span().length();
