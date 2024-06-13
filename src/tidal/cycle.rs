@@ -1370,25 +1370,27 @@ impl Cycle {
         cycle: u32,
         limit: usize,
     ) -> Result<Events, String> {
-        state.events += 1;
-        if state.events > limit {
-            return Err(format!(
-                "the cycle's event limit of {} was exceeded!",
-                limit
-            ));
-        }
         let events = match step {
             // repeats only make it here if they had no preceding value
             Step::Repeat => Events::empty(),
             // ranges get applied at parse time
             Step::Range(_) => Events::empty(),
-            Step::Single(s) => Events::Single(Event {
-                length: Fraction::one(),
-                target: Target::None,
-                span: Span::default(),
-                string: s.string.clone(),
-                value: s.value.clone(),
-            }),
+            Step::Single(s) => {
+                state.events += 1;
+                if state.events > limit {
+                    return Err(format!(
+                        "the cycle's event limit of {} was exceeded!",
+                        limit
+                    ));
+                }
+                Events::Single(Event {
+                    length: Fraction::one(),
+                    target: Target::None,
+                    span: Span::default(),
+                    string: s.string.clone(),
+                    value: s.value.clone(),
+                })
+            }
             Step::Subdivision(sd) => {
                 if sd.steps.is_empty() {
                     Events::empty()
