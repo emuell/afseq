@@ -22,29 +22,7 @@ pub struct Cycle {
 }
 
 impl Cycle {
-    // reset state to initial state
-    pub fn reset(&mut self) {
-        self.state.iteration = 0;
-        self.state.rng =
-            Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
-    }
-
-    // parse the root pair of the pest AST into a Subdivision
-    // then update the spans of all the generated steps
-    pub fn generate(&mut self) -> Vec<Vec<Event>> {
-        let cycle = self.state.iteration;
-        self.state.events = 0;
-        self.state.step = 0;
-        let mut events = Self::output(&self.root, &mut self.state, cycle);
-        self.state.iteration += 1;
-        events.transform_spans(&Span::default());
-        events.export()
-    }
-
-    pub fn is_stateful(&self) -> bool {
-        ['<', '{', '|', '?'].iter().any(|&c| self.input.contains(c))
-    }
-
+    /// create a Cycle from an mini-notation string with an optional seed
     pub fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
         match CycleParser::parse(Rule::mini, input) {
             Ok(mut tree) => {
@@ -82,6 +60,34 @@ impl Cycle {
             }
             Err(err) => Err(format!("{}", err)),
         }
+    }
+
+    // TODO remove this or improve, * and / can change the output, <1> does not etc..
+    /// check if a cycle will give different outputs between cycles
+    pub fn is_stateful(&self) -> bool {
+        ['<', '{', '|', '?', '/']
+            .iter()
+            .any(|&c| self.input.contains(c))
+    }
+
+    /// query for the next iteration of output
+    pub fn generate(&mut self) -> Vec<Vec<Event>> {
+        let cycle = self.state.iteration;
+        self.state.events = 0;
+        self.state.step = 0;
+        let mut events = Self::output(&self.root, &mut self.state, cycle);
+        self.state.iteration += 1;
+        events.transform_spans(&Span::default());
+        events.export()
+    }
+
+    /// reset state to initial state
+    pub fn reset(&mut self) {
+        self.state.iteration = 0;
+        self.state.step = 0;
+        self.state.events = 0;
+        self.state.rng =
+            Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
     }
 }
 
@@ -161,6 +167,8 @@ impl Pitch {
         (self.octave as u32 * 12 + self.note as u32).min(0x7f) as u8
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq)]
 enum Step {
@@ -441,6 +449,22 @@ impl Value {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Target::None => f.write_fmt(format_args!("")),
+            _ => {
+                f.write_fmt(format_args!(
+                    "{:?}",
+                    self // self.span.start, self.span.end, self.value
+                ))
+            }
+        }
+    }
+}
+
 impl Span {
     fn new(start: Fraction, end: Fraction) -> Self {
         Self { start, end }
@@ -494,20 +518,6 @@ impl Default for Span {
         Span {
             start: Fraction::zero(),
             end: Fraction::one(),
-        }
-    }
-}
-
-impl Display for Target {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Target::None => f.write_fmt(format_args!("")),
-            _ => {
-                f.write_fmt(format_args!(
-                    "{:?}",
-                    self // self.span.start, self.span.end, self.value
-                ))
-            }
         }
     }
 }
