@@ -892,19 +892,18 @@ impl CycleParser {
     /// recursively parse a pair as a Step
     fn step(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.as_rule() {
-            Rule::stack | Rule::section | Rule::choices | Rule::split => {
-                // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
-                // sections and choices are always immediately handled within other rules
-                // using Self::extract_section or Self::section
-                Err(format!("unexpected pair\n{:?}", pair))
-            }
+            Rule::single => Self::single(pair),
+            Rule::repeat => Ok(Step::Repeat),
             Rule::subdivision | Rule::mini => Self::group(pair, Step::subdivision),
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
-            Rule::single => Self::single(pair),
-            Rule::repeat => Ok(Step::Repeat),
             Rule::range => Self::range(pair),
             Rule::expression => Self::expression(pair),
+            Rule::stack | Rule::section | Rule::choices | Rule::split => {
+                // stacks can only appear inside rules for Subdivision, Alternating or Polymeter
+                // sections, choices and splits are always immediately handled within other rules
+                Err(format!("unexpected pair\n{:?}", pair))
+            }
             _ => Err(format!("rule not implemented\n{:?}", pair)),
         }
     }
@@ -933,24 +932,24 @@ impl CycleParser {
     }
 
     fn single(pair: Pair<Rule>) -> Result<Step, String> {
-        match pair.into_inner().next() {
-            Some(pair) => Ok(Step::Single(Single {
-                string: pair.as_str().to_string(),
-                value: Self::value(pair)?,
-            })),
-            None => Err("empty single".to_string()),
-        }
+        pair.clone()
+            .into_inner()
+            .next()
+            .ok_or_else(|| format!("empty single {}", pair))
+            .and_then(|value_pair| {
+                Ok(Step::Single(Single {
+                    string: value_pair.as_str().to_string(),
+                    value: Self::value(value_pair)?,
+                }))
+            })
     }
 
     /// transform static steps into their final form and push them onto a list
     fn push_applied(steps: &mut Vec<Step>, step: Step) {
         match &step {
             Step::Repeat => {
-                if let Some(last) = steps.last() {
-                    steps.push(last.clone())
-                } else {
-                    steps.push(Step::Single(Single::default()))
-                }
+                let repeat = steps.last().cloned().unwrap_or(Step::rest());
+                steps.push(repeat)
             }
             Step::StaticExpression(e) => match e.op {
                 StaticOp::Replicate() => {
@@ -1098,26 +1097,25 @@ impl CycleParser {
                 }))
             }
             (None, Some(stack), _) => {
-                if let Some(first) = stack.first() {
-                    let count = first.len();
-                    if count == 0 || stack.len() == 1 {
-                        // unreachable, a stack will always have more than one sections with each having at least one item
-                        Err(format!("invalid stack {:?}", stack))
-                    } else {
-                        let count = Step::Single(Single {
-                            value: Value::Integer(count as i32),
-                            string: count.to_string(),
-                        });
-                        // if there is a stack but no count, the first section will determine the count of the rest
-                        Ok(Step::Stack(Stack {
-                            stack: stack
-                                .into_iter()
-                                .map(|steps| Step::polymeter(steps, count.clone()))
-                                .collect(),
-                        }))
-                    }
+                let count = stack
+                    .first()
+                    .map(Vec::len)
+                    .ok_or_else(|| format!("empty stack {:?}", stack))?;
+
+                if stack.len() > 1 && count > 0 {
+                    let count = Step::Single(Single {
+                        value: Value::Integer(count as i32),
+                        string: count.to_string(),
+                    });
+                    // if there is a stack but no count, the first section will determine the count of the rest
+                    Ok(Step::Stack(Stack {
+                        stack: stack
+                            .into_iter()
+                            .map(|steps| Step::polymeter(steps, count.clone()))
+                            .collect(),
+                    }))
                 } else {
-                    // unreachable, empty stacks won't make it through parsing
+                    // unreachable, a stack will always have more than one sections with each having at least one item
                     Err(format!("invalid stack {:?}", stack))
                 }
             }
@@ -1207,21 +1205,14 @@ impl CycleParser {
         }
     }
 
-    fn dynamic_expression(left: Step, op: DynamicOp, op_pair: Pair<Rule>) -> Result<Step, String> {
-        match op {
-            DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair),
-            _ => Self::speed_expression(left, op, op_pair),
-        }
-    }
-
     fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
         let right = if let Some(right_pair) = pair.into_inner().next() {
-            let value_pair = right_pair
+            let value = right_pair
                 .clone()
                 .into_inner()
                 .next()
-                .ok_or_else(|| format!("invalid right hand {:?}", right_pair))?;
-            let value = Self::value(value_pair)?;
+                .ok_or_else(|| format!("invalid right hand {:?}", right_pair))
+                .and_then(Self::value)?;
             if matches!(op, StaticOp::Target()) && matches!(value, Value::Pitch(_)) {
                 Value::Name(right_pair.as_str().to_string())
             } else {
@@ -1252,7 +1243,10 @@ impl CycleParser {
 
         match Operator::parse(op_pair.clone())? {
             Operator::Static(op) => Self::static_expression(left, op, op_pair),
-            Operator::Dynamic(op) => Self::dynamic_expression(left, op, op_pair),
+            Operator::Dynamic(op) => match op {
+                DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair),
+                _ => Self::speed_expression(left, op, op_pair),
+            },
         }
     }
 }
