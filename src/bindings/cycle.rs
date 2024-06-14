@@ -2,7 +2,7 @@ use mlua::prelude::*;
 
 use crate::{event::NoteEvent, tidal::Cycle};
 
-use super::unwrap::{bad_argument_error, note_event_from_value};
+use super::unwrap::{bad_argument_error, note_events_from_value};
 
 // ---------------------------------------------------------------------------------------------
 
@@ -10,7 +10,7 @@ use super::unwrap::{bad_argument_error, note_event_from_value};
 #[derive(Clone, Debug)]
 pub struct CycleUserData {
     pub cycle: Cycle,
-    pub mappings: Vec<(String, Option<NoteEvent>)>,
+    pub mappings: Vec<(String, Vec<Option<NoteEvent>>)>,
     pub mapping_function: Option<LuaOwnedFunction>,
 }
 
@@ -47,7 +47,7 @@ impl LuaUserData for CycleUserData {
                 let cycle = this.cycle.clone();
                 let mut mappings = Vec::new();
                 for (k, v) in table.pairs::<LuaValue, LuaValue>().flatten() {
-                    mappings.push((k.to_string()?, note_event_from_value(&v, None)?));
+                    mappings.push((k.to_string()?, note_events_from_value(&v, None)?));
                 }
                 let mapping_function = None;
                 Ok(CycleUserData {
@@ -136,9 +136,9 @@ mod test {
                 .into_iter()
                 .collect::<HashMap<_, _>>(),
             HashMap::from([
-                ("a".to_string(), new_note(Note::C0)),
-                ("b".to_string(), new_note(Note::C4)),
-                ("c".to_string(), new_note(Note::C6)),
+                ("a".to_string(), vec![new_note(Note::C0)]),
+                ("b".to_string(), vec![new_note(Note::C4)]),
+                ("c".to_string(), vec![new_note(Note::C6)]),
             ])
         );
 

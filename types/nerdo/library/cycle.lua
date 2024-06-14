@@ -25,22 +25,21 @@ local Cycle = {}
 
 ----------------------------------------------------------------------------------------------------
 
----@alias MapFunction fun(context: CycleMapContext, value: string):NoteValue
----@alias MapGenerator fun(context: CycleMapContext, value: string):MapFunction
+---@alias CycleMapNoteValue NoteValue|(NoteValue[])|Note
+---@alias CycleMapFunction fun(context: CycleMapContext, value: string):CycleMapNoteValue
+---@alias CycleMapGenerator fun(context: CycleMapContext, value: string):CycleMapFunction
 
 ---Map names in in the cycle to custom note events.
 ---
 ---By default, strings in cycles are interpreted as notes, and integer values as MIDI note
 ---values. Custom identifiers such as "bd" are undefined and will result into a rest, when
 ---they are not mapped explicitely.
----
----Chords such as "c4'major" are not (yet) supported as values.
----@param map { [string]: NoteValue }
+---@param map { [string]: CycleMapNoteValue }
 ---@return Cycle
 ---### examples:
 ---```lua
 -----Using a fixed mapping table
----cycle("bd [bd sn]"):map({
+---cycle("bd [bd, sn]"):map({
 ---  bd = "c4",
 ---  sn = "e4 #1 v0.2"
 ---})
@@ -63,8 +62,15 @@ local Cycle = {}
 ---    return { key = note + octave * 12 }
 ---  end
 ---end)
+-----Using a dynamic map function to map values to chord degrees
+---cycle("1 5 1 [6|7]"):map(function(context)
+---  local cmin = scale("c", "minor")
+---  return function(context, value)
+---    return note(cmin:chord(tonumber(value)))
+---  end
+---end)
 ---```
----@overload fun(self, function: MapFunction|MapGenerator)
+---@overload fun(self, function: CycleMapFunction|CycleMapGenerator)
 function Cycle:map(map) end
 
 ----------------------------------------------------------------------------------------------------

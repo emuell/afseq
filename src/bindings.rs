@@ -45,8 +45,7 @@ pub use callback::{
 pub(crate) use callback::LuaCallback;
 pub(crate) use timeout::LuaTimeoutHook;
 pub(crate) use unwrap::{
-    gate_trigger_from_value, note_event_from_value, note_events_from_value,
-    pattern_pulse_from_value,
+    gate_trigger_from_value, note_events_from_value, pattern_pulse_from_value,
 };
 
 // ---------------------------------------------------------------------------------------------
