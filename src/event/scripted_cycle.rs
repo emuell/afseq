@@ -101,8 +101,8 @@ impl ScriptedCycleEventIter {
                 // apply custom note mapping
                 note_events.clone()
             } else {
-                // convert the cycle value to a single note
-                vec![event.value().into()]
+                // try converting the cycle value to a single note
+                event.value().try_into().map_err(LuaError::RuntimeError)?
             }
         };
         // verify that all identifiers are mapped
