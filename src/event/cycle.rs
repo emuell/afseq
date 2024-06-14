@@ -120,15 +120,15 @@ impl CycleEventIter {
     ///
     /// Returns error when the cycle string failed to parse.
     pub fn from_mini(input: &str) -> Result<Self, String> {
-        Ok(Self::new(Cycle::from(input, None)?))
+        Ok(Self::new(Cycle::from(input)?))
     }
 
     /// Try creating a new cycle event iter from the given mini notation string
     /// and the given seed for the cycle's random number generator.
     ///
     /// Returns error when the cycle string failed to parse.
-    pub fn from_mini_with_seed(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
-        Ok(Self::new(Cycle::from(input, seed)?))
+    pub fn from_mini_with_seed(input: &str, seed: [u8; 32]) -> Result<Self, String> {
+        Ok(Self::new(Cycle::from(input)?.with_seed(seed)))
     }
 
     /// Return a new cycle with the given value mappings applied.
@@ -223,7 +223,7 @@ pub fn new_cycle_event(input: &str) -> Result<CycleEventIter, String> {
 
 pub fn new_cycle_event_with_seed(
     input: &str,
-    seed: Option<[u8; 32]>,
+    seed: [u8; 32],
 ) -> Result<CycleEventIter, String> {
     CycleEventIter::from_mini_with_seed(input, seed)
 }
