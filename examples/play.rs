@@ -73,7 +73,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // generate a few phrases
     let cycle =
         new_cycle_event("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")?
-            .with_mappings(&[("bd", new_note("c4")), ("bd2", new_note(("c4", None, 0.5)))]);
+            .with_mappings(&[
+                ("bd", vec![new_note("c4")]),
+                ("bd2", vec![new_note(("c4", None, 0.5))]),
+            ]);
 
     let kick_pattern = beat_time
         .every_nth_beat(16.0)

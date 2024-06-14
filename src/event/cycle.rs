@@ -45,53 +45,52 @@ impl From<&CycleTarget> for Option<InstrumentId> {
 
 /// Helper struct to convert time tagged events from Cycle into a `Vec<EventIterItem>`
 pub(crate) struct CycleNoteEvents {
-    events: Vec<(Fraction, Fraction, Vec<Option<NoteEvent>>)>,
+    events: Vec<(Fraction, Fraction, Vec<Option<Event>>)>,
 }
 
 impl CycleNoteEvents {
     /// Create a new, empty list of events.
     pub fn new() -> Self {
-        Self { events: vec![] }
+        Self { events: Vec::new() }
     }
 
-    /// Add a new cycle channel item.
+    /// Add note events from a cycle channel event.
     pub fn add(
         &mut self,
         channel: usize,
         start: Fraction,
         length: Fraction,
-        note_event: NoteEvent,
+        note_events: Vec<Option<NoteEvent>>,
     ) {
         match self
             .events
             .binary_search_by(|(time, _, _)| time.cmp(&start))
         {
             Ok(pos) => {
-                // use max length of all notes in stack
-                let note_length = &mut self.events[pos].1;
-                *note_length = (*note_length).max(length);
-                // add note to existing time stack
-                let note_events = &mut self.events[pos].2;
-                note_events.resize(channel + 1, None);
-                note_events[channel] = Some(note_event);
+                // use min length of all notes in stack
+                let event_length = &mut self.events[pos].1;
+                *event_length = (*event_length).min(length);
+                // add new notes to existing event stack
+                let timed_event = &mut self.events[pos].2;
+                timed_event.resize(channel + 1, None);
+                timed_event[channel] = Some(Event::NoteEvents(note_events));
             }
-            Err(pos) => self
-                .events
-                .insert(pos, (start, length, vec![Some(note_event)])),
+            Err(pos) => self.events.insert(
+                pos,
+                (start, length, vec![Some(Event::NoteEvents(note_events))]),
+            ),
         }
     }
 
-    /// Convert to a list of NoteEvents.
+    /// Convert to a list of EventIterItems.
     pub fn into_event_iter_items(self) -> Vec<EventIterItem> {
-        let mut events: Vec<EventIterItem> = Vec::with_capacity(self.events.len());
-        for (start_time, length, note_events) in self.events.into_iter() {
-            events.push(EventIterItem::new_with_fraction(
-                Event::NoteEvents(note_events),
-                start_time,
-                length,
-            ));
+        let mut event_iter_items: Vec<EventIterItem> = Vec::with_capacity(self.events.len());
+        for (start_time, length, events) in self.events.into_iter() {
+            for event in events.into_iter().flatten() {
+                event_iter_items.push(EventIterItem::new_with_fraction(event, start_time, length));
+            }
         }
-        events
+        event_iter_items
     }
 }
 
@@ -106,7 +105,7 @@ impl CycleNoteEvents {
 #[derive(Clone, Debug)]
 pub struct CycleEventIter {
     cycle: Cycle,
-    mappings: HashMap<String, Option<NoteEvent>>,
+    mappings: HashMap<String, Vec<Option<NoteEvent>>>,
 }
 
 impl CycleEventIter {
@@ -132,7 +131,10 @@ impl CycleEventIter {
     }
 
     /// Return a new cycle with the given value mappings applied.
-    pub fn with_mappings<S: Into<String> + Clone>(self, map: &[(S, Option<NoteEvent>)]) -> Self {
+    pub fn with_mappings<S: Into<String> + Clone>(
+        self,
+        map: &[(S, Vec<Option<NoteEvent>>)],
+    ) -> Self {
         let mut mappings = HashMap::new();
         for (k, v) in map.iter().cloned() {
             mappings.insert(k.into(), v);
@@ -141,23 +143,25 @@ impl CycleEventIter {
     }
 
     /// Generate a note event from a single cycle event, applying mappings if necessary
-    fn note_event(&mut self, event: CycleEvent) -> Option<NoteEvent> {
-        let mut note_event = {
-            if let Some(mapped_note_event) = self.mappings.get(event.string()) {
-                // apply custom note mapping
-                mapped_note_event.clone()
+    fn note_events(&mut self, event: CycleEvent) -> Result<Vec<Option<NoteEvent>>, String> {
+        let mut note_events = {
+            if let Some(note_events) = self.mappings.get(event.string()) {
+                // apply custom note mappings
+                note_events.clone()
             } else {
-                // else try to convert value to a note
-                event.value().into()
+                // convert the cycle value to a single note
+                vec![event.value().into()]
             }
         };
         // inject target instrument, if present
         if let Some(instrument) = event.target().into() {
-            if let Some(note_event) = &mut note_event {
-                note_event.instrument = Some(instrument);
+            for mut note_event in &mut note_events {
+                if let Some(note_event) = &mut note_event {
+                    note_event.instrument = Some(instrument);
+                }
             }
         }
-        note_event
+        Ok(note_events)
     }
 
     /// Generate next batch of events from the next cycle run.
@@ -168,7 +172,7 @@ impl CycleEventIter {
             match self.cycle.generate() {
                 Ok(events) => events,
                 Err(err) => {
-                    // NB: only expected error here is exceeding the event limit  
+                    // NB: only expected error here is exceeding the event limit
                     panic!("Cycle runtime error: {err}");
                 }
             }
@@ -179,8 +183,16 @@ impl CycleEventIter {
             for event in channel_events.into_iter() {
                 let start = event.span().start();
                 let length = event.span().length();
-                if let Some(note_event) = self.note_event(event) {
-                    timed_note_events.add(channel_index, start, length, note_event);
+                match self.note_events(event) {
+                    Ok(note_events) => {
+                        if !note_events.is_empty() {
+                            timed_note_events.add(channel_index, start, length, note_events);
+                        }
+                    }
+                    Err(err) => {
+                        //  NB: only expected error here is a chord parser error
+                        panic!("Cycle runtime error: {err}");
+                    }
                 }
             }
         }
@@ -221,9 +233,6 @@ pub fn new_cycle_event(input: &str) -> Result<CycleEventIter, String> {
     CycleEventIter::from_mini(input)
 }
 
-pub fn new_cycle_event_with_seed(
-    input: &str,
-    seed: [u8; 32],
-) -> Result<CycleEventIter, String> {
+pub fn new_cycle_event_with_seed(input: &str, seed: [u8; 32]) -> Result<CycleEventIter, String> {
     CycleEventIter::from_mini_with_seed(input, seed)
 }

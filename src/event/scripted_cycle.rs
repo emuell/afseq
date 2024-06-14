@@ -4,7 +4,7 @@ use fraction::ToPrimitive;
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{add_lua_callback_error, note_event_from_value, LuaCallback, LuaTimeoutHook},
+    bindings::{add_lua_callback_error, note_events_from_value, LuaCallback, LuaTimeoutHook},
     event::{cycle::CycleNoteEvents, EventIter, EventIterItem, NoteEvent},
     BeatTimeBase, PulseIterItem,
 };
@@ -23,7 +23,7 @@ use crate::tidal::{Cycle, Event as CycleEvent, Value as CycleValue};
 #[derive(Clone, Debug)]
 pub struct ScriptedCycleEventIter {
     cycle: Cycle,
-    mappings: HashMap<String, Option<NoteEvent>>,
+    mappings: HashMap<String, Vec<Option<NoteEvent>>>,
     mapping_callback: Option<LuaCallback>,
     timeout_hook: Option<LuaTimeoutHook>,
     channel_steps: Vec<usize>,
@@ -31,7 +31,7 @@ pub struct ScriptedCycleEventIter {
 
 impl ScriptedCycleEventIter {
     /// Return a new cycle with the given value mappings applied.
-    pub fn with_mappings(cycle: Cycle, mappings: Vec<(String, Option<NoteEvent>)>) -> Self {
+    pub fn with_mappings(cycle: Cycle, mappings: Vec<(String, Vec<Option<NoteEvent>>)>) -> Self {
         let mappings = mappings.into_iter().collect();
         let mapping_callback = None;
         let timeout_hook = None;
@@ -72,15 +72,15 @@ impl ScriptedCycleEventIter {
         })
     }
 
-    /// Generate a note event from a single cycle event, applying mappings if necessary
-    fn note_event(
+    /// Generate a note event stack from a single cycle event, applying mappings if necessary
+    fn note_events(
         &mut self,
         channel_index: usize,
         _event_index: usize,
         event_length: f64,
         event: CycleEvent,
-    ) -> LuaResult<Option<NoteEvent>> {
-        let mut note_event = {
+    ) -> LuaResult<Vec<Option<NoteEvent>>> {
+        let mut note_events = {
             if let Some(mapping_callback) = self.mapping_callback.as_mut() {
                 // increase step counter
                 if self.channel_steps.len() <= channel_index {
@@ -96,17 +96,17 @@ impl ScriptedCycleEventIter {
                 )?;
                 // call mapping function
                 let result = mapping_callback.call_with_arg(event.string())?;
-                note_event_from_value(&result, None)?
-            } else if let Some(mapped_note_event) = self.mappings.get(event.string()) {
+                note_events_from_value(&result, None)?
+            } else if let Some(note_events) = self.mappings.get(event.string()) {
                 // apply custom note mapping
-                mapped_note_event.clone()
+                note_events.clone()
             } else {
-                // else try to convert value to a note
-                event.value().into()
+                // convert the cycle value to a single note
+                vec![event.value().into()]
             }
         };
         // verify that all identifiers are mapped
-        if note_event.is_none()
+        if (note_events.is_empty() || note_events.iter().all(|f| f.is_none()))
             && self.mapping_callback.is_none()
             && !matches!(event.value(), CycleValue::Rest | CycleValue::Hold)
         {
@@ -117,11 +117,13 @@ impl ScriptedCycleEventIter {
         }
         // inject target instrument, if present
         if let Some(instrument) = event.target().into() {
-            if let Some(note_event) = &mut note_event {
-                note_event.instrument = Some(instrument);
+            for mut note_event in &mut note_events {
+                if let Some(note_event) = &mut note_event {
+                    note_event.instrument = Some(instrument);
+                }
             }
         }
-        Ok(note_event)
+        Ok(note_events)
     }
 
     /// Generate next batch of events from the next cycle run.
@@ -149,7 +151,7 @@ impl ScriptedCycleEventIter {
                 let start = event.span().start();
                 let length = event.span().length();
                 let event_length = length.to_f64().unwrap_or_default();
-                match self.note_event(channel_index, event_index, event_length, event) {
+                match self.note_events(channel_index, event_index, event_length, event) {
                     Err(err) => {
                         if let Some(callback) = &self.mapping_callback {
                             callback.handle_error(&err)
@@ -157,9 +159,9 @@ impl ScriptedCycleEventIter {
                             add_lua_callback_error("map", &err)
                         }
                     }
-                    Ok(note_event) => {
-                        if let Some(note_event) = note_event {
-                            timed_note_events.add(channel_index, start, length, note_event);
+                    Ok(note_events) => {
+                        if !note_events.is_empty() {
+                            timed_note_events.add(channel_index, start, length, note_events);
                         }
                     }
                 }
