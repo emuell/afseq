@@ -5,30 +5,10 @@ use fraction::Fraction;
 use crate::{
     event::{new_note, Event, EventIter, EventIterItem, InstrumentId, NoteEvent},
     tidal::{Cycle, Event as CycleEvent, Target as CycleTarget, Value as CycleValue},
-    BeatTimeBase, Note, PulseIterItem,
+    BeatTimeBase, Chord, Note, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
-
-/// Default conversion of a cycle event value to an optional NoteEvent, as used by [`EventIter`].
-impl From<&CycleValue> for Option<NoteEvent> {
-    fn from(value: &CycleValue) -> Self {
-        match value {
-            CycleValue::Hold => None,
-            CycleValue::Rest => new_note(Note::OFF),
-            CycleValue::Float(_f) => None,
-            CycleValue::Integer(i) => new_note(Note::from((*i).clamp(0, 0x7f) as u8)),
-            CycleValue::Pitch(p) => new_note(Note::from(p.midi_note())),
-            CycleValue::Name(s) => {
-                if s.eq_ignore_ascii_case("off") {
-                    new_note(Note::OFF)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
 
 /// Default conversion of a cycle target to an optional instrument id, as used by [`EventIter`].
 impl From<&CycleTarget> for Option<InstrumentId> {
@@ -37,6 +17,38 @@ impl From<&CycleTarget> for Option<InstrumentId> {
             CycleTarget::None => None,
             CycleTarget::Index(i) => Some(InstrumentId::from(*i as usize)),
             CycleTarget::Name(_) => None, // unsupported
+        }
+    }
+}
+
+/// Default conversion of a CycleValue into a note stack.
+///
+/// Returns an error when resolving chord modes failed.
+impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
+    type Error = String;
+
+    fn try_from(value: &CycleValue) -> Result<Self, String> {
+        match value {
+            CycleValue::Hold => Ok(vec![None]),
+            CycleValue::Rest => Ok(vec![new_note(Note::OFF)]),
+            CycleValue::Float(_f) => Ok(vec![None]),
+            CycleValue::Integer(i) => Ok(vec![new_note(Note::from((*i).clamp(0, 0x7f) as u8))]),
+            CycleValue::Pitch(p) => Ok(vec![new_note(Note::from(p.midi_note()))]),
+            CycleValue::Chord(p, m) => {
+                let chord = Chord::try_from((p.midi_note(), m.as_str()))?;
+                Ok(chord
+                    .intervals()
+                    .iter()
+                    .map(|i| new_note(chord.note().transposed(*i as i32)))
+                    .collect())
+            }
+            CycleValue::Name(s) => {
+                if s.eq_ignore_ascii_case("off") {
+                    Ok(vec![new_note(Note::OFF)])
+                } else {
+                    Ok(vec![None])
+                }
+            }
         }
     }
 }
@@ -149,8 +161,8 @@ impl CycleEventIter {
                 // apply custom note mappings
                 note_events.clone()
             } else {
-                // convert the cycle value to a single note
-                vec![event.value().into()]
+                // try converting the cycle value to a single note
+                event.value().try_into()?
             }
         };
         // inject target instrument, if present
