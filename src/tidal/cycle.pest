@@ -16,13 +16,17 @@ number  = ${ (normal | float | integer) ~ !(ASCII_ALPHA) }
 octave  = { "10" | ASCII_DIGIT }
 mark    = { "#"|"b" }
 note    = ${ (^"a"|^"b"|^"c"|^"d"|^"e"|^"f"|^"g") }
-pitch   = ${ note ~ mark? ~ octave? ~ !(ASCII_ALPHANUMERIC)}
+pitch   = ${ note ~ mark? ~ octave? ~ !name}
+
+/// chord as pitch with mode string, separated via "'"
+mode    = ${ (ASCII_ALPHANUMERIC | "#" | "-" | "+" | "\u{0394}")+ }
+chord   = ${ pitch ~ "'" ~ mode }
 
 /// type for empty steps
-rest = @{ ("~" | "-") ~ !(ASCII_ALPHANUMERIC) }
+rest = @{ ("~" | "-") ~ !name }
 
 /// type for held steps
-hold = @{ "_" ~ !(ASCII_ALPHANUMERIC) }
+hold = @{ "_" ~ !name }
 
 /// arbitrary string identifier type
 name = @{ (ASCII_ALPHANUMERIC | "_")+ }
@@ -30,7 +34,7 @@ name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 repeat = { "!" }
 
 /// possible literals for single steps
-single = { hold | rest | number | pitch | name }
+single = { hold | rest | number | chord | pitch | name }
 
 /// groups
 subdivision     = { "[" ~ (stack | split | choices | section)? ~ "]" }

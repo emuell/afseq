@@ -189,6 +189,7 @@ pub enum Value {
     Float(f64),
     Integer(i32),
     Pitch(Pitch),
+    Chord(Pitch, String),
     Name(String),
 }
 
@@ -479,20 +480,22 @@ impl Value {
         match &self {
             Value::Rest => Target::None,
             Value::Hold => Target::None,
-            Value::Name(n) => Target::Name(n.clone()),
             Value::Integer(i) => Target::Index(*i),
             Value::Float(f) => Target::Index(*f as i32),
             Value::Pitch(p) => Target::Name(format!("{:?}", p)), // TODO might not be the best conversion idea
+            Value::Chord(p, m) => Target::Name(format!("{:?}'{}", p, m)),
+            Value::Name(n) => Target::Name(n.clone()),
         }
     }
     fn to_integer(&self) -> Option<i32> {
         match &self {
             Value::Rest => None,
             Value::Hold => None,
-            Value::Name(_n) => None,
             Value::Integer(i) => Some(*i),
             Value::Float(f) => Some(*f as i32),
-            Value::Pitch(n) => Some(n.note as i32),
+            Value::Pitch(n) => Some(n.midi_note() as i32),
+            Value::Chord(p, _m) => Some(p.midi_note() as i32),
+            Value::Name(_n) => None,
         }
     }
 
@@ -500,10 +503,11 @@ impl Value {
         match &self {
             Value::Rest => None,
             Value::Hold => None,
-            Value::Name(_n) => None,
             Value::Integer(i) => Some(*i as f64),
             Value::Float(f) => Some(*f),
-            Value::Pitch(n) => Some(n.note as f64),
+            Value::Pitch(n) => Some(n.midi_note() as f64),
+            Value::Chord(n, _m) => Some(n.midi_note() as f64),
+            Value::Name(_n) => None,
         }
     }
 
@@ -511,10 +515,11 @@ impl Value {
         match &self {
             Value::Rest => None,
             Value::Hold => None,
-            Value::Name(_n) => None,
             Value::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
             Value::Float(f) => Some(f.clamp(0.0, 1.0)),
-            Value::Pitch(n) => Some((n.note as f64).clamp(0.0, 128.0) / 128.0),
+            Value::Pitch(p) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
+            Value::Chord(p, _m) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
+            Value::Name(_n) => None,
         }
     }
 }
@@ -612,6 +617,16 @@ impl Event {
         Self {
             value: Value::Pitch(pitch.clone()),
             string: pitch.to_string(),
+            ..self.clone()
+        }
+    }
+
+    #[cfg(test)]
+    fn with_chord(&self, note: u8, octave: u8, mode: &str) -> Self {
+        let pitch = Pitch { note, octave };
+        Self {
+            value: Value::Chord(pitch.clone(), mode.to_string()),
+            string: format!("{}'{}", pitch, mode),
             ..self.clone()
         }
     }
@@ -1021,6 +1036,22 @@ impl CycleParser {
             Rule::hold => Ok(Value::Hold),
             Rule::rest => Ok(Value::Rest),
             Rule::pitch => Ok(Value::Pitch(Pitch::parse(pair))),
+            Rule::chord => {
+                let mut pitch = Pitch { note: 0, octave: 4 };
+                let mut mode = "";
+                for p in pair.into_inner() {
+                    match p.as_rule() {
+                        Rule::pitch => {
+                            pitch = Pitch::parse(p);
+                        }
+                        Rule::mode => {
+                            mode = p.as_str();
+                        }
+                        _ => (),
+                    }
+                }
+                Ok(Value::Chord(pitch, mode.to_string()))
+            }
             Rule::name => Ok(Value::Name(pair.as_str().to_string())),
             _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
         }
@@ -1834,6 +1865,33 @@ mod test {
                 Event::at(F::new(1u8, 4u8), F::new(3u8, 4u8)),
             ]]
         );
+
+        assert!(Cycle::from("c44'mode").is_err());
+        assert!(Cycle::from("c4'!mode").is_err());
+        assert!(Cycle::from("y'mode").is_err());
+        assert!(Cycle::from("c4'mo'de").is_err());
+
+        assert!(Cycle::from("c4'mode").is_ok());
+        assert!(Cycle::from("c'm7#\u{0394}").is_ok());
+
+        assert_cycles(
+            "<some_name _another_one c4'chord c4'-\u{0394}7 c6a_name>",
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::from(1)).with_name("some_name")
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::from(1)).with_name("_another_one")
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "chord")
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "-\u{0394}7"), // -Δ7
+                ]],
+                vec![vec![Event::at(F::from(0), F::from(1)).with_name("c6a_name")]],
+            ],
+        )?;
 
         assert_cycles(
             "[1 2] [3 4,[5 6]:42]",
