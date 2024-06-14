@@ -163,9 +163,18 @@ impl CycleEventIter {
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
     fn generate_events(&mut self) -> Vec<EventIterItem> {
+        // run the cycle event generator
+        let events = {
+            match self.cycle.generate() {
+                Ok(events) => events,
+                Err(err) => {
+                    // NB: only expected error here is exceeding the event limit  
+                    panic!("Cycle runtime error: {err}");
+                }
+            }
+        };
         let mut timed_note_events = CycleNoteEvents::new();
         // convert possibly mapped cycle channel items to a list of note events
-        let events = self.cycle.generate().unwrap_or_default();
         for (channel_index, channel_events) in events.into_iter().enumerate() {
             for event in channel_events.into_iter() {
                 let start = event.span().start();
