@@ -643,10 +643,9 @@ pub(crate) fn chord_events_from_mode(
         Ok(chord
             .intervals()
             .iter()
-            .copied()
             .map(|i| {
                 Some(NoteEvent {
-                    note: Note::from((chord.note() as u8).saturating_add(i)),
+                    note: chord.note().transposed(*i as i32),
                     ..note_event.clone()
                 })
             })
@@ -671,10 +670,9 @@ pub(crate) fn chord_events_from_intervals(
         Ok(chord
             .intervals()
             .iter()
-            .copied()
             .map(|i| {
                 Some(NoteEvent {
-                    note: Note::from((chord.note() as u8).saturating_add(i)),
+                    note: chord.note().transposed(*i as i32),
                     ..note_event.clone()
                 })
             })
