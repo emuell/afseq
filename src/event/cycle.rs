@@ -120,15 +120,15 @@ impl CycleEventIter {
     ///
     /// Returns error when the cycle string failed to parse.
     pub fn from_mini(input: &str) -> Result<Self, String> {
-        Ok(Self::new(Cycle::from(input, None)?))
+        Ok(Self::new(Cycle::from(input)?))
     }
 
     /// Try creating a new cycle event iter from the given mini notation string
     /// and the given seed for the cycle's random number generator.
     ///
     /// Returns error when the cycle string failed to parse.
-    pub fn from_mini_with_seed(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
-        Ok(Self::new(Cycle::from(input, seed)?))
+    pub fn from_mini_with_seed(input: &str, seed: [u8; 32]) -> Result<Self, String> {
+        Ok(Self::new(Cycle::from(input)?.with_seed(seed)))
     }
 
     /// Return a new cycle with the given value mappings applied.
@@ -163,9 +163,19 @@ impl CycleEventIter {
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
     fn generate_events(&mut self) -> Vec<EventIterItem> {
+        // run the cycle event generator
+        let events = {
+            match self.cycle.generate() {
+                Ok(events) => events,
+                Err(err) => {
+                    // NB: only expected error here is exceeding the event limit  
+                    panic!("Cycle runtime error: {err}");
+                }
+            }
+        };
         let mut timed_note_events = CycleNoteEvents::new();
         // convert possibly mapped cycle channel items to a list of note events
-        for (channel_index, channel_events) in self.cycle.generate().into_iter().enumerate() {
+        for (channel_index, channel_events) in events.into_iter().enumerate() {
             for event in channel_events.into_iter() {
                 let start = event.span().start();
                 let length = event.span().length();
@@ -213,7 +223,7 @@ pub fn new_cycle_event(input: &str) -> Result<CycleEventIter, String> {
 
 pub fn new_cycle_event_with_seed(
     input: &str,
-    seed: Option<[u8; 32]>,
+    seed: [u8; 32],
 ) -> Result<CycleEventIter, String> {
     CycleEventIter::from_mini_with_seed(input, seed)
 }

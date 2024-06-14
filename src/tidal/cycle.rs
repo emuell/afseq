@@ -17,14 +17,20 @@ use crate::pattern::euclidean::euclidean;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cycle {
     root: Step,
+    event_limit: usize,
     input: String,
     seed: Option<[u8; 32]>,
     state: CycleState,
 }
-
 impl Cycle {
-    /// create a Cycle from an mini-notation string with an optional seed
-    pub fn from(input: &str, seed: Option<[u8; 32]>) -> Result<Self, String> {
+    /// Default value for the cycle's event limit option.
+    const EVENT_LIMIT_DEFAULT: usize = 0x1000;
+
+    /// Create a Cycle from a mini-notation string, using an unseeded random number generator
+    /// and the default event limit setting.
+    ///
+    /// Returns a parse error, when the given string is not a valid mini notation expression.
+    pub fn from(input: &str) -> Result<Self, String> {
         match CycleParser::parse(Rule::mini, input) {
             Ok(mut tree) => {
                 if let Some(mini) = tree.next() {
@@ -39,15 +45,16 @@ impl Cycle {
                         step: 0,
                         events: 0,
                         iteration: 0,
-                        rng: Xoshiro256PlusPlus::from_seed(
-                            seed.unwrap_or_else(|| thread_rng().gen()),
-                        ),
+                        rng: Xoshiro256PlusPlus::from_seed(thread_rng().gen()),
                     };
+                    let seed = None;
+                    let event_limit = Self::EVENT_LIMIT_DEFAULT;
                     let cycle = Self {
                         input,
                         seed,
                         root,
                         state,
+                        event_limit,
                     };
                     #[cfg(test)]
                     {
@@ -63,6 +70,30 @@ impl Cycle {
         }
     }
 
+    /// Rebuild/configure a newly created cycle to use the given custom seed.
+    pub fn with_seed(self, seed: [u8; 32]) -> Self {
+        debug_assert!(
+            self.state.iteration == 0,
+            "Should not reconfigure seed of running cycle"
+        );
+        Self {
+            state: CycleState {
+                rng: Xoshiro256PlusPlus::from_seed(seed),
+                ..self.state
+            },
+            seed: Some(seed),
+            ..self
+        }
+    }
+
+    /// Rebuild/configure cycle to use the given custom event count limit.
+    pub fn with_event_limit(self, event_limit: usize) -> Self {
+        Self {
+            event_limit,
+            ..self
+        }
+    }
+
     // TODO remove this or improve, * and / can change the output, <1> does not etc..
     /// check if a cycle will give different outputs between cycles
     pub fn is_stateful(&self) -> bool {
@@ -71,15 +102,17 @@ impl Cycle {
             .any(|&c| self.input.contains(c))
     }
 
-    /// query for the next iteration of output
-    pub fn generate(&mut self) -> Vec<Vec<Event>> {
+    /// Query for the next iteration of output.
+    ///
+    /// Returns error when the number of generated events exceed the configured event limit.
+    pub fn generate(&mut self) -> Result<Vec<Vec<Event>>, String> {
         let cycle = self.state.iteration;
         self.state.events = 0;
         self.state.step = 0;
-        let mut events = Self::output(&self.root, &mut self.state, cycle);
+        let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
         self.state.iteration += 1;
         events.transform_spans(&Span::default());
-        events.export()
+        Ok(events.export())
     }
 
     /// reset state to initial state
@@ -1320,27 +1353,30 @@ struct CycleState {
     iteration: u32,
     rng: Xoshiro256PlusPlus,
     step: u32,
-    events: u32,
+    events: usize,
 }
 
 impl Cycle {
-    fn output_span(step: &Step, state: &mut CycleState, span: &Span) -> Events {
+    fn output_span(
+        step: &Step,
+        state: &mut CycleState,
+        span: &Span,
+        limit: usize,
+    ) -> Result<Events, String> {
         let range = span.whole_range();
-        let cycles = range
-            .map(|cycle| {
-                let mut events = Self::output(step, state, cycle);
-                events
-                    .transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
-                events
-            })
-            .collect();
+        let mut cycles = vec![];
+        for cycle in range {
+            let mut events = Self::output(step, state, cycle, limit)?;
+            events.transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
+            cycles.push(events)
+        }
         let mut events = Events::Multi(MultiEvents {
             span: span.clone(),
             length: span.length(),
             events: cycles,
         });
         events.crop(span);
-        events
+        Ok(events)
     }
 
     fn output_multiplied(
@@ -1348,41 +1384,52 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         mult: Fraction,
-    ) -> Events {
+        limit: usize,
+    ) -> Result<Events, String> {
         let span = Span::new(
             Fraction::from(cycle) * mult,
             Fraction::from(cycle + 1) * mult,
         );
-        let mut events = Self::output_span(step, state, &span);
+        let mut events = Self::output_span(step, state, &span, limit)?;
         events.normalize_spans(&span);
-        events
+        Ok(events)
     }
 
     // recursively output events for the entire cycle based on some state (random seed)
-    fn output(step: &Step, state: &mut CycleState, cycle: u32) -> Events {
-        state.events += 1;
-        if state.events > 1024 {
-            return Events::empty();
-        }
-        match step {
+    fn output(
+        step: &Step,
+        state: &mut CycleState,
+        cycle: u32,
+        limit: usize,
+    ) -> Result<Events, String> {
+        let events = match step {
             // repeats only make it here if they had no preceding value
             Step::Repeat => Events::empty(),
             // ranges get applied at parse time
             Step::Range(_) => Events::empty(),
-            Step::Single(s) => Events::Single(Event {
-                length: Fraction::one(),
-                target: Target::None,
-                span: Span::default(),
-                string: s.string.clone(),
-                value: s.value.clone(),
-            }),
+            Step::Single(s) => {
+                state.events += 1;
+                if state.events > limit {
+                    return Err(format!(
+                        "the cycle's event limit of {} was exceeded!",
+                        limit
+                    ));
+                }
+                Events::Single(Event {
+                    length: Fraction::one(),
+                    target: Target::None,
+                    span: Span::default(),
+                    string: s.string.clone(),
+                    value: s.value.clone(),
+                })
+            }
             Step::Subdivision(sd) => {
                 if sd.steps.is_empty() {
                     Events::empty()
                 } else {
                     let mut events = vec![];
                     for s in &sd.steps {
-                        let e = Self::output(s, state, cycle);
+                        let e = Self::output(s, state, cycle, limit)?;
                         events.push(e)
                     }
 
@@ -1401,7 +1448,7 @@ impl Cycle {
                     let length = a.steps.len() as u32;
                     let current = cycle % length;
                     if let Some(step) = a.steps.get(current as usize) {
-                        Self::output(step, state, cycle / length)
+                        Self::output(step, state, cycle / length, limit)?
                     } else {
                         Events::empty() // unreachable
                     }
@@ -1409,7 +1456,7 @@ impl Cycle {
             }
             Step::Choices(cs) => {
                 let choice = state.rng.gen_range(0..cs.choices.len());
-                Self::output(&cs.choices[choice], state, cycle) // TODO seed the rng properly
+                Self::output(&cs.choices[choice], state, cycle, limit)? // TODO seed the rng properly
             }
             Step::Polymeter(pm) => {
                 let step = pm.steps.as_ref();
@@ -1419,7 +1466,7 @@ impl Cycle {
                     _ => 1,
                 };
                 let mult = Fraction::from(count) / Fraction::from(length);
-                Self::output_multiplied(step, state, cycle, mult)
+                Self::output_multiplied(step, state, cycle, mult, limit)?
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1427,7 +1474,7 @@ impl Cycle {
                 } else {
                     let mut channels = vec![];
                     for s in &st.stack {
-                        channels.push(Self::output(s, state, cycle))
+                        channels.push(Self::output(s, state, cycle, limit)?)
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
@@ -1439,12 +1486,12 @@ impl Cycle {
             Step::StaticExpression(e) => {
                 match e.op {
                     StaticOp::Target() => {
-                        let mut out = Self::output(e.left.as_ref(), state, cycle);
+                        let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
                         out.mutate_events(&mut |event| event.target = e.right.to_target());
                         out
                     }
                     StaticOp::Degrade() => {
-                        let mut out = Self::output(e.left.as_ref(), state, cycle);
+                        let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
                         out.mutate_events(&mut |event: &mut Event| {
                             if let Some(chance) = e.right.to_chance() {
                                 // TODO seed the rng properly
@@ -1472,7 +1519,7 @@ impl Cycle {
                             } else {
                                 right
                             });
-                            Self::output_multiplied(e.left.as_ref(), state, cycle, mult)
+                            Self::output_multiplied(e.left.as_ref(), state, cycle, mult, limit)?
                         } else {
                             Events::empty()
                         }
@@ -1499,7 +1546,8 @@ impl Cycle {
                                 };
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
-                                        let out = Self::output(b.left.as_ref(), state, cycle);
+                                        let out =
+                                            Self::output(b.left.as_ref(), state, cycle, limit)?;
                                         for pulse in euclidean(
                                             steps.max(0) as u32,
                                             pulses.max(0) as u32,
@@ -1526,7 +1574,8 @@ impl Cycle {
                     events,
                 })
             }
-        }
+        };
+        Ok(events)
     }
 
     #[cfg(test)]
@@ -1591,18 +1640,15 @@ mod test {
     type F = fraction::Fraction;
 
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
-        let mut cycle = Cycle::from(input, None)?;
+        let mut cycle = Cycle::from(input)?;
         for out in outputs {
-            assert_eq!(cycle.generate(), out);
+            assert_eq!(cycle.generate()?, out);
         }
         Ok(())
     }
 
     fn assert_cycle_equality(a: &str, b: &str) -> Result<(), String> {
-        assert_eq!(
-            Cycle::from(a, None)?.generate(),
-            Cycle::from(b, None)?.generate(),
-        );
+        assert_eq!(Cycle::from(a)?.generate()?, Cycle::from(b)?.generate()?,);
         Ok(())
     }
 
@@ -1610,7 +1656,7 @@ mod test {
 
     pub fn cycle() -> Result<(), String> {
         assert_eq!(
-            Cycle::from("a b c d", None)?.generate(),
+            Cycle::from("a b c d")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 4u8)).with_note(9, 4),
                 Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_note(11, 4),
@@ -1619,11 +1665,11 @@ mod test {
             ]]
         );
         assert_eq!(
-            Cycle::from("\ta\r\n\tb\nc\n d\n\n", None)?.generate(),
-            Cycle::from("a b c d", None)?.generate()
+            Cycle::from("\ta\r\n\tb\nc\n d\n\n")?.generate()?,
+            Cycle::from("a b c d")?.generate()?
         );
         assert_eq!(
-            Cycle::from("a b [ c d ]", None)?.generate(),
+            Cycle::from("a b [ c d ]")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 3u8)).with_note(9, 4),
                 Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_note(11, 4),
@@ -1632,7 +1678,7 @@ mod test {
             ]]
         );
         assert_eq!(
-            Cycle::from("[a a] [b4 b5 b6] [c0 d1 c2 d3]", None)?.generate(),
+            Cycle::from("[a a] [b4 b5 b6] [c0 d1 c2 d3]")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 6u8)).with_note(9, 4),
                 Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_note(9, 4),
@@ -1646,7 +1692,7 @@ mod test {
             ]]
         );
         assert_eq!(
-            Cycle::from("[a0 [bb1 [b2 c3]]] c#4 [[[d5 D#6] E7 ] F8]", None)?.generate(),
+            Cycle::from("[a0 [bb1 [b2 c3]]] c#4 [[[d5 D#6] E7 ] F8]")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 6u8)).with_note(9, 0),
                 Event::at(F::new(1u8, 6u8), F::new(1u8, 12u8)).with_note(10, 1),
@@ -1660,7 +1706,7 @@ mod test {
             ]]
         );
         assert_eq!(
-            Cycle::from("[R [e [n o]]] , [[[i s] e ] _]", None)?.generate(),
+            Cycle::from("[R [e [n o]]] , [[[i s] e ] _]")?.generate()?,
             vec![
                 vec![
                     Event::at(F::from(0), F::new(1u8, 2u8)).with_name("R"),
@@ -1781,7 +1827,7 @@ mod test {
         )?;
 
         assert_eq!(
-            Cycle::from("[1 middle _] {}%42 [] <>", None)?.generate(),
+            Cycle::from("[1 middle _] {}%42 [] <>")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 12u8)).with_int(1),
                 Event::at(F::new(1u8, 12u8), F::new(1u8, 6u8)).with_name("middle"),
@@ -1810,7 +1856,7 @@ mod test {
         )?;
 
         assert_eq!(
-            Cycle::from("1 second*2 eb3*3 [32 32]*4", None)?.generate(),
+            Cycle::from("1 second*2 eb3*3 [32 32]*4")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 4u8)).with_int(1),
                 Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_name("second"),
@@ -1886,7 +1932,7 @@ mod test {
         )?;
 
         assert_eq!(
-            Cycle::from("1!2 3 [4!3 5]", None)?.generate(),
+            Cycle::from("1!2 3 [4!3 5]")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 4u8)).with_int(1),
                 Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(1),
@@ -1949,7 +1995,7 @@ mod test {
         )?;
 
         assert_eq!(
-            Cycle::from("c(3,8,9)", None)?.generate(),
+            Cycle::from("c(3,8,9)")?.generate()?,
             [[
                 Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
                 Event::at(F::new(3u8, 8u8), F::new(1u8, 4u8)),
@@ -1959,10 +2005,7 @@ mod test {
             ]]
         );
 
-        assert_eq!(
-            Cycle::from("a? b?", None)?.root,
-            Cycle::from("a?0.5 b?0.5", None)?.root
-        );
+        assert_eq!(Cycle::from("a? b?")?.root, Cycle::from("a?0.5 b?0.5")?.root);
 
         assert_cycle_equality("[a b c](3,8,9)", "[a b c](3,8,1)")?;
 
@@ -2022,17 +2065,22 @@ mod test {
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
-        assert!(Cycle::from("a b c [d", None).is_err());
-        assert!(Cycle::from("a b/ c [d", None).is_err());
-        assert!(Cycle::from("a b--- c [d", None).is_err());
-        assert!(Cycle::from("*a b c [d", None).is_err());
-        assert!(Cycle::from("a {{{}}", None).is_err());
-        assert!(Cycle::from("a*[]", None).is_err());
-        assert!(Cycle::from("] a z [", None).is_err());
-        assert!(Cycle::from("->err", None).is_err());
-        assert!(Cycle::from("(a, b)", None).is_err());
-        assert!(Cycle::from("#(12, 32)", None).is_err());
-        assert!(Cycle::from("#c $", None).is_err());
+        assert!(Cycle::from("[[a b c d]*100]*100")?.generate().is_err());
+        assert!(Cycle::from("[[a b c d]*100]*100")?
+            .with_event_limit(0x10000)
+            .generate()
+            .is_ok());
+        assert!(Cycle::from("a b c [d").is_err());
+        assert!(Cycle::from("a b/ c [d").is_err());
+        assert!(Cycle::from("a b--- c [d").is_err());
+        assert!(Cycle::from("*a b c [d").is_err());
+        assert!(Cycle::from("a {{{}}").is_err());
+        assert!(Cycle::from("a*[]").is_err());
+        assert!(Cycle::from("] a z [").is_err());
+        assert!(Cycle::from("->err").is_err());
+        assert!(Cycle::from("(a, b)").is_err());
+        assert!(Cycle::from("#(12, 32)").is_err());
+        assert!(Cycle::from("#c $").is_err());
         Ok(())
     }
 }

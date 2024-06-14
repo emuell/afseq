@@ -16,8 +16,10 @@ pub struct CycleUserData {
 
 impl CycleUserData {
     pub fn from(arg: LuaString, seed: Option<[u8; 32]>) -> LuaResult<Self> {
-        // a single value, probably a sequence
-        let cycle = Cycle::from(&arg.to_string_lossy(), seed).map_err(LuaError::runtime)?;
+        let mut cycle = Cycle::from(&arg.to_string_lossy()).map_err(LuaError::runtime)?;
+        if let Some(seed) = seed {
+            cycle = cycle.with_seed(seed);
+        }
         let mappings = Vec::new();
         let mapping_function = None;
         Ok(CycleUserData {

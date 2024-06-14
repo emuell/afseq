@@ -127,13 +127,24 @@ impl ScriptedCycleEventIter {
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
     fn generate_events(&mut self) -> Vec<EventIterItem> {
+        // run the cycle event generator
+        let events = {
+            match self.cycle.generate() {
+                Ok(events) => events,
+                Err(err) => {
+                    add_lua_callback_error("cycle", &LuaError::RuntimeError(err));
+                    // skip processing events
+                    return vec![];
+                }
+            }
+        };
         // reset timeout hook for mapping functions
         if let Some(timeout_hook) = &mut self.timeout_hook {
             timeout_hook.reset();
         }
         // convert possibly mapped cycle channel items to a list of note events
         let mut timed_note_events = CycleNoteEvents::new();
-        for (channel_index, channel_events) in self.cycle.generate().into_iter().enumerate() {
+        for (channel_index, channel_events) in events.into_iter().enumerate() {
             for (event_index, event) in channel_events.into_iter().enumerate() {
                 let start = event.span().start();
                 let length = event.span().length();
