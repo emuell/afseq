@@ -57,16 +57,24 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
 
 /// Helper struct to convert time tagged events from Cycle into a `Vec<EventIterItem>`
 pub(crate) struct CycleNoteEvents {
+    // collected events for a given time span per channels
     events: Vec<(Fraction, Fraction, Vec<Option<Event>>)>,
+    // max note event count per channel
+    event_counts: Vec<usize>,
 }
 
 impl CycleNoteEvents {
     /// Create a new, empty list of events.
     pub fn new() -> Self {
-        Self { events: Vec::new() }
+        let events = Vec::with_capacity(16);
+        let event_counts = Vec::with_capacity(3);
+        Self {
+            events,
+            event_counts,
+        }
     }
 
-    /// Add note events from a cycle channel event.
+    /// Add a single note event stack from a cycle channel event.
     pub fn add(
         &mut self,
         channel: usize,
@@ -74,6 +82,12 @@ impl CycleNoteEvents {
         length: Fraction,
         note_events: Vec<Option<NoteEvent>>,
     ) {
+        // memorize max event count per channel
+        if self.event_counts.len() <= channel {
+            self.event_counts.resize(channel + 1, 0);
+        }
+        self.event_counts[channel] = self.event_counts[channel].max(note_events.len());
+        // insert events into existing time slot or a new one
         match self
             .events
             .binary_search_by(|(time, _, _)| time.cmp(&start))
@@ -82,25 +96,48 @@ impl CycleNoteEvents {
                 // use min length of all notes in stack
                 let event_length = &mut self.events[pos].1;
                 *event_length = (*event_length).min(length);
-                // add new notes to existing event stack
+                // add new notes to existing events
                 let timed_event = &mut self.events[pos].2;
                 timed_event.resize(channel + 1, None);
                 timed_event[channel] = Some(Event::NoteEvents(note_events));
             }
-            Err(pos) => self.events.insert(
-                pos,
-                (start, length, vec![Some(Event::NoteEvents(note_events))]),
-            ),
+            Err(pos) => {
+                // insert a new time event
+                let mut timed_event = Vec::with_capacity(channel + 1);
+                timed_event.resize(channel + 1, None);
+                timed_event[channel] = Some(Event::NoteEvents(note_events));
+                self.events.insert(pos, (start, length, timed_event))
+            }
         }
     }
 
     /// Convert to a list of EventIterItems.
     pub fn into_event_iter_items(self) -> Vec<EventIterItem> {
+        // max number of note events in a single merged down Event
+        let max_event_count = self.event_counts.iter().sum::<usize>();
+        // apply padding per channel, merge down and convert to EventIterItem
         let mut event_iter_items: Vec<EventIterItem> = Vec::with_capacity(self.events.len());
-        for (start_time, length, events) in self.events.into_iter() {
-            for event in events.into_iter().flatten() {
-                event_iter_items.push(EventIterItem::new_with_fraction(event, start_time, length));
+        for (start_time, length, mut events) in self.events.into_iter() {
+            // ensure that each event in the channel, contains the same number of note events
+            for (channel, mut event) in events.iter_mut().enumerate() {
+                if let Some(Event::NoteEvents(note_events)) = &mut event {
+                    // pad existing note events with OFFs
+                    note_events.resize_with(self.event_counts[channel], || new_note(Note::OFF));
+                } else if self.event_counts[channel] > 0 {
+                    // pad missing note events with 'None'
+                    *event = Some(Event::NoteEvents(vec![None; self.event_counts[channel]]))
+                }
             }
+            // merge all events that happen at the same time together
+            let mut merged_note_events = Vec::with_capacity(max_event_count);
+            for mut event in events.into_iter().flatten() {
+                if let Event::NoteEvents(note_events) = &mut event {
+                    merged_note_events.append(note_events);
+                }
+            }
+            // convert padded, merged note events to a timed 'Event'
+            let event = Event::NoteEvents(merged_note_events);
+            event_iter_items.push(EventIterItem::new_with_fraction(event, start_time, length));
         }
         event_iter_items
     }
