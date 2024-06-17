@@ -112,6 +112,6 @@ where
 {
     /// Upgrade a [`FixedEventIter`] to a [`MutatedEventIter`].
     fn mutate(self, map: F) -> MutatedEventIter {
-        MutatedEventIter::new(self.events(), map)
+        MutatedEventIter::new(self.events().clone(), map)
     }
 }

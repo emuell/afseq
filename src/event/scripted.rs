@@ -4,6 +4,7 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{note_events_from_value, LuaCallback, LuaTimeoutHook},
+    event::{fixed::FixedEventIter, NoteEvent},
     BeatTimeBase, Event, EventIter, EventIterItem, PulseIterItem,
 };
 
@@ -14,6 +15,7 @@ use crate::{
 pub struct ScriptedEventIter {
     timeout_hook: LuaTimeoutHook,
     callback: LuaCallback,
+    note_event_state: Vec<Option<NoteEvent>>,
     pulse_step: usize,
     pulse_time_step: f64,
     step: usize,
@@ -30,6 +32,7 @@ impl ScriptedEventIter {
         timeout_hook.reset();
         // initialize emitter context for the function
         let mut callback = callback;
+        let note_event_state = Vec::new();
         let pulse = PulseIterItem::default();
         let pulse_step = 0;
         let pulse_time_step = 0.0;
@@ -38,6 +41,7 @@ impl ScriptedEventIter {
         Ok(Self {
             timeout_hook,
             callback,
+            note_event_state,
             pulse_step,
             pulse_time_step,
             step,
@@ -54,7 +58,11 @@ impl ScriptedEventIter {
         self.callback.set_context_step(self.step)?;
         // invoke callback and evaluate the result
         let events = note_events_from_value(&self.callback.call()?, None)?;
-        Ok(Some(vec![EventIterItem::new(Event::NoteEvents(events))]))
+        // normalize event
+        let mut event = Event::NoteEvents(events);
+        FixedEventIter::normalize_event(&mut event, &mut self.note_event_state);
+        // return as EventIterItem
+        Ok(Some(vec![EventIterItem::new(event)]))
     }
 }
 
@@ -63,6 +71,7 @@ impl Clone for ScriptedEventIter {
         Self {
             timeout_hook: self.timeout_hook.clone(),
             callback: self.callback.clone(),
+            note_event_state: self.note_event_state.clone(),
             pulse_step: self.pulse_step,
             pulse_time_step: self.pulse_time_step,
             step: self.step,
@@ -87,11 +96,7 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn run(
-        &mut self,
-        pulse: PulseIterItem,
-        emit_event: bool,
-    ) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
             let event = match self.next_event(pulse) {
@@ -137,5 +142,7 @@ impl EventIter for ScriptedEventIter {
         if let Err(err) = self.callback.reset() {
             self.callback.handle_error(&err);
         }
+        // reset last event
+        self.note_event_state.clear();
     }
 }
