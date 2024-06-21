@@ -53,6 +53,7 @@ pattern = {}
 ---@param length integer?
 ---@param value PulseValue? Value used as initial value when length > 0. by default 0.
 ---@return Pattern
+---@nodiscard
 function pattern.new(length, value)
   local t = setmetatable({}, {
     ---all table functions can be accessed as member functions
@@ -80,26 +81,30 @@ end
 ---When passing tables, those will be flattened.
 ---@param ... PulseValue|(PulseValue[])
 ---@return Pattern
+---@nodiscard
 function pattern.from(...)
   return pattern.new():push_back(...)
 end
 
 -- create a shallow-copy of the given pattern (or self)
+---@return Pattern
+---@nodiscard
 function pattern.copy(self)
   return pattern.from(self:unpack())
 end
 
 ---Create an new pattern or spread and existing pattern evenly within the given length,
 ---using Bresenham’s line algorithm. Similar, but not exactly like "euclidean".
----@param steps table|integer Existing pattern or number of on steps in the pattern.
----@param length integer Number of total steps in the pattern.
----@param offset integer? Optional rotation offset.
----@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
+---
 ---Shortcut for:
 ---```lua
 ---pattern.new(1, steps):spread(length / steps):rotate(offset) -- or
 ---pattern.from{1,1,1}:spread(length / #self):rotate(offset)
 ---```
+---@param steps table|integer Existing pattern or number of on steps in the pattern.
+---@param length integer Number of total steps in the pattern.
+---@param offset integer? Optional rotation offset.
+---@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
 function pattern.distributed(steps, length, offset, empty_value)
   assert(type(length) == "number" and length > 0,
     "invalid length argument (must be an integer > 0)")
@@ -220,6 +225,7 @@ end
 
 ---Shortcut for table.unpack(pattern): returns elements from this pattern as var args.
 ---@return (PulseValue)[]
+---@nodiscard
 function pattern.unpack(self)
   return table.unpack(self)
 end

@@ -12,6 +12,7 @@
 ---@param index integer
 ---@param length integer
 ---@return integer
+---@nodiscard
 function math.imod(index, length)
   return ((index - 1) % length) + 1
 end

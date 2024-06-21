@@ -21,50 +21,59 @@ local NoteTable = {}
 local Note = {}
 
 ---Create a transposed copy of the note or chord.
----@param step integer|integer[]
----@return Note
+---
 ---### examples:
 ---```lua
 ---note("c4"):transposed(12)
 ---note("c'maj"):transposed(5)
 ---note("c'maj"):transposed({0, 0, 5})
 ---```
+---@param step integer|integer[]
+---@return Note
+---@nodiscard
 function Note:transposed(step) end
 
 ---Create a copy of the note or chord with amplified volume values.
----@param factor number|number[] amplify factor > 0
----@return Note
+---
 ---### examples:
 ---```lua
 ---note({"c4 0.5", "g4"}):amplified(0.5)
 ---note("c'maj 0.5"):amplified({2.0, 1.0, 0.3})
 ---```
+---@param factor number|number[] amplify factor > 0
+---@return Note
+---@nodiscard
 function Note:amplified(factor) end
 
 ---Create a copy of the note or chord with new volume values.
----@param volume number|number[] new volume in range [0 - 1]
----@return Note
+---
 ---### examples:
 ---```lua
 ---note({"c4", "g4"}):with_volume(0.5)
 ---note("c'maj"):with_volume(0.5)
 ---note("c'maj"):with_volume({0.1, 0.2, 0.3})
 ---```
+---@param volume number|number[] new volume in range [0 - 1]
+---@return Note
+---@nodiscard
 function Note:with_volume(volume) end
 
 ---Create a copy of the note or chord with new instrument values.
 ---@param instrument number|number[] 
 ---@return Note
+---@nodiscard
 function Note:with_instrument(instrument) end
 
 ---Create a copy of the note or chord with new panning values.
 ---@param panning number|number[] 
 ---@return Note
+---@nodiscard
 function Note:with_panning(panning) end
 
 ---Create a copy of the note or chord with new delay values.
 ---@param delay number|number[] 
 ---@return Note
+---@nodiscard
 function Note:with_delay(delay) end
 
 ----------------------------------------------------------------------------------------------------
@@ -82,8 +91,7 @@ function Note:with_delay(delay) end
 --- -'p' -> panning (float in range [-1-1])
 --- -'d' -> delay (float in range [0-1])
 ---```
----@param ... NoteValue
----@return Note
+---
 ---### examples:
 --- ```lua
 --- note(60) -- middle C
@@ -93,6 +101,9 @@ function Note:with_delay(delay) end
 --- note("c4'maj v0.7") -- C4 major chord with volume 0.7
 --- note("c4", "e4 v0.5", "off") -- custom chord with a c4, e4 and 'off' note
 --- ```
+---@param ... NoteValue
+---@return Note
+---@nodiscard
 ---@overload fun(table: NoteValue[]): Note
 ---@overload fun(...: NoteValue): Note
 function note(...) end

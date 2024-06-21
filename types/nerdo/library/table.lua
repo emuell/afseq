@@ -1,11 +1,12 @@
 ---
 --- Part of the afseq trait:
---- adds a few extra helper functions to the Lua default tablelib
+--- adds a few extra helper functions to the Lua default table lib
 ---
 
 ----------------------------------------------------------------------------------------------------
 
 ---Create a new empty table that uses the global 'table.XXX' functions as methods. 
+---
 ---### examples:
 ---```lua
 ---t = table.new(); t:insert("a"); rprint(t) -> [1] = a;
@@ -16,12 +17,13 @@ end
 
 ---Create a new, or convert an exiting table to an object that uses the global
 ---'table.XXX' functions as methods, just like strings in Lua do.
----@param t table?
+---
 ---### examples:
 ---```lua
 ---t = table.create(); t:insert("a"); rprint(t) -> [1] = a;
 ---t = table.create{1,2,3}; print(t:concat("|")); -> "1|2|3";
 ---```
+---@param t table?
 function table.create(t)
   assert(not t or type(t) == 'table')
   return setmetatable(t or {}, { __index = _G.table })
@@ -44,13 +46,15 @@ end
 
 ---Returns true when the table is empty, else false and will also work
 ---for non indexed tables
----@param t table
----@return boolean
+---
 ---### examples:
 ---```lua
 ---t = {};          print(table.is_empty(t)); -> true;
 ---t = {66};        print(table.is_empty(t)); -> false;
 ---t = {["a"] = 1}; print(table.is_empty(t)); -> false;
+---@param t table
+---@return boolean
+---@nodiscard
 function table.is_empty(t)
   return t == nil or next(t) == nil
 end
@@ -58,10 +62,7 @@ end
 ---Find first match of *value* in the given table, starting from element
 ---number *start_index*.<br>
 ---Returns the first *key* that matches the value or nil
----@param t table
----@param value any
----@param start_index integer?
----@return any key_or_nil
+---
 ---### examples:
 ---```lua
 ---t = {"a", "b"}; table.find(t, "a") --> 1
@@ -69,6 +70,11 @@ end
 ---t = {"a", "b", "a"}; table.find(t, "a", 2) --> "3"
 ---t = {"a", "b"}; table.find(t, "c") --> nil
 ---```
+---@param t table
+---@param value any
+---@param start_index integer?
+---@return any key_or_nil
+---@nodiscard
 function table.find(t, value, start_index)
   local start_index = start_index or 1
   local count = 1
@@ -82,13 +88,15 @@ function table.find(t, value, start_index)
 end
 
 ---Return an indexed table of all keys that are used in the table.
----@param t table
----@return table
+---
 ---### examples:
 ---```lua
 ---t = {a="aa", b="bb"}; rprint(table.keys(t)); --> "a", "b"
 ---t = {"a", "b"};       rprint(table.keys(t)); --> 1, 2
 ---```
+---@param t table
+---@return table
+---@nodiscard
 function table.keys(t)
   local u = {}
   for k,_ in pairs(t) do
@@ -98,13 +106,15 @@ function table.keys(t)
 end
 
 ---Return an indexed table of all values that are used in the table
----@param t table
----@return table
+---
 ---### examples:
 ---```lua
 --- t = {a="aa", b="bb"}; rprint(table.values(t)); --> "aa", "bb"
 --- t = {"a", "b"};       rprint(table.values(t)); --> "a", "b"
 ---```
+---@param t table
+---@return table
+---@nodiscard
 function table.values(t)
   local u = {}
   for _,v in pairs(t) do
@@ -117,6 +127,7 @@ end
 ---into a new table - create a clone with unique references.
 ---@param t table
 ---@return table
+---@nodiscard
 function table.rcopy(t)
   assert(type(t) == 'table', ("bad argument #1 to 'table.copy' "..
     "(table expected, got '%s')"):format(type(t)))
@@ -141,7 +152,6 @@ end
 ---Deeply copy the metatable and all elements of the given table recursively
 ---into a new table - create a clone with unique references.
 ---@param t table
----@return table
 function table.copy(t)
   assert(type(t) == 'table', ("bad argument #1 to 'table.copy' "..
     "(table expected, got '%s')"):format(type(t)))
@@ -154,12 +164,14 @@ end
 
 ---Count the number of items of a table, also works for non index
 ---based tables (using pairs).
----@param t table
----@returns number
+---
 ---### examples:
 ---```lua
 ---t = {["a"]=1, ["b"]=1}; print(table.count(t)) --> 2
 ---```
+---@param t table
+---@returns number
+---@nodiscard
 function table.count(t)
   assert(type(t) == 'table', ("bad argument #1 to 'table.copy' "..
     "(table expected, got '%s')"):format(type(t)))

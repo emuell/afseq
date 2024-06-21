@@ -26,9 +26,6 @@
 ---- "9 -> "nine"
 ---- "11" -> "eleven"
 ---
----@param key NoteValue e.g. "c4" or 48
----@param mode ChordName
----@return Note
 ---### examples:
 ---```lua
 ---chord("c4", "minor") --> {"c4", "d#4", "f4"}
@@ -43,5 +40,9 @@
 ---note(scale("c4", "major"):chord("i", 3))
 ---note(scale("c4", "major"):chord("i", 3)):with_volume(0.5)
 ---```
+---@param key NoteValue e.g. "c4" or 48
+---@param mode ChordName
+---@return Note
+---@nodiscard
 ---@overload fun(key: NoteValue, intervals: integer[]): Note
 function chord(key, mode) end

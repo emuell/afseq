@@ -72,7 +72,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Single pulse value or a nested subdivion of pulses within a pattern.
+---Single pulse value or a nested subdivision of pulses within a pattern.
 ---@alias Pulse (0|1|number|boolean|nil)|(Pulse)[]
 
 ----------------------------------------------------------------------------------------------------
@@ -85,14 +85,14 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---### examples:
 ---```lua
 ---unit = "beats", resolution = 1.01 --> slightly off beat pulse
----unit = "1/16", resolution = 4/3 --> tripplet
+---unit = "1/16", resolution = 4/3 --> triplet
 ---```
 ---@field unit "ms"|"seconds"|"bars"|"beats"|"1/1"|"1/2"|"1/4"|"1/8"|"1/16"|"1/32"|"1/64"
 ---Factor which is applied on `unit` to specify the final time resolution of the emitter.
 ---### examples:
 ---```lua
 ---unit = "beats", resolution = 1.01 --> slightly off beat pulse
----unit = "1/16", resolution = 4/3 --> tripplet
+---unit = "1/16", resolution = 4/3 --> triplet
 ---```
 ---@field resolution number?
 ---
@@ -106,9 +106,9 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field offset number?
 ---
----Specify the rythmical pattern of the emitter. Each pulse with a value of 1 or true
+---Specify the rhythmical pattern of the emitter. Each pulse with a value of 1 or true
 ---will cause an event from the `emitter` property to be triggered in the emitters
----time unit. 0 or nil values never trigger, and values inbetween do *maybe* trigger.
+---time unit. 0 or nil values never trigger, and values in-between do *maybe* trigger.
 ---
 ---To create deterministic random patterns, seed the random number generator before
 ---creating the rhythm via `math.randomseed(some_seed)`
@@ -128,7 +128,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---pattern = { 1, 0, 0, 1 }
 ----- maybe trigger with probabilities
 ---pattern = { 1, 0, 0.5, 0.9 }
------ "cram" pulses into a sigle pulse slot via subdivisions
+----- "cram" pulses into a single pulse slot via subdivisions
 ---pattern = { 1, { 1, 1, 1 } }
 ---
 ----- fixed patterns created via "patterns"
@@ -140,12 +140,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  return math.random(0, 1)
 ---end
 ---
------ statefull generator function
+----- stateful generator function
 ---pattern = function(context)
----  local mypattern = table.create({0, 6, 10})
+---  local my_pattern = table.create({0, 6, 10})
 ---  ---@param context EmitterContext
 ---  return function(context)
----    return mypattern:find((context.step - 1) % 16) ~= nil
+---    return my_pattern:find((context.step - 1) % 16) ~= nil
 ---  end
 ---end
 ---
@@ -205,7 +205,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  return 48 + math.random(1, 4) * 5
 ---end
 ---
------ statefull generator function
+----- stateful generator function
 ---emit = function(initial_context)
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
 ---  ---@param context EmitterContext
@@ -243,7 +243,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  emit = sequence("c4'm", note("g3'm7"):transposed({0, 12, 0, 0}))
 ---}
 ---
------trigger notes in an euclidean tripplet pattern
+-----trigger notes in an euclidean triplet pattern
 ---return rhythm {
 ---  unit = "1/8",
 ---  resolution = 3/2,
@@ -283,4 +283,5 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@param options RhythmOptions
 ---@return userdata
+---@nodiscard
 function rhythm(options) end

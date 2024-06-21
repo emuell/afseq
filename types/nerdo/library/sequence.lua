@@ -11,49 +11,58 @@
 local Sequence = {}
 
 ---Create a copy of all notes in the sequence with transposed note values.
----@param step integer|integer[]
----@return Sequence
+---
 ---### examples:
 ---```lua
 ---sequence("c4", "d#5"):transposed(12)
 ---sequence(note("c'maj"), note("c'maj")):transposed({0, 5})
 ---```
+---@param step integer|integer[]
+---@return Sequence
+---@nodiscard
 function Sequence:transposed(step) end
 
 ---Create a copy of all notes in the sequence with amplified volume values.
----@param factor number|number[] 
----@return Sequence
+---
 ---### examples:
 ---```lua
 ---sequence({"c4 0.5", "g4"}):amplified(0.5)
 ---sequence("c'maj 0.5"):amplified({2.0, 1.0, 0.3})
 ---```
+---@param factor number|number[]
+---@return Sequence
+---@nodiscard
 function Sequence:amplified(factor) end
 
 ---Create a copy of all notes in the sequence with new instrument values.
----@param instrument number|number[] 
+---@param instrument number|number[]
 ---@return Note
+---@nodiscard
 function Sequence:with_instrument(instrument) end
 
 ---Create a copy of all notes in the sequence with new volume values.
----@param volume number|number[] 
----@return Sequence
+---
 ---### examples:
 ---```lua
 ---sequence({"c4", "g4"}):with_volume(0.5)
 ---sequence("c'maj"):with_volume(0.5)
 ---sequence("c'maj"):with_volume({0.1, 0.2, 0.3})
 ---```
+---@param volume number|number[]
+---@return Sequence
+---@nodiscard
 function Sequence:with_volume(volume) end
 
 ---Create a copy of all notes in the sequence with new panning values.
----@param panning number|number[] 
+---@param panning number|number[]
 ---@return Note
+---@nodiscard
 function Sequence:with_panning(panning) end
 
 ---Create a copy of all notes in the sequence with new delay values.
----@param delay number|number[] 
+---@param delay number|number[]
 ---@return Sequence
+---@nodiscard
 function Sequence:with_delay(delay) end
 
 ----------------------------------------------------------------------------------------------------
@@ -61,14 +70,16 @@ function Sequence:with_delay(delay) end
 ---Create a sequence from an array of note values or note value varargs.
 ---
 ---Using `sequence` instead of a raw `{}` table can be useful to ease transforming the note
----content and to explicitely pass a sequence of e.g. single notes to the emittor. 
----@param ... NoteValue|Note
----@return Sequence
+---content and to explicitly pass a sequence of e.g. single notes to the emitter.
+---
 ---### examples:
 ---```lua
 ---sequence(48, "c5", {}) -- sequence of C4, C5 and an empty note
 ---sequence("c4'maj", "g4'maj"):transpose(5) -- sequence of a +5 transposed C4 and G4 major chord
 --- ```
+---@param ... NoteValue|Note
+---@return Sequence
+---@nodiscard
 ---@overload fun(table: (NoteValue|Note)[]): Sequence
 ---@overload fun(...: (NoteValue|Note)): Sequence
 function sequence(...) end

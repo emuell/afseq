@@ -33,9 +33,8 @@ local Cycle = {}
 ---
 ---By default, strings in cycles are interpreted as notes, and integer values as MIDI note
 ---values. Custom identifiers such as "bd" are undefined and will result into a rest, when
----they are not mapped explicitely.
----@param map { [string]: CycleMapNoteValue }
----@return Cycle
+---they are not mapped explicitly.
+---
 ---### examples:
 ---```lua
 -----Using a fixed mapping table
@@ -56,7 +55,7 @@ local Cycle = {}
 ---cycle("4 5 4 <4 [5|7]>"):map(function(context)
 ---  local notes = scale("c", "minor").notes
 ---  return function(context, value)
----    -- emit a cmin note arp with 'value' as octave
+---    -- emit a 'cmin' note arp with 'value' as octave
 ---    local note = notes[math.imod(context.step, #notes)]
 ---    local octave = tonumber(value)
 ---    return { key = note + octave * 12 }
@@ -70,7 +69,10 @@ local Cycle = {}
 ---  end
 ---end)
 ---```
----@overload fun(self, function: CycleMapFunction|CycleMapGenerator)
+---@param map { [string]: CycleMapNoteValue }
+---@return Cycle
+---@nodiscard
+---@overload fun(self, function: CycleMapFunction|CycleMapGenerator): Cycle
 function Cycle:map(map) end
 
 ----------------------------------------------------------------------------------------------------
@@ -83,13 +85,11 @@ function Cycle:map(map) end
 --- * `:` - Sets the instrument or remappable target instead of selecting samples
 --- [Tidal Cycles Reference](https://tidalcycles.org/docs/reference/mini_notation/)
 ---
----@param input string
----@return Cycle
 ---### examples:
 --- ```lua
 -----A chord sequence
 ---cycle("[c4, e4, g4] [e4, g4, b4] [g4, b4, d5] [b4, d5, f#5]")
------Arpegio pattern with variations
+-----Arpeggio pattern with variations
 ---cycle("<c4 e4 g4> <e4 g4> <g4 b4 d5> <b4 f5>")
 -----Euclidean Rhythms
 ---cycle("c4(3,8) e4(5,8) g4(7,8)")
@@ -98,4 +98,7 @@ function Cycle:map(map) end
 -----Map custom identifiers to notes
 ---cycle("bd(3,8)"):map({ bd = "c4 #1" })
 --- ```
+---@param input string
+---@return Cycle
+---@nodiscard
 function cycle(input) end
