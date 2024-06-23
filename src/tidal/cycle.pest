@@ -36,12 +36,18 @@ repeat = { "!" }
 /// possible literals for single steps
 single = { hold | rest | number | chord | pitch | name }
 
-/// groups
-subdivision     = { "[" ~ (stack | split | choices | section)? ~ "]" }
-alternating     = { "<" ~ (stack | split | section)? ~ ">" }
+choice_op = {"|"}
+stack_op = {","}
+split_op = {"."}
 
-polymeter_tail  = { "%" ~  single }
-polymeter       = { "{" ~ (stack | split | section)? ~ "}" ~ polymeter_tail? }
+sections = _{ section ~ ((stack_op | split_op | choice_op) ~ section)* }
+
+/// groups
+subdivision     = { "[" ~ sections? ~ "]" }
+alternating     = { "<" ~ sections? ~ ">" }
+
+polymeter_tail  = { "%" ~  parameter }
+polymeter       = { "{" ~ sections? ~ "}" ~ polymeter_tail? }
 
 group     = _{ subdivision | alternating | polymeter }
 
@@ -66,18 +72,7 @@ expression  = { (single | group) ~ op+ }
 range       = ${ integer ~ ".." ~ integer }
 
 /// helper container that splits steps into sections
-section   = { ( expression | range | single | repeat | group)+ }
-
-/// a single choice inside a choice list
-choice    = {  expression | range | single | group }
-/// at least 2 choices, can only be inside subdivisions or the root
-choices   = { (choice) ~ ("|" ~ choice)+ }
-
-/// parallel sections of events found inside groups
-stack     = { (split | section) ~ ("," ~ (split | section))+ }
-
-// TODO shorthand for nested subdivisions
-split          = { (section) ~ ("." ~ section)+ }
+section   = _{ ( expression | range | single | repeat | group)+ }
 
 /// the root of the cycle
-mini = { SOI ~ ( stack | split | choices | section) ~ EOI }
+mini = { SOI ~ sections? ~ EOI }
