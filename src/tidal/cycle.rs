@@ -1905,6 +1905,7 @@ mod test {
 
         assert!(Cycle::from("c4'mode").is_ok());
         assert!(Cycle::from("c'm7#\u{0394}").is_ok());
+        assert!(Cycle::from("[[[[[[[[]]]]]][[[[[]][[[]]]]]][[[][[[]]]]][[[[]]]]]]").is_ok());
 
         assert_cycles(
             "<some_name _another_one c4'chord c4'-\u{0394}7 c6a_name>",
