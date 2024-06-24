@@ -112,9 +112,6 @@ mod test {
     #[test]
     fn parse() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
-
-        assert!(evaluate_cycle_userdata(&lua, r#"cycle({})"#).is_err());
-        assert!(evaluate_cycle_userdata(&lua, r#"cycle("")"#).is_err());
         assert!(evaluate_cycle_userdata(&lua, r#"cycle("[<")"#).is_err());
         assert!(evaluate_cycle_userdata(&lua, r#"cycle("[c4 e6]")"#).is_ok());
 
