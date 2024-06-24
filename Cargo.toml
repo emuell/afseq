@@ -15,13 +15,13 @@ paste = { version = "^1.0" }
 derive_more = { version = "^0.99" }
 log = { version = "^0.4" }
 simplelog = { version = "^0.12" }
-rand = { version = "0.8.5" }
-rand_xoshiro = { version = "0.6.0" }
-fraction = { version = "0.15.2" }
-pest = { version = "2.7.8" }
-pest_derive = { version = "2.7.8" }
+rand = { version = "^0.8" }
+rand_xoshiro = { version = "^0.6" }
+fraction = { version = "^0.15" }
+pest = { version = "^2.7" }
+pest_derive = { version = "^2.7" }
 # optional -> dhat-profiler
-dhat = { version = "0.3.2", optional = true }
+dhat = { version = "^0.3", optional = true }
 # optional -> scripting
 mlua = { version = "^0.9", features = [
     "lua51",
@@ -37,7 +37,7 @@ afplay = { git = "https://github.com/emuell/afplay", default-features = false, f
 
 [dev-dependencies]
 notify = { version = "^6.1" }
-ctrlc = { version = "3.4.0" }
+ctrlc = { version = "^3.4" }
 
 [profile.release]
 debug = 1
