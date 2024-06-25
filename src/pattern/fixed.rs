@@ -88,7 +88,7 @@ impl Pattern for FixedPattern {
         }
         // reset pulse iter and fetch first pulse from it
         let mut pulse_iter = self.pulses[self.pulse_index].clone().into_iter();
-        let pulse = pulse_iter.next().unwrap_or(PulseIterItem::default());
+        let pulse = pulse_iter.next().unwrap_or_default();
         self.pulse_iter = Some(pulse_iter);
         Some(pulse)
     }

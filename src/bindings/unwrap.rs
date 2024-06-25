@@ -77,7 +77,7 @@ impl<'lua> FromLua<'lua> for Note {
                 })
             }
             _ => {
-                return Err(LuaError::FromLuaConversionError {
+                Err(LuaError::FromLuaConversionError {
                     from: value.type_name(),
                     to: "note",
                     message: Some("expected a note number or note string".to_string()),
@@ -517,7 +517,7 @@ pub(crate) fn note_event_from_value(
         LuaValue::String(str) => note_event_from_string(&str.to_string_lossy()),
         LuaValue::Table(table) => note_event_from_table_map(table),
         _ => {
-            return Err(LuaError::FromLuaConversionError {
+            Err(LuaError::FromLuaConversionError {
                 from: arg.type_name(),
                 to: "note",
                 message: if let Some(index) = arg_index {
@@ -525,7 +525,7 @@ pub(crate) fn note_event_from_value(
                 } else {
                     Some("invalid note property".to_string())
                 },
-            });
+            })
         }
     }
 }

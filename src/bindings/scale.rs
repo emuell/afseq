@@ -23,12 +23,13 @@ impl LuaUserData for Scale {
                 let args = args.into_vec();
                 // parse degree
                 let mut degree = 1;
-                if !args.is_empty() {
-                    degree = note_degree_from_value(args.get(0).unwrap(), 1)?;
+                #[allow(clippy::get_first)]
+                if let Some(degree_value) = args.get(0) {
+                    degree = note_degree_from_value(degree_value, 1)?;
                 }
                 // parse count
                 let mut count = 3;
-                if args.len() >= 2 {
+                if let Some(count_value) = args.get(1) {
                     let count_error = || {
                         Err(bad_argument_error(
                             "chord",
@@ -37,7 +38,7 @@ impl LuaUserData for Scale {
                             "number of notes must be an integer in range [1..=5]",
                         ))
                     };
-                    if let Some(value) = args.get(1).unwrap().as_usize() {
+                    if let Some(value) = count_value.as_usize() {
                         count = value;
                         if !(1..=5).contains(&count) {
                             return count_error();

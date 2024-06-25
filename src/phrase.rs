@@ -135,11 +135,11 @@ impl Phrase {
                 }
                 RhythmSlot::Continue => {
                     // take over pending events
-                    self.next_events[rhythm_index] =
-                        previous_phrase.next_events[rhythm_index].clone();
+                    self.next_events[rhythm_index]
+                        .clone_from(&previous_phrase.next_events[rhythm_index]);
                     // take over rhythm
-                    self.rhythm_slots[rhythm_index] =
-                        previous_phrase.rhythm_slots[rhythm_index].clone();
+                    self.rhythm_slots[rhythm_index]
+                        .clone_from(&previous_phrase.rhythm_slots[rhythm_index]);
                 }
             }
         }

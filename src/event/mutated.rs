@@ -91,7 +91,7 @@ impl EventIter for MutatedEventIter {
     }
 
     fn reset(&mut self) {
-        self.events = self.initial_events.clone();
+        self.events.clone_from(&self.initial_events);
         self.event_index = 0;
         self.map = (self.reset_map)();
     }
