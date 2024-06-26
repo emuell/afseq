@@ -1,0 +1,190 @@
+use criterion::{black_box, criterion_group, Criterion};
+
+use afseq::prelude::*;
+
+// ---------------------------------------------------------------------------------------------
+
+fn create_phrase() -> Phrase {
+    let beat_time = BeatTimeBase {
+        samples_per_sec: 44100,
+        beats_per_min: 130.0,
+        beats_per_bar: 4,
+    };
+
+    let kick_cycle =
+        new_cycle_event("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")
+            .unwrap()
+            .with_mappings(&[
+                ("bd", vec![new_note("c4")]),
+                ("bd2", vec![new_note(("c4", None, 0.5))]),
+            ]);
+    let kick_pattern = beat_time.every_nth_beat(16.0).trigger(kick_cycle);
+
+    let snare_pattern = beat_time
+        .every_nth_beat(2.0)
+        .with_offset(BeatTimeStep::Beats(1.0))
+        .trigger(new_note_event("C_5"));
+
+    let hihat_pattern = beat_time
+        .every_nth_sixteenth(2.0)
+        .trigger(new_note_event("C_5").mutate({
+            let mut step = 0;
+            move |mut event| {
+                if let Event::NoteEvents(notes) = &mut event {
+                    for note in notes.iter_mut().flatten() {
+                        note.volume = 1.0 / (step + 1) as f32;
+                        step += 1;
+                        if step >= 3 {
+                            step = 0;
+                        }
+                    }
+                }
+                event
+            }
+        }));
+
+    let hihat_pattern2 = beat_time
+        .every_nth_sixteenth(2.0)
+        .with_offset(BeatTimeStep::Sixteenth(1.0))
+        .trigger(new_note_event("C_5").mutate({
+            let mut vel_step = 0;
+            let mut note_step = 0;
+            move |mut event| {
+                if let Event::NoteEvents(notes) = &mut event {
+                    for note in notes.iter_mut().flatten() {
+                        note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
+                        vel_step += 1;
+                        if vel_step >= 3 {
+                            vel_step = 0;
+                        }
+                        note.note = Note::from((Note::C4 as u8) + 32 - note_step);
+                        note_step += 1;
+                        if note_step >= 32 {
+                            note_step = 0;
+                        }
+                    }
+                }
+                event
+            }
+        }));
+
+    let hihat_rhythm = Phrase::new(
+        beat_time,
+        vec![hihat_pattern, hihat_pattern2],
+        BeatTimeStep::Bar(4.0),
+    );
+
+    let bass_notes = Scale::try_from((Note::C5, "aeolian")).unwrap().notes();
+    let bass_pattern = beat_time
+        .every_nth_eighth(1.0)
+        .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_pattern())
+        .trigger(new_note_event_sequence(vec![
+            new_note((bass_notes[0], None, 0.5)),
+            new_note((bass_notes[2], None, 0.5)),
+            new_note((bass_notes[3], None, 0.5)),
+            new_note((bass_notes[0], None, 0.5)),
+            new_note((bass_notes[2], None, 0.5)),
+            new_note((bass_notes[3], None, 0.5)),
+            new_note((bass_notes[6].transposed(-12), None, 0.5)),
+        ]));
+
+    let synth_pattern = beat_time
+        .every_nth_bar(4.0)
+        .trigger(new_polyphonic_note_sequence_event(vec![
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("G 4", None, 0.3)),
+            ],
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("F 4", None, 0.3)),
+            ],
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("G 4", None, 0.3)),
+            ],
+            vec![
+                new_note(("C 4", None, 0.3)),
+                new_note(("D#4", None, 0.3)),
+                new_note(("A#4", None, 0.3)),
+            ],
+        ]));
+
+    let fx_pattern = beat_time
+        .every_nth_seconds(8.0)
+        .trigger(new_polyphonic_note_sequence_event(vec![
+            vec![new_note(("C 4", None, 0.2)), None, None],
+            vec![None, new_note(("C 4", None, 0.2)), None],
+            vec![None, None, new_note(("F 4", None, 0.2))],
+        ]));
+
+    Phrase::new(
+        beat_time,
+        vec![
+            RhythmSlot::from(kick_pattern),
+            RhythmSlot::from(snare_pattern),
+            RhythmSlot::from(hihat_rhythm),
+            RhythmSlot::from(bass_pattern),
+            RhythmSlot::from(fx_pattern),
+            RhythmSlot::from(synth_pattern),
+        ],
+        BeatTimeStep::Bar(8.0),
+    )
+}
+
+// ---------------------------------------------------------------------------------------------
+
+pub fn create(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Rust Phrase");
+    group.bench_function("Create", |b| {
+        b.iter(|| {
+            black_box(create_phrase());
+        })
+    });
+    group.finish();
+}
+
+pub fn clone(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Rust Phrase");
+    let phrase = create_phrase();
+    group.bench_function("Clone", |b| {
+        b.iter(|| {
+            black_box(phrase.clone());
+        })
+    });
+    group.finish();
+}
+
+pub fn run(c: &mut Criterion) {
+    let event_count = 5000;
+    let mut group = c.benchmark_group("Rust Phrase");
+    group.measurement_time(std::time::Duration::from_secs(10));
+    let phrase = create_phrase();
+    group.throughput(criterion::Throughput::Elements(event_count));
+    group.bench_function("Run", |b| {
+        b.iter(|| {
+            let sample_time = SampleTime::MAX;
+            let mut phrase = phrase.clone();
+            let mut num_events = 0;
+            while let Some(event) = phrase.run_until_time(sample_time) {
+                black_box(event);
+                num_events += 1;
+                if num_events >= event_count {
+                    break;
+                }
+            }
+        })
+    });
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------------------------
+
+criterion_group! {
+    name = rhythm;
+    config = Criterion::default().sample_size(50);
+    targets = create, clone, run
+}

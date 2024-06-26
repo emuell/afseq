@@ -50,7 +50,7 @@ player = ["crossbeam-channel", "afplay"]
 default = ["scripting"]
 
 [[bench]]
-name = "cycle"
+name = "benches"
 harness = false
 
 [[example]]
