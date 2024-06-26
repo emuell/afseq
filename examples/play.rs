@@ -96,13 +96,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut step = 0;
             move |mut event| {
                 if let Event::NoteEvents(notes) = &mut event {
-                    for (_index, note) in notes.iter_mut().enumerate() {
-                        if let Some(note) = note {
-                            note.volume = 1.0 / (step + 1) as f32;
-                            step += 1;
-                            if step >= 3 {
-                                step = 0;
-                            }
+                    for note in notes.iter_mut().flatten() {
+                        note.volume = 1.0 / (step + 1) as f32;
+                        step += 1;
+                        if step >= 3 {
+                            step = 0;
                         }
                     }
                 }
@@ -118,18 +116,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut note_step = 0;
             move |mut event| {
                 if let Event::NoteEvents(notes) = &mut event {
-                    for (_index, note) in notes.iter_mut().enumerate() {
-                        if let Some(note) = note {
-                            note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
-                            vel_step += 1;
-                            if vel_step >= 3 {
-                                vel_step = 0;
-                            }
-                            note.note = Note::from((Note::C4 as u8) + 32 - note_step);
-                            note_step += 1;
-                            if note_step >= 32 {
-                                note_step = 0;
-                            }
+                    for note in notes.iter_mut().flatten() {
+                        note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
+                        vel_step += 1;
+                        if vel_step >= 3 {
+                            vel_step = 0;
+                        }
+                        note.note = Note::from((Note::C4 as u8) + 32 - note_step);
+                        note_step += 1;
+                        if note_step >= 32 {
+                            note_step = 0;
                         }
                     }
                 }
