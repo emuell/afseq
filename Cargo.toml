@@ -49,6 +49,9 @@ scripting = ["mlua"]
 player = ["crossbeam-channel", "afplay"]
 default = ["scripting"]
 
+[lib]
+bench = false
+
 [[bench]]
 name = "benches"
 harness = false
