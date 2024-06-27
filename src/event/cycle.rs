@@ -35,7 +35,7 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
             CycleValue::Integer(i) => Ok(vec![new_note(Note::from((*i).clamp(0, 0x7f) as u8))]),
             CycleValue::Pitch(p) => Ok(vec![new_note(Note::from(p.midi_note()))]),
             CycleValue::Chord(p, m) => {
-                let chord = Chord::try_from((p.midi_note(), m.as_str()))?;
+                let chord = Chord::try_from((p.midi_note(), m.as_ref()))?;
                 Ok(chord
                     .intervals()
                     .iter()

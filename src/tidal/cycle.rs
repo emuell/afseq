@@ -1,5 +1,7 @@
+use std::rc::Rc;
+
 #[cfg(test)]
-use core::fmt::Display;
+use std::fmt::Display;
 
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
@@ -125,13 +127,25 @@ impl Cycle {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Event {
     length: Fraction,
     span: Span,
     value: Value,
-    string: String,
+    string: Rc<str>,
     target: Target,
+}
+
+impl Default for Event {
+    fn default() -> Self {
+        Self {
+            length: Fraction::default(),
+            span: Span::default(),
+            value: Value::default(),
+            string: Rc::from("~"),
+            target: Target::default(),
+        }
+    }
 }
 
 impl Event {
@@ -189,8 +203,8 @@ pub enum Value {
     Float(f64),
     Integer(i32),
     Pitch(Pitch),
-    Chord(Pitch, String),
-    Name(String),
+    Chord(Pitch, Rc<str>),
+    Name(Rc<str>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -198,7 +212,7 @@ pub enum Target {
     #[default]
     None,
     Index(i32),
-    Name(String),
+    Name(Rc<str>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -273,14 +287,14 @@ impl Step {
 #[derive(Clone, Debug, PartialEq)]
 struct Single {
     value: Value,
-    string: String,
+    string: Rc<str>,
 }
 
 impl Default for Single {
     fn default() -> Self {
         Single {
             value: Value::Rest,
-            string: String::from("~"),
+            string: Rc::from("~"),
         }
     }
 }
@@ -482,9 +496,9 @@ impl Value {
             Value::Hold => Target::None,
             Value::Integer(i) => Target::Index(*i),
             Value::Float(f) => Target::Index(*f as i32),
-            Value::Pitch(p) => Target::Name(format!("{:?}", p)), // TODO might not be the best conversion idea
-            Value::Chord(p, m) => Target::Name(format!("{:?}'{}", p, m)),
-            Value::Name(n) => Target::Name(n.clone()),
+            Value::Pitch(p) => Target::Name(Rc::from(format!("{:?}", p))), // TODO might not be the best conversion idea
+            Value::Chord(p, m) => Target::Name(Rc::from(format!("{:?}'{}", p, m))),
+            Value::Name(n) => Target::Name(Rc::clone(n)),
         }
     }
     fn to_integer(&self) -> Option<i32> {
@@ -605,7 +619,7 @@ impl Event {
                 start,
                 end: start + length,
             },
-            string: "~".to_string(),
+            string: Rc::from("~"),
             value: Value::Rest,
             target: Target::None,
         }
@@ -616,7 +630,7 @@ impl Event {
         let pitch = Pitch { note, octave };
         Self {
             value: Value::Pitch(pitch.clone()),
-            string: pitch.to_string(),
+            string: Rc::from(pitch.to_string()),
             ..self.clone()
         }
     }
@@ -625,8 +639,8 @@ impl Event {
     fn with_chord(&self, note: u8, octave: u8, mode: &str) -> Self {
         let pitch = Pitch { note, octave };
         Self {
-            value: Value::Chord(pitch.clone(), mode.to_string()),
-            string: format!("{}'{}", pitch, mode),
+            value: Value::Chord(pitch.clone(), Rc::from(mode)),
+            string: Rc::from(format!("{}'{}", pitch, mode)),
             ..self.clone()
         }
     }
@@ -635,7 +649,7 @@ impl Event {
     fn with_int(&self, i: i32) -> Self {
         Self {
             value: Value::Integer(i),
-            string: i.to_string(),
+            string: Rc::from(i.to_string()),
             ..self.clone()
         }
     }
@@ -643,8 +657,8 @@ impl Event {
     #[cfg(test)]
     fn with_name(&self, n: &'static str) -> Self {
         Self {
-            value: Value::Name(String::from(n)),
-            string: n.to_string(),
+            value: Value::Name(Rc::from(n)),
+            string: Rc::from(n.to_string()),
             ..self.clone()
         }
     }
@@ -653,7 +667,7 @@ impl Event {
     fn with_float(&self, f: f64) -> Self {
         Self {
             value: Value::Float(f),
-            string: f.to_string(),
+            string: Rc::from(f.to_string()),
             ..self.clone()
         }
     }
@@ -718,7 +732,7 @@ impl Events {
         Events::Single(Event {
             length: Fraction::one(),
             span: Span::default(),
-            string: "~".to_string(),
+            string: Rc::from("~"),
             value: Value::Rest,
             target: Target::None,
         })
@@ -1047,9 +1061,9 @@ impl CycleParser {
                         _ => (),
                     }
                 }
-                Ok(Value::Chord(pitch, mode.to_string()))
+                Ok(Value::Chord(pitch, Rc::from(mode)))
             }
-            Rule::name => Ok(Value::Name(pair.as_str().to_string())),
+            Rule::name => Ok(Value::Name(Rc::from(pair.as_str()))),
             _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
         }
     }
@@ -1061,7 +1075,7 @@ impl CycleParser {
             .ok_or_else(|| format!("empty single {}", pair))
             .and_then(|value_pair| {
                 Ok(Step::Single(Single {
-                    string: value_pair.as_str().to_string(),
+                    string: Rc::from(value_pair.as_str()),
                     value: Self::value(value_pair)?,
                 }))
             })
@@ -1092,7 +1106,7 @@ impl CycleParser {
                             for _i in 1..repeats {
                                 steps.push(Step::Single(Single {
                                     value: Value::Hold,
-                                    string: "_".to_string(),
+                                    string: Rc::from("_"),
                                 }))
                             }
                         }
@@ -1109,7 +1123,7 @@ impl CycleParser {
                 for i in range {
                     steps.push(Step::Single(Single {
                         value: Value::Integer(i),
-                        string: i.to_string(),
+                        string: Rc::from(i.to_string()),
                     }))
                 }
             }
@@ -1279,7 +1293,7 @@ impl CycleParser {
                 if stack.len() > 1 && count > 0 {
                     let count = Step::Single(Single {
                         value: Value::Integer(count as i32),
-                        string: count.to_string(),
+                        string: Rc::from(count.to_string()),
                     });
                     // if there is a stack but no count, the first section will determine the count of the rest
                     Ok(Step::Stack(Stack {
@@ -1372,7 +1386,7 @@ impl CycleParser {
                 .ok_or_else(|| format!("invalid right hand {:?}", right_pair))
                 .and_then(Self::value)?;
             if matches!(op, StaticOp::Target()) && matches!(value, Value::Pitch(_)) {
-                Value::Name(right_pair.as_str().to_string())
+                Value::Name(Rc::from(right_pair.as_str()))
             } else {
                 value
             }
@@ -1482,7 +1496,7 @@ impl Cycle {
                     length: Fraction::one(),
                     target: Target::None,
                     span: Span::default(),
-                    string: s.string.clone(),
+                    string: Rc::clone(&s.string),
                     value: s.value.clone(),
                 })
             }
@@ -1884,7 +1898,7 @@ mod test {
                     Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_float(1.0),
                     Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
                         .with_note(3, 8)
-                        .with_target(Target::Name("test".to_string())),
+                        .with_target(Target::Name(Rc::from("test"))),
                 ]],
             ],
         )?;
@@ -1999,24 +2013,24 @@ mod test {
                     Event::at(F::from(0), F::new(1u8, 10u8)).with_int(1),
                     Event::at(F::new(1u8, 10u8), F::new(1u8, 10u8))
                         .with_int(2)
-                        .with_target(Target::Name("a".to_string())),
+                        .with_target(Target::Name(Rc::from("a"))),
                     Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
                     Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(1),
                     Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(2)
-                        .with_target(Target::Name("a".to_string())),
+                        .with_target(Target::Name(Rc::from("a"))),
                     Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 10u8)).with_int(10),
                     Event::at(F::new(1u8, 10u8), F::new(1u8, 10u8))
                         .with_int(20)
-                        .with_target(Target::Name("a".to_string())),
+                        .with_target(Target::Name(Rc::from("a"))),
                     Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
                     Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(10),
                     Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(20)
-                        .with_target(Target::Name("a".to_string())),
+                        .with_target(Target::Name(Rc::from("a"))),
                     Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
                 ]],
             ],
