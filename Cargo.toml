@@ -8,7 +8,6 @@ exclude = ["assets", "examples"]
 categories = ["audio", "midi", "sequencer"]
 
 [dependencies]
-# required
 lazy_static = { version = "^1.4" }
 anyhow = { version = "^1.0" }
 paste = { version = "^1.0" }
@@ -20,19 +19,21 @@ rand_xoshiro = { version = "^0.6" }
 fraction = { version = "^0.15" }
 pest = { version = "^2.7" }
 pest_derive = { version = "^2.7" }
+
 # optional -> dhat-profiler
 dhat = { version = "^0.3", optional = true }
-# optional -> scripting
-mlua = { version = "^0.9", features = [
-    "lua51",
-    "vendored",
-    "macros",
-    "unstable",
-], optional = true }
+
 # optional -> player
 crossbeam-channel = { version = "^0.5", optional = true }
 afplay = { git = "https://github.com/emuell/afplay", default-features = false, features = [
     "cpal-output",
+], optional = true }
+
+# optional -> scripting
+mlua = { version = "^0.9", default-features = false, features = [
+    "vendored",
+    "macros",
+    "unstable",
 ], optional = true }
 
 [dev-dependencies]
@@ -45,8 +46,10 @@ debug = 1
 
 [features]
 dhat-profiler = ["dhat"]
-scripting = ["mlua"]
 player = ["crossbeam-channel", "afplay"]
+scripting = ["mlua", "mlua/luajit"]
+scripting-no-jit = ["mlua", "mlua/lua51"]
+# NB: disable default-features when enabling no-jit!
 default = ["scripting"]
 
 [lib]
