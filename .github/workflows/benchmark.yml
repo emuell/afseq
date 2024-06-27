@@ -1,0 +1,19 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  runBenchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: boa-dev/criterion-compare-action@v3
+        with:
+          defaultFeatures: false
+          features: "scripting"
+          branchName: ${{ github.base_ref }}

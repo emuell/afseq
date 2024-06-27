@@ -38,6 +38,7 @@ afplay = { git = "https://github.com/emuell/afplay", default-features = false, f
 [dev-dependencies]
 notify = { version = "^6.1" }
 ctrlc = { version = "^3.4" }
+criterion = { version = "^0.5" }
 
 [profile.release]
 debug = 1
@@ -47,6 +48,13 @@ dhat-profiler = ["dhat"]
 scripting = ["mlua"]
 player = ["crossbeam-channel", "afplay"]
 default = ["scripting"]
+
+[lib]
+bench = false
+
+[[bench]]
+name = "benches"
+harness = false
 
 [[example]]
 name = "play"
