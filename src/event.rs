@@ -19,9 +19,9 @@ pub mod cycle;
 pub mod empty;
 pub mod fixed;
 pub mod mutated;
-#[cfg(feature = "scripting")]
+#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
 pub mod scripted;
-#[cfg(feature = "scripting")]
+#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
 pub mod scripted_cycle;
 
 // -------------------------------------------------------------------------------------------------

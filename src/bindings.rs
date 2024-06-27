@@ -79,7 +79,8 @@ impl LuaAppData {
 pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
     // create a new lua instance with the allowed std libraries
     let lua = Lua::new_with(
-        LuaStdLib::STRING | LuaStdLib::TABLE | LuaStdLib::MATH | LuaStdLib::PACKAGE,
+        // Only basics: no OS, IO, PACKAGE, DEBUG, FFI!
+        LuaStdLib::STRING | LuaStdLib::TABLE | LuaStdLib::MATH,
         LuaOptions::default(),
     )
     .expect("Failed to create a new lua engine");

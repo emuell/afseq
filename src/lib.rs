@@ -58,7 +58,7 @@ pub use phrase::Phrase;
 pub mod sequence;
 pub use sequence::Sequence;
 
-#[cfg(feature = "scripting")]
+#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
 pub mod bindings;
 
 #[cfg(feature = "player")]

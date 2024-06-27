@@ -7,7 +7,7 @@ use crate::{BeatTimeBase, PulseIterItem};
 // -------------------------------------------------------------------------------------------------
 
 pub mod probability;
-#[cfg(feature = "scripting")]
+#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
 pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
