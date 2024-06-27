@@ -163,7 +163,6 @@ pub fn run(c: &mut Criterion) {
     let mut group = c.benchmark_group("Rust Phrase");
     group.measurement_time(std::time::Duration::from_secs(10));
     let phrase = create_phrase();
-    group.throughput(criterion::Throughput::Elements(event_count));
     group.bench_function("Run", |b| {
         b.iter(|| {
             let sample_time = SampleTime::MAX;

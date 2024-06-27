@@ -1,22 +1,39 @@
-use criterion::{criterion_group, Criterion};
+use criterion::{black_box, criterion_group, Criterion};
 
 use afseq::tidal::Cycle;
 
 // ---------------------------------------------------------------------------------------------
 
-pub fn parser(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Cycle Parser");
-    group.bench_function("Mildly complex", |b| {
-        b.iter(|| Cycle::from("[a b c {a b}%4 ! !]").unwrap())
-    });
-    group.bench_function("Pretty complex", |b| {
-        b.iter(|| Cycle::from("<[{x@2 {x@3}}%4 x@3 x@4 ~!4] bd(3, 5) [[x@2 x@3 x@3]!2]>").unwrap())
-    });
-    group.bench_function("Very complex", |b| {
-        b.iter(|| Cycle::from("<[{x@2 {x@3}}%4 [0@2 <7 5>@2 3@2 5@1 0@1 3@2 <[7 2 3] [3 2 0]>@6] x@4 ~!4] bd(3, 5) [[x@2 x@3 x@3]!2]>").unwrap())});
-    group.bench_function("Very Nested", |b| {
-        b.iter(|| Cycle::from("{<[{[<>]}]>}{[]}{[[[]]]}").unwrap())
-    });
+fn create_cycle() -> Cycle {
+    // musical nonsense, trying to excessively use most of the supported features
+    Cycle::from(
+        r#"
+[{g@2 {g@3}}%4 ! !],
+[[a b c d](3,8,7)]
+[{a b!2 c}%3],
+[[0 1]!2 <a b>!4]
+[[[{{}}]]],
+[[1..12]:2]
+[<[7? 2? 3?] [3 2 0]>@6 . [a,b,c,d,e,f]:5],
+[<c4'maj g5'min d#'7#5 g8'5>]
+"#,
+    )
+    .unwrap()
+}
+
+// ---------------------------------------------------------------------------------------------
+
+pub fn parse(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Cycle");
+    group.bench_function("Parse", |b| b.iter(|| black_box(create_cycle())));
+    group.finish();
+}
+
+pub fn generate(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Cycle");
+    group.measurement_time(std::time::Duration::from_secs(10));
+    let mut cycle = create_cycle();
+    group.bench_function("Generate", |b| b.iter(|| black_box(cycle.generate())));
     group.finish();
 }
 
@@ -25,5 +42,5 @@ pub fn parser(c: &mut Criterion) {
 criterion_group! {
     name = cycle;
     config = Criterion::default().sample_size(50);
-    targets = parser
+    targets = parse, generate
 }
