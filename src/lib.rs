@@ -18,8 +18,18 @@
 
 // -------------------------------------------------------------------------------------------------
 
-#[cfg(all(feature = "scripting", not(any(feature = "lua51", feature = "luajit"))))]
-compile_error!("when enabling the `scripting` feature, enable one of the lua backend features, such as `lua51`, as well");
+#[cfg(all(
+    feature = "scripting",
+    not(any(
+        feature = "lua",
+        feature = "lua-jit",
+        feature = "luau",
+        feature = "luau-jit"
+    ))
+))]
+compile_error!(
+    "When enabling the `scripting` feature, enable one of the lua interpreter features as well: `lua`, `lua-jit`, `luau` or `lua-jit`"
+);
 
 // -------------------------------------------------------------------------------------------------
 

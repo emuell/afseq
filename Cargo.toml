@@ -40,6 +40,9 @@ notify = { version = "^6.1" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
 
+[profile.dev]
+debug = 1
+
 [profile.bench]
 debug = 1
 
@@ -47,12 +50,24 @@ debug = 1
 debug = 1
 
 [features]
+# enables profiling in examples
 dhat-profiler = ["dhat"]
+
+# example player implementation
 player = ["crossbeam-channel", "afplay"]
+
+# lua scripting
 scripting = ["mlua"]
-lua51 = ["mlua/lua51"]
-luajit = ["mlua/luajit"]
-default = ["scripting", "luajit"]
+
+# lua scripting interpreter backends (mutually exclusive)
+# all featured interpreters should be compatible with lua51
+lua = ["mlua/lua51"]
+lua-jit = ["mlua/luajit"]
+luau = ["mlua/luau"]
+luau-jit = ["mlua/luau-jit"]
+
+# default features enable scripting with a luaJIT interpreter 
+default = ["scripting", "lua-jit"]
 
 [lib]
 bench = false

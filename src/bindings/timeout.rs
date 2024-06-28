@@ -33,10 +33,10 @@ impl LuaTimeoutHook {
     pub(crate) fn new_with_timeout(lua: &Lua, timeout: Duration) -> Self {
         let active = Rc::new(RefCell::new(1));
         let start = Rc::new(RefCell::new(Instant::now()));
-        lua.set_hook(LuaHookTriggers::new().every_nth_instruction(timeout.as_millis() as u32), {
+        let timeout_hook = {
             let active = Rc::clone(&active);
             let start = Rc::clone(&start);
-            move |lua, _debug| {
+            move || {
                 if *active.borrow() > 0 {
                     if start.borrow().elapsed() > timeout {
                         *start.borrow_mut() = Instant::now();
@@ -47,14 +47,42 @@ impl LuaTimeoutHook {
                                 + "Also note that the script is running in real-time thread!",
                         ))
                     } else {
-                        Ok(())
+                        Ok(false) // continue running
                     }
                 } else {
-                    lua.remove_hook();
-                    Ok(())
+                    Ok(true) // remove hook
                 }
             }
-        });
+        };
+        // Lua or LuaJij -> set_hook
+        #[cfg(not(any(feature = "luau", feature = "luau-jit")))]
+        {
+            lua.set_hook(
+                LuaHookTriggers::new().every_nth_instruction(timeout.as_millis() as u32 * 10),
+                move |lua, _debug| match timeout_hook() {
+                    Ok(remove_hook) => {
+                        if remove_hook {
+                            lua.remove_hook();
+                        }
+                        Ok(())
+                    }
+                    Err(err) => Err(err),
+                },
+            );
+        }
+        // Luau -> set_interrupt
+        #[cfg(any(feature = "luau", feature = "luau-jit"))]
+        {
+            lua.set_interrupt(move |lua| match timeout_hook() {
+                Ok(remove_hook) => {
+                    if remove_hook {
+                        lua.remove_interrupt();
+                    }
+                    Ok(mlua::VmState::Continue)
+                }
+                Err(err) => Err(err),
+            });
+        }
         Self { active, start }
     }
 

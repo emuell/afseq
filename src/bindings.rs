@@ -300,13 +300,8 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
 
     // cache module bytecode to speed up initialization
     lazy_static! {
-        static ref MATH_BYTECODE: LuaResult<Vec<u8>> = {
-            let strip = true;
-            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
-                .load(include_str!("../types/nerdo/library/math.lua"))
-                .into_function()
-                .map(|x| x.dump(strip))
-        };
+        static ref MATH_BYTECODE: LuaResult<Vec<u8>> =
+            compile_chunk(include_str!("../types/nerdo/library/math.lua"));
     }
     // implemented in lua: load and evaluate cached chunk
     match MATH_BYTECODE.as_ref() {
@@ -417,13 +412,8 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
 fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up initialization
     lazy_static! {
-        static ref TABLE_BYTECODE: LuaResult<Vec<u8>> = {
-            let strip = true;
-            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
-                .load(include_str!("../types/nerdo/library/table.lua"))
-                .into_function()
-                .map(|x| x.dump(strip))
-        };
+        static ref TABLE_BYTECODE: LuaResult<Vec<u8>> =
+            compile_chunk(include_str!("../types/nerdo/library/table.lua"));
     }
     // implemented in lua: load and evaluate cached chunk
     match TABLE_BYTECODE.as_ref() {
@@ -439,13 +429,8 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
 fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up requires
     lazy_static! {
-        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> = {
-            let strip = true;
-            Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
-                .load(include_str!("../types/nerdo/library/pattern.lua"))
-                .into_function()
-                .map(|x| x.dump(strip))
-        };
+        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> =
+            compile_chunk(include_str!("../types/nerdo/library/pattern.lua"));
     }
     // implemented in lua: load and evaluate cached chunk
     match PATTERN_BYTECODE.as_ref() {
@@ -456,6 +441,22 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
             .exec(),
         Err(err) => Err(err.clone()),
     }
+}
+
+// --------------------------------------------------------------------------------------------------
+
+#[cfg(any(feature = "lua", feature = "lua-jit"))]
+fn compile_chunk(chunk: &'static str) -> LuaResult<Vec<u8>> {
+    let strip = false;
+    Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
+        .load(chunk)
+        .into_function()
+        .map(|x| x.dump(strip))
+}
+
+#[cfg(any(feature = "luau", feature = "luau-jit"))]
+fn compile_chunk(chunk: &'static str) -> LuaResult<Vec<u8>> {
+    Ok(mlua::Compiler::new().compile(chunk))
 }
 
 // --------------------------------------------------------------------------------------------------
