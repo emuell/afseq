@@ -32,7 +32,6 @@ afplay = { git = "https://github.com/emuell/afplay", default-features = false, f
 # optional -> scripting
 mlua = { version = "^0.9", default-features = false, features = [
     "vendored",
-    "macros",
     "unstable",
 ], optional = true }
 
@@ -41,16 +40,19 @@ notify = { version = "^6.1" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
 
+[profile.bench]
+debug = 1
+
 [profile.release]
 debug = 1
 
 [features]
 dhat-profiler = ["dhat"]
 player = ["crossbeam-channel", "afplay"]
-scripting = ["mlua", "mlua/luajit"]
-scripting-no-jit = ["mlua", "mlua/lua51"]
-# NB: disable default-features when enabling no-jit!
-default = ["scripting"]
+scripting = ["mlua"]
+lua51 = ["mlua/lua51"]
+luajit = ["mlua/luajit"]
+default = ["scripting", "luajit"]
 
 [lib]
 bench = false

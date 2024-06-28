@@ -7,7 +7,7 @@ use crate::{BeatTimeBase, PulseIterItem};
 pub mod empty;
 pub mod euclidean;
 pub mod fixed;
-#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
+#[cfg(feature = "scripting")]
 pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
