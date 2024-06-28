@@ -16,9 +16,6 @@ pub(crate) mod generic;
 pub mod beat_time;
 pub mod second_time;
 
-#[cfg(feature = "tidal")]
-mod tidal;
-
 // -------------------------------------------------------------------------------------------------
 
 /// Iter item as produced by [`RhythmIter`]
