@@ -1,4 +1,4 @@
 pub(crate) mod cycle;
 pub(crate) mod rhythm;
-#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
+#[cfg(feature = "scripting")]
 pub(crate) mod scripted;

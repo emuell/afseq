@@ -31,7 +31,7 @@
         "args": [
           "build",
           "--example=play-script",
-          "--features=scripting,player",
+          "--features=player",
           "--package=afseq"
         ],
         "filter": {

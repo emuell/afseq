@@ -6,14 +6,14 @@ mod benchmarks;
 
 // ---------------------------------------------------------------------------------------------
 
-#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
+#[cfg(feature = "scripting")]
 criterion_main!(
     benchmarks::scripted::scripted, //
     benchmarks::rhythm::rhythm,
     benchmarks::cycle::cycle,
 );
 
-#[cfg(not(any(feature = "scripting", feature = "scripting-no-jit")))]
+#[cfg(not(feature = "scripting"))]
 criterion_main!(
     benchmarks::rhythm::rhythm, //
     benchmarks::cycle::cycle,

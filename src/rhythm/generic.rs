@@ -10,7 +10,7 @@ use std::{
 
 use fraction::{ConstOne, ConstZero, Fraction, ToPrimitive};
 
-#[cfg(all(any(feature = "scripting", feature = "scripting-no-jit"), test))]
+#[cfg(all(feature = "scripting", test))]
 use std::borrow::BorrowMut;
 
 use crate::{
@@ -103,7 +103,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         self.pattern.borrow()
     }
     /// Get mut access the current pattern (only allowed in tests).
-    #[cfg(all(any(feature = "scripting", feature = "scripting-no-jit"), test))]
+    #[cfg(all(feature = "scripting", test))]
     pub(crate) fn pattern_mut(&mut self) -> &mut dyn Pattern {
         self.pattern.borrow_mut()
     }

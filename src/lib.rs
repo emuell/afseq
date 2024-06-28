@@ -6,10 +6,8 @@
 // Clippy lints
 
 #![warn(clippy::clone_on_ref_ptr)]
-
-// Useful, but also anoying: enable and check every now and then
+// Useful, but also annoying: enable and check every now and then
 // #![warn(clippy::pedantic)]
-
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::uninlined_format_args)]
@@ -17,6 +15,11 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_lossless)]
+
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(all(feature = "scripting", not(any(feature = "lua51", feature = "luajit"))))]
+compile_error!("when enabling the `scripting` feature, enable one of the lua backend features, such as `lua51`, as well");
 
 // -------------------------------------------------------------------------------------------------
 
@@ -58,7 +61,7 @@ pub use phrase::Phrase;
 pub mod sequence;
 pub use sequence::Sequence;
 
-#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
+#[cfg(feature = "scripting")]
 pub mod bindings;
 
 #[cfg(feature = "player")]

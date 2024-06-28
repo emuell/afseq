@@ -46,7 +46,7 @@ pub use super::{
     TimeBase,
 };
 
-#[cfg(any(feature = "scripting", feature = "scripting-no-jit"))]
+#[cfg(feature = "scripting")]
 // all public scripting types
 pub use super::{
     bindings::{
