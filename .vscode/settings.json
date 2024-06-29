@@ -1,11 +1,18 @@
 {
-    "rust-analyzer.cargo.features": "all",
-    "Lua.runtime.version": "Lua 5.1",
+    "rust-analyzer.cargo.features": [
+        "player",
+        "scripting",
+        "lua-jit"
+    ],
+    "Lua.runtime.version": "LuaJIT",
     "Lua.runtime.builtin": {
-        "debug": "disable",
-        "ffi": "disable",
         "os": "disable",
-        "io": "disable"
+        "io": "disable",
+        "package": "disable",
+        "debug": "disable",
+        "bit": "disable",
+        "jit": "disable",
+        "ffi": "disable",
     },
     "Lua.workspace.library": [
         "types/nerdo"
