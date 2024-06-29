@@ -102,16 +102,40 @@ impl Phrase {
         &self.rhythm_slots
     }
 
-    /// Run rhythms until a given sample time is reached, calling the given `visitor`
-    /// function for all emitted events to consume them.
-    pub fn emit_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
+    /// Run rhythms until a given sample time is reached, calling the given `consumer`
+    /// visitor function for all emitted events.
+    pub fn consume_events_until_time<F>(&mut self, sample_time: SampleTime, consumer: &mut F)
     where
         F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
         // emit next events until we've reached the desired sample_time
-        while let Some((rhythm_index, event)) = self.next_event_until_time(run_until_time) {
-            debug_assert!(event.time < run_until_time);
+        while let Some((rhythm_index, event)) = self.next_event_until_time(sample_time) {
+            debug_assert!(event.time < sample_time);
             consumer(rhythm_index, event.time, event.event, event.duration);
+        }
+    }
+
+    /// Seek rhythms until a given sample time is reached, ignoring all events until that time.
+    pub fn skip_events_until_time(&mut self, sample_time: SampleTime) {
+        // skip next events in all rhythms
+        for (rhythm_slot, next_event) in self
+            .rhythm_slots
+            .iter_mut()
+            .zip(self.next_events.iter_mut())
+        {
+            // skip cached, next due events
+            if let Some((rhythm_index, event)) = next_event.take() {
+                if event.time >= sample_time {
+                    // no yet due: put it back
+                    *next_event = Some((rhythm_index, event));
+                }
+            }
+            // when there's no cached event, seek the rhythm
+            if next_event.is_none() {
+                if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                    rhythm.borrow_mut().seek_until_time(sample_time);
+                }
+            }
         }
     }
 
@@ -221,11 +245,12 @@ impl RhythmIter for Phrase {
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
-        if let Some((_, event)) = self.next_event_until_time(sample_time) {
-            Some(event)
-        } else {
-            None
-        }
+        self.next_event_until_time(sample_time)
+            .map(|(_, event)| event)
+    }
+
+    fn seek_until_time(&mut self, sample_time: SampleTime) {
+        self.skip_events_until_time(sample_time)
     }
 }
 

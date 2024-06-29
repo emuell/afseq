@@ -16,8 +16,8 @@ use afplay::{
 
 use crate::{
     event::{unique_instrument_id, InstrumentId},
-    time::TimeBase,
-    Event, Note, RhythmIter, SampleTime, Sequence,
+    time::{SampleTimeDisplay, TimeBase},
+    Event, Note, SampleTime, Sequence,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -227,7 +227,7 @@ impl SamplePlayer {
         reset_playback_pos: bool,
         stop_fn: StopFn,
     ) {
-        // reset time counters when starting the first time or when explicitely requested, else continue
+        // reset time counters when starting the first time or when explicitly requested, else continue
         // playing from our previous time to avoid interrupting playback streams
         if reset_playback_pos || self.emitted_sample_time == 0 {
             self.reset_playback_position(sequence);
@@ -235,9 +235,9 @@ impl SamplePlayer {
         } else {
             // match playing notes state to the passed rhythm
             self.playing_notes
-                .resize(sequence.rhythm_slot_count(), HashMap::new());
+                .resize(sequence.phrase_rhythm_slot_count(), HashMap::new());
             // seek new phase to our previously played time
-            self.seek_sequence_until_time(sequence, self.emitted_sample_time);
+            sequence.skip_events_until_time(self.emitted_sample_time);
             log::debug!(target: "Player",
                 "Seek sequence to time {:.2}",
                 time_base.samples_to_seconds(self.emitted_sample_time)
@@ -285,7 +285,7 @@ impl SamplePlayer {
         // rebuild playing notes vec
         self.playing_notes.clear();
         self.playing_notes
-            .resize(sequence.rhythm_slot_count(), HashMap::new());
+            .resize(sequence.phrase_rhythm_slot_count(), HashMap::new());
         // stop whatever is playing in case we're restarting
         self.player
             .stop_all_sources()
@@ -296,21 +296,14 @@ impl SamplePlayer {
         self.emitted_beats = 0;
     }
 
-    #[allow(clippy::unused_self)]
-    fn seek_sequence_until_time(&mut self, sequence: &mut Sequence, sample_time: SampleTime) {
-        sequence.emit_until_time(sample_time, &mut |_, _, _, _| {
-            // ignore all events
-        });
-    }
-
     fn run_until_time(
         &mut self,
         sequence: &mut Sequence,
         start_offset: SampleTime,
         sample_time: SampleTime,
     ) {
-        let time_display = sequence.sample_time_display();
-        sequence.emit_until_time(
+        let time_base = *sequence.time_base();
+        sequence.consume_events_until_time(
             sample_time,
             &mut |rhythm_index, sample_time, event: Option<Event>, event_duration| {
                 // print
@@ -318,7 +311,7 @@ impl SamplePlayer {
                     const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
                     println!(
                         "{}: {}",
-                        time_display.display(sample_time),
+                        time_base.display(sample_time),
                         match &event {
                             Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
                             None => "---".to_string(),

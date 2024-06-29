@@ -65,9 +65,19 @@ pub trait RhythmIter: Debug {
     fn run(&mut self) -> Option<RhythmIterItem> {
         self.run_until_time(SampleTime::MAX)
     }
-    /// Sample time iter: runs pattern to generate a new pulse if the pulse's sample time is smaller
-    /// that the given sample time. Then generates an event from the event iter and returns it.  
+    /// Sample time iter: Generates the next due event but running the pattern to generate a new
+    /// pulse, if the pulse's sample time is smaller than the given sample time. Then generates an
+    /// event from the event iter and returns it. Else returns `None` when the pattern finished playing.
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem>;
+
+    /// Skip, dry run *all events* until the given target time is reached. Depending on the rhythm
+    /// impl this may be faster than using `run_until_time`, fetching, then discarding events.
+    fn seek_until_time(&mut self, sample_time: SampleTime) {
+        // default impl fetches and ignores all events until we've reached the given sample_time
+        while let Some(event) = self.run_until_time(sample_time) {
+            debug_assert!(event.time < sample_time);
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
