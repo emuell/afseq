@@ -1,39 +1,45 @@
 return rhythm {
   unit = "1/16",
   pattern = pattern.euclidean(6, 8, -5),
+  repeats = 63,
   offset = 16 * 64,
-  emit = function()
-    local SCALE_STEP_COUNT = 4
-    local INTERVALS = { 0, 3, 5, 4, 3, 5, 3, 1, 4, 0, 5, 1 }
+  emit = function(context)
+    local SCALE_STEP_COUNT = 8
+    local VOLUME_STEP_COUNT = 32
+
     local SCALES = {
+      scale("f", "major").notes,
       scale("c", "mixolydian").notes,
-      scale("g", "major").notes,
     }
+
+    local scale_index = 1
+    local volume_step = 4
+    local volume_direction = 1.0
+
     ---@param context EmitterContext
     return function(context)
-      -- get scale from current step
-      local scale_index = math.imod(
-        math.floor((context.step - 1) / #INTERVALS / SCALE_STEP_COUNT) + 1,
-        #SCALES)
-      local notes = pattern.from(INTERVALS):map(function(note_index) 
-        return SCALES[scale_index][note_index] or 0 
+      -- get current note set
+      local notes = pattern.from { 1, 6, 3, 4, 8, 3 }:map(function(v)
+        return SCALES[scale_index][v]
       end)
-      -- get key from current scale and step
-      local key
-      if context.step % 24 == 1 then
-        key = notes[math.random(#INTERVALS)]
-      else
-        key = notes[math.imod(context.step, #INTERVALS)]
+      -- get current note
+      local note = notes[math.imod(context.step, #notes)]
+      -- move scale step
+      scale_index = (math.floor(math.floor(context.step / #notes) / SCALE_STEP_COUNT) % #SCALES) + 1
+      -- move volume step
+      local volume = 0.3 * volume_step / VOLUME_STEP_COUNT + 0.2
+      if context.step % 2 == 0 then
+        volume = 0.3 * (1.0 - volume_step / VOLUME_STEP_COUNT) + 0.2
       end
-      -- get volume from step
-      local volume = (context.step % 3 == 1 or context.step % 7 == 1)
-          and 0.25 or math.random(3, 4) / 20;
-      volume = volume * 0.5
+      volume_step = volume_step + volume_direction
+      if volume_step >= VOLUME_STEP_COUNT or volume_step == 0 then
+        volume_direction = -volume_direction
+      end
       -- return final note
-      if key == 0 then
-        return {}
+      if note then
+        return { key = note, volume = volume * 0.16 }
       else
-        return { key = key, volume = volume }
+        return nil
       end
     end
   end
