@@ -17,6 +17,9 @@ fn create_phrase() -> Phrase {
         r#"
           return rhythm {
             unit = "1/1", 
+            pattern = function(context) 
+              return 1 
+            end,
             emit = cycle("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]"):map({
                 ["bd"] = "c4",
                 ["bd2"] = "c4 v0.5",
@@ -92,12 +95,18 @@ fn create_phrase() -> Phrase {
           return rhythm {
             unit = "bars", 
             resolution = 4,
-            emit = sequence( 
-              note("c4", "d#4", "g4"),
-              note("c4", "d#4", "f4"),
-              note("c4", "d#4", "g4"),
-              note("c4", "d#4", "a#4")
-            ):with_volume(0.3)
+            emit = function(context)
+              local CMIN = scale("c4", "minor")
+              local CHORDS = {
+                note(CMIN:chord("i", 3)),
+                note(CMIN:chord("i", 3)):transposed({0, 0, -2}),
+                note(CMIN:chord("i", 3)),
+                note(CMIN:chord("i", 4)):transposed({0, 0, 3, -12})
+              }
+              return function(context)
+                return CHORDS[math.imod(context.step, #CHORDS)] 
+              end
+            end
           }
         "#,
         "chord rhythm.lua",
@@ -141,7 +150,7 @@ pub fn clone(c: &mut Criterion) {
 }
 
 pub fn run(c: &mut Criterion) {
-    let event_count = 5000;
+    let event_count = 2500;
     let mut group = c.benchmark_group("Scripted Phrase");
     group.measurement_time(std::time::Duration::from_secs(10));
     let phrase = create_phrase();
@@ -162,10 +171,28 @@ pub fn run(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn seek(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Scripted Phrase");
+    let phrase = create_phrase();
+    let samples_per_sec = phrase.time_base().samples_per_sec;
+    let seek_counts = 60 * 30;
+    group.bench_function("Seek", |b| {
+        b.iter(|| {
+            let mut phrase = phrase.clone();
+            let mut sample_time = samples_per_sec as SampleTime;
+            while sample_time < (seek_counts * samples_per_sec) as SampleTime {
+                phrase.seek_until_time(sample_time);
+                sample_time += samples_per_sec as SampleTime;
+            }
+        })
+    });
+    group.finish();
+}
+
 // ---------------------------------------------------------------------------------------------
 
 criterion_group! {
     name = scripted;
-    config = Criterion::default().sample_size(50);
-    targets = create, clone, run
+    config = Criterion::default();
+    targets = create, clone, run, seek
 }

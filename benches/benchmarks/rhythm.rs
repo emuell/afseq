@@ -159,7 +159,7 @@ pub fn clone(c: &mut Criterion) {
 }
 
 pub fn run(c: &mut Criterion) {
-    let event_count = 5000;
+    let event_count = 2500;
     let mut group = c.benchmark_group("Rust Phrase");
     group.measurement_time(std::time::Duration::from_secs(10));
     let phrase = create_phrase();
@@ -180,10 +180,28 @@ pub fn run(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn seek(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Rust Phrase");
+    let phrase = create_phrase();
+    let samples_per_sec = phrase.time_base().samples_per_sec as SampleTime;
+    let seek_counts = 60 * 30;
+    group.bench_function("Seek", |b| {
+        b.iter(|| {
+            let mut phrase = phrase.clone();
+            let mut sample_time = samples_per_sec;
+            while sample_time <= seek_counts * samples_per_sec {
+                phrase.seek_until_time(sample_time);
+                sample_time += samples_per_sec;
+            }
+        })
+    });
+    group.finish();
+}
+
 // ---------------------------------------------------------------------------------------------
 
 criterion_group! {
     name = rhythm;
-    config = Criterion::default().sample_size(50);
-    targets = create, clone, run
+    config = Criterion::default();
+    targets = create, clone, run, seek
 }

@@ -31,7 +31,6 @@ pub fn parse(c: &mut Criterion) {
 
 pub fn generate(c: &mut Criterion) {
     let mut group = c.benchmark_group("Cycle");
-    group.measurement_time(std::time::Duration::from_secs(10));
     let mut cycle = create_cycle();
     group.bench_function("Generate", |b| b.iter(|| black_box(cycle.generate())));
     group.finish();
@@ -41,6 +40,6 @@ pub fn generate(c: &mut Criterion) {
 
 criterion_group! {
     name = cycle;
-    config = Criterion::default().sample_size(50);
+    config = Criterion::default();
     targets = parse, generate
 }
