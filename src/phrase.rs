@@ -265,7 +265,12 @@ impl Rhythm for Phrase {
         self.length.steps() as usize
     }
 
+    fn time_base(&self) -> &BeatTimeBase {
+        &self.time_base
+    }
+
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        self.time_base.clone_from(time_base);
         for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
                 rhythm.borrow_mut().set_time_base(time_base);

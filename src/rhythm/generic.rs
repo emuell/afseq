@@ -330,6 +330,10 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         self.pattern.len()
     }
 
+    fn time_base(&self) -> &BeatTimeBase {
+        &self.time_base
+    }
+
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // reschedule next event's sample time to the new time base
         if self.event_iter_sample_time > 0 {
@@ -338,7 +342,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
                     / self.step.to_samples(&self.time_base)
                     * self.step.to_samples(time_base);
         }
-        self.time_base = *time_base;
+        self.time_base.clone_from(time_base);
         // update pattern, gate and event iter
         self.pattern.set_time_base(time_base);
         self.gate.set_time_base(time_base);

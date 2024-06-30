@@ -48,7 +48,7 @@ impl RhythmIterItem {
 /// audio stream.
 ///
 /// `RhythmIter` impls typically will use a [`EventIter`](crate::EventIter) to produce one or
-/// multiple notes, or a sigle parameter change event. The event iter impl is an iterator too,
+/// multiple notes, or a single parameter change event. The event iter impl is an iterator too,
 /// so the emitted event content may dynamically change over time as well.
 pub trait RhythmIter: Debug {
     /// Create a sample time display printer, which serializes the given sample time to the rhythm's
@@ -105,7 +105,10 @@ pub trait Rhythm: RhythmIter {
     /// A rhythm pattern repeats after `self.pattern_step_length() * self.pattern_length()` samples.
     fn pattern_length(&self) -> usize;
 
-    /// Set or update the rhythm's internal beat or second time bases with a new time base.
+    /// Get the rhythm's current internal time base.
+    fn time_base(&self) -> &BeatTimeBase;
+    /// Update the rhythm's internal time bases with a new time base.
+    /// A rhythm usually will be created with a valid initial time base.
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
     /// Set/unset a new default instrument value for all emitted note events which have no
@@ -115,7 +118,7 @@ pub trait Rhythm: RhythmIter {
     /// Set optional, application specific external context data for the pattern and emitter.
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
-    /// Create a new cloned instance of this rhythm. This actualy is a clone(), wrapped into
+    /// Create a new cloned instance of this rhythm. This actually is a clone(), wrapped into
     /// a `Box<dyn Rhythm>`, but called 'duplicate' to avoid conflicts with possible Clone impls.
     fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>>;
     /// Resets/rewinds the rhythm to its initial state.
