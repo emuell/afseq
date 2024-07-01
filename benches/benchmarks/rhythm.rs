@@ -152,7 +152,8 @@ pub fn clone(c: &mut Criterion) {
     let phrase = create_phrase();
     group.bench_function("Clone", |b| {
         b.iter(|| {
-            black_box(phrase.clone());
+            let mut phrase = black_box(phrase.clone());
+            phrase.reset();
         })
     });
     group.finish();
@@ -167,6 +168,7 @@ pub fn run(c: &mut Criterion) {
         b.iter(|| {
             let sample_time = SampleTime::MAX;
             let mut phrase = phrase.clone();
+            phrase.reset();
             let mut num_events = 0;
             while let Some(event) = phrase.run_until_time(sample_time) {
                 black_box(event);
@@ -183,15 +185,17 @@ pub fn run(c: &mut Criterion) {
 pub fn seek(c: &mut Criterion) {
     let mut group = c.benchmark_group("Rust Phrase");
     let phrase = create_phrase();
-    let samples_per_sec = phrase.time_base().samples_per_sec as SampleTime;
-    let seek_counts = 60 * 30;
+    let samples_per_sec = phrase.time_base().samples_per_sec;
+    let seek_step = 10;
+    let seek_time = 60 * 60;
     group.bench_function("Seek", |b| {
         b.iter(|| {
             let mut phrase = phrase.clone();
-            let mut sample_time = samples_per_sec;
-            while sample_time <= seek_counts * samples_per_sec {
+            phrase.reset();
+            let mut sample_time = samples_per_sec as SampleTime;
+            while sample_time < (seek_time * samples_per_sec) as SampleTime {
                 phrase.seek_until_time(sample_time);
-                sample_time += samples_per_sec;
+                sample_time += seek_step * samples_per_sec as SampleTime;
             }
         })
     });
