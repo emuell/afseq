@@ -13,7 +13,6 @@
           "build",
           "--example=play",
           "--features=player",
-          "--package=afseq"
         ],
         "filter": {
           "name": "play",
@@ -32,7 +31,6 @@
           "build",
           "--example=play-script",
           "--features=player",
-          "--package=afseq"
         ],
         "filter": {
           "name": "play-script",
@@ -43,12 +41,44 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "arg": [],
-      "name": "Debug current Lua File",
-      "program": "${file}",
+      "type": "lldb",
       "request": "launch",
+      "name": "Debug tests",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+        ],
+      },
+      "args": [
+        "--test",
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug benchmarks",
+      "cargo": {
+        "args": [
+          "bench",
+          "--no-run",
+        ],
+      },
+      "args": [
+        "--bench",
+        "--profile-time",
+        "100",
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lua",
+      "name": "Debug current Lua File",
+      "request": "launch",
+      "program": "${file}",
+      "arg": [],
       "stopOnEntry": true,
-      "type": "lua"
     },
   ]
 }
