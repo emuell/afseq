@@ -103,11 +103,15 @@ impl EventIter for FixedEventIter {
             return None;
         }
         let event = self.events[self.event_index].clone();
-        self.event_index += 1;
-        if self.event_index >= self.events.len() {
-            self.event_index = 0;
-        }
+        self.event_index = (self.event_index + 1) % self.events.len();
         Some(vec![EventIterItem::new(event)])
+    }
+
+    fn omit(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+        if !emit_event || self.events.is_empty() {
+            return;
+        }
+        self.event_index = (self.event_index + 1) % self.events.len();
     }
 
     fn duplicate(&self) -> Box<dyn EventIter> {

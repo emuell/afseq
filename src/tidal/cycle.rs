@@ -96,12 +96,10 @@ impl Cycle {
         }
     }
 
-    // TODO remove this or improve, * and / can change the output, <1> does not etc..
-    /// check if a cycle will give different outputs between cycles
+    /// Check if a cycle may give different outputs between cycles.
     pub fn is_stateful(&self) -> bool {
-        ['<', '{', '|', '?', '/']
-            .iter()
-            .any(|&c| self.input.contains(c))
+        // TODO improve: * and / can change the output, <1> does not etc..
+        self.input.contains(['<', '{', '|', '?', '/'])
     }
 
     /// Query for the next iteration of output.
@@ -115,6 +113,23 @@ impl Cycle {
         self.state.iteration += 1;
         events.transform_spans(&Span::default());
         Ok(events.export())
+    }
+
+    /// Calculate next iteration of output without actually generating events.
+    ///
+    /// For stateful inputs, this generates output events, discarding resulting events,
+    /// for stateless inputs, this simply moves the iteration counter.   
+    ///
+    /// Returns error when the number of generated events exceed the configured event limit.
+    pub fn omit(&mut self) -> Result<(), String> {
+        let cycle = self.state.iteration;
+        self.state.events = 0;
+        self.state.step = 0;
+        if self.is_stateful() {
+            let _ = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
+        }
+        self.state.iteration += 1;
+        Ok(())
     }
 
     /// reset state to initial state

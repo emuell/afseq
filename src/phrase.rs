@@ -124,17 +124,15 @@ impl Phrase {
             .zip(self.next_events.iter_mut())
         {
             // skip cached, next due events
-            if let Some((rhythm_index, event)) = next_event.take() {
+            if let Some((_, event)) = next_event {
                 if event.time >= sample_time {
-                    // no yet due: put it back
-                    *next_event = Some((rhythm_index, event));
+                    // cached event is not yet due: no need to seek the slot
+                    continue;
                 }
+                *next_event = None;
             }
-            // when there's no cached event, seek the rhythm
-            if next_event.is_none() {
-                if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                    rhythm.borrow_mut().seek_until_time(sample_time);
-                }
+            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
+                rhythm.borrow_mut().skip_until_time(sample_time);
             }
         }
     }
@@ -142,10 +140,10 @@ impl Phrase {
     /// reset playback status and shift events to the given sample position.
     /// Further take over rhythms from the passed previously playing phrase for `RhythmSlot::Continue` slots.   
     pub fn reset_with_offset(&mut self, sample_offset: SampleTime, previous_phrase: &Phrase) {
-        // reset rhythm iters, unless they are in continue mode. in contine mode, copy the slot
+        // reset rhythm iters, unless they are in continue mode. in continue mode, copy the slot
         // from the previously playing phrase and adjust sample offsets to fit.
-        for rhythm_index in 0..self.rhythm_slots.len() {
-            match &mut self.rhythm_slots[rhythm_index] {
+        for (rhythm_index, rhythm_slot) in self.rhythm_slots.iter_mut().enumerate() {
+            match rhythm_slot {
                 RhythmSlot::Rhythm(rhythm) => {
                     {
                         let mut rhythm = rhythm.borrow_mut();
@@ -162,8 +160,7 @@ impl Phrase {
                     self.next_events[rhythm_index]
                         .clone_from(&previous_phrase.next_events[rhythm_index]);
                     // take over rhythm
-                    self.rhythm_slots[rhythm_index]
-                        .clone_from(&previous_phrase.rhythm_slots[rhythm_index]);
+                    rhythm_slot.clone_from(&previous_phrase.rhythm_slots[rhythm_index]);
                 }
             }
         }
@@ -249,7 +246,7 @@ impl RhythmIter for Phrase {
             .map(|(_, event)| event)
     }
 
-    fn seek_until_time(&mut self, sample_time: SampleTime) {
+    fn skip_until_time(&mut self, sample_time: SampleTime) {
         self.skip_events_until_time(sample_time)
     }
 }

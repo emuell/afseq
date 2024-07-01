@@ -395,7 +395,15 @@ pub trait EventIter: Debug {
     /// Returns an optional stack of event iter items, which should be emitted for the given pulse.
     fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>>;
 
-    /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
+    /// Move iterator with the given pulse value forward without returning an event.
+    ///
+    /// This can be used to optimize iterator skipping in some EventIter implementations, but by
+    /// default calls `run` and simply discards the generated event return value.
+    fn omit(&mut self, pulse: PulseIterItem, emit_event: bool) {
+        let _ = self.run(pulse, emit_event);
+    }
+
+    /// Create a new cloned instance of this event iter. This actually is a clone(), wrapped into
     /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
     /// Clone impls.
     fn duplicate(&self) -> Box<dyn EventIter>;

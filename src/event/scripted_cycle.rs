@@ -170,6 +170,14 @@ impl ScriptedCycleEventIter {
         // convert timed note events into EventIterItems
         timed_note_events.into_event_iter_items()
     }
+
+    /// Generate next batch of events from the next cycle run but ignore the results.
+    fn omit_events(&mut self) {
+        // run the cycle event generator
+        if let Err(err) = self.cycle.omit() {
+            add_lua_callback_error("cycle", &LuaError::RuntimeError(err));
+        }
+    }
 }
 
 impl EventIter for ScriptedCycleEventIter {
@@ -200,6 +208,12 @@ impl EventIter for ScriptedCycleEventIter {
             Some(self.generate_events())
         } else {
             None
+        }
+    }
+
+    fn omit(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+        if emit_event {
+            self.omit_events()
         }
     }
 
