@@ -48,7 +48,7 @@ impl ScriptedEventIter {
         })
     }
 
-    fn next_event(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
+    fn generate_event(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
@@ -63,6 +63,19 @@ impl ScriptedEventIter {
         FixedEventIter::normalize_event(&mut event, &mut self.note_event_state);
         // return as EventIterItem
         Ok(Some(vec![EventIterItem::new(event)]))
+    }
+
+    fn omit_event(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
+        // reset timeout
+        self.timeout_hook.reset();
+        // update function context
+        self.callback.set_context_pulse_value(pulse)?;
+        self.callback
+            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
+        self.callback.set_context_step(self.step)?;
+        // invoke callback and ignore the result
+        self.callback.call()?;
+        Ok(())
     }
 }
 
@@ -99,7 +112,7 @@ impl EventIter for ScriptedEventIter {
     fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
-            let event = match self.next_event(pulse) {
+            let event = match self.generate_event(pulse) {
                 Ok(event) => event,
                 Err(err) => {
                     self.callback.handle_error(&err);
@@ -114,6 +127,21 @@ impl EventIter for ScriptedEventIter {
             self.pulse_step += 1;
             self.pulse_time_step += pulse.step_time;
             None
+        }
+    }
+
+    fn omit(&mut self, pulse: PulseIterItem, emit_event: bool) {
+        // generate a new event and move or only update pulse counters
+        if emit_event {
+            if let Err(err) = self.omit_event(pulse) {
+                self.callback.handle_error(&err);
+            }
+            self.step += 1;
+            self.pulse_step += 1;
+            self.pulse_time_step += pulse.step_time;
+        } else {
+            self.pulse_step += 1;
+            self.pulse_time_step += pulse.step_time;
         }
     }
 

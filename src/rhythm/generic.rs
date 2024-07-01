@@ -256,7 +256,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             // next event is not yet due
             return None;
         }
-        // fetch new event iter items, if neccessary
+        // fetch new event iter items, if necessary
         if self.event_iter_items.is_empty() {
             // generate a pulse from the pattern and pass the pulse to the gate
             let (new_pulse_item, emit_event) = {
@@ -270,8 +270,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             };
             self.event_iter_pulse_item = new_pulse_item;
             // generate new events from the gated pulse
-            let slice = self.event_iter.run(new_pulse_item, emit_event);
-            if let Some(slice) = slice {
+            if let Some(slice) = self.event_iter.run(new_pulse_item, emit_event) {
                 self.event_iter_items = VecDeque::from(slice);
             } else {
                 self.event_iter_items.clear();
@@ -283,13 +282,13 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
             .pop_front()
             .map(|event| self.event_with_default_instrument(event))
         {
-            if self.event_iter_item_start_time(&event_item.start) >= sample_time {
+            // return event as sample timed rhythm iter item
+            let time = self.event_iter_item_start_time(&event_item.start);
+            if time >= sample_time {
                 // the given event iter item is not yet due: put it back
                 self.event_iter_items.push_front(event_item);
                 return None;
             }
-            // return event as sample timed rhythm iter item
-            let time = self.event_iter_item_start_time(&event_item.start);
             let event = Some(event_item.event);
             let duration = self.event_iter_item_duration(&event_item.length);
             // advance to the next pulse in the next iteration when all events got consumed
@@ -305,6 +304,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         } else {
             // and return a timed None event
             let time = self.event_iter_item_start_time(&Fraction::ZERO);
+            debug_assert!(time < sample_time, "Event should be due here");
             let event = None;
             let duration = self.event_iter_item_duration(&Fraction::ONE);
             // advance to the next pulse in the next iteration
@@ -315,6 +315,66 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
                 event,
                 duration,
             })
+        }
+    }
+
+    fn skip_until_time(&mut self, sample_time: SampleTime) {
+        loop {
+            // quickly check if the next event is due before the given target time
+            self.event_iter_sample_time = sample_time;
+            let next_sample_time =
+                self.sample_offset + self.event_iter_next_sample_time as SampleTime;
+            if next_sample_time >= sample_time {
+                // next event is not yet due: we're done
+                break;
+            }
+            // fetch new event iter items, if necessary
+            if self.event_iter_items.is_empty() {
+                // generate a pulse from the pattern and pass the pulse to the gate
+                let (new_pulse_item, emit_event) = {
+                    if let Some(pulse) = self.pattern.run() {
+                        let emit_event = self.gate.run(&pulse);
+                        (pulse, emit_event)
+                    } else {
+                        // pattern playback finished
+                        break;
+                    }
+                };
+                self.event_iter_pulse_item = new_pulse_item;
+
+                // test if the event iter crosses the target time
+                let step_duration = self.current_steps_sample_duration();
+                let next_step_time =
+                    (self.event_iter_next_sample_time + step_duration) as SampleTime;
+                if next_step_time < sample_time {
+                    self.event_iter.omit(new_pulse_item, emit_event);
+                    self.event_iter_next_sample_time += step_duration;
+                    continue;
+                } else {
+                    // generate new events from the gated pulse
+                    if let Some(slice) = self.event_iter.run(new_pulse_item, emit_event) {
+                        self.event_iter_items = VecDeque::from(slice);
+                    } else {
+                        self.event_iter_items.clear();
+                    }
+                }
+            }
+            // fetch a new event item from the event iter item deque
+            if let Some(event_item) = self.event_iter_items.pop_front() {
+                // return event as sample timed rhythm iter item
+                let time = self.event_iter_item_start_time(&event_item.start);
+                if time >= sample_time {
+                    // the given event iter item is not yet due: put it back
+                    self.event_iter_items.push_front(event_item);
+                    break;
+                }
+                // advance to the next pulse in the next iteration when all events got consumed
+                if self.event_iter_items.is_empty() {
+                    self.event_iter_next_sample_time += self.current_steps_sample_duration();
+                }
+            } else {
+                self.event_iter_next_sample_time += self.current_steps_sample_duration();
+            }
         }
     }
 }

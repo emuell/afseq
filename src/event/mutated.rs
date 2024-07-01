@@ -73,17 +73,13 @@ impl EventIter for MutatedEventIter {
     }
 
     fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
-        if emit_event {
-            let event = self.events[self.event_index].clone();
-            self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
-            self.event_index += 1;
-            if self.event_index >= self.events.len() {
-                self.event_index = 0;
-            }
-            Some(vec![EventIterItem::new(event)])
-        } else {
-            None
+        if !emit_event || self.events.is_empty() {
+            return None;
         }
+        let event = self.events[self.event_index].clone();
+        self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
+        self.event_index = (self.event_index + 1) % self.events.len();
+        Some(vec![EventIterItem::new(event)])
     }
 
     fn duplicate(&self) -> Box<dyn EventIter> {
