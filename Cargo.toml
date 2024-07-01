@@ -41,13 +41,13 @@ ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
 
 [profile.dev]
-debug = 1
+debug = "full"
 
 [profile.bench]
-debug = 1
+debug = "full"
 
 [profile.release]
-debug = 1
+debug = "full"
 
 [features]
 # enables profiling in examples
