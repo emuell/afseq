@@ -70,12 +70,13 @@ pub trait RhythmIter: Debug {
     /// event from the event iter and returns it. Else returns `None` when the pattern finished playing.
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem>;
 
-    /// Skip, dry run *all events* until the given target time is reached. Depending on the rhythm
-    /// impl this may be faster than using `run_until_time`, fetching, then discarding events.
-    fn seek_until_time(&mut self, sample_time: SampleTime) {
-        // default impl fetches and ignores all events until we've reached the given sample_time
-        while let Some(event) = self.run_until_time(sample_time) {
-            debug_assert!(event.time < sample_time);
+    /// Skip, dry run *all events* until the given target time is reached.
+    ///
+    /// This calls `run_until_time` by default, until the target time is reached and
+    /// discards all generated events, but may be overridden to optimize run time.
+    fn skip_until_time(&mut self, sample_time: SampleTime) {
+        while self.run_until_time(sample_time).is_some() {
+            // continue
         }
     }
 }

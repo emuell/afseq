@@ -185,7 +185,7 @@ pub fn seek(c: &mut Criterion) {
             phrase.reset();
             let mut sample_time = samples_per_sec as SampleTime;
             while sample_time < (seek_time * samples_per_sec) as SampleTime {
-                phrase.seek_until_time(sample_time);
+                phrase.skip_until_time(sample_time);
                 sample_time += seek_step * samples_per_sec as SampleTime;
             }
         })
