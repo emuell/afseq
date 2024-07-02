@@ -44,7 +44,6 @@ impl Cycle {
                     let input = input.to_string();
                     let root = CycleParser::step(mini)?;
                     let state = CycleState {
-                        step: 0,
                         events: 0,
                         iteration: 0,
                         rng: Xoshiro256PlusPlus::from_seed(thread_rng().gen()),
@@ -99,7 +98,7 @@ impl Cycle {
     /// Check if a cycle may give different outputs between cycles.
     pub fn is_stateful(&self) -> bool {
         // TODO improve: * and / can change the output, <1> does not etc..
-        self.input.contains(['<', '{', '|', '?', '/'])
+        self.input.contains(['<', '{', '|', '?', '/', '*'])
     }
 
     /// Query for the next iteration of output.
@@ -108,7 +107,6 @@ impl Cycle {
     pub fn generate(&mut self) -> Result<Vec<Vec<Event>>, String> {
         let cycle = self.state.iteration;
         self.state.events = 0;
-        self.state.step = 0;
         let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
         self.state.iteration += 1;
         events.transform_spans(&Span::default());
@@ -124,7 +122,6 @@ impl Cycle {
     pub fn omit(&mut self) -> Result<(), String> {
         let cycle = self.state.iteration;
         self.state.events = 0;
-        self.state.step = 0;
         if self.is_stateful() {
             let _ = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
         }
@@ -135,7 +132,6 @@ impl Cycle {
     /// reset state to initial state
     pub fn reset(&mut self) {
         self.state.iteration = 0;
-        self.state.step = 0;
         self.state.events = 0;
         self.state.rng =
             Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
@@ -1444,7 +1440,6 @@ impl CycleParser {
 struct CycleState {
     iteration: u32,
     rng: Xoshiro256PlusPlus,
-    step: u32,
     events: usize,
 }
 
@@ -1729,6 +1724,7 @@ impl Cycle {
 #[cfg(test)]
 mod test {
     use super::*;
+
     type F = fraction::Fraction;
 
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
@@ -1740,13 +1736,50 @@ mod test {
     }
 
     fn assert_cycle_equality(a: &str, b: &str) -> Result<(), String> {
-        assert_eq!(Cycle::from(a)?.generate()?, Cycle::from(b)?.generate()?,);
+        let seed = rand::thread_rng().gen();
+        assert_eq!(
+            Cycle::from(a)?.with_seed(seed).generate()?,
+            Cycle::from(b)?.with_seed(seed).generate()?,
+        );
         Ok(())
     }
 
     #[test]
 
-    pub fn cycle() -> Result<(), String> {
+    fn span() -> Result<(), String> {
+        assert!(Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
+            .includes(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
+        Ok(())
+    }
+
+    #[test]
+    fn parse() -> Result<(), String> {
+        assert!(Cycle::from("a b c [d").is_err());
+        assert!(Cycle::from("a b/ c [d").is_err());
+        assert!(Cycle::from("a b--- c [d").is_err());
+        assert!(Cycle::from("*a b c [d").is_err());
+        assert!(Cycle::from("a {{{}}").is_err());
+        assert!(Cycle::from("a*[]").is_err());
+        assert!(Cycle::from("] a z [").is_err());
+        assert!(Cycle::from("->err").is_err());
+        assert!(Cycle::from("(a, b)").is_err());
+        assert!(Cycle::from("#(12, 32)").is_err());
+        assert!(Cycle::from("#c $").is_err());
+
+        assert!(Cycle::from("c44'mode").is_err());
+        assert!(Cycle::from("c4'!mode").is_err());
+        assert!(Cycle::from("y'mode").is_err());
+        assert!(Cycle::from("c4'mo'de").is_err());
+
+        assert!(Cycle::from("c4'mode").is_ok());
+        assert!(Cycle::from("c'm7#\u{0394}").is_ok());
+        assert!(Cycle::from("[[[[[[[[]]]]]][[[[[]][[[]]]]]][[[][[[]]]]][[[[]]]]]]").is_ok());
+
+        Ok(())
+    }
+
+    #[test]
+    fn generate() -> Result<(), String> {
         assert_eq!(
             Cycle::from("a b c d")?.generate()?,
             [[
@@ -1926,15 +1959,6 @@ mod test {
                 Event::at(F::new(1u8, 4u8), F::new(3u8, 4u8)),
             ]]
         );
-
-        assert!(Cycle::from("c44'mode").is_err());
-        assert!(Cycle::from("c4'!mode").is_err());
-        assert!(Cycle::from("y'mode").is_err());
-        assert!(Cycle::from("c4'mo'de").is_err());
-
-        assert!(Cycle::from("c4'mode").is_ok());
-        assert!(Cycle::from("c'm7#\u{0394}").is_ok());
-        assert!(Cycle::from("[[[[[[[[]]]]]][[[[[]][[[]]]]]][[[][[[]]]]][[[[]]]]]]").is_ok());
 
         assert_cycles(
             "<some_name _another_one c4'chord c4'-\u{0394}7 c6a_name>",
@@ -2125,42 +2149,27 @@ mod test {
             ]]
         );
 
-        assert_eq!(Cycle::from("a? b?")?.root, Cycle::from("a?0.5 b?0.5")?.root);
-
+        assert_cycle_equality("a? b?", "a?0.5 b?0.5")?;
         assert_cycle_equality("[a b c](3,8,9)", "[a b c](3,8,1)")?;
-
         assert_cycle_equality("[a b c](3,8,7)", "[a b c](3,8,-1)")?;
-
         assert_cycle_equality("[a a a a]", "[a ! ! !]")?;
-
         assert_cycle_equality("[! ! a !]", "[~ ~ a a]")?;
-
         assert_cycle_equality("a ~ ~ ~", "a - - -")?;
-
         assert_cycle_equality("[a b] ! ! <a b c> !", "[a b] [a b] [a b] <a b c> <a b c>")?;
-
         assert_cycle_equality("{a b!2 c}%3", "{a b b c}%3")?;
-
         assert_cycle_equality("a b, {c d e}%2", "{a b, c d e}")?;
-
         assert_cycle_equality("0..3", "0 1 2 3")?;
-
         assert_cycle_equality("-5..-8", "-5 -6 -7 -8")?;
-
         assert_cycle_equality("a b . c d", "[a b] [c d]")?;
-
         assert_cycle_equality(
             "a b . c d e . f g h i [j k . l m]",
             "[a b] [c d e] [f g h i [[j k] [l m]]]",
         )?;
-
         assert_cycle_equality(
             "a b . c d e , f g h i . j k, l m",
             "[a b] [c d e], [[f g h i] [j k]], [l m]",
         )?;
-
         assert_cycle_equality("{a b . c d . f g h}%2", "{[a b] [c d] [f g h]}%2")?;
-
         assert_cycle_equality("<a b . c d . f g h>", "<[a b] [c d] [f g h]>")?;
 
         assert_cycles(
@@ -2180,27 +2189,18 @@ mod test {
             ],
         )?;
 
-        assert!(Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
-            .includes(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
-
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
+        Ok(())
+    }
+
+    #[test]
+    fn event_limit() -> Result<(), String> {
         assert!(Cycle::from("[[a b c d]*100]*100")?.generate().is_err());
         assert!(Cycle::from("[[a b c d]*100]*100")?
             .with_event_limit(0x10000)
             .generate()
             .is_ok());
-        assert!(Cycle::from("a b c [d").is_err());
-        assert!(Cycle::from("a b/ c [d").is_err());
-        assert!(Cycle::from("a b--- c [d").is_err());
-        assert!(Cycle::from("*a b c [d").is_err());
-        assert!(Cycle::from("a {{{}}").is_err());
-        assert!(Cycle::from("a*[]").is_err());
-        assert!(Cycle::from("] a z [").is_err());
-        assert!(Cycle::from("->err").is_err());
-        assert!(Cycle::from("(a, b)").is_err());
-        assert!(Cycle::from("#(12, 32)").is_err());
-        assert!(Cycle::from("#c $").is_err());
         Ok(())
     }
 }
