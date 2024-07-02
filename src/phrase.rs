@@ -308,3 +308,210 @@ impl Rhythm for Phrase {
         }
     }
 }
+
+// --------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    use crate::prelude::*;
+
+    fn create_phrase() -> Result<Phrase, String> {
+        let beat_time = BeatTimeBase {
+            samples_per_sec: 44100,
+            beats_per_min: 130.0,
+            beats_per_bar: 4,
+        };
+
+        let seed_bytes = 12312312312_u64.to_le_bytes();
+        let mut seed = [0; 32];
+        for i in 0..32 {
+            seed[i] = seed_bytes[i % 8];
+        }
+
+        let kick_cycle = new_cycle_event_with_seed(
+            "bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd? [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]",
+            seed,
+        )?;
+        let mut kick_pattern = beat_time.every_nth_beat(16.0).trigger(kick_cycle);
+        kick_pattern.set_sample_offset(20); // test with offsets
+
+        let snare_pattern = beat_time
+            .every_nth_beat(2.0)
+            .with_offset(BeatTimeStep::Beats(1.0))
+            .trigger(new_note_event("C_5"));
+
+        let hihat_pattern =
+            beat_time
+                .every_nth_sixteenth(2.0)
+                .trigger(new_note_event("C_5").mutate({
+                    let mut step = 0;
+                    move |mut event| {
+                        if let Event::NoteEvents(notes) = &mut event {
+                            for note in notes.iter_mut().flatten() {
+                                note.volume = 1.0 / (step + 1) as f32;
+                                step += 1;
+                                if step >= 3 {
+                                    step = 0;
+                                }
+                            }
+                        }
+                        event
+                    }
+                }));
+
+        let hihat_pattern2 = beat_time
+            .every_nth_sixteenth(2.0)
+            .with_offset(BeatTimeStep::Sixteenth(1.0))
+            .trigger(new_note_event("C_5").mutate({
+                let mut vel_step = 0;
+                let mut note_step = 0;
+                move |mut event| {
+                    if let Event::NoteEvents(notes) = &mut event {
+                        for note in notes.iter_mut().flatten() {
+                            note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
+                            vel_step += 1;
+                            if vel_step >= 3 {
+                                vel_step = 0;
+                            }
+                            note.note = Note::from((Note::C4 as u8) + 32 - note_step);
+                            note_step += 1;
+                            if note_step >= 32 {
+                                note_step = 0;
+                            }
+                        }
+                    }
+                    event
+                }
+            }));
+
+        let hihat_rhythm = Phrase::new(
+            beat_time,
+            vec![hihat_pattern, hihat_pattern2],
+            BeatTimeStep::Bar(4.0),
+        );
+
+        let bass_notes = Scale::try_from((Note::C5, "aeolian")).unwrap().notes();
+        let bass_pattern = beat_time
+            .every_nth_eighth(1.0)
+            .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_pattern())
+            .trigger(new_note_event_sequence(vec![
+                new_note((bass_notes[0], None, 0.5)),
+                new_note((bass_notes[2], None, 0.5)),
+                new_note((bass_notes[3], None, 0.5)),
+                new_note((bass_notes[0], None, 0.5)),
+                new_note((bass_notes[2], None, 0.5)),
+                new_note((bass_notes[3], None, 0.5)),
+                new_note((bass_notes[6].transposed(-12), None, 0.5)),
+            ]));
+
+        let synth_pattern =
+            beat_time
+                .every_nth_bar(4.0)
+                .trigger(new_polyphonic_note_sequence_event(vec![
+                    vec![
+                        new_note(("C 4", None, 0.3)),
+                        new_note(("D#4", None, 0.3)),
+                        new_note(("G 4", None, 0.3)),
+                    ],
+                    vec![
+                        new_note(("C 4", None, 0.3)),
+                        new_note(("D#4", None, 0.3)),
+                        new_note(("F 4", None, 0.3)),
+                    ],
+                    vec![
+                        new_note(("C 4", None, 0.3)),
+                        new_note(("D#4", None, 0.3)),
+                        new_note(("G 4", None, 0.3)),
+                    ],
+                    vec![
+                        new_note(("C 4", None, 0.3)),
+                        new_note(("D#4", None, 0.3)),
+                        new_note(("A#4", None, 0.3)),
+                    ],
+                ]));
+
+        let fx_pattern =
+            beat_time
+                .every_nth_seconds(8.0)
+                .trigger(new_polyphonic_note_sequence_event(vec![
+                    vec![new_note(("C 4", None, 0.2)), None, None],
+                    vec![None, new_note(("C 4", None, 0.2)), None],
+                    vec![None, None, new_note(("F 4", None, 0.2))],
+                ]));
+
+        Ok(Phrase::new(
+            beat_time,
+            vec![
+                RhythmSlot::from(kick_pattern),
+                RhythmSlot::from(snare_pattern),
+                RhythmSlot::from(hihat_rhythm),
+                RhythmSlot::from(bass_pattern),
+                RhythmSlot::from(fx_pattern),
+                RhythmSlot::from(synth_pattern),
+            ],
+            BeatTimeStep::Bar(8.0),
+        ))
+    }
+
+    fn run_phrase(phrase: &mut Phrase, time: SampleTime) -> Vec<RhythmIterItem> {
+        let mut events = Vec::new();
+        while let Some(event) = phrase.run_until_time(time) {
+            events.push(event)
+        }
+        events
+    }
+
+    // slow skip using run_until_time
+    fn skip_phrase_by_running(phrase: &mut Phrase, time: SampleTime) {
+        while phrase.run_until_time(time).is_some() {
+            // ignore event
+        }
+    }
+
+    // fast skip using skip_events_until_time
+    fn skip_phrase_by_omitting(phrase: &mut Phrase, time: SampleTime) {
+        phrase.skip_events_until_time(time)
+    }
+
+    #[test]
+    fn skip_events() -> Result<(), String> {
+        let sample_offset = 2345676;
+
+        let mut phrase1 = create_phrase()?;
+        phrase1.set_sample_offset(sample_offset);
+        let mut events1 = Vec::new();
+
+        let mut phrase2 = create_phrase()?;
+        phrase2.set_sample_offset(sample_offset);
+        let mut events2 = Vec::new();
+
+        // run_time, seek_time
+        let run_steps = [
+            (1024, 1),
+            (2000, 555432),
+            (5000, 666),
+            (200, 211),
+            (100, 10200),
+            (1024, 122),
+            (8000, 5577432),
+            (50000, 66),
+            (20020, 2121),
+            (1000, 100),
+        ];
+
+        let mut sample_time = sample_offset;
+        for (run_time, seek_time) in run_steps {
+            sample_time += run_time;
+            events1.append(&mut run_phrase(&mut phrase1, sample_time));
+            events2.append(&mut run_phrase(&mut phrase2, sample_time));
+
+            sample_time += seek_time;
+            skip_phrase_by_running(&mut phrase1, sample_time);
+            skip_phrase_by_omitting(&mut phrase2, sample_time);
+        }
+
+        assert_eq!(events1, events2);
+
+        Ok(())
+    }
+}
