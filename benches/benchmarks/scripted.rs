@@ -20,7 +20,7 @@ fn create_phrase() -> Phrase {
             pattern = function(context) 
               return 1 
             end,
-            emit = cycle("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]"):map({
+            emit = cycle("bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd? [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]"):map({
                 ["bd"] = "c4",
                 ["bd2"] = "c4 v0.5",
             })

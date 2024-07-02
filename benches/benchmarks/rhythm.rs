@@ -12,7 +12,7 @@ fn create_phrase() -> Phrase {
     };
 
     let kick_cycle =
-        new_cycle_event("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")
+        new_cycle_event("bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd?] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")
             .unwrap()
             .with_mappings(&[
                 ("bd", vec![new_note("c4")]),
