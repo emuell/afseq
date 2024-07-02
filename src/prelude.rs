@@ -10,7 +10,7 @@
 pub use super::{
     // all public types to create event iters, gates and patterns
     event::{
-        cycle::{new_cycle_event, CycleEventIter},
+        cycle::{new_cycle_event, new_cycle_event_with_seed, CycleEventIter},
         fixed::ToFixedEventIter,
         fixed::ToFixedEventIterSequence,
         mutated::ToMutatedEventIter,
