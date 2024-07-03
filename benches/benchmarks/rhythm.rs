@@ -165,19 +165,25 @@ pub fn run(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(10));
     let phrase = create_phrase();
     group.bench_function("Run", |b| {
-        b.iter(|| {
-            let sample_time = SampleTime::MAX;
-            let mut phrase = phrase.clone();
-            phrase.reset();
-            let mut num_events = 0;
-            while let Some(event) = phrase.run_until_time(sample_time) {
-                black_box(event);
-                num_events += 1;
-                if num_events >= event_count {
-                    break;
+        b.iter_batched(
+            || {
+                let mut phrase = phrase.clone();
+                phrase.reset();
+                phrase
+            },
+            |mut phrase| {
+                let sample_time = SampleTime::MAX;
+                let mut num_events = 0;
+                while let Some(event) = phrase.run_until_time(sample_time) {
+                    black_box(event);
+                    num_events += 1;
+                    if num_events >= event_count {
+                        break;
+                    }
                 }
-            }
-        })
+            },
+            criterion::BatchSize::SmallInput,
+        )
     });
     group.finish();
 }
@@ -189,15 +195,21 @@ pub fn seek(c: &mut Criterion) {
     let seek_step = 10;
     let seek_time = 60 * 60;
     group.bench_function("Seek", |b| {
-        b.iter(|| {
-            let mut phrase = phrase.clone();
-            phrase.reset();
-            let mut sample_time = samples_per_sec as SampleTime;
-            while sample_time < (seek_time * samples_per_sec) as SampleTime {
-                phrase.seek_until_time(sample_time);
-                sample_time += seek_step * samples_per_sec as SampleTime;
-            }
-        })
+        b.iter_batched(
+            || {
+                let mut phrase = phrase.clone();
+                phrase.reset();
+                phrase
+            },
+            |mut phrase| {
+                let mut sample_time = samples_per_sec as SampleTime;
+                while sample_time < (seek_time * samples_per_sec) as SampleTime {
+                    phrase.seek_until_time(sample_time);
+                    sample_time += seek_step * samples_per_sec as SampleTime;
+                }
+            },
+            criterion::BatchSize::SmallInput,
+        )
     });
     group.finish();
 }
