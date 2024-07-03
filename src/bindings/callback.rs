@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 use mlua::prelude::*;
 
@@ -71,18 +71,18 @@ pub fn add_lua_callback_error(name: &str, err: &LuaError) {
 /// with values before it's called.
 ///
 /// Errors from callbacks should be handled by calling `self.handle_error` so external clients
-/// can deal with them later, as apropriate.
+/// can deal with them later, as appropriate.
 ///
 /// By memorizing the original generator function and environment, it also can be reset to its
 /// initial state by calling the original generator function again to fetch a new freshly
 /// initialized function.
 ///
-/// TODO: Upvalues of generators or simple functions could actuially be collected and restored
+/// TODO: Upvalues of generators or simple functions could actually be collected and restored
 /// too, but this uses debug functionality and may break some upvalues.
 #[derive(Debug, Clone)]
 pub(crate) struct LuaCallback {
     environment: Option<LuaOwnedTable>,
-    context: LuaOwnedTable,
+    context: LuaOwnedAnyUserData,
     generator: Option<LuaOwnedFunction>,
     function: LuaOwnedFunction,
     initialized: bool,
@@ -96,8 +96,15 @@ impl LuaCallback {
 
     /// Create a new Callback from an owned lua function.
     pub fn with_owned(lua: &Lua, function: LuaOwnedFunction) -> LuaResult<Self> {
-        // create an empty context and memorize the function without calling it
-        let context = lua.create_table()?.into_owned();
+        // create and register the callback context
+        LuaCallbackContext::register(lua)?;
+        let context = lua
+            .create_any_userdata(LuaCallbackContext {
+                values: HashMap::new(),
+                external_values: HashMap::new(),
+            })?
+            .into_owned();
+        // and memorize the function without calling it
         let environment = function.to_ref().environment().map(LuaTable::into_owned);
         let generator = None;
         let initialized = false;
@@ -112,27 +119,31 @@ impl LuaCallback {
 
     /// Sets the emitter time base context for the callback.
     pub fn set_context_time_base(&mut self, time_base: &BeatTimeBase) -> LuaResult<()> {
-        let table = self.context.to_ref();
-        table.raw_set("beats_per_min", time_base.beats_per_min)?;
-        table.raw_set("beats_per_bar", time_base.beats_per_bar)?;
-        table.raw_set("samples_per_sec", time_base.samples_per_sec)?;
+        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
+        values.insert(b"beats_per_min", time_base.beats_per_min as LuaNumber);
+        values.insert(b"beats_per_min", time_base.beats_per_min as LuaNumber);
+        values.insert(b"beats_per_bar", time_base.beats_per_bar as LuaNumber);
+        values.insert(b"samples_per_sec", time_base.samples_per_sec as LuaNumber);
         Ok(())
     }
 
     /// Sets external emitter context for the callback.
     pub fn set_context_external_data(&mut self, data: &[(Cow<str>, f64)]) -> LuaResult<()> {
-        let table = self.context.to_ref();
+        let external_values = &mut self
+            .context
+            .borrow_mut::<LuaCallbackContext>()?
+            .external_values;
         for (key, value) in data {
-            table.raw_set(key as &str, *value)?;
+            external_values.insert(key.to_string(), *value as LuaNumber);
         }
         Ok(())
     }
 
     /// Sets the pulse value emitter context for the callback.
     pub fn set_context_pulse_value(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
-        let table = self.context.to_ref();
-        table.raw_set("pulse_value", pulse.value)?;
-        table.raw_set("pulse_time", pulse.step_time)?;
+        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
+        values.insert(b"pulse_value", pulse.value as LuaNumber);
+        values.insert(b"pulse_time", pulse.step_time as LuaNumber);
         Ok(())
     }
 
@@ -142,16 +153,16 @@ impl LuaCallback {
         pulse_step: usize,
         pulse_time_step: f64,
     ) -> LuaResult<()> {
-        let table = self.context.to_ref();
-        table.raw_set("pulse_step", pulse_step + 1)?;
-        table.raw_set("pulse_time_step", pulse_time_step)?;
+        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
+        values.insert(b"pulse_step", (pulse_step + 1) as LuaNumber);
+        values.insert(b"pulse_time_step", pulse_time_step as LuaNumber);
         Ok(())
     }
 
     /// Sets the step emitter context for the callback.
     pub fn set_context_step(&mut self, step: usize) -> LuaResult<()> {
-        let table = self.context.to_ref();
-        table.raw_set("step", step + 1)?;
+        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
+        values.insert(b"step", (step + 1) as LuaNumber);
         Ok(())
     }
 
@@ -162,10 +173,10 @@ impl LuaCallback {
         step: usize,
         step_length: f64,
     ) -> LuaResult<()> {
-        let table = self.context.to_ref();
-        table.raw_set("channel", channel + 1)?;
-        table.raw_set("step", step + 1)?;
-        table.raw_set("step_length", step_length)?;
+        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
+        values.insert(b"channel", (channel + 1) as LuaNumber);
+        values.insert(b"step", (step + 1) as LuaNumber);
+        values.insert(b"step_length", step_length as LuaNumber);
         Ok(())
     }
 
@@ -221,13 +232,13 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Name of the inner function for errors. Usually will be an annonymous function.
+    /// Name of the inner function for errors. Usually will be an anonymous function.
     pub fn name(&self) -> String {
         self.function
             .to_ref()
             .info()
             .name
-            .unwrap_or("annonymous function".to_string())
+            .unwrap_or("anonymous function".to_string())
     }
 
     /// Invoke the Lua function callback or generator.
@@ -241,14 +252,14 @@ impl LuaCallback {
         arg: A,
     ) -> LuaResult<LuaValue<'lua>> {
         if self.initialized {
-            self.function.call((self.context.to_ref(), arg))
+            self.function.call((&self.context, arg))
         } else {
             self.initialized = true;
             let result = {
                 // HACK: don't borrow self here, so we can borrow mut again to assign the generator function
                 // see https://stackoverflow.com/questions/73641155/how-to-force-rust-to-drop-a-mutable-borrow
                 let function = unsafe { &*(&self.function as *const LuaOwnedFunction) };
-                function.call::<_, LuaValue>((self.context.to_ref(), arg.clone()))?
+                function.call::<_, LuaValue>((&self.context, arg.clone()))?
             };
             if let Some(inner_function) = result.as_function().cloned().map(|f| f.into_owned()) {
                 // function returned a function -> is a generator. use the inner function instead.
@@ -259,8 +270,7 @@ impl LuaCallback {
                     .map(LuaTable::into_owned);
                 self.environment = environment;
                 self.generator = Some(std::mem::replace(&mut self.function, inner_function));
-                self.function
-                    .call::<_, LuaValue>((self.context.to_ref(), arg))
+                self.function.call::<_, LuaValue>((&self.context, arg))
             } else {
                 // function returned some value. use this function directly.
                 self.environment = None;
@@ -288,7 +298,7 @@ impl LuaCallback {
                 // then fetch a new fresh function from the generator
                 let value = function_generator
                     .to_ref()
-                    .call::<_, LuaValue>(self.context.to_ref())?;
+                    .call::<_, LuaValue>(&self.context)?;
                 if let Some(function) = value.as_function() {
                     self.function = function.clone().into_owned();
                 } else {
@@ -302,6 +312,43 @@ impl LuaCallback {
             }
         }
         Ok(())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Memorizes an optional set of values that are passed along as context with the callback.
+#[derive(Debug, Clone)]
+struct LuaCallbackContext {
+    values: HashMap<&'static [u8], LuaNumber>,
+    external_values: HashMap<String, LuaNumber>,
+}
+
+impl LuaCallbackContext {
+    fn register(lua: &Lua) -> LuaResult<()> {
+        // NB: registering for a specific engine is faster than implementing the UserData impl
+        // See https://github.com/mlua-rs/mlua/discussions/283
+        lua.register_userdata_type::<LuaCallbackContext>(|reg| {
+            reg.add_meta_field_with("__index", |lua| {
+                lua.create_function(
+                    |lua, (this, key): (LuaUserDataRef<LuaCallbackContext>, LuaString)| {
+                        if let Some(value) = this.values.get(key.as_bytes()) {
+                            // fast path (string bytes)
+                            value.into_lua(lua)
+                        } else if let Some(value) =
+                            this.external_values.get(key.to_string_lossy().as_ref())
+                        {
+                            // slower path (string )
+                            value.into_lua(lua)
+                        } else {
+                            Err(mlua::Error::RuntimeError(
+                                "no such field in context".to_string(),
+                            ))
+                        }
+                    },
+                )
+            })
+        })
     }
 }
 
