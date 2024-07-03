@@ -21,7 +21,7 @@ pub struct Cycle {
     root: Step,
     event_limit: usize,
     input: String,
-    seed: Option<[u8; 32]>,
+    seed: Option<u64>,
     state: CycleState,
 }
 impl Cycle {
@@ -77,11 +77,10 @@ impl Cycle {
             self.state.iteration == 0,
             "Should not reconfigure seed of running cycle"
         );
+        // create a u64 seed value from the given seed array
+        // TODO: should pass a u64 here directly
+        let seed: u64 = Xoshiro256PlusPlus::from_seed(seed).gen();
         Self {
-            state: CycleState {
-                rng: Xoshiro256PlusPlus::from_seed(seed),
-                ..self.state
-            },
             seed: Some(seed),
             ..self
         }
@@ -107,34 +106,26 @@ impl Cycle {
     pub fn generate(&mut self) -> Result<Vec<Vec<Event>>, String> {
         let cycle = self.state.iteration;
         self.state.events = 0;
+        if let Some(seed) = self.seed {
+            self.state.rng = Xoshiro256PlusPlus::seed_from_u64(seed.wrapping_add(cycle as u64));
+        }
         let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
         self.state.iteration += 1;
         events.transform_spans(&Span::default());
         Ok(events.export())
     }
 
-    /// Calculate next iteration of output without actually generating events.
+    /// Move cycle iteration without generating any events.
     ///
-    /// For stateful inputs, this generates output events, discarding resulting events,
-    /// for stateless inputs, this simply moves the iteration counter.   
-    ///
-    /// Returns error when the number of generated events exceed the configured event limit.
-    pub fn omit(&mut self) -> Result<(), String> {
-        let cycle = self.state.iteration;
-        self.state.events = 0;
-        if self.is_stateful() {
-            let _ = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
-        }
+    /// This simply moves the cycle iteration count.
+    pub fn omit(&mut self) {
         self.state.iteration += 1;
-        Ok(())
     }
 
     /// reset state to initial state
     pub fn reset(&mut self) {
         self.state.iteration = 0;
         self.state.events = 0;
-        self.state.rng =
-            Xoshiro256PlusPlus::from_seed(self.seed.unwrap_or_else(|| thread_rng().gen()));
     }
 }
 
@@ -1543,7 +1534,7 @@ impl Cycle {
             }
             Step::Choices(cs) => {
                 let choice = state.rng.gen_range(0..cs.choices.len());
-                Self::output(&cs.choices[choice], state, cycle, limit)? // TODO seed the rng properly
+                Self::output(&cs.choices[choice], state, cycle, limit)?
             }
             Step::Polymeter(pm) => {
                 let step = pm.steps.as_ref();
@@ -1581,7 +1572,6 @@ impl Cycle {
                         let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
                         out.mutate_events(&mut |event: &mut Event| {
                             if let Some(chance) = e.right.to_chance() {
-                                // TODO seed the rng properly
                                 if chance < state.rng.gen_range(0.0..1.0) {
                                     event.value = Value::Rest
                                 }
@@ -1741,6 +1731,20 @@ mod test {
             Cycle::from(a)?.with_seed(seed).generate()?,
             Cycle::from(b)?.with_seed(seed).generate()?,
         );
+        Ok(())
+    }
+
+    fn assert_cycle_seeking(input: &str) -> Result<(), String> {
+        let seed = rand::thread_rng().gen();
+        for number_of_seeks in 1..9 {
+            let mut cycle1 = Cycle::from(input)?.with_seed(seed);
+            let mut cycle2 = Cycle::from(input)?.with_seed(seed);
+            for _ in 0..number_of_seeks {
+                let _ = cycle1.generate()?;
+                cycle2.omit();
+            }
+            assert_eq!(cycle1.generate()?, cycle2.generate()?);
+        }
         Ok(())
     }
 
@@ -2201,6 +2205,19 @@ mod test {
             .with_event_limit(0x10000)
             .generate()
             .is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn seeking() -> Result<(), String> {
+        assert_cycle_seeking("[a b c d]")?; // stateless
+        assert_cycle_seeking("[a b], [c d]")?;
+        assert_cycle_seeking("{a b}%2 {a b}*5")?; // stateful
+        assert_cycle_seeking("[a b]*5 [a b]/5")?;
+        assert_cycle_seeking("[a b c d]<c d>")?;
+        assert_cycle_seeking("a <b c>")?;
+        assert_cycle_seeking("[a b? c d]|[c? d?]")?;
+        assert_cycle_seeking("[{a b}/2 c d], <c d> e? {a b}*2")?;
         Ok(())
     }
 }
