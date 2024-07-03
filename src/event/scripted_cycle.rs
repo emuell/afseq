@@ -128,7 +128,7 @@ impl ScriptedCycleEventIter {
 
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
-    fn generate_events(&mut self) -> Vec<EventIterItem> {
+    fn generate(&mut self) -> Vec<EventIterItem> {
         // run the cycle event generator
         let events = {
             match self.cycle.generate() {
@@ -170,11 +170,6 @@ impl ScriptedCycleEventIter {
         // convert timed note events into EventIterItems
         timed_note_events.into_event_iter_items()
     }
-
-    /// Move the cycle event generator without generating any events
-    fn omit_events(&mut self) {
-        self.cycle.omit();
-    }
 }
 
 impl EventIter for ScriptedCycleEventIter {
@@ -202,15 +197,15 @@ impl EventIter for ScriptedCycleEventIter {
 
     fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         if emit_event {
-            Some(self.generate_events())
+            Some(self.generate())
         } else {
             None
         }
     }
 
-    fn omit(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
         if emit_event {
-            self.omit_events()
+            self.cycle.advance();
         }
     }
 

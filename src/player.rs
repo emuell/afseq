@@ -236,10 +236,10 @@ impl SamplePlayer {
             // match playing notes state to the passed rhythm
             self.playing_notes
                 .resize(sequence.phrase_rhythm_slot_count(), HashMap::new());
-            // seek new phase to our previously played time
-            sequence.skip_events_until_time(self.emitted_sample_time);
+            // move new phase to our previously played time
+            sequence.advance_until_time(self.emitted_sample_time);
             log::debug!(target: "Player",
-                "Seek sequence to time {:.2}",
+                "Advance sequence to time {:.2}",
                 time_base.samples_to_seconds(self.emitted_sample_time)
             );
         }

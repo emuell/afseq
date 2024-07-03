@@ -327,7 +327,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Iterator
     type Item = RhythmIterItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.run()
+        self.run_until_time(SampleTime::MAX)
     }
 }
 
@@ -353,7 +353,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         self.run_rhythm(sample_time, fetch_new_items)
     }
 
-    fn skip_until_time(&mut self, sample_time: SampleTime) {
+    fn advance_until_time(&mut self, sample_time: SampleTime) {
         // memorize current time
         self.event_iter_sample_time = sample_time;
         // clear pending event iter items with regular runs
@@ -371,7 +371,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
         if self.pattern_playback_finished {
             return;
         }
-        // batch omit events in whole steps, if possible
+        // batch advance event iter in full pulse steps
         loop {
             // quickly check if the next event is due before the given target time
             let next_sample_time = self.sample_offset as f64 + self.event_iter_next_sample_time;
@@ -384,8 +384,8 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
                 // test if the event iter crosses the target time
                 let step_duration = self.current_steps_sample_duration();
                 if ((next_sample_time + step_duration) as SampleTime) < sample_time {
-                    // omit all events from the gated pulse
-                    self.event_iter.omit(pulse, emit_event);
+                    // skip all events from the gated pulse
+                    self.event_iter.advance(pulse, emit_event);
                     self.event_iter_next_sample_time += step_duration;
                 } else {
                     // generate new events from the gated pulse

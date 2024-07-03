@@ -115,8 +115,8 @@ impl Phrase {
         }
     }
 
-    /// Seek rhythms until a given sample time is reached, ignoring all events until that time.
-    pub fn skip_events_until_time(&mut self, sample_time: SampleTime) {
+    /// Move rhythms until a given sample time is reached, ignoring all events until that time.
+    pub fn advance_until_time(&mut self, sample_time: SampleTime) {
         // skip next events in all rhythms
         for (rhythm_slot, next_event) in self
             .rhythm_slots
@@ -126,13 +126,13 @@ impl Phrase {
             // skip cached, next due events
             if let Some((_, event)) = next_event {
                 if event.time >= sample_time {
-                    // cached event is not yet due: no need to seek the slot
+                    // cached event is not yet due: no need to advance the slot
                     continue;
                 }
                 *next_event = None;
             }
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().skip_until_time(sample_time);
+                rhythm.borrow_mut().advance_until_time(sample_time);
             }
         }
     }
@@ -246,8 +246,8 @@ impl RhythmIter for Phrase {
             .map(|(_, event)| event)
     }
 
-    fn skip_until_time(&mut self, sample_time: SampleTime) {
-        self.skip_events_until_time(sample_time)
+    fn advance_until_time(&mut self, sample_time: SampleTime) {
+        self.advance_until_time(sample_time)
     }
 }
 
@@ -469,8 +469,8 @@ mod test {
     }
 
     // fast skip using skip_events_until_time
-    fn skip_phrase_by_omitting(phrase: &mut Phrase, time: SampleTime) {
-        phrase.skip_events_until_time(time)
+    fn skip_phrase_by_advancing(phrase: &mut Phrase, time: SampleTime) {
+        phrase.advance_until_time(time)
     }
 
     #[test]
@@ -485,7 +485,7 @@ mod test {
         phrase2.set_sample_offset(sample_offset);
         let mut events2 = Vec::new();
 
-        // run_time, seek_time
+        // run_time, advance_time
         let run_steps = [
             (1024, 1),
             (2000, 555432),
@@ -507,7 +507,7 @@ mod test {
 
             sample_time += seek_time;
             skip_phrase_by_running(&mut phrase1, sample_time);
-            skip_phrase_by_omitting(&mut phrase2, sample_time);
+            skip_phrase_by_advancing(&mut phrase2, sample_time);
         }
 
         assert_eq!(events1, events2);

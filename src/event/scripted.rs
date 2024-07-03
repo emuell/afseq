@@ -48,7 +48,7 @@ impl ScriptedEventIter {
         })
     }
 
-    fn generate_event(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
+    fn generate(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
@@ -65,7 +65,7 @@ impl ScriptedEventIter {
         Ok(Some(vec![EventIterItem::new(event)]))
     }
 
-    fn omit_event(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
+    fn advance(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
         if self.callback.is_stateful().unwrap_or(true) {
             // reset timeout
             self.timeout_hook.reset();
@@ -116,7 +116,7 @@ impl EventIter for ScriptedEventIter {
     fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
-            let event = match self.generate_event(pulse) {
+            let event = match self.generate(pulse) {
                 Ok(event) => event,
                 Err(err) => {
                     self.callback.handle_error(&err);
@@ -134,10 +134,10 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn omit(&mut self, pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, pulse: PulseIterItem, emit_event: bool) {
         // generate a new event and move or only update pulse counters
         if emit_event {
-            if let Err(err) = self.omit_event(pulse) {
+            if let Err(err) = self.advance(pulse) {
                 self.callback.handle_error(&err);
             }
             self.step += 1;

@@ -60,21 +60,18 @@ pub trait RhythmIter: Debug {
     /// Set a new custom sample offset value.
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
 
-    /// Step iter: runs pattern to generate a new pulse, then generates an event from the event iter.
-    /// Returns `None` when the pattern finished playing.
-    fn run(&mut self) -> Option<RhythmIterItem> {
-        self.run_until_time(SampleTime::MAX)
-    }
-    /// Sample time iter: Generates the next due event but running the pattern to generate a new
+    /// Sample time iter: Generate a single next due event but running the pattern to generate a new
     /// pulse, if the pulse's sample time is smaller than the given sample time. Then generates an
-    /// event from the event iter and returns it. Else returns `None` when the pattern finished playing.
+    /// event from the event iter and returns it.
+    ///
+    /// Returns `None` when no event is due of when the pattern finished playing, else Some event.
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem>;
 
-    /// Skip, dry run *all events* until the given target time is reached.
+    /// Skip *all events* until the given target time is reached.
     ///
     /// This calls `run_until_time` by default, until the target time is reached and
     /// discards all generated events, but may be overridden to optimize run time.
-    fn skip_until_time(&mut self, sample_time: SampleTime) {
+    fn advance_until_time(&mut self, sample_time: SampleTime) {
         while self.run_until_time(sample_time).is_some() {
             // continue
         }
@@ -88,7 +85,7 @@ impl Iterator for dyn RhythmIter {
     type Item = RhythmIterItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.run()
+        self.run_until_time(SampleTime::MAX)
     }
 }
 
