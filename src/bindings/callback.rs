@@ -241,12 +241,23 @@ impl LuaCallback {
             .unwrap_or("anonymous function".to_string())
     }
 
-    /// Invoke the Lua function callback or generator.
+    /// Returns true if the callback is a generator.
+    ///
+    /// To test this, the callback must have run at least once, so it returns None if it never has.
+    pub fn is_stateful(&self) -> Option<bool> {
+        if self.initialized {
+            Some(self.generator.is_some())
+        } else {
+            None
+        }
+    }
+
+    /// Invoke the Lua function or generator and return its result as LuaValue.
     pub fn call(&mut self) -> LuaResult<LuaValue> {
         self.call_with_arg(LuaValue::Nil)
     }
 
-    /// Invoke the Lua function callback or generator with an additional argument.
+    /// Invoke the Lua function or generator with an additional argument and return its result as LuaValue.
     pub fn call_with_arg<'lua, A: IntoLua<'lua> + Clone>(
         &'lua mut self,
         arg: A,

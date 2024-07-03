@@ -66,16 +66,20 @@ impl ScriptedEventIter {
     }
 
     fn omit_event(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
-        // reset timeout
-        self.timeout_hook.reset();
-        // update function context
-        self.callback.set_context_pulse_value(pulse)?;
-        self.callback
-            .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
-        self.callback.set_context_step(self.step)?;
-        // invoke callback and ignore the result
-        self.callback.call()?;
-        Ok(())
+        if self.callback.is_stateful().unwrap_or(true) {
+            // reset timeout
+            self.timeout_hook.reset();
+            // update function context
+            self.callback.set_context_pulse_value(pulse)?;
+            self.callback
+                .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
+            self.callback.set_context_step(self.step)?;
+            // invoke callback and ignore the result
+            self.callback.call()?;
+            Ok(())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -137,12 +141,9 @@ impl EventIter for ScriptedEventIter {
                 self.callback.handle_error(&err);
             }
             self.step += 1;
-            self.pulse_step += 1;
-            self.pulse_time_step += pulse.step_time;
-        } else {
-            self.pulse_step += 1;
-            self.pulse_time_step += pulse.step_time;
         }
+        self.pulse_step += 1;
+        self.pulse_time_step += pulse.step_time;
     }
 
     fn duplicate(&self) -> Box<dyn EventIter> {
