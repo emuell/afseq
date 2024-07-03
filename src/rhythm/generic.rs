@@ -181,11 +181,13 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     }
 
     /// Return current pulse duration in samples
+    #[inline]
     pub fn current_steps_sample_duration(&self) -> f64 {
         self.step.to_samples(&self.time_base) * self.event_iter_pulse_item.step_time
     }
 
     /// Return start sample time of the given event iter item
+    #[inline]
     fn event_iter_item_start_time(&self, start: &Fraction) -> SampleTime {
         let step_time = self.current_steps_sample_duration();
         let event_iter_time = self.sample_offset as f64 + self.event_iter_next_sample_time;
@@ -194,6 +196,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     }
 
     /// Return duration in sample time of the given event iter item
+    #[inline]
     fn event_iter_item_duration(&self, length: &Fraction) -> SampleTime {
         let step_time = self.current_steps_sample_duration();
         let length = length.to_f64().unwrap_or(1.0);

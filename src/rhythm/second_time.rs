@@ -10,16 +10,19 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 impl GenericRhythmTimeStep for SecondTimeStep {
+    #[inline]
     fn default_offset() -> Self {
         0.0
     }
 
+    #[inline]
     fn default_step() -> Self {
         1.0
     }
 
+    #[inline]
     fn to_samples(&self, time_base: &BeatTimeBase) -> f64 {
-        time_base.seconds_to_samples_exact(*self)
+        *self * time_base.samples_per_second() as f64
     }
 }
 

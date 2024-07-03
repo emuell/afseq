@@ -36,7 +36,4 @@ pub trait TimeBase: Debug {
     fn seconds_to_samples(&self, seconds: f64) -> SampleTime {
         (seconds * self.samples_per_second() as f64).trunc() as SampleTime
     }
-    fn seconds_to_samples_exact(&self, seconds: f64) -> f64 {
-        seconds * self.samples_per_second() as f64
-    }
 }
