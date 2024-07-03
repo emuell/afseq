@@ -15,10 +15,12 @@ pub struct BeatTimeBase {
 
 impl BeatTimeBase {
     /// Time base's samples per beat, in order to convert beat to sample time and vice versa.
+    #[inline]
     pub fn samples_per_beat(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64
     }
     /// Time base's samples per bar, in order to convert bar to sample time and vice versa.
+    #[inline]
     pub fn samples_per_bar(&self) -> f64 {
         self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64 * self.beats_per_bar as f64
     }
@@ -33,6 +35,7 @@ impl From<BeatTimeBase> for SecondTimeBase {
 }
 
 impl TimeBase for BeatTimeBase {
+    #[inline]
     fn samples_per_second(&self) -> u32 {
         self.samples_per_sec
     }
@@ -43,10 +46,10 @@ impl SampleTimeDisplay for BeatTimeBase {
     fn display(&self, sample_time: SampleTime) -> String {
         let total_beats = sample_time / self.samples_per_beat() as u64;
         let total_beats_f = sample_time as f64 / self.samples_per_beat();
-        let beat_frations = total_beats_f - total_beats as f64;
+        let beat_fractions = total_beats_f - total_beats as f64;
         let bars = total_beats / self.beats_per_bar as u64;
         let beats = total_beats - self.beats_per_bar as u64 * bars;
-        let ppq = (beat_frations * 960.0 + 0.5) as u64;
+        let ppq = (beat_fractions * 960.0 + 0.5) as u64;
         format!("{}.{}.{:03}", bars + 1, beats + 1, ppq)
     }
 }
@@ -69,7 +72,6 @@ pub enum BeatTimeStep {
 impl BeatTimeStep {
     /// Get number of steps in the current time resolution.
     pub fn steps(&self) -> f32 {
-        #[allow(clippy::match_same_arms)]
         match *self {
             BeatTimeStep::SixtyFourth(amount) => amount,
             BeatTimeStep::ThirtySecond(amount) => amount,
@@ -109,6 +111,7 @@ impl BeatTimeStep {
         }
     }
     /// Convert a beat or bar step to samples for the given beat time base.
+    #[inline]
     pub fn to_samples(&self, time_base: &BeatTimeBase) -> f64 {
         self.steps() as f64 * self.samples_per_step(time_base)
     }

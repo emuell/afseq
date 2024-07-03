@@ -12,6 +12,7 @@ pub struct SecondTimeBase {
 }
 
 impl TimeBase for SecondTimeBase {
+    #[inline]
     fn samples_per_second(&self) -> u32 {
         self.samples_per_sec
     }
