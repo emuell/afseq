@@ -116,9 +116,7 @@ impl Cycle {
     }
 
     /// Move cycle iteration without generating any events.
-    ///
-    /// This simply moves the cycle iteration count.
-    pub fn omit(&mut self) {
+    pub fn advance(&mut self) {
         self.state.iteration += 1;
     }
 
@@ -1734,14 +1732,14 @@ mod test {
         Ok(())
     }
 
-    fn assert_cycle_seeking(input: &str) -> Result<(), String> {
+    fn assert_cycle_advancing(input: &str) -> Result<(), String> {
         let seed = rand::thread_rng().gen();
-        for number_of_seeks in 1..9 {
+        for number_of_runs in 1..9 {
             let mut cycle1 = Cycle::from(input)?.with_seed(seed);
             let mut cycle2 = Cycle::from(input)?.with_seed(seed);
-            for _ in 0..number_of_seeks {
+            for _ in 0..number_of_runs {
                 let _ = cycle1.generate()?;
-                cycle2.omit();
+                cycle2.advance();
             }
             assert_eq!(cycle1.generate()?, cycle2.generate()?);
         }
@@ -2209,15 +2207,15 @@ mod test {
     }
 
     #[test]
-    fn seeking() -> Result<(), String> {
-        assert_cycle_seeking("[a b c d]")?; // stateless
-        assert_cycle_seeking("[a b], [c d]")?;
-        assert_cycle_seeking("{a b}%2 {a b}*5")?; // stateful
-        assert_cycle_seeking("[a b]*5 [a b]/5")?;
-        assert_cycle_seeking("[a b c d]<c d>")?;
-        assert_cycle_seeking("a <b c>")?;
-        assert_cycle_seeking("[a b? c d]|[c? d?]")?;
-        assert_cycle_seeking("[{a b}/2 c d], <c d> e? {a b}*2")?;
+    fn advancing() -> Result<(), String> {
+        assert_cycle_advancing("[a b c d]")?; // stateless
+        assert_cycle_advancing("[a b], [c d]")?;
+        assert_cycle_advancing("{a b}%2 {a b}*5")?; // stateful
+        assert_cycle_advancing("[a b]*5 [a b]/5")?;
+        assert_cycle_advancing("[a b c d]<c d>")?;
+        assert_cycle_advancing("a <b c>")?;
+        assert_cycle_advancing("[a b? c d]|[c? d?]")?;
+        assert_cycle_advancing("[{a b}/2 c d], <c d> e? {a b}*2")?;
         Ok(())
     }
 }

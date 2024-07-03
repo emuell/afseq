@@ -192,7 +192,7 @@ impl CycleEventIter {
     }
 
     /// Generate a note event from a single cycle event, applying mappings if necessary
-    fn note_events(&mut self, event: CycleEvent) -> Result<Vec<Option<NoteEvent>>, String> {
+    fn map_note_event(&mut self, event: CycleEvent) -> Result<Vec<Option<NoteEvent>>, String> {
         let mut note_events = {
             if let Some(note_events) = self.mappings.get(event.string()) {
                 // apply custom note mappings
@@ -215,7 +215,7 @@ impl CycleEventIter {
 
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
-    fn generate_events(&mut self) -> Vec<EventIterItem> {
+    fn generate(&mut self) -> Vec<EventIterItem> {
         // run the cycle event generator
         let events = {
             match self.cycle.generate() {
@@ -232,7 +232,7 @@ impl CycleEventIter {
             for event in channel_events.into_iter() {
                 let start = event.span().start();
                 let length = event.span().length();
-                match self.note_events(event) {
+                match self.map_note_event(event) {
                     Ok(note_events) => {
                         if !note_events.is_empty() {
                             timed_note_events.add(channel_index, start, length, note_events);
@@ -248,11 +248,6 @@ impl CycleEventIter {
         // convert timed note events into EventIterItems
         timed_note_events.into_event_iter_items()
     }
-
-    /// Move the cycle event generator without generating any events
-    fn omit_events(&mut self) {
-        self.cycle.omit();
-    }
 }
 
 impl EventIter for CycleEventIter {
@@ -266,15 +261,15 @@ impl EventIter for CycleEventIter {
 
     fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         if emit_event {
-            Some(self.generate_events())
+            Some(self.generate())
         } else {
             None
         }
     }
 
-    fn omit(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
         if emit_event {
-            self.omit_events()
+            self.cycle.advance();
         }
     }
 

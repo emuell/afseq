@@ -59,17 +59,16 @@ impl Sequence {
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
     /// function for all emitted events to consume them.
-    pub fn consume_events_until_time<F>(&mut self, run_until_time: SampleTime, consumer: &mut F)
+    pub fn consume_events_until_time<F>(&mut self, sample_time: SampleTime, consumer: &mut F)
     where
         F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
     {
         debug_assert!(
-            run_until_time >= self.sample_position,
+            sample_time >= self.sample_position,
             "can not rewind playback here"
         );
-        while run_until_time - self.sample_position > 0 {
-            let (next_phrase_start, samples_to_run) =
-                self.samples_until_next_phrase(run_until_time);
+        while sample_time - self.sample_position > 0 {
+            let (next_phrase_start, samples_to_run) = self.samples_until_next_phrase(sample_time);
             if next_phrase_start <= samples_to_run {
                 // run current phrase until it ends
                 let sample_position = self.sample_position;
@@ -97,20 +96,19 @@ impl Sequence {
         }
     }
 
-    /// Seek sequence until a given sample time is reached, ignoring all events.
-    pub fn skip_events_until_time(&mut self, run_until_time: SampleTime) {
+    /// Move sequence playback head to the given sample time, ignoring all events.
+    pub fn advance_until_time(&mut self, sample_time: SampleTime) {
         debug_assert!(
-            run_until_time >= self.sample_position,
+            sample_time >= self.sample_position,
             "can not rewind playback here"
         );
-        while run_until_time - self.sample_position > 0 {
-            let (next_phrase_start, samples_to_run) =
-                self.samples_until_next_phrase(run_until_time);
+        while sample_time - self.sample_position > 0 {
+            let (next_phrase_start, samples_to_run) = self.samples_until_next_phrase(sample_time);
             if next_phrase_start <= samples_to_run {
                 // run current phrase until it ends
                 let sample_position = self.sample_position;
                 self.current_phrase_mut()
-                    .skip_events_until_time(sample_position + next_phrase_start);
+                    .advance_until_time(sample_position + next_phrase_start);
                 // select next phrase in the sequence
                 let previous_phrase = self.current_phrase_mut().clone();
                 self.phrase_index = (self.phrase_index + 1) % self.phrases().len();
@@ -126,7 +124,7 @@ impl Sequence {
                 // keep running the current phrase
                 let sample_position = self.sample_position;
                 self.current_phrase_mut()
-                    .skip_events_until_time(sample_position + samples_to_run);
+                    .advance_until_time(sample_position + samples_to_run);
                 self.sample_position_in_phrase += samples_to_run;
                 self.sample_position += samples_to_run;
             }

@@ -395,11 +395,11 @@ pub trait EventIter: Debug {
     /// Returns an optional stack of event iter items, which should be emitted for the given pulse.
     fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>>;
 
-    /// Move iterator with the given pulse value forward without returning an event.
+    /// Move iterator with the given pulse value forward without generating an event.
     ///
     /// This can be used to optimize iterator skipping in some EventIter implementations, but by
     /// default calls `run` and simply discards the generated event return value.
-    fn omit(&mut self, pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, pulse: PulseIterItem, emit_event: bool) {
         let _ = self.run(pulse, emit_event);
     }
 

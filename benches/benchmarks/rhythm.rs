@@ -191,7 +191,7 @@ pub fn run(c: &mut Criterion) {
 pub fn seek(c: &mut Criterion) {
     let mut group = c.benchmark_group("Rust Phrase");
     let phrase = create_phrase();
-    let samples_per_sec = phrase.time_base().samples_per_sec;
+    let samples_per_sec = phrase.time_base().samples_per_sec as SampleTime;
     let seek_step = 10;
     let seek_time = 60 * 60;
     group.bench_function("Seek", |b| {
@@ -202,10 +202,10 @@ pub fn seek(c: &mut Criterion) {
                 phrase
             },
             |mut phrase| {
-                let mut sample_time = samples_per_sec as SampleTime;
-                while sample_time < (seek_time * samples_per_sec) as SampleTime {
-                    phrase.skip_until_time(sample_time);
-                    sample_time += seek_step * samples_per_sec as SampleTime;
+                let mut sample_time = samples_per_sec;
+                while sample_time < seek_time * samples_per_sec {
+                    phrase.advance_until_time(sample_time);
+                    sample_time += seek_step * samples_per_sec;
                 }
             },
             criterion::BatchSize::SmallInput,

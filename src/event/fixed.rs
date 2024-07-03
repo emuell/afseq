@@ -107,7 +107,7 @@ impl EventIter for FixedEventIter {
         Some(vec![EventIterItem::new(event)])
     }
 
-    fn omit(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
         if !emit_event || self.events.is_empty() {
             return;
         }
