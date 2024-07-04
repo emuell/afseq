@@ -8,17 +8,17 @@ use crate::{BeatTimeBase, Gate, PulseIterItem};
 // -------------------------------------------------------------------------------------------------
 
 /// Probability gate implementation. Returns false for 0 pulse values and true for values of 1.
-/// Values inbetween 0 and 1 do *maybe* trigger, using the pulse value as probability.
+/// Values between 0 and 1 do *maybe* trigger, using the pulse value as probability.
 #[derive(Debug, Clone)]
 pub struct ProbabilityGate {
     rand_gen: Xoshiro256PlusPlus,
-    seed: Option<[u8; 32]>,
+    seed: Option<u64>,
 }
 
 impl ProbabilityGate {
-    pub fn new(seed: Option<[u8; 32]>) -> Self {
+    pub fn new(seed: Option<u64>) -> Self {
         let rand_seed = seed.unwrap_or_else(|| thread_rng().gen());
-        let rand_gen = Xoshiro256PlusPlus::from_seed(rand_seed);
+        let rand_gen = Xoshiro256PlusPlus::seed_from_u64(rand_seed);
         Self { rand_gen, seed }
     }
 }
@@ -41,13 +41,9 @@ impl Gate for ProbabilityGate {
     }
 
     fn reset(&mut self) {
-        // reset random number generator to its initial state when the gate is seeded
+        // reset random number generator to its initial state, when the gate is seeded
         if let Some(seed) = self.seed {
-            self.rand_gen = Xoshiro256PlusPlus::from_seed(seed);
-        }
-        // else create a new random number generator from a random seed
-        else {
-            self.rand_gen = Xoshiro256PlusPlus::from_seed(thread_rng().gen());
+            self.rand_gen = Xoshiro256PlusPlus::seed_from_u64(seed);
         }
     }
 }

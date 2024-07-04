@@ -322,12 +322,7 @@ mod test {
             beats_per_bar: 4,
         };
 
-        let seed_bytes = 12312312312_u64.to_le_bytes();
-        let mut seed = [0; 32];
-        for i in 0..32 {
-            seed[i] = seed_bytes[i % 8];
-        }
-
+        let seed = 12312312312_u64;
         let kick_cycle = new_cycle_event_with_seed(
             "bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd? [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]",
             seed,

@@ -15,7 +15,7 @@ pub struct CycleUserData {
 }
 
 impl CycleUserData {
-    pub fn from(arg: LuaString, seed: Option<[u8; 32]>) -> LuaResult<Self> {
+    pub fn from(arg: LuaString, seed: Option<u64>) -> LuaResult<Self> {
         let mut cycle = Cycle::from(&arg.to_string_lossy()).map_err(LuaError::runtime)?;
         if let Some(seed) = seed {
             cycle = cycle.with_seed(seed);

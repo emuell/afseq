@@ -60,7 +60,7 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<Step, Offset> {
     /// Create a new pattern based rhythm which emits `value` every `beat_time` `step`,
     /// and an optional seed for the random number generator.
-    pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<[u8; 32]>) -> Self {
+    pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<u64>) -> Self {
         let offset = Offset::default_offset();
         let instrument = None;
         let pattern = Box::<FixedPattern>::default();

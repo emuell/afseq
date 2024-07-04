@@ -72,14 +72,11 @@ impl Cycle {
     }
 
     /// Rebuild/configure a newly created cycle to use the given custom seed.
-    pub fn with_seed(self, seed: [u8; 32]) -> Self {
+    pub fn with_seed(self, seed: u64) -> Self {
         debug_assert!(
             self.state.iteration == 0,
             "Should not reconfigure seed of running cycle"
         );
-        // create a u64 seed value from the given seed array
-        // TODO: should pass a u64 here directly
-        let seed: u64 = Xoshiro256PlusPlus::from_seed(seed).gen();
         Self {
             seed: Some(seed),
             ..self

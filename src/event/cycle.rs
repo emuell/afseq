@@ -175,7 +175,7 @@ impl CycleEventIter {
     /// and the given seed for the cycle's random number generator.
     ///
     /// Returns error when the cycle string failed to parse.
-    pub fn from_mini_with_seed(input: &str, seed: [u8; 32]) -> Result<Self, String> {
+    pub fn from_mini_with_seed(input: &str, seed: u64) -> Result<Self, String> {
         Ok(Self::new(Cycle::from(input)?.with_seed(seed)))
     }
 
@@ -288,6 +288,6 @@ pub fn new_cycle_event(input: &str) -> Result<CycleEventIter, String> {
     CycleEventIter::from_mini(input)
 }
 
-pub fn new_cycle_event_with_seed(input: &str, seed: [u8; 32]) -> Result<CycleEventIter, String> {
+pub fn new_cycle_event_with_seed(input: &str, seed: u64) -> Result<CycleEventIter, String> {
     CycleEventIter::from_mini_with_seed(input, seed)
 }

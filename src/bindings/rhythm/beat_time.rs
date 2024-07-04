@@ -23,7 +23,7 @@ impl BeatTimeRhythm {
         timeout_hook: &LuaTimeoutHook,
         time_base: &BeatTimeBase,
         table: &LuaTable,
-        rand_seed: Option<[u8; 32]>,
+        rand_seed: Option<u64>,
     ) -> LuaResult<BeatTimeRhythm> {
         // resolution
         let mut resolution = 1.0;

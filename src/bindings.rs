@@ -55,7 +55,7 @@ pub(crate) use unwrap::{
 pub(crate) struct LuaAppData {
     /// Global random seed, set by math.randomseed() for each Lua instance and passed to
     /// newly created rhythm impls.
-    pub(crate) rand_seed: Option<[u8; 32]>,
+    pub(crate) rand_seed: Option<u64>,
     /// Global random number generator, used for our math.random() impl.
     pub(crate) rand_rgn: Xoshiro256PlusPlus,
 }
@@ -392,16 +392,12 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
     math.raw_set(
         "randomseed",
         lua.create_function(|lua, arg: LuaNumber| -> LuaResult<()> {
-            let bytes = arg.to_le_bytes();
-            let mut new_seed = [0; 32];
-            for i in 0..32 {
-                new_seed[i] = bytes[i % 8];
-            }
+            let new_seed = arg as u64;
             let mut app_data = lua
                 .app_data_mut::<LuaAppData>()
                 .expect("Failed to access Lua app data");
             app_data.rand_seed = Some(new_seed);
-            app_data.rand_rgn = Xoshiro256PlusPlus::from_seed(new_seed);
+            app_data.rand_rgn = Xoshiro256PlusPlus::seed_from_u64(new_seed);
             Ok(())
         })?,
     )?;
