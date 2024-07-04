@@ -275,7 +275,7 @@ fn register_global_bindings(
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
                     Err(_) => false,
                 };
-                // NB: don't keep borrowing app_data_ref here: Rhytm constructos may use random functions
+                // NB: don't keep borrowing app_data_ref here: Rhythm constructors may use random functions
                 let rand_seed = {
                     lua.app_data_ref::<LuaAppData>()
                         .expect("Failed to access Lua app data")
@@ -321,70 +321,7 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
                 .app_data_mut::<LuaAppData>()
                 .expect("Failed to access Lua app data")
                 .rand_rgn;
-            if args.is_empty() {
-                Ok(rand.gen::<LuaNumber>())
-            } else if args.len() == 1 {
-                let max = args.get(0).unwrap().as_integer();
-                if let Some(max) = max {
-                    if max >= 1 {
-                        let rand_int: LuaInteger = rand.gen_range(1..=max);
-                        Ok(rand_int as LuaNumber)
-                    } else {
-                        Err(bad_argument_error(
-                            "math.random",
-                            "max",
-                            1,
-                            "invalid interval: max must be >= 1",
-                        ))
-                    }
-                } else {
-                    Err(bad_argument_error(
-                        "math.random",
-                        "max",
-                        1,
-                        "expecting an integer value",
-                    ))
-                }
-            } else if args.len() == 2 {
-                let min = args.get(0).unwrap().as_integer();
-                let max = args.get(1).unwrap().as_integer();
-                if let Some(min) = min {
-                    if let Some(max) = max {
-                        if max >= min {
-                            let rand_int: LuaInteger = rand.gen_range(min..=max);
-                            Ok(rand_int as LuaNumber)
-                        } else {
-                            Err(bad_argument_error(
-                                "math.random",
-                                "max",
-                                1,
-                                "invalid interval: max must be >= min",
-                            ))
-                        }
-                    } else {
-                        Err(bad_argument_error(
-                            "math.random",
-                            "max",
-                            1,
-                            "expecting an integer value",
-                        ))
-                    }
-                } else {
-                    Err(bad_argument_error(
-                        "math.random",
-                        "min",
-                        1,
-                        "expecting an integer value",
-                    ))
-                }
-            } else {
-                Err(bad_argument_error(
-                    "math.random",
-                    "undefined",
-                    3,
-                    "wrong number of arguments",
-                ))
-            }
+            generate_random_number("math.random", rand, args)
         })?,
     )?;
 
@@ -399,6 +336,39 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
             app_data.rand_seed = Some(new_seed);
             app_data.rand_rgn = Xoshiro256PlusPlus::seed_from_u64(new_seed);
             Ok(())
+        })?,
+    )?;
+
+    // function math.randomstate(seed?)
+    math.raw_set(
+        "randomstate",
+        lua.create_function(|lua, seed: LuaValue| -> LuaResult<LuaFunction> {
+            let seed = {
+                if let Some(seed) = seed.as_number() {
+                    seed.trunc() as u64
+                }
+                else if let Some(seed) = seed.as_integer() {
+                    seed as u64
+                } else if seed.is_nil() {
+                    let app_data = lua
+                        .app_data_mut::<LuaAppData>()
+                        .expect("Failed to access Lua app data");
+                    app_data.rand_seed.unwrap_or(rand::thread_rng().gen())
+                } else {
+                    return Err(bad_argument_error(
+                        "randomstate",
+                        "seed",
+                        1,
+                        "expecting an integer value",
+                    ));
+                }
+            };
+            lua.create_function_mut({
+                let mut rand = Xoshiro256PlusPlus::seed_from_u64(seed);
+                move |_lua: &Lua, args: LuaMultiValue| -> LuaResult<LuaNumber> {
+                    generate_random_number("math.randomstate", &mut rand, args)
+                }
+            })
         })?,
     )?;
 
@@ -436,6 +406,80 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
             .set_mode(mlua::ChunkMode::Binary)
             .exec(),
         Err(err) => Err(err.clone()),
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
+
+// Generate a new random number in Lua math.random style.
+fn generate_random_number<R: rand::Rng>(
+    func_name: &'static str,
+    rand: &mut R,
+    args: LuaMultiValue,
+) -> LuaResult<LuaNumber> {
+    if args.is_empty() {
+        Ok(rand.gen::<LuaNumber>())
+    } else if args.len() == 1 {
+        let max = args.get(0).unwrap().as_integer();
+        if let Some(max) = max {
+            if max >= 1 {
+                let rand_int: LuaInteger = rand.gen_range(1..=max);
+                Ok(rand_int as LuaNumber)
+            } else {
+                Err(bad_argument_error(
+                    func_name,
+                    "max",
+                    1,
+                    "invalid interval: max must be >= 1",
+                ))
+            }
+        } else {
+            Err(bad_argument_error(
+                func_name,
+                "max",
+                1,
+                "expecting an integer value",
+            ))
+        }
+    } else if args.len() == 2 {
+        let min = args.get(0).unwrap().as_integer();
+        let max = args.get(1).unwrap().as_integer();
+        if let Some(min) = min {
+            if let Some(max) = max {
+                if max >= min {
+                    let rand_int: LuaInteger = rand.gen_range(min..=max);
+                    Ok(rand_int as LuaNumber)
+                } else {
+                    Err(bad_argument_error(
+                        func_name,
+                        "max",
+                        1,
+                        "invalid interval: max must be >= min",
+                    ))
+                }
+            } else {
+                Err(bad_argument_error(
+                    func_name,
+                    "max",
+                    1,
+                    "expecting an integer value",
+                ))
+            }
+        } else {
+            Err(bad_argument_error(
+                func_name,
+                "min",
+                1,
+                "expecting an integer value",
+            ))
+        }
+    } else {
+        Err(bad_argument_error(
+            func_name,
+            "undefined",
+            3,
+            "wrong number of arguments",
+        ))
     }
 }
 
@@ -486,6 +530,12 @@ mod test {
         assert!(lua
             .load(r#"return pattern.new()"#)
             .eval::<LuaTable>()
+            .is_ok());
+
+        // math.randomstate is present
+        assert!(lua
+            .load(r#"return math.randomstate(123)(1, 10)"#)
+            .eval::<LuaNumber>()
             .is_ok());
 
         // timeout hook is installed and does its job
