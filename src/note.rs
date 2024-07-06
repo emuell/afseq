@@ -188,7 +188,7 @@ impl TryFrom<&str> for Note {
     /// Try converting the given string to a Note value
     fn try_from(s: &str) -> Result<Self, String> {
         fn is_note_off(s: &str) -> bool {
-            s.to_lowercase() == "off"
+            s.eq_ignore_ascii_case("off") || s == "~"
         }
         fn is_sharp_symbol(s: &str, index: usize) -> bool {
             if let Some(c) = s.chars().nth(index) {
@@ -365,6 +365,7 @@ mod test {
         assert!(Note::try_from("cc2").is_err());
         assert!(Note::try_from("cbb2").is_err());
         assert!(Note::try_from("c##2").is_err());
+        
         assert_eq!(Note::try_from("C4")?, Note::C4);
         assert_eq!(Note::try_from("Cb4")?, Note::B3);
         assert_eq!(Note::try_from("C#3")?, Note::Cs3);
@@ -374,6 +375,11 @@ mod test {
         assert_eq!(Note::try_from("g 9")?, Note::G9);
         assert_eq!(Note::try_from("A 8")?, Note::A8);
         assert_eq!(Note::try_from("bb2")?, Note::As2);
+
+        assert_eq!(Note::try_from("OFF")?, Note::OFF);
+        assert_eq!(Note::try_from("off")?, Note::OFF);
+        assert_eq!(Note::try_from("~")?, Note::OFF);
+
         Ok(())
     }
 }
