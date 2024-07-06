@@ -352,9 +352,10 @@ impl LuaCallbackContext {
                             // slower path (string )
                             value.into_lua(lua)
                         } else {
-                            Err(mlua::Error::RuntimeError(
-                                "no such field in context".to_string(),
-                            ))
+                            Err(mlua::Error::RuntimeError(format!(
+                                "undefined field '{}' in context",
+                                key.to_string_lossy()
+                            )))
                         }
                     },
                 )
