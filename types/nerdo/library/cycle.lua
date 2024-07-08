@@ -70,6 +70,10 @@ local Cycle = {}
 ---    return note(cmin:chord(tonumber(value)))
 ---  end
 ---end)
+-----Same as above, but using mappings helpers to create chords
+---cycle("1 5 1 [6|7]"):map(
+---  mappings.chord_from_degrees(scale("c", "major")
+---)
 ---```
 ---@param map { [string]: CycleMapNoteValue }|CycleMapFunction|CycleMapGenerator
 ---@return Cycle
@@ -84,6 +88,7 @@ function Cycle:map(map) end
 --- * Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
 --- * Operators currently only accept numbers on the right side (`a3*2` is valid, `a3*<1 2>` is not)
 --- * `:` - Sets the instrument or remappable target instead of selecting samples
+---
 --- [Tidal Cycles Reference](https://tidalcycles.org/docs/reference/mini_notation/)
 ---
 ---### examples:
