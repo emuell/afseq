@@ -153,6 +153,7 @@ pub(crate) fn register_bindings(
     register_math_bindings(lua)?;
     register_table_bindings(lua)?;
     register_pattern_module(lua)?;
+    register_mappings_module(lua)?;
     Ok(())
 }
 
@@ -346,8 +347,7 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
             let seed = {
                 if let Some(seed) = seed.as_number() {
                     seed.trunc() as u64
-                }
-                else if let Some(seed) = seed.as_integer() {
+                } else if let Some(seed) = seed.as_integer() {
                     seed as u64
                 } else if seed.is_nil() {
                     let app_data = lua
@@ -403,6 +403,23 @@ fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
         Ok(bytecode) => lua
             .load(bytecode)
             .set_name("[inbuilt:pattern.lua]")
+            .set_mode(mlua::ChunkMode::Binary)
+            .exec(),
+        Err(err) => Err(err.clone()),
+    }
+}
+
+fn register_mappings_module(lua: &mut Lua) -> LuaResult<()> {
+    // cache module bytecode to speed up requires
+    lazy_static! {
+        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> =
+            compile_chunk(include_str!("../types/nerdo/library/mappings.lua"));
+    }
+    // implemented in lua: load and evaluate cached chunk
+    match PATTERN_BYTECODE.as_ref() {
+        Ok(bytecode) => lua
+            .load(bytecode)
+            .set_name("[inbuilt:mappings.lua]")
             .set_mode(mlua::ChunkMode::Binary)
             .exec(),
         Err(err) => Err(err.clone()),
