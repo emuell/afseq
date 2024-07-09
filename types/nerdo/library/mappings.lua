@@ -5,6 +5,8 @@
 
 ----------------------------------------------------------------------------------------------------
 
+---@alias NoteMapFunction fun(context: CycleMapContext, value: Note|string):Note|string
+
 ---@class NoteProperties
 ---@field transpose number? Note transpose step
 ---@field instrument number? Instrument/Sample/Patch >= 0
@@ -36,7 +38,7 @@ mappings = {}
 ---Applies given note properties to notes in the cycle.
 ---
 ---@param properties NoteProperties|(NoteProperties[])
----@return CycleMapFunction
+---@return NoteMapFunction
 mappings.with_properties = function(properties)
   properties = type(properties) == "table" and properties or { properties }
   return function(context, value)
@@ -117,16 +119,45 @@ end
 ---
 ---@param scale Scale
 ---@param note_counts (number|number[])?
+---@return NoteMapFunction
 mappings.chord_from_degrees = function(scale, note_counts)
   note_counts = (type(note_counts) == "table" and note_counts) or
       (type(note_counts) == "number" and { note_counts }) or { 3 }
   return function(context, value)
-    local degree = tonumber(value, 10)
+    local degree = type(value) == "string" and tonumber(value, 10) or nil
     if degree == nil then
       return value -- pass non number values as they are
     end
     assert(degree >= 1 and degree <= 7, "invalid degree value for chord: '" .. degree .. "'");
     local note_count = note_counts[math.imod(context.step, #note_counts)]
     return scale:chord(degree, note_count)
+  end
+end
+
+----------------------------------------------------------------------------------------------------
+
+---Combine multiple map functions into one.
+---
+---### examples:
+---```lua
+---return rhythm {
+---  unit = "1/1",
+---  emit = cycle("1 5 <_ 6>"):map(
+---    mappings.combine(
+---      mappings.chord_from_degrees( scale("c4", "minor") ),
+---      mappings.with_delay({ 0.0, 0.1 }),
+---      mappings.with_volume( 0.5 ))
+---    )
+---}
+---```
+---@param ... NoteMapFunction
+---@return NoteMapFunction
+function mappings.combine(...)
+  local mappings = {...}
+  return function(context, value)
+    for _, mapping in ipairs(mappings) do
+      value = mapping(context, value)
+    end
+    return value
   end
 end
