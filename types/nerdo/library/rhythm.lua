@@ -197,7 +197,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----- a chord of c4, d#4, g4
 ---emit = {{"c4", "d#4", "g4"}} -- or {"c4'min"}
 ----- a sequence of c4, g4 with volume 0.5
----emit = sequence{"c4", "g4"}:with_volume(0.5)
+---emit = sequence{"c4", "g4"}:volume(0.5)
 ---
 ----- stateless generator function
 ----- a function
@@ -240,7 +240,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  unit = "bars",
 ---  resolution = 4,
 ---  offset = 1,
----  emit = sequence("c4'm", note("g3'm7"):transposed({0, 12, 0, 0}))
+---  emit = sequence("c4'm", note("g3'm7"):transpose({0, 12, 0, 0}))
 ---}
 ---
 -----trigger notes in an euclidean triplet pattern
@@ -248,7 +248,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  unit = "1/8",
 ---  resolution = 3/2,
 ---  pattern = pattern.euclidean(6, 16, 2),
----  emit = sequence("c3", "c3", note{ "c4", "a4" }:with_volume(0.75))
+---  emit = sequence("c3", "c3", note{ "c4", "a4" }:volume(0.75))
 ---}
 ---
 -----trigger notes in a seeded, random subdivision pattern

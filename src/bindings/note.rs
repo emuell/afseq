@@ -91,7 +91,7 @@ impl LuaUserData for NoteUserData {
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transposed", |lua, this, value: LuaValue| {
+        methods.add_method_mut("transpose", |lua, this, value: LuaValue| {
             let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
             for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 if let Some(note) = note {
@@ -104,12 +104,12 @@ impl LuaUserData for NoteUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("amplified", |lua, this, value: LuaValue| {
+        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
             let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if volume < 0.0 {
                     return Err(bad_argument_error(
-                        "amplified",
+                        "amplify",
                         "volume",
                         1,
                         "amplify value must be >= 0.0",
@@ -122,12 +122,12 @@ impl LuaUserData for NoteUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_instrument", |lua, this, value: LuaValue| {
+        methods.add_method_mut("instrument", |lua, this, value: LuaValue| {
             let instruments = instrument_array_from_value(lua, value, this.notes.len())?;
             for (note, instrument) in this.notes.iter_mut().zip(instruments.into_iter()) {
                 if instrument < 0 {
                     return Err(bad_argument_error(
-                        "with_instrument",
+                        "instrument",
                         "instrument",
                         1,
                         "instrument must be >= 0",
@@ -140,12 +140,12 @@ impl LuaUserData for NoteUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
+        methods.add_method_mut("volume", |lua, this, value: LuaValue| {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if !(0.0..=1.0).contains(&volume) {
                     return Err(bad_argument_error(
-                        "with_volume",
+                        "volume",
                         "volume",
                         1,
                         "volume must be in range [0.0..=1.0]",
@@ -158,12 +158,12 @@ impl LuaUserData for NoteUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
+        methods.add_method_mut("panning", |lua, this, value: LuaValue| {
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (note, panning) in this.notes.iter_mut().zip(pannings.into_iter()) {
                 if !(-1.0..=1.0).contains(&panning) {
                     return Err(bad_argument_error(
-                        "with_panning",
+                        "panning",
                         "panning",
                         1,
                         "panning must be in range [-1.0..=1.0]",
@@ -176,12 +176,12 @@ impl LuaUserData for NoteUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
+        methods.add_method_mut("delay", |lua, this, value: LuaValue| {
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (note, delay) in this.notes.iter_mut().zip(delays.into_iter()) {
                 if !(0.0..=1.0).contains(&delay) {
                     return Err(bad_argument_error(
-                        "with_delay",
+                        "delay",
                         "delay",
                         1,
                         "delay must be in range [-1.0..=1.0]",
@@ -365,17 +365,17 @@ mod test {
     fn note_transpose() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
 
-        // transposed
+        // transpose
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transposed(12)"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transpose(12)"#)?.notes,
             vec![new_note("c5"), new_note("d5"), new_note("e5"),]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transposed({2, 4})"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):transpose({2, 4})"#)?.notes,
             vec![new_note("d_4"), new_note("f#4"), new_note("e_4"),]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "c4"):transposed({-1000, 1000})"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "c4"):transpose({-1000, 1000})"#)?.notes,
             vec![new_note(0x0_u8), new_note(0x7f_u8),]
         );
 
@@ -386,17 +386,17 @@ mod test {
     fn note_volume() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
 
-        // with_volume
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume(1.0)"#).is_ok());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume()"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume(-1)"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume({})"#).is_ok());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume({"wurst"})"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_volume({-1})"#).is_err());
+        // volume
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume(1.0)"#).is_ok());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume()"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume(-1)"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume({})"#).is_ok());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume({"wurst"})"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume({-1})"#).is_err());
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume(0.2)"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):volume(0.2)"#
             )?
             .notes,
             vec![
@@ -408,7 +408,7 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume({0.0, 0.0})"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):volume({0.0, 0.0})"#
             )?
             .notes,
             vec![
@@ -420,7 +420,7 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):with_volume({0.1, 0.2, 0.3})"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):volume({0.1, 0.2, 0.3})"#
             )?
             .notes,
             vec![
@@ -434,7 +434,7 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):amplified(200.0)"#
+                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):amplify(200.0)"#
             )?
             .notes,
             vec![
@@ -446,7 +446,7 @@ mod test {
         assert_eq!(
             evaluate_note_userdata(
                 &lua,
-                r#"note("c4 v0.25", "d4 v0.25", "e4 v0.5"):amplified({2.0, 4.0})"#
+                r#"note("c4 v0.25", "d4 v0.25", "e4 v0.5"):amplify({2.0, 4.0})"#
             )?
             .notes,
             vec![
@@ -462,15 +462,15 @@ mod test {
     fn note_panning() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
 
-        // with_panning
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning(1.0)"#).is_ok());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning()"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning(-2)"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning({})"#).is_ok());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning({"wurst"})"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_panning({2})"#).is_err());
+        // panning
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):panning(1.0)"#).is_ok());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):panning()"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):panning(-2)"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):panning({})"#).is_ok());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):panning({"wurst"})"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):panning({2})"#).is_err());
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):with_panning(-1.0)"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):panning(-1.0)"#)?.notes,
             vec![
                 new_note(("c4", None, 1.0, -1.0)),
                 new_note(("d4", None, 1.0, -1.0)),
@@ -478,7 +478,7 @@ mod test {
             ]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):with_panning({-1.0, 1.0})"#)?
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):panning({-1.0, 1.0})"#)?
                 .notes,
             vec![
                 new_note(("c4", None, 1.0, -1.0)),
@@ -493,15 +493,15 @@ mod test {
     fn note_delay() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
 
-        // with_delay
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay(1.0)"#).is_ok());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay()"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay(-1)"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay({})"#).is_ok());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay({"wurst"})"#).is_err());
-        assert!(evaluate_note_userdata(&lua, r#"note("c4"):with_delay({2})"#).is_err());
+        // delay
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):delay(1.0)"#).is_ok());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):delay()"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):delay(-1)"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):delay({})"#).is_ok());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):delay({"wurst"})"#).is_err());
+        assert!(evaluate_note_userdata(&lua, r#"note("c4"):delay({2})"#).is_err());
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):with_delay(0.75)"#)?.notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):delay(0.75)"#)?.notes,
             vec![
                 new_note(("c4", None, 1.0, 0.0, 0.75)),
                 new_note(("d4", None, 1.0, 0.0, 0.75)),
@@ -509,7 +509,7 @@ mod test {
             ]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):with_delay({0.25, 0.5})"#)?
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):delay({0.25, 0.5})"#)?
                 .notes,
             vec![
                 new_note(("c4", None, 1.0, 0.0, 0.25)),

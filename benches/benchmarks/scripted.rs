@@ -78,9 +78,9 @@ fn create_phrase() -> Phrase {
             resolution = 8,
             offset = 8,
             emit = {
-              note("c_4", "---", "---"):with_volume(0.2),
-              note("---", "c_5", "---"):with_volume(0.25),
-              note("---", "---", "f_5"):with_volume(0.2)
+              note("c_4", "---", "---"):volume(0.2),
+              note("---", "c_5", "---"):volume(0.25),
+              note("---", "---", "f_5"):volume(0.2)
             }
           }
         "#,
@@ -95,9 +95,9 @@ fn create_phrase() -> Phrase {
           local CMIN = scale("c4", "minor")
           local CHORDS = {
             note(CMIN:chord("i", 3)),
-            note(CMIN:chord("i", 3)):transposed({0, 0, -2}),
+            note(CMIN:chord("i", 3)):transpose({0, 0, -2}),
             note(CMIN:chord("i", 3)),
-            note(CMIN:chord("i", 4)):transposed({0, 0, 3, -12})
+            note(CMIN:chord("i", 4)):transpose({0, 0, 3, -12})
           }
           return rhythm {
             unit = "bars", 

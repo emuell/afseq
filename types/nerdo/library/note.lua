@@ -24,57 +24,57 @@ local Note = {}
 ---
 ---### examples:
 ---```lua
----note("c4"):transposed(12)
----note("c'maj"):transposed(5)
----note("c'maj"):transposed({0, 0, 5})
+---note("c4"):transpose(12)
+---note("c'maj"):transpose(5)
+---note("c'maj"):transpose({0, 0, 5})
 ---```
 ---@param step integer|integer[]
 ---@return Note
 ---@nodiscard
-function Note:transposed(step) end
+function Note:transpose(step) end
 
 ---Create a copy of the note or chord with amplified volume values.
 ---
 ---### examples:
 ---```lua
----note({"c4 0.5", "g4"}):amplified(0.5)
----note("c'maj 0.5"):amplified({2.0, 1.0, 0.3})
+---note({"c4 0.5", "g4"}):amplify(0.5)
+---note("c'maj 0.5"):amplify({2.0, 1.0, 0.3})
 ---```
 ---@param factor number|number[] amplify factor > 0
 ---@return Note
 ---@nodiscard
-function Note:amplified(factor) end
+function Note:amplify(factor) end
 
 ---Create a copy of the note or chord with new volume values.
 ---
 ---### examples:
 ---```lua
----note({"c4", "g4"}):with_volume(0.5)
----note("c'maj"):with_volume(0.5)
----note("c'maj"):with_volume({0.1, 0.2, 0.3})
+---note({"c4", "g4"}):volume(0.5)
+---note("c'maj"):volume(0.5)
+---note("c'maj"):volume({0.1, 0.2, 0.3})
 ---```
 ---@param volume number|number[] new volume in range [0 - 1]
 ---@return Note
 ---@nodiscard
-function Note:with_volume(volume) end
+function Note:volume(volume) end
 
 ---Create a copy of the note or chord with new instrument values.
 ---@param instrument number|number[] 
 ---@return Note
 ---@nodiscard
-function Note:with_instrument(instrument) end
+function Note:instrument(instrument) end
 
 ---Create a copy of the note or chord with new panning values.
 ---@param panning number|number[] 
 ---@return Note
 ---@nodiscard
-function Note:with_panning(panning) end
+function Note:panning(panning) end
 
 ---Create a copy of the note or chord with new delay values.
 ---@param delay number|number[] 
 ---@return Note
 ---@nodiscard
-function Note:with_delay(delay) end
+function Note:delay(delay) end
 
 ----------------------------------------------------------------------------------------------------
 

@@ -22,7 +22,7 @@ local Scale = {}
 ---```lua
 ---local cmin = scale("c4", "minor")
 ---cmin:chord("i", 4) --> {48, 51, 55, 58}
----note(cmin:chord(5)):transposed({12, 0, 0}) --> Gm 1st inversion
+---note(cmin:chord(5)):transpose({12, 0, 0}) --> Gm 1st inversion
 ---```
 ---@param degree DegreeValue Degree value in range [1..7]
 ---@param note_count integer? Number of notes in chord. By default 3.

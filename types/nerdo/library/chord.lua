@@ -38,7 +38,7 @@
 ---note("c4'major v0.5")
 -----or:
 ---note(scale("c4", "major"):chord("i", 3))
----note(scale("c4", "major"):chord("i", 3)):with_volume(0.5)
+---note(scale("c4", "major"):chord("i", 3)):volume(0.5)
 ---```
 ---@param key NoteValue e.g. "c4" or 48
 ---@param mode ChordName

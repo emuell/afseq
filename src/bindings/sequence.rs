@@ -73,7 +73,7 @@ impl LuaUserData for SequenceUserData {
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transposed", |lua, this, volume: LuaValue| {
+        methods.add_method_mut("transpose", |lua, this, volume: LuaValue| {
             let steps = transpose_steps_array_from_value(lua, volume, this.notes.len())?;
             for (notes, step) in this.notes.iter_mut().zip(steps.into_iter()) {
                 for note in notes.iter_mut().flatten() {
@@ -86,12 +86,12 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("amplified", |lua, this, value: LuaValue| {
+        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
             let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
                 if volume < 0.0 {
                     return Err(bad_argument_error(
-                        "amplified",
+                        "amplify",
                         "volume",
                         1,
                         "amplify value must be >= 0.0",
@@ -104,12 +104,12 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_instrument", |lua, this, value: LuaValue| {
+        methods.add_method_mut("instrument", |lua, this, value: LuaValue| {
             let instruments = instrument_array_from_value(lua, value, this.notes.len())?;
             for (notes, instrument) in this.notes.iter_mut().zip(instruments) {
                 if instrument < 0 {
                     return Err(bad_argument_error(
-                        "with_instrument",
+                        "instrument",
                         "instrument",
                         1,
                         "instrument must be >= 0",
@@ -122,12 +122,12 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_volume", |lua, this, value: LuaValue| {
+        methods.add_method_mut("volume", |lua, this, value: LuaValue| {
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (notes, volume) in this.notes.iter_mut().zip(volumes) {
                 if !(0.0..=1.0).contains(&volume) {
                     return Err(bad_argument_error(
-                        "with_volume",
+                        "volume",
                         "volume",
                         1,
                         "volume must be in range [0.0..=1.0]",
@@ -140,12 +140,12 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_panning", |lua, this, value: LuaValue| {
+        methods.add_method_mut("panning", |lua, this, value: LuaValue| {
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (notes, panning) in this.notes.iter_mut().zip(pannings) {
                 if !(-1.0..=1.0).contains(&panning) {
                     return Err(bad_argument_error(
-                        "with_panning",
+                        "panning",
                         "panning",
                         1,
                         "panning must be in range [-1.0..=1.0]",
@@ -158,12 +158,12 @@ impl LuaUserData for SequenceUserData {
             Ok(this.clone())
         });
 
-        methods.add_method_mut("with_delay", |lua, this, value: LuaValue| {
+        methods.add_method_mut("delay", |lua, this, value: LuaValue| {
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (notes, delay) in this.notes.iter_mut().zip(delays) {
                 if !(0.0..=1.0).contains(&delay) {
                     return Err(bad_argument_error(
-                        "with_delay",
+                        "delay",
                         "delay",
                         1,
                         "delay must be in range [-1.0..=1.0]",
@@ -319,45 +319,45 @@ mod test {
             ]
         );
 
-        // with_xxx
+        // xxx
         assert!(evaluate_sequence_userdata(
             &lua, //
-            r#"sequence("c", "d", "f"):transposed(1)"#
-        )
-        .is_ok());
-        assert!(evaluate_sequence_userdata(
-            &lua, //
-            r#"sequence("c'maj"):with_volume(0.2)"#
+            r#"sequence("c", "d", "f"):transpose(1)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua, //
-            r#"sequence(12, 24, 48):with_panning(0.0)"#
-        )
-        .is_ok());
-        assert!(evaluate_sequence_userdata(
-            &lua,
-            r#"sequence({key = "c"}, "d", "f"):with_delay(0.0)"#
+            r#"sequence("c'maj"):volume(0.2)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua, //
-            r#"sequence("c", "d", "f"):transposed({1, 2})"#
+            r#"sequence(12, 24, 48):panning(0.0)"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua,
-            r#"sequence("c", "d", "f"):with_volume({0.5, 1.0})"#
+            r#"sequence({key = "c"}, "d", "f"):delay(0.0)"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &lua, //
+            r#"sequence("c", "d", "f"):transpose({1, 2})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua,
-            r#"sequence("c", "d", "f"):with_panning({0.0, 1.0})"#
+            r#"sequence("c", "d", "f"):volume({0.5, 1.0})"#
         )
         .is_ok());
         assert!(evaluate_sequence_userdata(
             &lua,
-            r#"sequence("c", "d", "f"):with_delay({0.0, 0.25})"#
+            r#"sequence("c", "d", "f"):panning({0.0, 1.0})"#
+        )
+        .is_ok());
+        assert!(evaluate_sequence_userdata(
+            &lua,
+            r#"sequence("c", "d", "f"):delay({0.0, 0.25})"#
         )
         .is_ok());
 

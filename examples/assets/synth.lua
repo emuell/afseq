@@ -8,8 +8,8 @@ return rhythm {
   repeats = 3,
   emit = sequence(
     note(cmin:chord("i", 3)),
-    note(cmin:chord("i", 3)):transposed({0, 0, -2}),
+    note(cmin:chord("i", 3)):transpose({0, 0, -2}),
     note(cmin:chord("i", 3)),
-    note(cmin:chord("i", 4)):transposed({0, 0, 3, -12})
-  ):amplified({ 0.6, 0.5, 0.6, 0.5 })
+    note(cmin:chord("i", 4)):transpose({0, 0, 3, -12})
+  ):amplify({ 0.6, 0.5, 0.6, 0.5 })
 }

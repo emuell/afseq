@@ -14,56 +14,56 @@ local Sequence = {}
 ---
 ---### examples:
 ---```lua
----sequence("c4", "d#5"):transposed(12)
----sequence(note("c'maj"), note("c'maj")):transposed({0, 5})
+---sequence("c4", "d#5"):transpose(12)
+---sequence(note("c'maj"), note("c'maj")):transpose({0, 5})
 ---```
 ---@param step integer|integer[]
 ---@return Sequence
 ---@nodiscard
-function Sequence:transposed(step) end
+function Sequence:transpose(step) end
 
 ---Create a copy of all notes in the sequence with amplified volume values.
 ---
 ---### examples:
 ---```lua
----sequence({"c4 0.5", "g4"}):amplified(0.5)
----sequence("c'maj 0.5"):amplified({2.0, 1.0, 0.3})
+---sequence({"c4 0.5", "g4"}):amplify(0.5)
+---sequence("c'maj 0.5"):amplify({2.0, 1.0, 0.3})
 ---```
 ---@param factor number|number[]
 ---@return Sequence
 ---@nodiscard
-function Sequence:amplified(factor) end
+function Sequence:amplify(factor) end
 
 ---Create a copy of all notes in the sequence with new instrument values.
 ---@param instrument number|number[]
 ---@return Note
 ---@nodiscard
-function Sequence:with_instrument(instrument) end
+function Sequence:instrument(instrument) end
 
 ---Create a copy of all notes in the sequence with new volume values.
 ---
 ---### examples:
 ---```lua
----sequence({"c4", "g4"}):with_volume(0.5)
----sequence("c'maj"):with_volume(0.5)
----sequence("c'maj"):with_volume({0.1, 0.2, 0.3})
+---sequence({"c4", "g4"}):volume(0.5)
+---sequence("c'maj"):volume(0.5)
+---sequence("c'maj"):volume({0.1, 0.2, 0.3})
 ---```
 ---@param volume number|number[]
 ---@return Sequence
 ---@nodiscard
-function Sequence:with_volume(volume) end
+function Sequence:volume(volume) end
 
 ---Create a copy of all notes in the sequence with new panning values.
 ---@param panning number|number[]
 ---@return Note
 ---@nodiscard
-function Sequence:with_panning(panning) end
+function Sequence:panning(panning) end
 
 ---Create a copy of all notes in the sequence with new delay values.
 ---@param delay number|number[]
 ---@return Sequence
 ---@nodiscard
-function Sequence:with_delay(delay) end
+function Sequence:delay(delay) end
 
 ----------------------------------------------------------------------------------------------------
 
