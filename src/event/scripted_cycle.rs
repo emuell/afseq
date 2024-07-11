@@ -170,6 +170,35 @@ impl ScriptedCycleEventIter {
         // convert timed note events into EventIterItems
         timed_note_events.into_event_iter_items()
     }
+
+    /// Skip next batch of events from the cycle.
+    /// This maintains cycle mapping callback states as well, if needed.
+    fn advance(&mut self) {
+        if self.mapping_callback.is_none() {
+            // no mapping callback present: just advance the cycle
+            self.cycle.advance();
+        } else {
+            // run the cycle event generator
+            let events = {
+                match self.cycle.generate() {
+                    Ok(events) => events,
+                    Err(err) => {
+                        add_lua_callback_error("cycle", &LuaError::RuntimeError(err));
+                        return;
+                    }
+                }
+            };
+            // advance channel_steps for generated each event
+            for (channel_index, channel_events) in events.into_iter().enumerate() {
+                if self.channel_steps.len() <= channel_index {
+                    self.channel_steps.resize(channel_index + 1, 0);
+                }
+                for _event in channel_events.into_iter() {
+                    self.channel_steps[channel_index] += 1
+                }
+            }
+        }
+    }
 }
 
 impl EventIter for ScriptedCycleEventIter {
@@ -205,7 +234,7 @@ impl EventIter for ScriptedCycleEventIter {
 
     fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
         if emit_event {
-            self.cycle.advance();
+            self.advance();
         }
     }
 
