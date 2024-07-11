@@ -253,11 +253,10 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             // generate a pulse from the pattern and pass the pulse to the gate
             if let Some((pulse, emit_event)) = self.run_pattern() {
                 // generate new events from the gated pulse
-                if let Some(slice) = self.event_iter.run(pulse, emit_event) {
-                    self.event_iter_items = VecDeque::from(slice);
-                } else {
-                    self.event_iter_items.clear();
-                }
+                self.event_iter_items = self
+                    .event_iter
+                    .run(pulse, emit_event)
+                    .map_or_else(VecDeque::default, VecDeque::from);
             } else {
                 // pattern playback finished
                 self.pattern_playback_finished = true;
@@ -389,14 +388,16 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
                     self.event_iter_next_sample_time += step_duration;
                 } else {
                     // generate new events from the gated pulse
-                    if let Some(slice) = self.event_iter.run(pulse, emit_event) {
-                        self.event_iter_items = VecDeque::from(slice);
-                        break; // clear remaining items with regular runs
-                    } else {
-                        self.event_iter_items.clear();
+                    self.event_iter_items = self
+                        .event_iter
+                        .run(pulse, emit_event)
+                        .map_or_else(VecDeque::default, VecDeque::from);
+                    // when the remaining step is empty advance to next step
+                    if self.event_iter_items.is_empty() {
                         self.event_iter_next_sample_time += self.current_steps_sample_duration();
-                        return; // remaining step is empty: we can finish this run
                     }
+                    // we're done either way now...
+                    break;
                 }
             } else {
                 // pattern playback finished: we're done here

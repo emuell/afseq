@@ -434,6 +434,10 @@ mod test {
                     vec![None, None, new_note(("F 4", None, 0.2))],
                 ]));
 
+        let tone_pattern = beat_time
+            .every_nth_eighth(1.0)
+            .trigger(new_cycle_event("[60 63 65 <58 ~>]/4")?);
+
         Ok(Phrase::new(
             beat_time,
             vec![
@@ -443,6 +447,7 @@ mod test {
                 RhythmSlot::from(bass_pattern),
                 RhythmSlot::from(fx_pattern),
                 RhythmSlot::from(synth_pattern),
+                RhythmSlot::from(tone_pattern),
             ],
             BeatTimeStep::Bar(8.0),
         ))
@@ -484,13 +489,13 @@ mod test {
         let run_steps = [
             (1024, 1),
             (2000, 555432),
-            (5000, 666),
+            (5012, 666),
             (200, 211),
-            (100, 10200),
+            (100, 11200),
             (1024, 122),
             (8000, 5577432),
-            (50000, 66),
-            (20020, 2121),
+            (50700, 66),
+            (21020, 2121),
             (1000, 100),
         ];
 
