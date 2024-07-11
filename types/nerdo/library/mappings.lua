@@ -22,12 +22,12 @@
 ---```lua
 ----- set volume values of notes in cycles
 ---cycle("c4 <a# g d#>"):map(
----  mappings.with_volume({1.0, 0.5})
+---  mappings.volume({1.0, 0.5})
 ---)
 ---
------ convert numbers in cycle to chord degrees
+----- convert numbers in cycle to chords, using numbers in the cycle as scale degrees
 ---cycle("[1 5 6 <_ 4>]/4"):map(
----  mappings.chord_from_degrees(scale("a", "major"))
+---  mappings.chords(scale("a", "major"))
 ---)
 ---```
 ---@class CycleMappings : table
@@ -39,68 +39,79 @@ mappings = {}
 ---
 ---@param properties NoteProperties|(NoteProperties[])
 ---@return NoteMapFunction
-mappings.with_properties = function(properties)
+mappings.note_properties = function(properties)
   properties = type(properties) == "table" and properties or { properties }
   return function(context, value)
     local property = properties[math.imod(context.step, #properties)]
     local result = note(tonumber(value) or value)
     if property.transpose then
-      result = result:transposed(property.transpose)
+      result = result:transpose(property.transpose)
     end
     if property.instrument then
-      result = result:with_instrument(property.instrument)
+      result = result:instrument(property.instrument)
     end
     if property.volume then
-      result = result:with_volume(property.volume)
+      result = result:volume(property.volume)
     end
     if property.panning then
-      result = result:with_panning(property.panning)
+      result = result:panning(property.panning)
     end
     if property.delay then
-      result = result:with_delay(property.delay)
+      result = result:delay(property.delay)
     end
     return result
   end
 end
 
+---@param steps number|number[]
+mappings.transpose = function(steps)
+  steps = type(steps) == "table" and steps or { steps }
+  return function(context, value)
+    local step = steps[math.imod(context.step, #steps)]
+    local result = note(tonumber(value) or value)
+    result = result:transpose(step)
+    return result
+  end
+end
+
 ---@param instruments number|number[]
-mappings.with_instrument = function(instruments)
+mappings.instrument = function(instruments)
   instruments = type(instruments) == "table" and instruments or { instruments }
   local properties = {}
   for i, instrument in ipairs(instruments) do
     properties[i] = { instrument = instrument }
   end
-  return mappings.with_properties(properties)
+  return mappings.note_properties(properties)
 end
 
 ---@param volumes number|number[]
-mappings.with_volume = function(volumes)
+mappings.volume = function(volumes)
   volumes = type(volumes) == "table" and volumes or { volumes }
   local properties = {}
   for i, volume in ipairs(volumes) do
     properties[i] = { volume = volume }
   end
-  return mappings.with_properties(properties)
+  return mappings.note_properties(properties)
 end
 
 ---@param pannings number|number[]
-mappings.with_panning = function(pannings)
+mappings.panning = function(pannings)
   pannings = type(pannings) == "table" and pannings or { pannings }
   local properties = {}
   for i, panning in ipairs(pannings) do
     properties[i] = { panning = panning }
   end
-  return mappings.with_properties(properties)
+  return mappings.note_properties(properties)
 end
 
 ---@param delays number|number[]
-mappings.with_delay = function(delays)
+mappings.delay = function(delays)
   delays = type(delays) == "table" and delays or { delays }
   local properties = {}
   for i, delay in ipairs(delays) do
     properties[i] = { delay = delay }
   end
-  return mappings.with_properties(properties)
+  return mappings.note_properties(properties)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -113,14 +124,14 @@ end
 ---### examples:
 ---```
 ---cycle("[1 5 6 <_ 4>]/4"):map(
----  mappings.chord_from_degrees(scale("a", "major"))
+---  mappings.chords(scale("a", "major"))
 ---)
 ---```
 ---
 ---@param scale Scale
 ---@param note_counts (number|number[])?
 ---@return NoteMapFunction
-mappings.chord_from_degrees = function(scale, note_counts)
+mappings.chords = function(scale, note_counts)
   note_counts = (type(note_counts) == "table" and note_counts) or
       (type(note_counts) == "number" and { note_counts }) or { 3 }
   return function(context, value)
@@ -136,6 +147,29 @@ end
 
 ----------------------------------------------------------------------------------------------------
 
+---Maps numbers in cycle to intervals in the given scale.
+---
+---### examples:
+---```
+---cycle("1 3 5 7"):map(
+---  mappings.intervals(scale("a4", "major"))
+---)
+---```
+---
+---@param scale Scale
+---@return NoteMapFunction
+mappings.intervals = function(scale)
+  return function(context, value)
+    local interval = type(value) == "string" and tonumber(value, 10) or nil
+    if interval == nil then
+      return value -- pass non number values as they are
+    end
+    return note(scale.notes[interval])
+  end
+end
+
+----------------------------------------------------------------------------------------------------
+
 ---Combine multiple map functions into one.
 ---
 ---### examples:
@@ -144,16 +178,16 @@ end
 ---  unit = "1/1",
 ---  emit = cycle("1 5 <_ 6>"):map(
 ---    mappings.combine(
----      mappings.chord_from_degrees( scale("c4", "minor") ),
----      mappings.with_delay({ 0.0, 0.1 }),
----      mappings.with_volume( 0.5 ))
+---      mappings.chords( scale("c4", "minor") ),
+---      mappings.delay({ 0.0, 0.1 }),
+---      mappings.volume( 0.5 ))
 ---    )
 ---}
 ---```
 ---@param ... NoteMapFunction
 ---@return NoteMapFunction
 function mappings.combine(...)
-  local mappings = {...}
+  local mappings = { ... }
   return function(context, value)
     for _, mapping in ipairs(mappings) do
       value = mapping(context, value)
