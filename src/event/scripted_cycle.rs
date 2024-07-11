@@ -73,26 +73,20 @@ impl ScriptedCycleEventIter {
     }
 
     /// Generate a note event stack from a single cycle event, applying mappings if necessary
-    fn note_events(
+    fn cycle_to_note_event(
         &mut self,
         channel_index: usize,
-        _event_index: usize,
-        event_length: f64,
+        channel_step: usize,
+        step_length: f64,
         event: CycleEvent,
     ) -> LuaResult<Vec<Option<NoteEvent>>> {
         let mut note_events = {
             if let Some(mapping_callback) = self.mapping_callback.as_mut() {
-                // increase step counter
-                if self.channel_steps.len() <= channel_index {
-                    self.channel_steps.resize(channel_index + 1, 0);
-                }
-                let channel_step = self.channel_steps[channel_index];
-                self.channel_steps[channel_index] += 1;
                 // update step in context
                 mapping_callback.set_context_cycle_step(
                     channel_index,
                     channel_step,
-                    event_length,
+                    step_length,
                 )?;
                 // call mapping function
                 let result = mapping_callback.call_with_arg(event.string())?;
@@ -147,11 +141,18 @@ impl ScriptedCycleEventIter {
         // convert possibly mapped cycle channel items to a list of note events
         let mut timed_note_events = CycleNoteEvents::new();
         for (channel_index, channel_events) in events.into_iter().enumerate() {
-            for (event_index, event) in channel_events.into_iter().enumerate() {
+            if self.channel_steps.len() <= channel_index {
+                self.channel_steps.resize(channel_index + 1, 0);
+            }
+            for event in channel_events.into_iter() {
+                // increase step counter
+                let channel_step = self.channel_steps[channel_index];
+                self.channel_steps[channel_index] += 1;
+                // convert cycle to note event
                 let start = event.span().start();
                 let length = event.span().length();
-                let event_length = length.to_f64().unwrap_or_default();
-                match self.note_events(channel_index, event_index, event_length, event) {
+                let step_length = length.to_f64().unwrap_or(0.0);
+                match self.cycle_to_note_event(channel_index, channel_step, step_length, event) {
                     Err(err) => {
                         if let Some(callback) = &self.mapping_callback {
                             callback.handle_error(&err)
@@ -174,10 +175,7 @@ impl ScriptedCycleEventIter {
     /// Skip next batch of events from the cycle.
     /// This maintains cycle mapping callback states as well, if needed.
     fn advance(&mut self) {
-        if self.mapping_callback.is_none() {
-            // no mapping callback present: just advance the cycle
-            self.cycle.advance();
-        } else {
+        if let Some(mapping_callback) = &mut self.mapping_callback {
             // run the cycle event generator
             let events = {
                 match self.cycle.generate() {
@@ -188,15 +186,49 @@ impl ScriptedCycleEventIter {
                     }
                 }
             };
-            // advance channel_steps for generated each event
-            for (channel_index, channel_events) in events.into_iter().enumerate() {
-                if self.channel_steps.len() <= channel_index {
-                    self.channel_steps.resize(channel_index + 1, 0);
+            if mapping_callback.is_stateful().unwrap_or(true) {
+                // run statefull callbacks but ignore results
+                if let Some(timeout_hook) = &mut self.timeout_hook {
+                    timeout_hook.reset();
                 }
-                for _event in channel_events.into_iter() {
-                    self.channel_steps[channel_index] += 1
+                for (channel_index, channel_events) in events.into_iter().enumerate() {
+                    if self.channel_steps.len() <= channel_index {
+                        self.channel_steps.resize(channel_index + 1, 0);
+                    }
+                    for event in channel_events.into_iter() {
+                        // move step counter
+                        let channel_step = self.channel_steps[channel_index];
+                        self.channel_steps[channel_index] += 1;
+                        // update step in context
+                        let step_length = event.span().length().to_f64().unwrap_or(0.0);
+                        if let Err(err) = mapping_callback.set_context_cycle_step(
+                            channel_index,
+                            channel_step,
+                            step_length,
+                        ) {
+                            add_lua_callback_error("cycle", &err);
+                            return;
+                        }
+                        // call mapping function
+                        if let Err(err) = mapping_callback.call_with_arg(event.string()) {
+                            add_lua_callback_error("cycle", &err);
+                            return;
+                        }
+                    }
+                }
+            } else {
+                // advance channel_steps for generated each event
+                for (channel_index, channel_events) in events.into_iter().enumerate() {
+                    if self.channel_steps.len() <= channel_index {
+                        self.channel_steps.resize(channel_index + 1, 0);
+                    }
+                    self.channel_steps[channel_index] += channel_events.len();
                 }
             }
+        } else {
+            // no mapping callback present: just advance the cycle
+            self.cycle.advance();
+            self.channel_steps.clear();
         }
     }
 }
