@@ -20,20 +20,24 @@ local NoteTable = {}
 ---@field notes NoteTable[]
 local Note = {}
 
----Create a transposed copy of the note or chord.
+---Transpose the notes key with the specified step or steps.
+---
+---Values outside of the valid key range (0 - 127) will be clamped.
 ---
 ---### examples:
 ---```lua
 ---note("c4"):transpose(12)
 ---note("c'maj"):transpose(5)
----note("c'maj"):transpose({0, 0, 5})
+---note("c'maj"):transpose({0, 0, -12})
 ---```
 ---@param step integer|integer[]
 ---@return Note
 ---@nodiscard
 function Note:transpose(step) end
 
----Create a copy of the note or chord with amplified volume values.
+---Multiply the note's volume attribute with the specified factor or factors.
+---
+---Values outside of the valid volume range (0 - 1) will be clamped.
 ---
 ---### examples:
 ---```lua
@@ -45,7 +49,7 @@ function Note:transpose(step) end
 ---@nodiscard
 function Note:amplify(factor) end
 
----Create a copy of the note or chord with new volume values.
+---Set the note's volume attribute to the specified value or values.
 ---
 ---### examples:
 ---```lua
@@ -58,20 +62,20 @@ function Note:amplify(factor) end
 ---@nodiscard
 function Note:volume(volume) end
 
----Create a copy of the note or chord with new instrument values.
----@param instrument number|number[] 
+---Set the note's instrument attribute to the specified value or values.
+---@param instrument number|number[]
 ---@return Note
 ---@nodiscard
 function Note:instrument(instrument) end
 
----Create a copy of the note or chord with new panning values.
----@param panning number|number[] 
+---Set the note's panning attribute to the specified value or values.
+---@param panning number|number[]
 ---@return Note
 ---@nodiscard
 function Note:panning(panning) end
 
----Create a copy of the note or chord with new delay values.
----@param delay number|number[] 
+---Set the note's delay attribute to the specified value or values.
+---@param delay number|number[]
 ---@return Note
 ---@nodiscard
 function Note:delay(delay) end
@@ -80,11 +84,11 @@ function Note:delay(delay) end
 
 ---@alias NoteValue NoteTable|string|number|nil
 
---- Create a new monophonic or polyphonic note (a chord) from a number value, 
+--- Create a new monophonic or polyphonic note (a chord) from a number value,
 --- a note string, chord string or array of note values.
 ---
---- In note strings the following prefixes are used to specify optional note 
---- attributes: 
+--- In note strings the following prefixes are used to specify optional note
+--- attributes:
 ---```md
 --- -'#' -> instrument (integer > 0)
 --- -'v' -> volume (float in range [0-1])

@@ -91,26 +91,33 @@ impl LuaUserData for NoteUserData {
     }
 
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("transpose", |lua, this, value: LuaValue| {
-            let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
-            for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
-                if let Some(note) = note {
-                    if note.note.is_note_on() {
-                        let transposed_note = (u8::from(note.note) as i32 + step).clamp(0, 0x7f);
-                        note.note = Note::from(transposed_note as u8);
+        methods.add_function(
+            "transpose",
+            |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
+                let mut this = ud.borrow_mut::<Self>()?;
+                let steps = transpose_steps_array_from_value(lua, value, this.notes.len())?;
+                for (note, step) in this.notes.iter_mut().zip(steps.into_iter()) {
+                    if let Some(note) = note {
+                        if note.note.is_note_on() {
+                            let transposed_note =
+                                (u8::from(note.note) as i32 + step).clamp(0, 0x7f);
+                            note.note = Note::from(transposed_note as u8);
+                        }
                     }
                 }
-            }
-            Ok(this.clone())
-        });
+                drop(this);
+                Ok(ud)
+            },
+        );
 
-        methods.add_method_mut("amplify", |lua, this, value: LuaValue| {
+        methods.add_function("amplify", |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
+            let mut this = ud.borrow_mut::<Self>()?;
             let volumes = amplify_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if volume < 0.0 {
                     return Err(bad_argument_error(
                         "amplify",
-                        "volume",
+                        "value",
                         1,
                         "amplify value must be >= 0.0",
                     ));
@@ -119,34 +126,41 @@ impl LuaUserData for NoteUserData {
                     note.volume = (note.volume * volume).clamp(0.0, 1.0);
                 }
             }
-            Ok(this.clone())
+            drop(this);
+            Ok(ud)
         });
 
-        methods.add_method_mut("instrument", |lua, this, value: LuaValue| {
-            let instruments = instrument_array_from_value(lua, value, this.notes.len())?;
-            for (note, instrument) in this.notes.iter_mut().zip(instruments.into_iter()) {
-                if instrument < 0 {
-                    return Err(bad_argument_error(
-                        "instrument",
-                        "instrument",
-                        1,
-                        "instrument must be >= 0",
-                    ));
+        methods.add_function(
+            "instrument",
+            |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
+                let mut this = ud.borrow_mut::<Self>()?;
+                let instruments = instrument_array_from_value(lua, value, this.notes.len())?;
+                for (note, instrument) in this.notes.iter_mut().zip(instruments.into_iter()) {
+                    if instrument < 0 {
+                        return Err(bad_argument_error(
+                            "instrument",
+                            "value",
+                            1,
+                            "instrument must be >= 0",
+                        ));
+                    }
+                    if let Some(note) = note {
+                        note.instrument = Some(InstrumentId::from(instrument as usize));
+                    }
                 }
-                if let Some(note) = note {
-                    note.instrument = Some(InstrumentId::from(instrument as usize));
-                }
-            }
-            Ok(this.clone())
-        });
+                drop(this);
+                Ok(ud)
+            },
+        );
 
-        methods.add_method_mut("volume", |lua, this, value: LuaValue| {
+        methods.add_function("volume", |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
+            let mut this = ud.borrow_mut::<Self>()?;
             let volumes = volume_array_from_value(lua, value, this.notes.len())?;
             for (note, volume) in this.notes.iter_mut().zip(volumes.into_iter()) {
                 if !(0.0..=1.0).contains(&volume) {
                     return Err(bad_argument_error(
                         "volume",
-                        "volume",
+                        "value",
                         1,
                         "volume must be in range [0.0..=1.0]",
                     ));
@@ -155,16 +169,18 @@ impl LuaUserData for NoteUserData {
                     note.volume = volume;
                 }
             }
-            Ok(this.clone())
+            drop(this);
+            Ok(ud)
         });
 
-        methods.add_method_mut("panning", |lua, this, value: LuaValue| {
+        methods.add_function("panning", |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
+            let mut this = ud.borrow_mut::<Self>()?;
             let pannings = panning_array_from_value(lua, value, this.notes.len())?;
             for (note, panning) in this.notes.iter_mut().zip(pannings.into_iter()) {
                 if !(-1.0..=1.0).contains(&panning) {
                     return Err(bad_argument_error(
                         "panning",
-                        "panning",
+                        "value",
                         1,
                         "panning must be in range [-1.0..=1.0]",
                     ));
@@ -173,16 +189,18 @@ impl LuaUserData for NoteUserData {
                     note.panning = panning;
                 }
             }
-            Ok(this.clone())
+            drop(this);
+            Ok(ud)
         });
 
-        methods.add_method_mut("delay", |lua, this, value: LuaValue| {
+        methods.add_function("delay", |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
+            let mut this = ud.borrow_mut::<Self>()?;
             let delays = delay_array_from_value(lua, value, this.notes.len())?;
             for (note, delay) in this.notes.iter_mut().zip(delays.into_iter()) {
                 if !(0.0..=1.0).contains(&delay) {
                     return Err(bad_argument_error(
                         "delay",
-                        "delay",
+                        "value",
                         1,
                         "delay must be in range [-1.0..=1.0]",
                     ));
@@ -191,7 +209,8 @@ impl LuaUserData for NoteUserData {
                     note.delay = delay;
                 }
             }
-            Ok(this.clone())
+            drop(this);
+            Ok(ud)
         });
     }
 }
@@ -394,11 +413,8 @@ mod test {
         assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume({"wurst"})"#).is_err());
         assert!(evaluate_note_userdata(&lua, r#"note("c4"):volume({-1})"#).is_err());
         assert_eq!(
-            evaluate_note_userdata(
-                &lua,
-                r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):volume(0.2)"#
-            )?
-            .notes,
+            evaluate_note_userdata(&lua, r#"note("c4 v0.5", "d4 v0.5", "e4 v0.5"):volume(0.2)"#)?
+                .notes,
             vec![
                 new_note(("c4", None, 0.2)),
                 new_note(("d4", None, 0.2)),
@@ -478,8 +494,7 @@ mod test {
             ]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):panning({-1.0, 1.0})"#)?
-                .notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):panning({-1.0, 1.0})"#)?.notes,
             vec![
                 new_note(("c4", None, 1.0, -1.0)),
                 new_note(("d4", None, 1.0, 1.0)),
@@ -509,8 +524,7 @@ mod test {
             ]
         );
         assert_eq!(
-            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):delay({0.25, 0.5})"#)?
-                .notes,
+            evaluate_note_userdata(&lua, r#"note("c4", "d4", "e4"):delay({0.25, 0.5})"#)?.notes,
             vec![
                 new_note(("c4", None, 1.0, 0.0, 0.25)),
                 new_note(("d4", None, 1.0, 0.0, 0.5)),

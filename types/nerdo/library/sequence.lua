@@ -10,7 +10,9 @@
 ---@field notes NoteTable[][]
 local Sequence = {}
 
----Create a copy of all notes in the sequence with transposed note values.
+---Transpose all notes key values with the specified step value or values.
+---
+---Values outside of the valid key range (0 - 127) will be clamped.
 ---
 ---### examples:
 ---```lua
@@ -22,7 +24,9 @@ local Sequence = {}
 ---@nodiscard
 function Sequence:transpose(step) end
 
----Create a copy of all notes in the sequence with amplified volume values.
+---Multiply all notes volume values with the specified factor or factors.
+---
+---Values outside of the valid volume range (0 - 1) will be clamped.
 ---
 ---### examples:
 ---```lua
@@ -34,13 +38,13 @@ function Sequence:transpose(step) end
 ---@nodiscard
 function Sequence:amplify(factor) end
 
----Create a copy of all notes in the sequence with new instrument values.
+---Set all notes instrument attribute to the specified value or values.
 ---@param instrument number|number[]
 ---@return Note
 ---@nodiscard
 function Sequence:instrument(instrument) end
 
----Create a copy of all notes in the sequence with new volume values.
+---Set all notes volume attribute to the specified value or values.
 ---
 ---### examples:
 ---```lua
@@ -53,13 +57,13 @@ function Sequence:instrument(instrument) end
 ---@nodiscard
 function Sequence:volume(volume) end
 
----Create a copy of all notes in the sequence with new panning values.
+---Set all notes panning attribute to the specified value or values.
 ---@param panning number|number[]
 ---@return Note
 ---@nodiscard
 function Sequence:panning(panning) end
 
----Create a copy of all notes in the sequence with new delay values.
+---Set all notes delay attribute to the specified value or values.
 ---@param delay number|number[]
 ---@return Sequence
 ---@nodiscard
