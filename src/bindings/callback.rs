@@ -97,9 +97,9 @@ impl LuaCallback {
     /// Create a new Callback from an owned lua function.
     pub fn with_owned(lua: &Lua, function: LuaOwnedFunction) -> LuaResult<Self> {
         // create and register the callback context
-        LuaCallbackContext::register(lua)?;
+        CallbackContext::register(lua)?;
         let context = lua
-            .create_any_userdata(LuaCallbackContext {
+            .create_any_userdata(CallbackContext {
                 values: HashMap::new(),
                 external_values: HashMap::new(),
             })?
@@ -119,11 +119,11 @@ impl LuaCallback {
 
     /// Sets the emitter time base context for the callback.
     pub fn set_context_time_base(&mut self, time_base: &BeatTimeBase) -> LuaResult<()> {
-        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
-        values.insert(b"beats_per_min", time_base.beats_per_min as LuaNumber);
-        values.insert(b"beats_per_min", time_base.beats_per_min as LuaNumber);
-        values.insert(b"beats_per_bar", time_base.beats_per_bar as LuaNumber);
-        values.insert(b"samples_per_sec", time_base.samples_per_sec as LuaNumber);
+        let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
+        values.insert(b"beats_per_min", time_base.beats_per_min.into());
+        values.insert(b"beats_per_min", time_base.beats_per_min.into());
+        values.insert(b"beats_per_bar", time_base.beats_per_bar.into());
+        values.insert(b"samples_per_sec", time_base.samples_per_sec.into());
         Ok(())
     }
 
@@ -131,19 +131,19 @@ impl LuaCallback {
     pub fn set_context_external_data(&mut self, data: &[(Cow<str>, f64)]) -> LuaResult<()> {
         let external_values = &mut self
             .context
-            .borrow_mut::<LuaCallbackContext>()?
+            .borrow_mut::<CallbackContext>()?
             .external_values;
         for (key, value) in data {
-            external_values.insert(key.to_string(), *value as LuaNumber);
+            external_values.insert(key.to_string(), (*value).into());
         }
         Ok(())
     }
 
     /// Sets the pulse value emitter context for the callback.
     pub fn set_context_pulse_value(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
-        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
-        values.insert(b"pulse_value", pulse.value as LuaNumber);
-        values.insert(b"pulse_time", pulse.step_time as LuaNumber);
+        let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
+        values.insert(b"pulse_value", pulse.value.into());
+        values.insert(b"pulse_time", pulse.step_time.into());
         Ok(())
     }
 
@@ -153,16 +153,16 @@ impl LuaCallback {
         pulse_step: usize,
         pulse_time_step: f64,
     ) -> LuaResult<()> {
-        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
-        values.insert(b"pulse_step", (pulse_step + 1) as LuaNumber);
-        values.insert(b"pulse_time_step", pulse_time_step as LuaNumber);
+        let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
+        values.insert(b"pulse_step", (pulse_step + 1).into());
+        values.insert(b"pulse_time_step", pulse_time_step.into());
         Ok(())
     }
 
     /// Sets the step emitter context for the callback.
     pub fn set_context_step(&mut self, step: usize) -> LuaResult<()> {
-        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
-        values.insert(b"step", (step + 1) as LuaNumber);
+        let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
+        values.insert(b"step", (step + 1).into());
         Ok(())
     }
 
@@ -173,10 +173,10 @@ impl LuaCallback {
         step: usize,
         step_length: f64,
     ) -> LuaResult<()> {
-        let values = &mut self.context.borrow_mut::<LuaCallbackContext>()?.values;
-        values.insert(b"channel", (channel + 1) as LuaNumber);
-        values.insert(b"step", (step + 1) as LuaNumber);
-        values.insert(b"step_length", step_length as LuaNumber);
+        let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
+        values.insert(b"channel", (channel + 1).into());
+        values.insert(b"step", (step + 1).into());
+        values.insert(b"step_length", step_length.into());
         Ok(())
     }
 
@@ -330,19 +330,19 @@ impl LuaCallback {
 
 /// Memorizes an optional set of values that are passed along as context with the callback.
 #[derive(Debug, Clone)]
-struct LuaCallbackContext {
-    values: HashMap<&'static [u8], LuaNumber>,
-    external_values: HashMap<String, LuaNumber>,
+struct CallbackContext {
+    values: HashMap<&'static [u8], ContextValue>,
+    external_values: HashMap<String, ContextValue>,
 }
 
-impl LuaCallbackContext {
+impl CallbackContext {
     fn register(lua: &Lua) -> LuaResult<()> {
         // NB: registering for a specific engine is faster than implementing the UserData impl
         // See https://github.com/mlua-rs/mlua/discussions/283
-        lua.register_userdata_type::<LuaCallbackContext>(|reg| {
+        lua.register_userdata_type::<CallbackContext>(|reg| {
             reg.add_meta_field_with("__index", |lua| {
                 lua.create_function(
-                    |lua, (this, key): (LuaUserDataRef<LuaCallbackContext>, LuaString)| {
+                    |lua, (this, key): (LuaUserDataRef<CallbackContext>, LuaString)| {
                         if let Some(value) = this.values.get(key.as_bytes()) {
                             // fast path (string bytes)
                             value.into_lua(lua)
@@ -363,6 +363,48 @@ impl LuaCallbackContext {
         })
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// A to lua convertible value within a CallbackContext
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum ContextValue {
+    Number(LuaNumber),
+    String(&'static [u8]),
+}
+
+impl<'lua> IntoLua<'lua> for &ContextValue {
+    fn into_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        match *self {
+            ContextValue::Number(num) => Ok(LuaValue::Number(num)),
+            ContextValue::String(str) => Ok(LuaValue::String(lua.create_string(str)?)),
+        }
+    }
+}
+
+impl From<&'static [u8]> for ContextValue {
+    fn from(val: &'static [u8]) -> Self {
+        ContextValue::String(val)
+    }
+}
+
+macro_rules! context_value_from_number_impl {
+    ($type:ty) => {
+        impl From<$type> for ContextValue {
+            fn from(val: $type) -> Self {
+                ContextValue::Number(val as LuaNumber)
+            }
+        }
+    };
+}
+
+context_value_from_number_impl!(i32);
+context_value_from_number_impl!(u32);
+context_value_from_number_impl!(i64);
+context_value_from_number_impl!(u64);
+context_value_from_number_impl!(usize);
+context_value_from_number_impl!(f32);
+context_value_from_number_impl!(f64);
 
 // --------------------------------------------------------------------------------------------------
 
