@@ -4,7 +4,10 @@ use fraction::ToPrimitive;
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{add_lua_callback_error, note_events_from_value, LuaCallback, LuaTimeoutHook},
+    bindings::{
+        add_lua_callback_error, note_events_from_value, ContextPlaybackState, LuaCallback,
+        LuaTimeoutHook,
+    },
     event::{cycle::CycleNoteEvents, EventIter, EventIterItem, NoteEvent},
     BeatTimeBase, PulseIterItem,
 };
@@ -58,10 +61,17 @@ impl ScriptedCycleEventIter {
         let mappings = HashMap::new();
         // initialize emitter context for the function
         let mut mapping_callback = mapping_callback;
+        let playback_state = ContextPlaybackState::Running;
         let channel = 0;
         let step = 0;
         let step_length = 0.0;
-        mapping_callback.set_cycle_context(time_base, channel, step, step_length)?;
+        mapping_callback.set_cycle_context(
+            playback_state,
+            time_base,
+            channel,
+            step,
+            step_length,
+        )?;
         let channel_steps = vec![];
         Ok(Self {
             cycle,
@@ -138,6 +148,13 @@ impl ScriptedCycleEventIter {
         if let Some(timeout_hook) = &mut self.timeout_hook {
             timeout_hook.reset();
         }
+        // set callback playback state
+        if let Some(callback) = &mut self.mapping_callback {
+            let playback_state = ContextPlaybackState::Running;
+            if let Err(err) = callback.set_context_playback_state(playback_state) {
+                callback.handle_error(&err);
+            }
+        }
         // convert possibly mapped cycle channel items to a list of note events
         let mut timed_note_events = CycleNoteEvents::new();
         for (channel_index, channel_events) in events.into_iter().enumerate() {
@@ -187,10 +204,16 @@ impl ScriptedCycleEventIter {
                 }
             };
             if mapping_callback.is_stateful().unwrap_or(true) {
-                // run statefull callbacks but ignore results
+                // reset timeout hooks
                 if let Some(timeout_hook) = &mut self.timeout_hook {
                     timeout_hook.reset();
                 }
+                // set playback state
+                let playback_state = ContextPlaybackState::Seeking;
+                if let Err(err) = mapping_callback.set_context_playback_state(playback_state) {
+                    mapping_callback.handle_error(&err);
+                }
+                // run stateful callbacks but ignore results
                 for (channel_index, channel_events) in events.into_iter().enumerate() {
                     if self.channel_steps.len() <= channel_index {
                         self.channel_steps.resize(channel_index + 1, 0);

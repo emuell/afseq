@@ -63,6 +63,23 @@ pub fn add_lua_callback_error(name: &str, err: &LuaError) {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Playback state in LuaCallback context.
+pub(crate) enum ContextPlaybackState {
+    Seeking,
+    Running,
+}
+
+impl ContextPlaybackState {
+    fn into_bytes_string(self) -> &'static [u8] {
+        match self {
+            Self::Seeking => b"seeking",
+            Self::Running => b"running",
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Lazily evaluates a lua function the first time it's called, to either use it as a iterator,
 /// a function which returns a function, or directly as it is.
 ///
@@ -115,6 +132,36 @@ impl LuaCallback {
             function,
             initialized,
         })
+    }
+
+    /// Returns true if the callback is a generator.
+    ///
+    /// To test this, the callback must have run at least once, so it returns None if it never has.
+    pub fn is_stateful(&self) -> Option<bool> {
+        if self.initialized {
+            Some(self.generator.is_some())
+        } else {
+            None
+        }
+    }
+
+    /// Name of the inner function for errors. Usually will be an anonymous function.
+    pub fn name(&self) -> String {
+        self.function
+            .to_ref()
+            .info()
+            .name
+            .unwrap_or("anonymous function".to_string())
+    }
+
+    /// Sets the emitters playback state for the callback.
+    pub fn set_context_playback_state(
+        &mut self,
+        playback_state: ContextPlaybackState,
+    ) -> LuaResult<()> {
+        let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
+        values.insert(b"playback", playback_state.into_bytes_string().into());
+        Ok(())
     }
 
     /// Sets the emitter time base context for the callback.
@@ -208,12 +255,14 @@ impl LuaCallback {
     /// Sets the emitter context for the callback.
     pub fn set_emitter_context(
         &mut self,
+        playback_state: ContextPlaybackState,
         time_base: &BeatTimeBase,
         pulse: PulseIterItem,
         pulse_step: usize,
         pulse_time_step: f64,
         step: usize,
     ) -> LuaResult<()> {
+        self.set_context_playback_state(playback_state)?;
         self.set_gate_context(time_base, pulse, pulse_step, pulse_time_step)?;
         self.set_context_step(step)?;
         Ok(())
@@ -222,34 +271,16 @@ impl LuaCallback {
     /// Sets the cycle context for the callback.
     pub fn set_cycle_context(
         &mut self,
+        playback_state: ContextPlaybackState,
         time_base: &BeatTimeBase,
         channel: usize,
         step: usize,
         step_length: f64,
     ) -> LuaResult<()> {
+        self.set_context_playback_state(playback_state)?;
         self.set_context_time_base(time_base)?;
         self.set_context_cycle_step(channel, step, step_length)?;
         Ok(())
-    }
-
-    /// Name of the inner function for errors. Usually will be an anonymous function.
-    pub fn name(&self) -> String {
-        self.function
-            .to_ref()
-            .info()
-            .name
-            .unwrap_or("anonymous function".to_string())
-    }
-
-    /// Returns true if the callback is a generator.
-    ///
-    /// To test this, the callback must have run at least once, so it returns None if it never has.
-    pub fn is_stateful(&self) -> Option<bool> {
-        if self.initialized {
-            Some(self.generator.is_some())
-        } else {
-            None
-        }
     }
 
     /// Invoke the Lua function or generator and return its result as LuaValue.

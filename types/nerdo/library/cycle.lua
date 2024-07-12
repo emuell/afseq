@@ -9,6 +9,8 @@
 ---Context passed to 'cycle:map` functions.
 ---@class CycleMapContext : TimeContext
 ---
+---Specifies how the cycle currently is running.
+---@field playback PlaybackState
 ---channel/voice index within the cycle. each channel in the cycle gets emitted and thus mapped
 ---separately, starting with the first channel index 1.
 ---@field channel integer
