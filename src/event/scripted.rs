@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use mlua::prelude::*;
 
 use crate::{
-    bindings::{note_events_from_value, LuaCallback, LuaTimeoutHook},
+    bindings::{note_events_from_value, ContextPlaybackState, LuaCallback, LuaTimeoutHook},
     event::{fixed::FixedEventIter, NoteEvent},
     BeatTimeBase, Event, EventIter, EventIterItem, PulseIterItem,
 };
@@ -33,11 +33,19 @@ impl ScriptedEventIter {
         // initialize emitter context for the function
         let mut callback = callback;
         let note_event_state = Vec::new();
+        let playback_state = ContextPlaybackState::Running;
         let pulse = PulseIterItem::default();
         let pulse_step = 0;
         let pulse_time_step = 0.0;
         let step = 0;
-        callback.set_emitter_context(time_base, pulse, pulse_step, pulse_time_step, step)?;
+        callback.set_emitter_context(
+            playback_state,
+            time_base,
+            pulse,
+            pulse_step,
+            pulse_time_step,
+            step,
+        )?;
         Ok(Self {
             timeout_hook,
             callback,
@@ -48,10 +56,12 @@ impl ScriptedEventIter {
         })
     }
 
-    fn generate(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
+    fn run(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
+        let playback_state = ContextPlaybackState::Running;
+        self.callback.set_context_playback_state(playback_state)?;
         self.callback.set_context_pulse_value(pulse)?;
         self.callback
             .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
@@ -70,6 +80,8 @@ impl ScriptedEventIter {
             // reset timeout
             self.timeout_hook.reset();
             // update function context
+            let playback_state = ContextPlaybackState::Seeking;
+            self.callback.set_context_playback_state(playback_state)?;
             self.callback.set_context_pulse_value(pulse)?;
             self.callback
                 .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
@@ -116,7 +128,7 @@ impl EventIter for ScriptedEventIter {
     fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
-            let event = match self.generate(pulse) {
+            let event = match self.run(pulse) {
                 Ok(event) => event,
                 Err(err) => {
                     self.callback.handle_error(&err);

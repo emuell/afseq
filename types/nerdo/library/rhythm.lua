@@ -6,7 +6,9 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----RENOISE SPECIFIC: Optional trigger context passed to `pattern` and 'emit' functions.
+---Optional trigger context passed to `pattern`, `gate` and 'emit' functions.
+---Specifies which keyboard note triggered, if any, started the rhythm.
+---
 ---@class TriggerContext
 ---
 ---Note value that triggered, started the rhythm, if any.
@@ -18,7 +20,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to `pattern` functions.
+---Transport & playback time context passed to `pattern`, `gate` and `emit` functions.
 ---@class TimeContext : TriggerContext
 ---
 -----Project's tempo in beats per minutes.
@@ -30,7 +32,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to `pattern` functions.
+---Context passed to `pattern` and `gate` functions.
 ---@class PatternContext : TimeContext
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
@@ -61,9 +63,16 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
+---- *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
+---  unnecessary computations while seeking, and only maintain your generator's internal state.
+---- *running*: The emitter is played back regularly. Results are audible.
+---@alias PlaybackState "seeking"|"running"
+
 ---Context passed to 'emit' functions.
 ---@class EmitterContext : GateContext
 ---
+---Specifies how the emitter currently is running.
+---@field playback PlaybackState
 ---Continues step counter, incrementing with each new *emitted* pulse.
 ---Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
 ---how often the emit function already got called.

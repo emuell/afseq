@@ -202,6 +202,7 @@ mod test {
                       local pulse_step, pulse_time_step = 1, 0.0 
                       local step = 1 
                       local function validate_context(context) 
+                        assert(context.playback == "running")
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
