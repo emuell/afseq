@@ -1771,7 +1771,7 @@ mod test {
         assert!(Cycle::from("c4'mo'de").is_err());
 
         assert!(Cycle::from("c4'mode").is_ok());
-        assert!(Cycle::from("c'm7#\u{0394}").is_ok());
+        assert!(Cycle::from("c'm7#^-").is_ok());
         assert!(Cycle::from("[[[[[[[[]]]]]][[[[[]][[[]]]]]][[[][[[]]]]][[[[]]]]]]").is_ok());
 
         Ok(())
@@ -1960,7 +1960,7 @@ mod test {
         );
 
         assert_cycles(
-            "<some_name _another_one c4'chord c4'-\u{0394}7 c6a_name>",
+            "<some_name _another_one c4'chord c4'-^7 c6a_name>",
             vec![
                 vec![vec![
                     Event::at(F::from(0), F::from(1)).with_name("some_name")
@@ -1972,7 +1972,7 @@ mod test {
                     Event::at(F::from(0), F::from(1)).with_chord(0, 4, "chord")
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "-\u{0394}7"), // -Δ7
+                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "-^7"),
                 ]],
                 vec![vec![Event::at(F::from(0), F::from(1)).with_name("c6a_name")]],
             ],

@@ -16,8 +16,8 @@
 ---
 ---Chord names also can be shortened by using the following synonyms:
 ---- "min" | "m" | "-" -> "minor"
----- "maj" | "M" | "Δ" -> "major"
----- "minMaj" | "mM" | "-Δ" -> "minMajor"
+---- "maj" | "M" | "^" -> "major"
+---- "minMaj" | "mM" | "-^" -> "minMajor"
 ---- "+" | "aug" -> "augmented"
 ---- "o" | "dim" -> "diminished"
 ---- "5 -> "five"
