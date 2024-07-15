@@ -19,8 +19,8 @@ return rhythm {
     ---@param context EmitterContext
     return function(context)
       -- get current note set
-      local notes = pattern.from { 1, 6, 3, 4, 8, 3 }:map(function(v)
-        return SCALES[scale_index][v]
+      local notes = pattern.from { 1, 6, 3, 4, 8, 3 }:map(function(index, value)
+        return SCALES[scale_index][value]
       end)
       -- get current note
       local note = notes[math.imod(context.step, #notes)]

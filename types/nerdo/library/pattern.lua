@@ -36,7 +36,7 @@ local empty_pulse_values = {
 ---pattern.new(12):init(function() return math.random(0.5, 1.0) end )
 ----- generate note patterns
 ---pattern.from{ "c4", "g4", "a4" } * 7 + { "a4", "g4", "c4" }
----pattern.from{ 1, 5, 6, 4 }:map(function(degree) 
+---pattern.from{ 1, 5, 6, 4 }:map(function(index, degree) 
 ---  return scale("c", "minor"):chord(degree) 
 ---end)
 ---```
@@ -292,11 +292,11 @@ function pattern.init(self, value, length)
 end
 
 ---Apply the given function to every item in the pattern.
----@param fun fun(value: PulseValue):PulseValue
+---@param fun fun(index: integer, value: PulseValue): PulseValue
 function pattern.map(self, fun)
   local num = #self
   for i = 1, num do
-    self[i] = fun(self[i])
+    self[i] = fun(i, self[i])
   end
   return self
 end

@@ -55,7 +55,7 @@ fn create_phrase() -> Phrase {
           gate = function (context)
               return context.pulse_value == 1.0
           end,
-          emit = pattern.from(1, 3, 4, 1, 3, 4, -7):map(function(value)
+          emit = pattern.from(1, 3, 4, 1, 3, 4, -7):map(function(index, value)
             if value < 0 then
               return { key = scale.notes[-value] - 12, volume = 0.7 }
             else
