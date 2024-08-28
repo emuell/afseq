@@ -38,13 +38,13 @@ function Sequence:transpose(step) end
 ---@nodiscard
 function Sequence:amplify(factor) end
 
----Set all notes instrument attribute to the specified value or values.
+---Set the instrument attribute of all notes to the specified value or values.
 ---@param instrument number|number[]
 ---@return Note
 ---@nodiscard
 function Sequence:instrument(instrument) end
 
----Set all notes volume attribute to the specified value or values.
+---Set the volume attribute of all notes to the specified value or values.
 ---
 ---### examples:
 ---```lua
@@ -57,13 +57,13 @@ function Sequence:instrument(instrument) end
 ---@nodiscard
 function Sequence:volume(volume) end
 
----Set all notes panning attribute to the specified value or values.
+---Set the panning attribute of all notes to the specified value or values.
 ---@param panning number|number[]
 ---@return Note
 ---@nodiscard
 function Sequence:panning(panning) end
 
----Set all notes delay attribute to the specified value or values.
+---Set the delay attribute of all notes to the specified value or values.
 ---@param delay number|number[]
 ---@return Sequence
 ---@nodiscard
