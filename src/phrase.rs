@@ -3,10 +3,8 @@
 use std::{borrow::Cow, cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
-    event::{Event, InstrumentId},
-    prelude::BeatTimeStep,
-    time::SampleTimeDisplay,
-    BeatTimeBase, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
+    BeatTimeBase, BeatTimeStep, Event, InputParameterMap, InstrumentId, Rhythm, RhythmIter,
+    RhythmIterItem, SampleTime, SampleTimeDisplay,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -63,6 +61,7 @@ pub type PhraseIterItem = (RhythmIndex, RhythmIterItem);
 pub struct Phrase {
     time_base: BeatTimeBase,
     length: BeatTimeStep,
+    input_parameters: InputParameterMap,
     rhythm_slots: Vec<RhythmSlot>,
     next_events: Vec<Option<PhraseIterItem>>,
     sample_offset: SampleTime,
@@ -79,13 +78,25 @@ impl Phrase {
     ) -> Self {
         let next_events = vec![None; rhythm_slots.len()];
         let sample_offset = 0;
+        let rhythm_slots = rhythm_slots
+            .into_iter()
+            .map(|r| r.into())
+            .collect::<Vec<RhythmSlot>>();
+        // collect input parameters from all slots
+        let mut input_parameters = InputParameterMap::new();
+        for slot in &rhythm_slots {
+            if let RhythmSlot::Rhythm(rhythm) = slot {
+                let rhythm = (**rhythm).borrow();
+                for (id, param) in rhythm.input_parameters() {
+                    input_parameters.insert(id.to_string(), Rc::clone(param));
+                }
+            }
+        }
         Self {
             time_base,
             length,
-            rhythm_slots: rhythm_slots
-                .into_iter()
-                .map(|rhythm| -> RhythmSlot { rhythm.into() })
-                .collect::<Vec<_>>(),
+            input_parameters,
+            rhythm_slots,
             next_events,
             sample_offset,
         }
@@ -252,6 +263,10 @@ impl RhythmIter for Phrase {
 }
 
 impl Rhythm for Phrase {
+    fn input_parameters(&self) -> &InputParameterMap {
+        &self.input_parameters
+    }
+
     fn pattern_step_length(&self) -> f64 {
         // use our length's step, likely won't be used anyway for phrases
         self.length.samples_per_step(&self.time_base)

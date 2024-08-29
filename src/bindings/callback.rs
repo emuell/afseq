@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use lazy_static::lazy_static;
 use std::sync::RwLock;
 
-use crate::{time::BeatTimeBase, PulseIterItem};
+use crate::{BeatTimeBase, InputParameterMap, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -119,6 +119,7 @@ impl LuaCallback {
             .create_any_userdata(CallbackContext {
                 values: HashMap::new(),
                 external_values: HashMap::new(),
+                input_parameters: HashMap::new(),
             })?
             .into_owned();
         // and memorize the function without calling it
@@ -171,6 +172,16 @@ impl LuaCallback {
         values.insert(b"beats_per_min", time_base.beats_per_min.into());
         values.insert(b"beats_per_bar", time_base.beats_per_bar.into());
         values.insert(b"samples_per_sec", time_base.samples_per_sec.into());
+        Ok(())
+    }
+
+    /// Sets input parameter context for the callback.
+    pub fn set_context_input_parameters(&mut self, parameters: InputParameterMap) -> LuaResult<()> {
+        let input_parameters = &mut self
+            .context
+            .borrow_mut::<CallbackContext>()?
+            .input_parameters;
+        *input_parameters = parameters;
         Ok(())
     }
 
@@ -364,6 +375,7 @@ impl LuaCallback {
 struct CallbackContext {
     values: HashMap<&'static [u8], ContextValue>,
     external_values: HashMap<String, ContextValue>,
+    input_parameters: InputParameterMap,
 }
 
 impl CallbackContext {
@@ -374,13 +386,24 @@ impl CallbackContext {
             reg.add_meta_field_with("__index", |lua| {
                 lua.create_function(
                     |lua, (this, key): (LuaUserDataRef<CallbackContext>, LuaString)| {
+                        // values (most likely, least overhead)
                         if let Some(value) = this.values.get(key.as_bytes()) {
-                            // fast path (string bytes)
                             value.into_lua(lua)
-                        } else if let Some(value) =
+                        }
+                        // inputs value table
+                        // TODO: this should also be a CallbackContext struct to access single values
+                        // and to fire an error when accessing an invalid input id
+                        else if key == b"inputs" {
+                            let inputs = lua.create_table()?;
+                            for (id, param) in &this.input_parameters {
+                                inputs.set::<&str, _>(id, param.borrow().lua_value(lua)?)?;
+                            }
+                            Ok(LuaValue::Table(inputs))
+                        }
+                        // external values
+                        else if let Some(value) =
                             this.external_values.get(key.to_string_lossy().as_ref())
                         {
-                            // slower path (string )
                             value.into_lua(lua)
                         } else {
                             Err(mlua::Error::RuntimeError(format!(

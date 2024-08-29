@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use mlua::prelude::*;
+use mlua::prelude::LuaResult;
 
 use crate::{
     bindings::{pattern_pulse_from_value, LuaCallback, LuaTimeoutHook},
-    BeatTimeBase, Pattern, Pulse, PulseIter, PulseIterItem,
+    BeatTimeBase, InputParameterMap, Pattern, Pulse, PulseIter, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -139,6 +139,8 @@ impl Pattern for ScriptedPattern {
     }
 
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        // reset timeout
+        self.timeout_hook.reset();
         // update function context from the new time base
         if let Err(err) = self.callback.set_context_time_base(time_base) {
             self.callback.handle_error(&err);
@@ -146,8 +148,19 @@ impl Pattern for ScriptedPattern {
     }
 
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+        // reset timeout
+        self.timeout_hook.reset();
         // update function context from the new time base
         if let Err(err) = self.callback.set_context_external_data(data) {
+            self.callback.handle_error(&err);
+        }
+    }
+
+    fn set_input_parameters(&mut self, parameters: InputParameterMap) {
+        // reset timeout
+        self.timeout_hook.reset();
+        // update function context with the new parameters
+        if let Err(err) = self.callback.set_context_input_parameters(parameters) {
             self.callback.handle_error(&err);
         }
     }

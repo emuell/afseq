@@ -3,11 +3,7 @@
 
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
 
-use crate::{
-    event::{Event, InstrumentId},
-    time::SampleTimeDisplay,
-    BeatTimeBase, SampleTime,
-};
+use crate::{BeatTimeBase, Event, InputParameterMap, InstrumentId, SampleTime, SampleTimeDisplay};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -97,6 +93,9 @@ impl Iterator for dyn RhythmIter {
 /// Rhythms can be reset and cloned (duplicated), so that they can be triggered multiple times
 /// using possibly different patterns and time bases.
 pub trait Rhythm: RhythmIter {
+    /// Shared access to the rhythms input parameters, if any.
+    fn input_parameters(&self) -> &InputParameterMap;
+
     /// Length in samples of a single step in the rhythm's internal pattern.
     fn pattern_step_length(&self) -> f64;
     /// Get length in steps of the rhythm's internal pattern (cycle length in steps).

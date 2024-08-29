@@ -3,9 +3,8 @@ use std::{borrow::Cow, collections::HashMap};
 use fraction::Fraction;
 
 use crate::{
-    event::{new_note, Event, EventIter, EventIterItem, InstrumentId, NoteEvent},
-    tidal::{Cycle, Event as CycleEvent, Target as CycleTarget, Value as CycleValue},
-    BeatTimeBase, Chord, Note, PulseIterItem,
+    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CycleTarget, CycleValue, Event,
+    EventIter, EventIterItem, InputParameterMap, InstrumentId, Note, NoteEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -256,6 +255,10 @@ impl EventIter for CycleEventIter {
     }
 
     fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+        // nothing to do
+    }
+
+    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
         // nothing to do
     }
 

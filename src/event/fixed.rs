@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use crate::{
-    event::{new_note, Event, EventIter, EventIterItem, NoteEvent, ParameterChangeEvent},
-    BeatTimeBase, Note, PulseIterItem,
+    event::new_note, BeatTimeBase, Event, EventIter, EventIterItem, InputParameterMap, Note,
+    NoteEvent, ParameterChangeEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -95,6 +95,10 @@ impl EventIter for FixedEventIter {
     }
 
     fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+        // nothing to do
+    }
+
+    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
         // nothing to do
     }
 
