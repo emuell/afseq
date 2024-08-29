@@ -7,7 +7,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{BeatTimeBase, Note, PulseIterItem};
+use crate::{BeatTimeBase, InputParameterMap, Note, PulseIterItem};
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
 use derive_more::{Deref, Display, From, Into};
@@ -386,6 +386,9 @@ pub trait EventIter: Debug {
 
     /// Set optional, application specific external context data for the event iter.
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+
+    /// Set or update optional, input parameter map for callbacks.
+    fn set_input_parameters(&mut self, parameters: InputParameterMap);
 
     /// Move iterator with the given pulse value forward.
     /// `pulse` contains the current value and timing information for the current step in the pattern.

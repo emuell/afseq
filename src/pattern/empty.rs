@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{BeatTimeBase, Pattern, PulseIterItem};
+use crate::{BeatTimeBase, InputParameterMap, Pattern, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -28,6 +28,10 @@ impl Pattern for EmptyPattern {
     }
 
     fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+        // nothing to do
+    }
+
+    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
         // nothing to do
     }
 

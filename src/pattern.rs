@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, fmt::Debug};
 
-use crate::{BeatTimeBase, PulseIterItem};
+use crate::{BeatTimeBase, InputParameterMap, PulseIterItem};
 
 pub mod empty;
 pub mod euclidean;
@@ -32,6 +32,9 @@ pub trait Pattern: Debug {
 
     /// Set optional, application specific external context data for the pattern.
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+
+    /// Set or update optional, input parameter map for callbacks.
+    fn set_input_parameters(&mut self, parameters: InputParameterMap);
 
     /// Set how many times the pattern should be repeated. If 0, the pattern will be run once.
     /// When None, which is the default, the pattern will be repeated indefinitely.

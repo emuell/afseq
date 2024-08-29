@@ -1,18 +1,17 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use fraction::ToPrimitive;
-use mlua::prelude::*;
+use mlua::prelude::{LuaError, LuaResult};
 
 use crate::{
     bindings::{
         add_lua_callback_error, note_events_from_value, ContextPlaybackState, LuaCallback,
         LuaTimeoutHook,
     },
-    event::{cycle::CycleNoteEvents, EventIter, EventIterItem, NoteEvent},
-    BeatTimeBase, PulseIterItem,
+    event::cycle::CycleNoteEvents,
+    BeatTimeBase, Cycle, CycleEvent, CycleValue, EventIter, EventIterItem, InputParameterMap,
+    NoteEvent, PulseIterItem,
 };
-
-use crate::tidal::{Cycle, Event as CycleEvent, Value as CycleValue};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -274,6 +273,17 @@ impl EventIter for ScriptedCycleEventIter {
         }
         if let Some(callback) = &mut self.mapping_callback {
             if let Err(err) = callback.set_context_external_data(data) {
+                callback.handle_error(&err);
+            }
+        }
+    }
+
+    fn set_input_parameters(&mut self, parameters: InputParameterMap) {
+        if let Some(timeout_hook) = &mut self.timeout_hook {
+            timeout_hook.reset();
+        }
+        if let Some(callback) = &mut self.mapping_callback {
+            if let Err(err) = callback.set_context_input_parameters(parameters) {
                 callback.handle_error(&err);
             }
         }

@@ -3,7 +3,7 @@
 use std::{
     borrow::{Borrow, Cow},
     cell::RefCell,
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fmt::Debug,
     rc::Rc,
 };
@@ -18,7 +18,7 @@ use crate::{
     gate::probability::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
-    Gate, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
+    Gate, InputParameterMap, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -46,7 +46,9 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     step: Step,
     offset: Offset,
     instrument: Option<InstrumentId>,
+    input_parameters: InputParameterMap,
     pattern: Box<dyn Pattern>,
+    pattern_repeat_count: Option<usize>,
     pattern_playback_finished: bool,
     gate: Box<dyn Gate>,
     event_iter: Box<dyn EventIter>,
@@ -63,7 +65,9 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<u64>) -> Self {
         let offset = Offset::default_offset();
         let instrument = None;
+        let input_parameters = HashMap::new();
         let pattern = Box::<FixedPattern>::default();
+        let pattern_repeat_count = None;
         let pattern_playback_finished = false;
         let gate = Box::new(ProbabilityGate::new(seed));
         let event_iter = Box::<FixedEventIter>::default();
@@ -77,7 +81,9 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             step,
             offset,
             instrument,
+            input_parameters,
             pattern,
+            pattern_repeat_count,
             pattern_playback_finished,
             gate,
             event_iter,
@@ -133,6 +139,17 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         Self { instrument, ..self }
     }
 
+    /// Return a new rhythm instance with the given input parameter map.  
+    #[must_use]
+    pub fn with_input_parameters(self, parameters: InputParameterMap) -> Self {
+        let mut new = self;
+        new.input_parameters.clone_from(&parameters);
+        new.pattern.set_input_parameters(parameters.clone());
+        new.gate.set_input_parameters(parameters.clone());
+        new.event_iter.set_input_parameters(parameters);
+        new
+    }
+
     /// Return a new rhythm instance which trigger events with the given [`Pattern`].  
     #[must_use]
     pub fn with_pattern<T: Pattern + Sized + 'static>(self, pattern: T) -> Self {
@@ -142,7 +159,15 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     /// Return a new rhythm instance which triggers events with the given dyn [`Pattern`].  
     #[must_use]
     pub fn with_pattern_dyn(self, pattern: Box<dyn Pattern>) -> Self {
-        Self { pattern, ..self }
+        let time_base = self.time_base;
+        let input_parameters = self.input_parameters.clone();
+        let pattern_repeat_count = self.pattern_repeat_count;
+        let mut new = self;
+        new.pattern = pattern;
+        new.pattern.set_time_base(&time_base);
+        new.pattern.set_input_parameters(input_parameters);
+        new.pattern.set_repeat_count(pattern_repeat_count);
+        new
     }
 
     /// Return a new rhythm instance which repeats the pattern up to `count` times.
@@ -150,6 +175,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     #[must_use]
     pub fn with_repeat(self, count: Option<usize>) -> Self {
         let mut new = self;
+        new.pattern_repeat_count = count;
         new.pattern.set_repeat_count(count);
         new
     }
@@ -165,7 +191,13 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     /// probability gate.  
     #[must_use]
     pub fn with_gate_dyn(self, gate: Box<dyn Gate>) -> Self {
-        Self { gate, ..self }
+        let time_base = self.time_base;
+        let input_parameters = self.input_parameters.clone();
+        let mut new = self;
+        new.gate = gate;
+        new.gate.set_time_base(&time_base);
+        new.gate.set_input_parameters(input_parameters);
+        new
     }
 
     /// Return a new rhythm instance which uses the given [`EventIter`] to trigger events.
@@ -177,7 +209,13 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     /// Return a new rhythm instance which uses the given dyn [`EventIter`] to trigger events.
     #[must_use]
     pub fn trigger_dyn(self, event_iter: Box<dyn EventIter>) -> Self {
-        Self { event_iter, ..self }
+        let time_base = self.time_base;
+        let input_parameters = self.input_parameters.clone();
+        let mut new = self;
+        new.event_iter = event_iter;
+        new.event_iter.set_time_base(&time_base);
+        new.event_iter.set_input_parameters(input_parameters);
+        new
     }
 
     /// Return current pulse duration in samples
@@ -311,6 +349,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Clone
 {
     fn clone(&self) -> Self {
         Self {
+            input_parameters: self.input_parameters.clone(),
             pattern: self.pattern.duplicate(),
             event_iter: self.event_iter.duplicate(),
             event_iter_items: self.event_iter_items.clone(),
@@ -418,6 +457,10 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
     for GenericRhythm<Step, Offset>
 {
+    fn input_parameters(&self) -> &InputParameterMap {
+        &self.input_parameters
+    }
+
     fn pattern_step_length(&self) -> f64 {
         self.step.to_samples(&self.time_base)
     }
