@@ -36,7 +36,9 @@ compile_error!(
 // Exports
 
 pub mod time;
-pub use time::{BeatTimeBase, SampleTime, SecondTimeBase, TimeBase};
+pub use time::{
+    BeatTimeBase, BeatTimeStep, SampleTime, SampleTimeDisplay, SecondTimeBase, TimeBase,
+};
 
 pub mod note;
 pub use note::Note;
@@ -48,10 +50,14 @@ pub mod scale;
 pub use scale::Scale;
 
 pub mod event;
-pub use event::{Event, EventIter, EventIterItem};
+pub use event::{
+    Event, EventIter, EventIterItem, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId,
+};
 
 pub mod tidal;
-// pub use tidal::{Cycle};
+pub use tidal::{
+    Cycle, Event as CycleEvent, Span as CycleSpan, Target as CycleTarget, Value as CycleValue,
+};
 
 pub mod pulse;
 pub use pulse::{Pulse, PulseIter, PulseIterItem};
@@ -66,7 +72,7 @@ pub mod rhythm;
 pub use rhythm::{Rhythm, RhythmIter, RhythmIterItem};
 
 pub mod phrase;
-pub use phrase::Phrase;
+pub use phrase::{Phrase, RhythmSlot};
 
 pub mod sequence;
 pub use sequence::Sequence;
