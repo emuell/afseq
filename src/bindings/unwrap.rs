@@ -1,13 +1,13 @@
 //! Various lua->rust conversion helpers
 
-use std::{ops::RangeBounds, sync::Arc};
+use std::{cell::RefCell, ops::RangeBounds, rc::Rc, sync::Arc};
 
 use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaCallback, cycle::CycleUserData, note::NoteUserData,
-        sequence::SequenceUserData, LuaTimeoutHook,
+        callback::LuaCallback, cycle::CycleUserData, input::InputParameterUserData,
+        note::NoteUserData, sequence::SequenceUserData, LuaTimeoutHook,
     },
     prelude::*,
 };
@@ -76,13 +76,11 @@ impl<'lua> FromLua<'lua> for Note {
                     }
                 })
             }
-            _ => {
-                Err(LuaError::FromLuaConversionError {
-                    from: value.type_name(),
-                    to: "note",
-                    message: Some("expected a note number or note string".to_string()),
-                })
-            }
+            _ => Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "note",
+                message: Some("expected a note number or note string".to_string()),
+            }),
         }
     }
 }
@@ -516,17 +514,15 @@ pub(crate) fn note_event_from_value(
         LuaValue::Integer(note_value) => note_event_from_number(*note_value),
         LuaValue::String(str) => note_event_from_string(&str.to_string_lossy()),
         LuaValue::Table(table) => note_event_from_table_map(table),
-        _ => {
-            Err(LuaError::FromLuaConversionError {
-                from: arg.type_name(),
-                to: "note",
-                message: if let Some(index) = arg_index {
-                    Some(format!("arg #{} is not a valid note property", index + 1).to_string())
-                } else {
-                    Some("invalid note property".to_string())
-                },
-            })
-        }
+        _ => Err(LuaError::FromLuaConversionError {
+            from: arg.type_name(),
+            to: "note",
+            message: if let Some(index) = arg_index {
+                Some(format!("arg #{} is not a valid note property", index + 1).to_string())
+            } else {
+                Some("invalid note property".to_string())
+            },
+        }),
     }
 }
 
@@ -776,6 +772,42 @@ pub fn gate_trigger_from_value(value: &LuaValue) -> LuaResult<bool> {
             message: Some("Invalid boolean gate value".to_string()),
         }),
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<InputParameterMap> {
+    let mut parameters = InputParameterMap::new();
+    for user_data in value.clone().sequence_values::<LuaAnyUserData>() {
+        if let Ok(parameter_user_data) = user_data?.take::<InputParameterUserData>() {
+            let parameter_id = parameter_user_data.parameter.id().to_string();
+            if parameter_id.is_empty() {
+                return Err(LuaError::FromLuaConversionError {
+                    from: "user_data",
+                    to: "input parameter",
+                    message: Some("Parameter id's can not be empty.".to_string()),
+                });
+            }
+            let parameter = Rc::new(RefCell::new(parameter_user_data.parameter));
+            if parameters.insert(parameter_id.clone(), parameter).is_some() {
+                return Err(LuaError::FromLuaConversionError {
+                    from: "user_data",
+                    to: "input parameter",
+                    message: Some(format!(
+                        "Parameter id's must be unique: an input with id '{}' already exists.",
+                        parameter_id
+                    )),
+                });
+            }
+        } else {
+            return Err(LuaError::FromLuaConversionError {
+                from: "user_data",
+                to: "input parameter",
+                message: Some("Invalid input parameter".to_string()),
+            });
+        }
+    }
+    Ok(parameters)
 }
 
 // -------------------------------------------------------------------------------------------------

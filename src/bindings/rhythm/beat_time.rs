@@ -2,8 +2,8 @@ use mlua::prelude::*;
 
 use super::super::{
     unwrap::{
-        bad_argument_error, event_iter_from_value, gate_from_value, pattern_from_value,
-        pattern_repeat_count_from_value,
+        bad_argument_error, event_iter_from_value, gate_from_value, inputs_from_value,
+        pattern_from_value, pattern_repeat_count_from_value,
     },
     LuaTimeoutHook,
 };
@@ -72,6 +72,12 @@ impl BeatTimeRhythm {
                     "offset must be >= 0",
                 ));
             }
+        }
+        // inputs
+        if table.contains_key("inputs")? {
+            let value = table.get::<_, LuaTable>("inputs")?;
+            let inputs = inputs_from_value(lua, &value)?;
+            rhythm = rhythm.with_input_parameters(inputs);
         }
         // pattern
         if table.contains_key("pattern")? {
