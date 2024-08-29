@@ -71,6 +71,12 @@ pub use phrase::Phrase;
 pub mod sequence;
 pub use sequence::Sequence;
 
+pub mod input;
+pub use input::{
+    Parameter as InputParameter, ParameterMap as InputParameterMap,
+    ParameterType as InputParameterType,
+};
+
 #[cfg(feature = "scripting")]
 pub mod bindings;
 
