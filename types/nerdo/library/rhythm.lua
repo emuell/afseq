@@ -17,6 +17,30 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field trigger_volume number?
 ---Note slice offset value that triggered, started the rhythm, if any.
 ---@field trigger_offset integer?
+---
+---Current input parameter values. Input parameter ids are used as key. 
+---Values will have the speficied parameter type. 
+---
+---## examples:
+---```lua
+----- trigger a single note as specified by input parameter 'note' when 
+----- input parameter 'enabled' is true, else triggers nothing.
+---rhythm {
+---  inputs = {
+---     boolean_input("enable", false),
+---     integer_input("note", { 0, 127 }, 50)
+---  },
+---  trigger = function(context)
+---    if context.inputs.enanble == true then -- boolean value
+---      return note(context.inputs.note) -- integer value
+---    else
+---      return nil
+---    end
+---  end
+---}
+---```
+---@see InputParameter
+---@field inputs { [string]: number|integer|boolean|string }
 
 ----------------------------------------------------------------------------------------------------
 
@@ -114,6 +138,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---offset = 4 -- start emitting after 4*4 beats
 ---```
 ---@field offset number?
+---
+---Define optional input parameters for the rhythm. Input parameters can dynamically 
+---change a rhythms behavior everywhere where `context` are passed, e.g. in pattern, 
+---gate, emitter generator functions or cycle mapping functions.
+---@see TriggerContext.inputs
+---@field inputs? InputParameter[]
 ---
 ---Specify the rhythmical pattern of the emitter. Each pulse with a value of 1 or true
 ---will cause an event from the `emitter` property to be triggered in the emitters
