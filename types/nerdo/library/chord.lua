@@ -1,5 +1,5 @@
 ---@meta
----Do not try to execute this file. It's just a type definition file.
+error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---Part of the afseq trait: Defines LuaLS annotations for the afseq note chord function.
 ---
