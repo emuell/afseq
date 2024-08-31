@@ -106,6 +106,48 @@ impl<'lua> IntoLua<'lua> for NoteEvent {
 
 // ---------------------------------------------------------------------------------------------
 
+// Check if a lua value is a string, without using implicit conversions.
+pub(crate) fn string_from_value(
+    value: &LuaValue,
+    function: &str,
+    arg_name: &str,
+    arg_index: usize,
+) -> LuaResult<String> {
+    if let Some(string) = value.as_string_lossy() {
+        Ok(string.into())
+    } else {
+        Err(bad_argument_error(
+            function,
+            arg_name,
+            arg_index,
+            "expecting a string or nil",
+        ))
+    }
+}
+
+// Check if a lua value is a string - without using implicit conversions - or nil.
+pub(crate) fn optional_string_from_value(
+    value: &LuaValue,
+    function: &str,
+    arg_name: &str,
+    arg_index: usize,
+) -> LuaResult<String> {
+    if let Some(string) = value.as_string_lossy() {
+        Ok(string.into())
+    } else if value.is_nil() {
+        Ok(String::new())
+    } else {
+        Err(bad_argument_error(
+            function,
+            arg_name,
+            arg_index,
+            "expecting a string or nil",
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
 // Check if a lua value is a sequence (an array alike table).
 pub(crate) fn sequence_from_value<'lua>(
     value: &'lua LuaValue<'lua>,

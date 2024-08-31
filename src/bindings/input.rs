@@ -39,53 +39,86 @@ mod test {
     fn inputs() -> LuaResult<()> {
         let lua = new_test_engine()?;
 
-        // boolean_input
+        // boolean
         assert!(lua
-            .load(r#"boolean_input("name", "off")"#)
+            .load(r#"parameter.boolean(1, false)"#) // invalid id
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"boolean_input("name", false, {})"#)
+            .load(r#"parameter.boolean("name", "off")"#) // invalid default
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"boolean_input("name", false, "Fancy Name", "Fancy Description")"#)
+            .load(r#"parameter.boolean("name", false, {})"#) // invalid name
+            .eval::<LuaValue>()
+            .is_err());
+
+        assert!(lua
+            .load(r#"parameter.boolean("name", true)"#)
+            .eval::<LuaValue>()
+            .is_ok());
+        assert!(lua
+            .load(r#"parameter.boolean("name", false, "Fancy Name", "Fancy Description")"#)
             .eval::<LuaValue>()
             .is_ok());
 
-        // integer_input
+        // integer
         assert!(lua
-            .load(r#"integer_input("name", false)"#)
+            .load(r#"parameter.integer({}, 1)"#) // invalid id
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"integer_input("name", {1, 20}, 20.5)"#) // not an integer
+            .load(r#"parameter.integer("name", false)"#) // not an integer
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"integer_input("name", {1, 20}, 50)"#) // out of range
+            .load(r#"parameter.integer("name", 20.5)"#) // not an integer
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"integer_input("name", {-20, 20}, 0, "Fancy Name", "Fancy Description")"#)
+            .load(r#"parameter.integer("name", 50, {1, 20})"#) // out of range
+            .eval::<LuaValue>()
+            .is_err());
+
+        assert!(lua
+            .load(r#"parameter.integer("name", 50)"#)
+            .eval::<LuaValue>()
+            .is_ok());
+        assert!(lua
+            .load(r#"parameter.integer("name", 0, {-20, 20}, "Fancy Name", "Fancy Description")"#)
             .eval::<LuaValue>()
             .is_ok());
 
-        // number_input
+        // number
         assert!(lua
-            .load(r#"number_input("name", false)"#)
+            .load(r#"parameter.number(12, 0.0)"#) // invalid id
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"number_input("name", {1, 20}, 50)"#) // out of range
+            .load(r#"parameter.number("name", false)"#) // default not a number
             .eval::<LuaValue>()
             .is_err());
         assert!(lua
-            .load(r#"number_input("name", {-20, 20}, 0, "Fancy Name", "Fancy Description")"#)
+            .load(r#"parameter.number("name", 50, {1, 20})"#) // out of range
+            .eval::<LuaValue>()
+            .is_err());
+        assert!(lua
+            .load(r#"parameter.number("name", 50, 100"#) // invalid range
+            .eval::<LuaValue>()
+            .is_err());
+
+        assert!(lua
+            .load(r#"parameter.number("name", 0.5)"#)
             .eval::<LuaValue>()
             .is_ok());
         assert!(lua
-            .load(r#"number_input("name", {-20.5, 20.5}, 0.5, "Fancy Name", "Fancy Description")"#)
+            .load(r#"parameter.number("name", 0, {-20, 20}, "Fancy Name", "Fancy Description")"#)
+            .eval::<LuaValue>()
+            .is_ok());
+        assert!(lua
+            .load(
+                r#"parameter.number("name", 0.5, {-20.5, 20.5}, "Fancy Name", "Fancy Description")"#
+            )
             .eval::<LuaValue>()
             .is_ok());
         Ok(())

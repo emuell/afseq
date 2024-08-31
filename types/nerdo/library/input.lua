@@ -9,57 +9,64 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Unique id of the parameter. The id will be used in the `input` context table as key.
 ---@alias InputParameterId string
 
----Optional name of the parameter as displayed to the user. When undefined the id is used.
+---Default boolean value.
+---@alias InputParameterBooleanDefault boolean
+---Default integer value. Must be in the specified value range.
+---@alias InputParameterIntegerDefault integer
+---Default number value. Must be in the specified value range.
+---@alias InputParameterNumberDefault number
+
+---Optional value range. When undefined (0.0 - 1.0)
+---@alias InputParameterIntegerRange { [1]: integer, [2]: integer }
+---Optional value range. When undefined (0 - 100)
+---@alias InputParameterNumberRange { [1]: number, [2]: number }
+
+---Optional name of the parameter as displayed to the user. When undefined, the id is used.
 ---@alias InputParameterName string
 
 ---Optional long description of the parameter describing what the parameter does.
 ---@alias InputParameterDescription string
 
----Valid value range. Default: (0 - 1)
----@alias InputParameterIntegerRange { [1]: integer, [2]: integer }
----Valid value range. Default: (0 - 1)
----@alias InputParameterFloatRange { [1]: number, [2]: number }
-
----Default value. Default: false
----@alias InputParameterBooleanDefault boolean
----Default value. Default: 0
----@alias InputParameterIntegerDefault integer
----Default value. Default: 0.0
----@alias InputParameterFloatDefault number
 
 ----------------------------------------------------------------------------------------------------
 
 ---Opaque input parameter user data. Construct new input parameters via the `XXX_input(...)`
 ---functions. Input parameter values can then be accessed via function contexts in pattern,
----gate and emitter functions or generators. 
+---gate and emitter functions or generators.
 ---@see TriggerContext.inputs
 ---@class InputParameter : userdata
 local InputParameter = {}
 
 ----------------------------------------------------------------------------------------------------
 
----Creates a InputParameter with "boolean" Lua type and the given other properties.
----@param id InputParameterId
----@param default InputParameterBooleanDefault
----@param name InputParameterName?
----@param description InputParameterDescription?
----@return InputParameter
-function boolean_input(id, default, name, description) end
+---Functions to create InputParamters.
+parameter = {
+    ---Creates a InputParameter with "boolean" Lua type with the given default value
+    ---and other optional properties.
+    ---@param id InputParameterId
+    ---@param default InputParameterBooleanDefault
+    ---@param name InputParameterName?
+    ---@param description InputParameterDescription?
+    ---@return InputParameter
+    boolean = function(id, default, name, description) end,
 
----Creates a InputParameter with  "integer" Lua type and the given other properties.
----@param id InputParameterId
----@param min_max InputParameterIntegerRange
----@param default InputParameterIntegerDefault
----@param name InputParameterName?
----@param description InputParameterDescription?
----@return InputParameter
-function integer_input(id, min_max, default, name, description) end
+    ---Creates a InputParameter with "integer" Lua type with the given default value
+    ---and other optional properties.
+    ---@param id InputParameterId
+    ---@param default InputParameterIntegerDefault
+    ---@param range InputParameterIntegerRange?
+    ---@param name InputParameterName?
+    ---@param description InputParameterDescription?
+    ---@return InputParameter
+    integer = function(id, default, range, name, description) end,
 
----Creates a InputParameter with "number" Lua type and the given other properties.
----@param id InputParameterId
----@param min_max InputParameterFloatRange
----@param default InputParameterFloatDefault
----@param name InputParameterName?
----@param description InputParameterDescription?
----@return InputParameter
-function number_input(id, min_max, default, name, description) end
+    ---Creates a InputParameter with "number" Lua type with the given default value
+    ---and other optional properties.
+    ---@param id InputParameterId
+    ---@param default InputParameterNumberDefault
+    ---@param range InputParameterNumberRange?
+    ---@param name InputParameterName?
+    ---@param description InputParameterDescription?
+    ---@return InputParameter
+    number = function(id, default, range, name, description) end,
+}
