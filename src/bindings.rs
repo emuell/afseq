@@ -15,7 +15,10 @@ use self::{
     note::NoteUserData,
     rhythm::rhythm_from_userdata,
     sequence::SequenceUserData,
-    unwrap::{bad_argument_error, validate_table_properties},
+    unwrap::{
+        bad_argument_error, optional_string_from_value, string_from_value,
+        validate_table_properties,
+    },
 };
 
 use crate::{
@@ -152,9 +155,10 @@ pub(crate) fn register_bindings(
     time_base: &BeatTimeBase,
 ) -> LuaResult<()> {
     register_global_bindings(lua, timeout_hook, time_base)?;
+    register_parameter_bindings(lua)?;
     register_math_bindings(lua)?;
     register_table_bindings(lua)?;
-    register_pattern_module(lua)?;
+    register_pattern_bindings(lua)?;
     Ok(())
 }
 
@@ -254,156 +258,6 @@ fn register_global_bindings(
         })?,
     )?;
 
-    // function boolean_input(id, default, name?, description?)
-    globals.raw_set(
-        "boolean_input",
-        lua.create_function(
-            |_lua,
-             (id, default, name, description): (
-                LuaString,
-                LuaValue,
-                Option<LuaString>,
-                Option<LuaString>,
-            )|
-             -> LuaResult<InputParameterUserData> {
-                let id = id.to_string_lossy().to_string();
-                let default = default.as_boolean().ok_or_else(|| {
-                    bad_argument_error("boolean_input", "default", 1, "expecting a boolean value")
-                })?;
-                let name = {
-                    if let Some(name) = name {
-                        name.to_string_lossy().to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-                let description = {
-                    if let Some(description) = description {
-                        description.to_string_lossy().to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_boolean(&id, &name, &description, default),
-                })
-            },
-        )?,
-    )?;
-
-    // function integer_input(id, range, default, name?, description?)
-    globals.raw_set(
-        "integer_input",
-        #[allow(clippy::unnecessary_cast)]
-        lua.create_function(
-            |_lua,
-             (id, range, default, name, description): (
-                LuaString,
-                LuaTable,
-                LuaValue,
-                Option<LuaString>,
-                Option<LuaString>,
-            )|
-             -> LuaResult<InputParameterUserData> {
-                let id = id.to_string_lossy().to_string();
-                let default = default.as_integer().ok_or_else(|| {
-                    bad_argument_error("integer_input", "default", 1, "expecting an integer value")
-                })? as i32;
-                let range = {
-                    let start = range.get::<LuaInteger, LuaInteger>(1)? as i32;
-                    let end = range.get::<LuaInteger, LuaInteger>(2)? as i32;
-                    start..=end
-                };
-                if !range.contains(&default) {
-                    return Err(bad_argument_error(
-                        "integer_input",
-                        "range",
-                        2,
-                        "default value must be within the specified range",
-                    ));
-                }
-                let name = {
-                    if let Some(name) = name {
-                        name.to_string_lossy().to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-                let description = {
-                    if let Some(description) = description {
-                        description.to_string_lossy().to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_integer(
-                        &id,
-                        &name,
-                        &description,
-                        range,
-                        default,
-                    ),
-                })
-            },
-        )?,
-    )?;
-
-    // function number_input(id, range, default, name?, description?)
-    globals.raw_set(
-        "number_input",
-        #[allow(clippy::unnecessary_cast)]
-        lua.create_function(
-            |_lua,
-             (id, range, default, name, description): (
-                LuaString,
-                LuaTable,
-                LuaValue,
-                Option<LuaString>,
-                Option<LuaString>,
-            )|
-             -> LuaResult<InputParameterUserData> {
-                let id = id.to_string_lossy().to_string();
-                let default = default
-                    .as_number()
-                    .or_else(|| default.as_integer().map(|v| v as LuaNumber))
-                    .ok_or_else(|| {
-                        bad_argument_error("number_input", "default", 1, "expecting a number value")
-                    })? as f64;
-                let range = {
-                    let start = range.get::<LuaInteger, f64>(1)?;
-                    let end = range.get::<LuaInteger, f64>(2)?;
-                    start..=end
-                };
-                if !range.contains(&default) {
-                    return Err(bad_argument_error(
-                        "number_input",
-                        "range",
-                        2,
-                        "default value must be within the specified range",
-                    ));
-                }
-                let name = {
-                    if let Some(name) = name {
-                        name.to_string_lossy().to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-                let description = {
-                    if let Some(description) = description {
-                        description.to_string_lossy().to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_float(&id, &name, &description, range, default),
-                })
-            },
-        )?,
-    )?;
-
     // function rhythm { args... }
     globals.raw_set(
         "rhythm",
@@ -444,6 +298,166 @@ fn register_global_bindings(
             }
         })?,
     )?;
+
+    Ok(())
+}
+
+fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
+    let parameter = lua.create_table()?;
+
+    // function boolean(id, default, name?, description?)
+    parameter.raw_set(
+        "boolean",
+        lua.create_function(
+            |_lua,
+             (id, default, name, description): (LuaValue, LuaValue, LuaValue, LuaValue)|
+             -> LuaResult<InputParameterUserData> {
+                let id = string_from_value(&id, "boolean", "id", 1)?;
+                if id.is_empty() {
+                    return Err(bad_argument_error(
+                        "boolean",
+                        "id",
+                        1,
+                        "ids can not be empty",
+                    ));
+                }
+                let default = default.as_boolean().ok_or_else(|| {
+                    bad_argument_error("boolean_input", "default", 2, "expecting a boolean value")
+                })?;
+                let name = optional_string_from_value(&name, "boolean", "name", 3)?;
+                let description =
+                    optional_string_from_value(&description, "boolean", "description", 4)?;
+                Ok(InputParameterUserData {
+                    parameter: InputParameter::new_boolean(&id, &name, &description, default),
+                })
+            },
+        )?,
+    )?;
+
+    // function integer(id, default, range, name?, description?)
+    parameter.raw_set(
+        "integer",
+        #[allow(clippy::unnecessary_cast)]
+        lua.create_function(
+            |_lua,
+             (id, default, range, name, description): (
+                LuaValue,
+                LuaValue,
+                Option<LuaTable>,
+                LuaValue,
+                LuaValue,
+            )|
+             -> LuaResult<InputParameterUserData> {
+                let id = string_from_value(&id, "integer", "id", 1)?;
+                if id.is_empty() {
+                    return Err(bad_argument_error(
+                        "integer",
+                        "id",
+                        1,
+                        "ids can not be empty",
+                    ));
+                }
+                let default = default.as_integer().ok_or_else(|| {
+                    bad_argument_error("integer_input", "default", 1, "expecting an integer value")
+                })? as i32;
+                let range = {
+                    if let Some(range) = range {
+                        let start = range.get::<LuaInteger, LuaInteger>(1)? as i32;
+                        let end = range.get::<LuaInteger, LuaInteger>(2)? as i32;
+                        start..=end
+                    } else {
+                        0..=100
+                    }
+                };
+                if !range.contains(&default) {
+                    return Err(bad_argument_error(
+                        "integer_input",
+                        "range",
+                        2,
+                        &format!(
+                            "default value must be within range {}..={}",
+                            range.start(),
+                            range.end()
+                        ),
+                    ));
+                }
+                let name = optional_string_from_value(&name, "integer", "name", 3)?;
+                let description =
+                    optional_string_from_value(&description, "integer", "description", 4)?;
+                Ok(InputParameterUserData {
+                    parameter: InputParameter::new_integer(
+                        &id,
+                        &name,
+                        &description,
+                        range,
+                        default,
+                    ),
+                })
+            },
+        )?,
+    )?;
+
+    // function number_input(id, default, range, name?, description?)
+    parameter.raw_set(
+        "number",
+        #[allow(clippy::unnecessary_cast)]
+        lua.create_function(
+            |_lua,
+             (id, default, range, name, description): (
+                LuaValue,
+                LuaValue,
+                Option<LuaTable>,
+                LuaValue,
+                LuaValue,
+            )|
+             -> LuaResult<InputParameterUserData> {
+                let id = string_from_value(&id, "inumber", "id", 1)?;
+                if id.is_empty() {
+                    return Err(bad_argument_error(
+                        "integer",
+                        "id",
+                        1,
+                        "ids can not be empty",
+                    ));
+                }
+                let default = default
+                    .as_number()
+                    .or_else(|| default.as_integer().map(|v| v as LuaNumber))
+                    .ok_or_else(|| {
+                        bad_argument_error("number_input", "default", 1, "expecting a number value")
+                    })? as f64;
+                let range = {
+                    if let Some(range) = range {
+                        let start = range.get::<LuaInteger, f64>(1)?;
+                        let end = range.get::<LuaInteger, f64>(2)?;
+                        start..=end
+                    } else {
+                        0.0..=1.0
+                    }
+                };
+                if !range.contains(&default) {
+                    return Err(bad_argument_error(
+                        "number_input",
+                        "range",
+                        2,
+                        &format!(
+                            "default value must be within range {}..={}",
+                            range.start(),
+                            range.end()
+                        ),
+                    ));
+                }
+                let name = optional_string_from_value(&name, "number", "name", 3)?;
+                let description =
+                    optional_string_from_value(&description, "number", "description", 4)?;
+                Ok(InputParameterUserData {
+                    parameter: InputParameter::new_float(&id, &name, &description, range, default),
+                })
+            },
+        )?,
+    )?;
+
+    lua.globals().set::<_, LuaTable>("parameter", parameter)?;
 
     Ok(())
 }
@@ -544,7 +558,7 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     }
 }
 
-fn register_pattern_module(lua: &mut Lua) -> LuaResult<()> {
+fn register_pattern_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up requires
     lazy_static! {
         static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> =
