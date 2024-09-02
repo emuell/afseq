@@ -18,10 +18,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Note slice offset value that triggered, started the rhythm, if any.
 ---@field trigger_offset integer?
 ---
----Current input parameter values. Input parameter ids are used as key. 
----Values will have the speficied parameter type. 
+---Current input parameter values, using parameter ids as keys
+---and the actual parameter value as value. 
 ---@see InputParameter
----@field inputs { [string]: number|integer|boolean|string }
+---@field inputs table<string, number|integer|boolean|string>
 
 ----------------------------------------------------------------------------------------------------
 
@@ -121,13 +121,13 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field offset number?
 ---
 ---Define optional input parameters for the rhythm. Input parameters can dynamically 
----change a rhythms behavior everywhere where `context` are passed, e.g. in pattern, 
----gate, emitter generator functions or cycle mapping functions.
+---change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern, 
+---gate, emitter or cycle map generator functions.
 ---
 ---## examples:
 ---```lua
------ trigger a single note as specified by input parameter 'note' when 
------ input parameter 'enabled' is true, else triggers nothing.
+----- trigger a single note as specified by input parameter 'note' 
+----- when input parameter 'enabled' is true, else triggers nothing.
 ---  inputs = {
 ---    parameter.boolean("enabled", true),
 ---    parameter.integer("note", 48, { 0, 127 })
