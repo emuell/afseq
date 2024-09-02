@@ -3,8 +3,8 @@
 use std::{borrow::Cow, cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
-    BeatTimeBase, BeatTimeStep, Event, InputParameterMap, InstrumentId, Rhythm, RhythmIter,
-    RhythmIterItem, SampleTime, SampleTimeDisplay,
+    BeatTimeBase, BeatTimeStep, Event, InputParameter, InputParameterSet, InstrumentId, Rhythm,
+    RhythmIter, RhythmIterItem, SampleTime, SampleTimeDisplay,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ pub type PhraseIterItem = (RhythmIndex, RhythmIterItem);
 pub struct Phrase {
     time_base: BeatTimeBase,
     length: BeatTimeStep,
-    input_parameters: InputParameterMap,
+    input_parameters: InputParameterSet,
     rhythm_slots: Vec<RhythmSlot>,
     next_events: Vec<Option<PhraseIterItem>>,
     sample_offset: SampleTime,
@@ -83,12 +83,18 @@ impl Phrase {
             .map(|r| r.into())
             .collect::<Vec<RhythmSlot>>();
         // collect input parameters from all slots
-        let mut input_parameters = InputParameterMap::new();
+        let mut input_parameters = InputParameterSet::new();
         for slot in &rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = slot {
                 let rhythm = (**rhythm).borrow();
-                for (id, param) in rhythm.input_parameters() {
-                    input_parameters.insert(id.to_string(), Rc::clone(param));
+                for param in rhythm.input_parameters() {
+                    // silently skip duplicate parameter ids
+                    if !input_parameters
+                        .iter()
+                        .any(|p| p.borrow().id() == param.borrow().id())
+                    {
+                        input_parameters.push(Rc::clone(param));
+                    }
                 }
             }
         }
@@ -263,7 +269,7 @@ impl RhythmIter for Phrase {
 }
 
 impl Rhythm for Phrase {
-    fn input_parameters(&self) -> &InputParameterMap {
+    fn input_parameters(&self) -> &[Rc<RefCell<InputParameter>>] {
         &self.input_parameters
     }
 

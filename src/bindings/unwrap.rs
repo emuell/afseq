@@ -818,8 +818,8 @@ pub fn gate_trigger_from_value(value: &LuaValue) -> LuaResult<bool> {
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<InputParameterMap> {
-    let mut parameters = InputParameterMap::new();
+pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<InputParameterSet> {
+    let mut parameters = InputParameterSet::new();
     for user_data in value.clone().sequence_values::<LuaAnyUserData>() {
         if let Ok(parameter_user_data) = user_data?.take::<InputParameterUserData>() {
             let parameter_id = parameter_user_data.parameter.id().to_string();
@@ -831,7 +831,7 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
                 });
             }
             let parameter = Rc::new(RefCell::new(parameter_user_data.parameter));
-            if parameters.insert(parameter_id.clone(), parameter).is_some() {
+            if parameters.iter().any(|p| p.borrow().id() == parameter_id) {
                 return Err(LuaError::FromLuaConversionError {
                     from: "user_data",
                     to: "input parameter",
@@ -841,6 +841,7 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
                     )),
                 });
             }
+            parameters.push(parameter)
         } else {
             return Err(LuaError::FromLuaConversionError {
                 from: "user_data",

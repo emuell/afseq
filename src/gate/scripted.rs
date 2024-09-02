@@ -4,7 +4,7 @@ use mlua::prelude::LuaResult;
 
 use crate::{
     bindings::{gate_trigger_from_value, LuaCallback, LuaTimeoutHook},
-    BeatTimeBase, Gate, InputParameterMap, PulseIterItem,
+    BeatTimeBase, Gate, InputParameterSet, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -86,7 +86,7 @@ impl Gate for ScriptedGate {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new parameters

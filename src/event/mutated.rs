@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
-    event::fixed::FixedEventIter, BeatTimeBase, Event, EventIter, EventIterItem, InputParameterMap,
+    event::fixed::FixedEventIter, BeatTimeBase, Event, EventIter, EventIterItem, InputParameterSet,
     PulseIterItem,
 };
 
@@ -72,7 +72,7 @@ impl EventIter for MutatedEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
         // nothing to do
     }
 

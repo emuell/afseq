@@ -3,4 +3,4 @@
 // -------------------------------------------------------------------------------------------------
 
 pub mod parameter;
-pub use parameter::{Parameter, ParameterMap, ParameterType};
+pub use parameter::{Parameter, ParameterSet, ParameterType};

@@ -3,7 +3,7 @@
 use std::{
     borrow::{Borrow, Cow},
     cell::RefCell,
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     fmt::Debug,
     rc::Rc,
 };
@@ -18,7 +18,8 @@ use crate::{
     gate::probability::ProbabilityGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
-    Gate, InputParameterMap, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem, SampleTime,
+    Gate, InputParameter, InputParameterSet, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem,
+    SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -46,7 +47,7 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     step: Step,
     offset: Offset,
     instrument: Option<InstrumentId>,
-    input_parameters: InputParameterMap,
+    input_parameters: InputParameterSet,
     pattern: Box<dyn Pattern>,
     pattern_repeat_count: Option<usize>,
     pattern_playback_finished: bool,
@@ -65,7 +66,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
     pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<u64>) -> Self {
         let offset = Offset::default_offset();
         let instrument = None;
-        let input_parameters = HashMap::new();
+        let input_parameters = InputParameterSet::new();
         let pattern = Box::<FixedPattern>::default();
         let pattern_repeat_count = None;
         let pattern_playback_finished = false;
@@ -141,7 +142,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
 
     /// Return a new rhythm instance with the given input parameter map.  
     #[must_use]
-    pub fn with_input_parameters(self, parameters: InputParameterMap) -> Self {
+    pub fn with_input_parameters(self, parameters: InputParameterSet) -> Self {
         let mut new = self;
         new.input_parameters.clone_from(&parameters);
         new.pattern.set_input_parameters(parameters.clone());
@@ -457,7 +458,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
     for GenericRhythm<Step, Offset>
 {
-    fn input_parameters(&self) -> &InputParameterMap {
+    fn input_parameters(&self) -> &[Rc<RefCell<InputParameter>>] {
         &self.input_parameters
     }
 
