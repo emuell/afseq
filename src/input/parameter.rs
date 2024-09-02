@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, ops::RangeInclusive, rc::Rc};
+use std::{cell::RefCell, ops::RangeInclusive, rc::Rc};
 
 #[cfg(feature = "scripting")]
 use mlua::prelude::{IntoLua, Lua, LuaInteger, LuaResult, LuaValue};
@@ -17,8 +17,9 @@ pub enum ParameterType {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A map of parameters, using the parameter id as key and a Parameter RefCell as value.
-pub type ParameterMap = HashMap<String, Rc<RefCell<Parameter>>>;
+/// A parameter vector with Parameter RefCells. Ids are unique, so this actually is a set, but
+/// stored as a vector to preserve the parameter order.
+pub type ParameterSet = Vec<Rc<RefCell<Parameter>>>;
 
 // -------------------------------------------------------------------------------------------------
 

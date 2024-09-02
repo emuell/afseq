@@ -4,7 +4,7 @@ use mlua::prelude::LuaResult;
 
 use crate::{
     bindings::{pattern_pulse_from_value, LuaCallback, LuaTimeoutHook},
-    BeatTimeBase, InputParameterMap, Pattern, Pulse, PulseIter, PulseIterItem,
+    BeatTimeBase, InputParameterSet, Pattern, Pulse, PulseIter, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -156,7 +156,7 @@ impl Pattern for ScriptedPattern {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new parameters

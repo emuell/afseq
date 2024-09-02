@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use super::euclidean::euclidean;
-use crate::{BeatTimeBase, InputParameterMap, Pattern, Pulse, PulseIter, PulseIterItem};
+use crate::{BeatTimeBase, InputParameterSet, Pattern, Pulse, PulseIter, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -101,7 +101,7 @@ impl Pattern for FixedPattern {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
         // nothing to do
     }
 

@@ -4,7 +4,7 @@ use fraction::Fraction;
 
 use crate::{
     event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CycleTarget, CycleValue, Event,
-    EventIter, EventIterItem, InputParameterMap, InstrumentId, Note, NoteEvent, PulseIterItem,
+    EventIter, EventIterItem, InputParameterSet, InstrumentId, Note, NoteEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -258,7 +258,7 @@ impl EventIter for CycleEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
         // nothing to do
     }
 

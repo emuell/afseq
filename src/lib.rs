@@ -79,7 +79,7 @@ pub use sequence::Sequence;
 
 pub mod input;
 pub use input::{
-    Parameter as InputParameter, ParameterMap as InputParameterMap,
+    Parameter as InputParameter, ParameterSet as InputParameterSet,
     ParameterType as InputParameterType,
 };
 

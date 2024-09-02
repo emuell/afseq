@@ -1,11 +1,11 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Debug};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
 use mlua::prelude::*;
 
 use lazy_static::lazy_static;
 use std::sync::RwLock;
 
-use crate::{BeatTimeBase, InputParameterMap, PulseIterItem};
+use crate::{BeatTimeBase, InputParameter, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -176,12 +176,16 @@ impl LuaCallback {
     }
 
     /// Sets input parameter context for the callback.
-    pub fn set_context_input_parameters(&mut self, parameters: InputParameterMap) -> LuaResult<()> {
+    pub fn set_context_input_parameters(&mut self, parameters: InputParameterSet) -> LuaResult<()> {
         let input_parameters = &mut self
             .context
             .borrow_mut::<CallbackContext>()?
             .input_parameters;
-        *input_parameters = parameters;
+        for parameter in &parameters {
+            let parameter = Rc::clone(parameter);
+            let parameter_id = parameter.borrow().id().to_string();
+            input_parameters.insert(parameter_id, parameter);
+        }
         Ok(())
     }
 
@@ -375,7 +379,7 @@ impl LuaCallback {
 struct CallbackContext {
     values: HashMap<&'static [u8], ContextValue>,
     external_values: HashMap<String, ContextValue>,
-    input_parameters: InputParameterMap,
+    input_parameters: HashMap<String, Rc<RefCell<InputParameter>>>,
 }
 
 impl CallbackContext {

@@ -5,7 +5,7 @@ use mlua::prelude::LuaResult;
 use crate::{
     bindings::{note_events_from_value, ContextPlaybackState, LuaCallback, LuaTimeoutHook},
     event::fixed::FixedEventIter,
-    BeatTimeBase, Event, EventIter, EventIterItem, InputParameterMap, NoteEvent, PulseIterItem,
+    BeatTimeBase, Event, EventIter, EventIterItem, InputParameterSet, NoteEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -127,7 +127,7 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new parameters

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{BeatTimeBase, EventIter, EventIterItem, InputParameterMap, PulseIterItem};
+use crate::{BeatTimeBase, EventIter, EventIterItem, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -17,7 +17,7 @@ impl EventIter for EmptyEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
         // nothing to do
     }
 

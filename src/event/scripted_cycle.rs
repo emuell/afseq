@@ -9,7 +9,7 @@ use crate::{
         LuaTimeoutHook,
     },
     event::cycle::CycleNoteEvents,
-    BeatTimeBase, Cycle, CycleEvent, CycleValue, EventIter, EventIterItem, InputParameterMap,
+    BeatTimeBase, Cycle, CycleEvent, CycleValue, EventIter, EventIterItem, InputParameterSet,
     NoteEvent, PulseIterItem,
 };
 
@@ -278,7 +278,7 @@ impl EventIter for ScriptedCycleEventIter {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterMap) {
+    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
         if let Some(timeout_hook) = &mut self.timeout_hook {
             timeout_hook.reset();
         }

@@ -35,7 +35,7 @@ pub use super::{
     EventIterItem,
     Gate,
     InputParameter,
-    InputParameterMap,
+    InputParameterSet,
     InputParameterType,
     Note,
     Pattern,

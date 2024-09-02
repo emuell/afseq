@@ -3,7 +3,7 @@
 
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
 
-use crate::{BeatTimeBase, Event, InputParameterMap, InstrumentId, SampleTime, SampleTimeDisplay};
+use crate::{BeatTimeBase, Event, InputParameter, InstrumentId, SampleTime, SampleTimeDisplay};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -94,7 +94,7 @@ impl Iterator for dyn RhythmIter {
 /// using possibly different patterns and time bases.
 pub trait Rhythm: RhythmIter {
     /// Shared access to the rhythms input parameters, if any.
-    fn input_parameters(&self) -> &InputParameterMap;
+    fn input_parameters(&self) -> &[Rc<RefCell<InputParameter>>];
 
     /// Length in samples of a single step in the rhythm's internal pattern.
     fn pattern_step_length(&self) -> f64;

@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, fmt::Debug};
 
-use crate::{BeatTimeBase, InputParameterMap, PulseIterItem};
+use crate::{BeatTimeBase, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ pub trait Gate: Debug {
     fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
 
     /// Set or update optional, input parameter map for callbacks.
-    fn set_input_parameters(&mut self, parameters: InputParameterMap);
+    fn set_input_parameters(&mut self, parameters: InputParameterSet);
 
     /// Returns true if the event should be triggered, else false.
     fn run(&mut self, pulse: &PulseIterItem) -> bool;
