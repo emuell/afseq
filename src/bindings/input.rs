@@ -121,6 +121,33 @@ mod test {
             )
             .eval::<LuaValue>()
             .is_ok());
+
+        // number
+        assert!(lua
+            .load(r#"parameter.enum(12, "default")"#) // invalid id
+            .eval::<LuaValue>()
+            .is_err());
+        assert!(lua
+            .load(r#"parameter.enum("name", 1, [1])"#) // default not a string
+            .eval::<LuaValue>()
+            .is_err());
+        assert!(lua
+            .load(r#"parameter.enum("name", "value", {"1", "2"})"#) // default not in values
+            .eval::<LuaValue>()
+            .is_err());
+        assert!(lua
+            .load(r#"parameter.enum("name", "a", {"a", "b", "A"})"#) // values not unique
+            .eval::<LuaValue>()
+            .is_err());
+
+        assert!(lua
+            .load(r#"parameter.enum("name", "value", {"VALUE", "value2"})"#)
+            .eval::<LuaValue>()
+            .is_ok());
+        assert!(lua
+            .load(r#"parameter.enum("name", "value", {"value", "wurst"}, "Fancy Name", "Fancy Description")"#)
+            .eval::<LuaValue>()
+            .is_ok());
         Ok(())
     }
 }

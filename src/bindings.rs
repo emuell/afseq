@@ -322,7 +322,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                     ));
                 }
                 let default = default.as_boolean().ok_or_else(|| {
-                    bad_argument_error("boolean_input", "default", 2, "expecting a boolean value")
+                    bad_argument_error("boolean", "default", 2, "expecting a boolean value")
                 })?;
                 let name = optional_string_from_value(&name, "boolean", "name", 3)?;
                 let description =
@@ -358,7 +358,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                     ));
                 }
                 let default = default.as_integer().ok_or_else(|| {
-                    bad_argument_error("integer_input", "default", 1, "expecting an integer value")
+                    bad_argument_error("integer", "default", 1, "expecting an integer value")
                 })? as i32;
                 let range = {
                     if let Some(range) = range {
@@ -371,7 +371,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 };
                 if !range.contains(&default) {
                     return Err(bad_argument_error(
-                        "integer_input",
+                        "integer",
                         "range",
                         2,
                         &format!(
@@ -411,10 +411,10 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 LuaValue,
             )|
              -> LuaResult<InputParameterUserData> {
-                let id = string_from_value(&id, "inumber", "id", 1)?;
+                let id = string_from_value(&id, "number", "id", 1)?;
                 if id.is_empty() {
                     return Err(bad_argument_error(
-                        "integer",
+                        "number",
                         "id",
                         1,
                         "ids can not be empty",
@@ -424,7 +424,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                     .as_number()
                     .or_else(|| default.as_integer().map(|v| v as LuaNumber))
                     .ok_or_else(|| {
-                        bad_argument_error("number_input", "default", 1, "expecting a number value")
+                        bad_argument_error("number", "default", 1, "expecting a number value")
                     })? as f64;
                 let range = {
                     if let Some(range) = range {
@@ -437,7 +437,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 };
                 if !range.contains(&default) {
                     return Err(bad_argument_error(
-                        "number_input",
+                        "number",
                         "range",
                         2,
                         &format!(
@@ -452,6 +452,58 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                     optional_string_from_value(&description, "number", "description", 4)?;
                 Ok(InputParameterUserData {
                     parameter: InputParameter::new_float(&id, &name, &description, range, default),
+                })
+            },
+        )?,
+    )?;
+
+    // function enum(id, default, values, name?, description?)
+    parameter.raw_set(
+        "enum",
+        lua.create_function(
+            |_lua,
+             (id, default, value_table, name, description): (
+                LuaValue,
+                LuaValue,
+                LuaTable,
+                LuaValue,
+                LuaValue,
+            )|
+             -> LuaResult<InputParameterUserData> {
+                let id = string_from_value(&id, "enum", "id", 1)?;
+                if id.is_empty() {
+                    return Err(bad_argument_error("enum", "id", 1, "ids can not be empty"));
+                }
+                let default = string_from_value(&default, "enum", "default", 2)?;
+                let mut values = Vec::with_capacity(value_table.len()? as usize);
+                for value in value_table.sequence_values::<String>() {
+                    values.push(value?);
+                }
+                if !values.iter().any(|v| v.eq_ignore_ascii_case(&default)) {
+                    return Err(bad_argument_error(
+                        "enum",
+                        "values",
+                        2,
+                        "values must contain the default value",
+                    ));
+                }
+                if (1..values.len()).any(|i| {
+                    values[i..]
+                        .iter()
+                        .any(|v| v.eq_ignore_ascii_case(&values[i - 1]))
+                }) {
+                    return Err(bad_argument_error(
+                        "enum",
+                        "values",
+                        2,
+                        "values must not contain duplicate entries",
+                    ));
+                }
+                let name = optional_string_from_value(&name, "enum", "name", 3)?;
+                let description =
+                    optional_string_from_value(&description, "enum", "description", 4)?;
+                Ok(InputParameterUserData {
+                    parameter: InputParameter::new_enum(&id, &name, &description, values, default),
                 })
             },
         )?,

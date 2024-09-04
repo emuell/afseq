@@ -15,6 +15,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@alias InputParameterIntegerDefault integer
 ---Default number value. Must be in the specified value range.
 ---@alias InputParameterNumberDefault number
+---Default string value. Must be a valid string within the specified value set.
+---@alias InputParameterEnumDefault string
 
 ---Optional value range. When undefined (0.0 - 1.0)
 ---@alias InputParameterIntegerRange { [1]: integer, [2]: integer }
@@ -41,7 +43,7 @@ local InputParameter = {}
 
 ---Functions to create InputParamters.
 parameter = {
-    ---Creates a InputParameter with "boolean" Lua type with the given default value
+    ---Creates an InputParameter with "boolean" Lua type with the given default value
     ---and other optional properties.
     ---@param id InputParameterId
     ---@param default InputParameterBooleanDefault
@@ -50,7 +52,7 @@ parameter = {
     ---@return InputParameter
     boolean = function(id, default, name, description) end,
 
-    ---Creates a InputParameter with "integer" Lua type with the given default value
+    ---Creates an InputParameter with "integer" Lua type with the given default value
     ---and other optional properties.
     ---@param id InputParameterId
     ---@param default InputParameterIntegerDefault
@@ -60,7 +62,7 @@ parameter = {
     ---@return InputParameter
     integer = function(id, default, range, name, description) end,
 
-    ---Creates a InputParameter with "number" Lua type with the given default value
+    ---Creates an InputParameter with "number" Lua type with the given default value
     ---and other optional properties.
     ---@param id InputParameterId
     ---@param default InputParameterNumberDefault
@@ -69,4 +71,14 @@ parameter = {
     ---@param description InputParameterDescription?
     ---@return InputParameter
     number = function(id, default, range, name, description) end,
+
+    ---Creates an InputParameter with a "string" Lua type with the given default value,
+    ---set of valid values to choose from and other optional properties.
+    ---@param id InputParameterId
+    ---@param default InputParameterEnumDefault
+    ---@param values string[]
+    ---@param name InputParameterName?
+    ---@param description InputParameterDescription?
+    ---@return InputParameter
+    enum = function(id, default, values, name, description) end,
 }
