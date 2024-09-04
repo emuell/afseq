@@ -113,15 +113,8 @@ impl LuaCallback {
 
     /// Create a new Callback from an owned lua function.
     pub fn with_owned(lua: &Lua, function: LuaOwnedFunction) -> LuaResult<Self> {
-        // create and register the callback context
-        CallbackContext::register(lua)?;
-        let context = lua
-            .create_any_userdata(CallbackContext {
-                values: HashMap::new(),
-                external_values: HashMap::new(),
-                input_parameters: HashMap::new(),
-            })?
-            .into_owned();
+        // create a new callback context
+        let context = lua.create_userdata(CallbackContext::new())?.into_owned();
         // and memorize the function without calling it
         let environment = function.to_ref().environment().map(LuaTable::into_owned);
         let generator = None;
@@ -177,15 +170,14 @@ impl LuaCallback {
 
     /// Sets input parameter context for the callback.
     pub fn set_context_input_parameters(&mut self, parameters: InputParameterSet) -> LuaResult<()> {
-        let input_parameters = &mut self
-            .context
-            .borrow_mut::<CallbackContext>()?
-            .input_parameters;
+        let inputs_context = &mut self.context.borrow_mut::<CallbackContext>()?.inputs_context;
+        let mut parameters_map = HashMap::new();
         for parameter in &parameters {
             let parameter = Rc::clone(parameter);
-            let parameter_id = parameter.borrow().id().to_string();
-            input_parameters.insert(parameter_id, parameter);
+            let parameter_id = parameter.borrow().id().as_bytes().to_vec();
+            parameters_map.insert(parameter_id, parameter);
         }
+        inputs_context.parameters_map = Rc::new(parameters_map);
         Ok(())
     }
 
@@ -379,46 +371,96 @@ impl LuaCallback {
 struct CallbackContext {
     values: HashMap<&'static [u8], ContextValue>,
     external_values: HashMap<String, ContextValue>,
-    input_parameters: HashMap<String, Rc<RefCell<InputParameter>>>,
+    // NB: don't make this a LuaOwnedAnyUserData. A userdata ref would cause reference
+    // cycles that would prevent destroying the Lua instance...
+    inputs_context: CallbackInputsContext,
 }
 
 impl CallbackContext {
-    fn register(lua: &Lua) -> LuaResult<()> {
-        // NB: registering for a specific engine is faster than implementing the UserData impl
-        // See https://github.com/mlua-rs/mlua/discussions/283
-        lua.register_userdata_type::<CallbackContext>(|reg| {
-            reg.add_meta_field_with("__index", |lua| {
-                lua.create_function(
-                    |lua, (this, key): (LuaUserDataRef<CallbackContext>, LuaString)| {
-                        // values (most likely, least overhead)
-                        if let Some(value) = this.values.get(key.as_bytes()) {
-                            value.into_lua(lua)
-                        }
-                        // inputs value table
-                        // TODO: this should also be a CallbackContext struct to access single values
-                        // and to fire an error when accessing an invalid input id
-                        else if key == b"inputs" {
-                            let inputs = lua.create_table()?;
-                            for (id, param) in &this.input_parameters {
-                                inputs.set::<&str, _>(id, param.borrow().lua_value(lua)?)?;
-                            }
-                            Ok(LuaValue::Table(inputs))
-                        }
-                        // external values
-                        else if let Some(value) =
-                            this.external_values.get(key.to_string_lossy().as_ref())
-                        {
-                            value.into_lua(lua)
-                        } else {
-                            Err(mlua::Error::RuntimeError(format!(
-                                "undefined field '{}' in context",
-                                key.to_string_lossy()
-                            )))
-                        }
-                    },
-                )
+    fn new() -> Self {
+        Self {
+            values: HashMap::new(),
+            external_values: HashMap::new(),
+            inputs_context: CallbackInputsContext::new(),
+        }
+    }
+}
+
+impl LuaUserData for CallbackContext {
+    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_meta_field_with("__index", |lua| {
+            lua.create_function(|lua, (this, key): (LuaUserDataRef<Self>, LuaString)| {
+                // values (most likely, least overhead)
+                if let Some(value) = this.values.get(key.as_bytes()) {
+                    value.into_lua(lua)
+                }
+                // inputs value table (also likely, small overhead)
+                else if key == b"inputs" {
+                    lua.create_userdata(this.inputs_context.clone())?
+                        .into_lua(lua)
+                }
+                // external values
+                else if let Some(value) = this.external_values.get(key.to_string_lossy().as_ref())
+                {
+                    value.into_lua(lua)
+                } else {
+                    Err(mlua::Error::RuntimeError(format!(
+                        "undefined field '{}' in context",
+                        key.to_string_lossy()
+                    )))
+                }
             })
-        })
+        });
+        fields.add_meta_field_with("__newindex", |lua| {
+            lua.create_function(|_lua: &Lua, _: LuaValue| -> LuaResult<LuaFunction> {
+                Err(mlua::Error::RuntimeError(
+                    "context is read-only and thus can't be modified".to_string(),
+                ))
+            })
+        });
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Memorizes an optional set of input values within a CallbackContext, storing a reference to
+/// a parameter map, so it's cheap to clone...
+#[derive(Debug, Clone)]
+struct CallbackInputsContext {
+    parameters_map: Rc<HashMap<Vec<u8>, Rc<RefCell<InputParameter>>>>,
+}
+
+impl CallbackInputsContext {
+    fn new() -> Self {
+        Self {
+            parameters_map: Rc::new(HashMap::new()),
+        }
+    }
+}
+
+impl LuaUserData for CallbackInputsContext {
+    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_meta_field_with("__index", |lua| {
+            lua.create_function(
+                |lua, (this, key): (mlua::UserDataRef<Self>, mlua::String)| {
+                    if let Some(parameter) = this.parameters_map.get(key.as_bytes()) {
+                        Ok(parameter.borrow().lua_value(lua)?)
+                    } else {
+                        Err(mlua::Error::RuntimeError(format!(
+                            "undefined parameter id '{}' in inputs context",
+                            key.to_string_lossy()
+                        )))
+                    }
+                },
+            )
+        });
+        fields.add_meta_field_with("__newindex", |lua| {
+            lua.create_function(|_lua: &Lua, _: LuaValue| -> LuaResult<LuaFunction> {
+                Err(mlua::Error::RuntimeError(
+                    "context inputs are read-only and thus can't be modified".to_string(),
+                ))
+            })
+        });
     }
 }
 
