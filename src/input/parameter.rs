@@ -12,7 +12,7 @@ pub enum ParameterType {
     #[default]
     Float,
     Integer,
-    // TODO: Enum,
+    Enum,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -36,6 +36,7 @@ pub struct Parameter {
     range: RangeInclusive<f64>,
     default: f64,
     value: f64,
+    value_strings: Vec<String>,
 }
 
 impl Parameter {
@@ -60,6 +61,7 @@ impl Parameter {
             false => 0.0,
         };
         let value = default;
+        let value_strings = vec![];
         Self {
             id,
             name,
@@ -68,6 +70,7 @@ impl Parameter {
             range,
             default,
             value,
+            value_strings,
         }
     }
 
@@ -97,6 +100,7 @@ impl Parameter {
         let range = RangeInclusive::new(*range.start() as f64, *range.end() as f64);
         let default = default as f64;
         let value = default;
+        let value_strings = vec![];
         Self {
             id,
             name,
@@ -105,6 +109,7 @@ impl Parameter {
             range,
             default,
             value,
+            value_strings,
         }
     }
 
@@ -132,6 +137,7 @@ impl Parameter {
         let description = description.to_string();
         let param_type = ParameterType::Float;
         let value = default;
+        let value_strings = vec![];
         Self {
             id,
             name,
@@ -140,6 +146,52 @@ impl Parameter {
             range,
             default,
             value,
+            value_strings,
+        }
+    }
+
+    /// Create a new enum parameter with the given properties.
+    ///
+    /// Name and description are optional and may be empty, all other values
+    /// must be valid.
+    ///
+    /// ### Panics
+    /// Panics if the default value is not in the specified values set.
+    pub fn new_enum(
+        id: &str,
+        name: &str,
+        description: &str,
+        values: Vec<String>,
+        default: String,
+    ) -> Self {
+        debug_assert!(
+            values.iter().any(|v| v.eq_ignore_ascii_case(&default)),
+            "Invalid parameter default value"
+        );
+
+        let id: String = id.to_string();
+        let mut name: String = name.to_string();
+        if name.is_empty() {
+            name.clone_from(&id);
+        }
+        let description = description.to_string();
+        let param_type = ParameterType::Enum;
+        let range = 0.0..=values.len() as f64;
+        let default = values
+            .iter()
+            .position(|e| e.eq_ignore_ascii_case(&default))
+            .unwrap_or(0) as f64;
+        let value = default;
+        let value_strings = values;
+        Self {
+            id,
+            name,
+            description,
+            parameter_type: param_type,
+            range,
+            default,
+            value,
+            value_strings,
         }
     }
 
@@ -166,6 +218,11 @@ impl Parameter {
     /// Valid internal value range. Falls back to (0..=1) when unspecified.
     pub fn range(&self) -> &RangeInclusive<f64> {
         &self.range
+    }
+
+    /// Valid values for enum parameters.
+    pub fn value_strings(&self) -> &[String] {
+        &self.value_strings
     }
 
     /// Default value to reset the parameter.
@@ -201,6 +258,7 @@ impl Parameter {
             },
             ParameterType::Float => self.value.to_string(),
             ParameterType::Integer => (self.value as i64).to_string(),
+            ParameterType::Enum => self.value_strings[self.value.round() as usize].clone(),
         }
     }
 
@@ -214,6 +272,9 @@ impl Parameter {
             },
             ParameterType::Float => self.value.into_lua(lua),
             ParameterType::Integer => (self.value as LuaInteger).into_lua(lua),
+            ParameterType::Enum => self.value_strings[self.value.round() as usize]
+                .clone()
+                .into_lua(lua),
         }
     }
 }
