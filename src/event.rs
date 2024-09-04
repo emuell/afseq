@@ -10,7 +10,6 @@ use std::{
 use crate::{BeatTimeBase, InputParameterSet, Note, PulseIterItem};
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
-use derive_more::{Deref, Display, From, Into};
 use fraction::{ConstOne, ConstZero, Fraction};
 
 // -------------------------------------------------------------------------------------------------
@@ -27,11 +26,31 @@ pub mod scripted_cycle;
 // -------------------------------------------------------------------------------------------------
 
 /// Id to refer to a specific instrument/patch/sample in a [`NoteEvent`].
-#[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    derive_more::Display,
+    derive_more::From,
+    derive_more::Into,
+    Eq,
+    PartialEq,
+    Hash,
+)]
 pub struct InstrumentId(usize);
 
 /// Id to refer to a specific parameter in a [`ParameterChangeEvent`].
-#[derive(Copy, Clone, Debug, Display, Deref, From, Into, PartialEq, Eq, Hash)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    derive_more::Display,
+    derive_more::From,
+    derive_more::Into,
+    Eq,
+    PartialEq,
+    Hash,
+)]
 pub struct ParameterId(usize);
 
 // -------------------------------------------------------------------------------------------------
