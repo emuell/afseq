@@ -14,6 +14,9 @@ return rhythm {
       end
     end
   end,
+  gate = function (context)
+    return context.pulse_value > math.random()
+  end,
   emit = function(context)
     local rand = math.randomstate(0x8879)
     return function(context)

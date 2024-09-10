@@ -132,7 +132,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Rc::new(RefCell::new(BeatTimeRhythm::new(
                     beat_time,
                     BeatTimeStep::Beats(1.0),
-                    None
                 )))
             })
         };

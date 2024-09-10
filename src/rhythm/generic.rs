@@ -15,7 +15,7 @@ use std::borrow::BorrowMut;
 
 use crate::{
     event::{fixed::FixedEventIter, Event, EventIter, EventIterItem, InstrumentId},
-    gate::probability::ProbabilityGate,
+    gate::threshold::ThresholdGate,
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
     Gate, InputParameter, InputParameterSet, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem,
@@ -63,14 +63,14 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<Step, Offset> {
     /// Create a new pattern based rhythm which emits `value` every `beat_time` `step`,
     /// and an optional seed for the random number generator.
-    pub fn new(time_base: BeatTimeBase, step: Step, seed: Option<u64>) -> Self {
+    pub fn new(time_base: BeatTimeBase, step: Step) -> Self {
         let offset = Offset::default_offset();
         let instrument = None;
         let input_parameters = InputParameterSet::new();
         let pattern = Box::<FixedPattern>::default();
         let pattern_repeat_count = None;
         let pattern_playback_finished = false;
-        let gate = Box::new(ProbabilityGate::new(seed));
+        let gate = Box::new(ThresholdGate::new());
         let event_iter = Box::<FixedEventIter>::default();
         let event_iter_sample_time = 0;
         let event_iter_next_sample_time = offset.to_samples(&time_base);
@@ -181,15 +181,13 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         new
     }
 
-    /// Return a new rhythm instance which uses the given [`Gate`] instead of the default
-    /// probability gate.  
+    /// Return a new rhythm instance which uses the given [`Gate`] instead of the default gate.  
     #[must_use]
     pub fn with_gate<T: Gate + Sized + 'static>(self, gate: T) -> Self {
         self.with_gate_dyn(Box::new(gate))
     }
 
-    /// Return a new rhythm instance which uses the given dyn [`Gate`] instead of the default
-    /// probability gate.  
+    /// Return a new rhythm instance which uses the given dyn [`Gate`] instead of the default gate.  
     #[must_use]
     pub fn with_gate_dyn(self, gate: Box<dyn Gate>) -> Self {
         let time_base = self.time_base;

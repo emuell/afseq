@@ -9,6 +9,7 @@ use crate::{BeatTimeBase, InputParameterSet, PulseIterItem};
 pub mod probability;
 #[cfg(feature = "scripting")]
 pub mod scripted;
+pub mod threshold;
 
 // -------------------------------------------------------------------------------------------------
 

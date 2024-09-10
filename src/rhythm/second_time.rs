@@ -33,9 +33,9 @@ pub type SecondTimeRhythm = GenericRhythm<SecondTimeStep, SecondTimeStep>;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Shortcuts for creating sample-time based rhythms.
+/// Shortcuts for creating second-time based rhythms.
 impl BeatTimeBase {
     pub fn every_nth_seconds(&self, step: SecondTimeStep) -> SecondTimeRhythm {
-        SecondTimeRhythm::new(*self, step, None)
+        SecondTimeRhythm::new(*self, step)
     }
 }

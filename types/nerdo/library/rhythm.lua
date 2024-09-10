@@ -19,7 +19,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field trigger_offset integer?
 ---
 ---Current input parameter values, using parameter ids as keys
----and the actual parameter value as value. 
+---and the actual parameter value as value.
 ---@see InputParameter
 ---@field inputs table<string, number|integer|boolean|string>
 
@@ -120,13 +120,13 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field offset number?
 ---
----Define optional input parameters for the rhythm. Input parameters can dynamically 
----change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern, 
+---Define optional input parameters for the rhythm. Input parameters can dynamically
+---change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern,
 ---gate, emitter or cycle map generator functions.
 ---
 ---## examples:
 ---```lua
------ trigger a single note as specified by input parameter 'note' 
+----- trigger a single note as specified by input parameter 'note'
 ----- when input parameter 'enabled' is true, else triggers nothing.
 ---  inputs = {
 ---    parameter.boolean("enabled", true),
@@ -206,12 +206,19 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field repeats (integer|boolean)?
 ---
----Set optional pulse train filter between pattern and emitter. By default a probability
----gate is used, which passes 1s directly, skips 0s, and applies values in range (0 - 1) using
----the pulse value as probability, like:
+---Optional pulse train filter function or generator function which filters events between
+---the pattern and emitter. By default a threshold gate, which passes all pulse values
+---greater than zero. 
+---
+---Custom function should returns true when a pattern pulse value should be passed, 
+---and false when the emitter should be skipped.  
+---
+---### examples:
 ---```lua
+----- probability gate: skips all 0s, passes all 1s. pulse alues in range (0, 1) are
+----- maybe passed, using the pulse value as probablility.
 ---gate = function(context)
----  return context.pulse_value >= 1 or context.pulse_value > math.random()
+---  return context.pulse_value > math.random()
 ---end
 ---```
 ---@field gate Pulse[]|(fun(context: GateContext):boolean)|(fun(context: GateContext):fun(context: GateContext):boolean)?

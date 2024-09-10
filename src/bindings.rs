@@ -282,17 +282,11 @@ fn register_global_bindings(
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
                     Err(_) => false,
                 };
-                // NB: don't keep borrowing app_data_ref here: Rhythm constructors may use random functions
-                let rand_seed = {
-                    lua.app_data_ref::<LuaAppData>()
-                        .expect("Failed to access Lua app data")
-                        .rand_seed
-                };
                 if second_time_unit {
-                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, &table, rand_seed)?
+                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, &table)?
                         .into_lua(lua)
                 } else {
-                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, &table, rand_seed)?
+                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, &table)?
                         .into_lua(lua)
                 }
             }
