@@ -111,6 +111,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
         .with_instrument(HIHAT)
+        .with_pattern([1.0, 0.5].to_pattern())
+        .with_gate(ProbabilityGate::new(None))
         .trigger(new_note_event("C_5").mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
