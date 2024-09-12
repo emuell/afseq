@@ -1,0 +1,22 @@
+[book]
+authors = ["mail@emuell.net"]
+language = "en"
+multilingual = false
+src = "src"
+title = "AFSEQ"
+
+[build]
+build-dir = "out"
+create-missing = false
+
+[preprocessor.alerts]
+[preprocessor.toc]
+max-level = 3
+
+[output.html]
+default-theme = "dark"
+preferred-dark-theme = "ayu"
+additional-css = [ "src/styles.css" ]
+
+[output.linkcheck]
+warning-policy = "ignore"
