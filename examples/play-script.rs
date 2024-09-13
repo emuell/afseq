@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let path = path?.path();
         if let Some(extension) = path.extension() {
             let extension = extension.to_string_lossy().to_string();
-            if matches!(extension.as_str(), "lua" | "wav") {
+            if matches!(extension.as_str(), "lua" | "fnl" | "wav") {
                 if let Some(stem) = path.file_stem() {
                     entry_stems.insert(stem.to_string_lossy().to_string());
                 }
@@ -69,17 +69,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut entries = vec![];
     for stem in entry_stems.iter() {
         let base_path = PathBuf::new().join(DEMO_PATH).join(stem);
-        let wave_file = base_path.with_extension("wav");
-        let lua_file = base_path.with_extension("lua");
-        if wave_file.exists() && lua_file.exists() {
+        let audio_file = base_path.with_extension("wav");
+        let audio_file_exists = audio_file.exists();
+        let script_files = ["lua", "fnl"]
+            .iter()
+            .map(|e| base_path.with_extension(e))
+            .collect::<Vec<_>>();
+        let script_file_exists = script_files.iter().any(|f| f.exists());
+        if audio_file_exists && script_file_exists {
             log::info!("Found file/script: '{}'...", stem);
-            let instrument_id = sample_pool.load_sample(&wave_file.to_string_lossy())?;
-            let script_path = lua_file.to_string_lossy().to_string();
+            let instrument_id = sample_pool.load_sample(&audio_file.to_string_lossy())?;
+            let script_path = script_files
+                .iter()
+                .find(|f| f.exists())
+                .cloned()
+                .unwrap_or_default();
+            let script_path = script_path.to_string_lossy().to_string();
             entries.push(RhythmEntry {
                 instrument_id,
                 script_path,
             });
-        } else if lua_file.exists() || wave_file.exists() {
+        } else if audio_file_exists || script_file_exists {
             log::warn!("Ignoring file/script: '{}'...", stem);
         }
     }
