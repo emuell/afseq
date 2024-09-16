@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs::read_to_string, path::Path};
 
 use mlua::prelude::LuaResult;
 
@@ -9,8 +9,17 @@ mod fennel;
 // -------------------------------------------------------------------------------------------------
 
 trait Transpiler {
-    /// Transpile source code at fiven file path into a Lua source code string
-    fn transpile(file_path: &Path) -> LuaResult<String>;
+    /// Read and transpile given file contents into a Lua source code string
+    fn transpile_file(file_path: &Path) -> LuaResult<String> {
+        Self::transpile(&read_to_string(file_path)?, file_path)
+    }
+
+    /// Transpile a source code string into a Lua source code string using the given
+    /// optional file path for tracebacks
+    fn transpile<'a, P: Into<Option<&'a Path>>>(
+        file_contents: &str,
+        file_path: P,
+    ) -> LuaResult<String>;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -35,7 +44,7 @@ pub(crate) fn transpile(file_path: &Path) -> LuaResult<String> {
         .map(|s| s.to_string_lossy())
         .unwrap_or("".into());
     if file_extension.eq_ignore_ascii_case("fnl") {
-        fennel::FennelTranspiler::transpile(file_path)
+        fennel::FennelTranspiler::transpile_file(file_path)
     } else {
         Err(mlua::Error::runtime(format!(
             "Unexpected file extension for transpiler: '{}'. Supported extensions are: '{}'",

@@ -1,38 +1,52 @@
-use std::path::Path;
+use std::{cell::RefCell, path::Path};
 
-use lazy_static::lazy_static;
 use mlua::prelude::*;
 
-use crate::{bindings::compile_chunk, bindings::transpiler::Transpiler};
+use super::Transpiler;
 
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) struct FennelTranspiler {}
 
 impl Transpiler for FennelTranspiler {
-    fn transpile(file_path: &Path) -> LuaResult<String> {
-        lazy_static! {
-            static ref FENNEL_BYTECODE: LuaResult<Vec<u8>> =
-                compile_chunk(include_str!("./fennel.lua"));
+    fn transpile<'a, P: Into<Option<&'a Path>>>(
+        file_contents: &str,
+        _file_path: P,
+    ) -> LuaResult<String> {
+        // get cached compile function
+        // NB: this will leak the entire interpreter instance which holds the function!
+        thread_local! {
+            static FENNEL: RefCell<LuaResult<LuaOwnedFunction>> = {
+                let try_create = || -> LuaResult<LuaOwnedFunction> {
+                    let lua = unsafe { Lua::unsafe_new_with(LuaStdLib::ALL, LuaOptions::default()) };
+                    let fennel = lua.load(include_str!("./fennel.lua"))
+                        .set_name("[inbuilt:fennel.lua]")
+                        .call::<(), LuaTable>(())?;
+                    let traceback_function = fennel.get::<_, LuaFunction>("traceback")?;
+                    lua.globals()
+                        .get::<_, LuaTable>("debug")?
+                        .set("traceback", traceback_function)?;
+                    let compile_function = fennel.get::<_, LuaFunction>("compileString")?;
+                    Ok(compile_function.into_owned())
+                };
+                RefCell::new(try_create().map_err(|err|
+                    LuaError::runtime(format!("Failed to load lua transpiler: {}", err))))
+            };
         }
-        let lua = unsafe { Lua::unsafe_new_with(LuaStdLib::ALL, LuaOptions::default()) };
-        let fennel = match FENNEL_BYTECODE.as_ref() {
-            Ok(bytecode) => lua
-                .load(bytecode)
-                .set_name("[inbuilt:fennel.lua]")
-                .set_mode(mlua::ChunkMode::Binary)
-                .call::<(), LuaTable>(()),
-            Err(err) => Err(err.clone()),
-        }?;
-        let compile_function = fennel.get::<_, LuaFunction>("compile")?;
-        // debug.traceback = fennel.traceback
-        let file_handle = lua
-            .load(format!(
-                "return io.open([[{}]])",
-                file_path.to_string_lossy()
-            ))
-            .eval::<LuaValue>()?;
-        let lua_code = compile_function.call::<_, LuaString>((file_handle, LuaValue::Nil))?;
+        let compile_function = FENNEL.with_borrow(|fennel| fennel.clone())?;
+        // compile file
+        let compile_options = LuaValue::Nil;
+        let lua_code = compile_function
+            .to_ref()
+            .call::<_, LuaString>((file_contents, compile_options))
+            .map_err(|err| LuaError::SyntaxError {
+                message: match err {
+                    LuaError::RuntimeError(str) => str.clone(),
+                    _ => err.to_string(),
+                },
+                incomplete_input: false,
+            })?;
+        // return compiled code
         Ok(lua_code.to_string_lossy().to_string())
     }
 }
