@@ -4,6 +4,7 @@ use mlua::prelude::LuaResult;
 
 // -------------------------------------------------------------------------------------------------
 
+mod erde;
 mod fennel;
 
 // -------------------------------------------------------------------------------------------------
@@ -14,8 +15,8 @@ trait Transpiler {
         Self::transpile(&read_to_string(file_path)?, file_path)
     }
 
-    /// Transpile a source code string into a Lua source code string using the given
-    /// optional file path for tracebacks
+    /// Transpile a source code string into a Lua source code string,
+    /// using the given optional file path for tracebacks
     fn transpile<'a, P: Into<Option<&'a Path>>>(
         file_contents: &str,
         file_path: P,
@@ -24,9 +25,9 @@ trait Transpiler {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Extensions of files which can be transpiled to Lua
+/// File extensions which can be transpiled to Lua
 pub(crate) fn transpilable_file_extensions() -> Vec<&'static str> {
-    vec!["fnl"]
+    vec!["fnl", "erde"]
 }
 
 /// Check via the file extension if the file can be transpiled to Lua
@@ -39,16 +40,18 @@ pub(crate) fn is_transpilable_file(file_path: &Path) -> bool {
 
 /// Convert/transpile Lua compatible language files to Lua
 pub(crate) fn transpile(file_path: &Path) -> LuaResult<String> {
-    let file_extension = file_path
+    let extension = file_path
         .extension()
         .map(|s| s.to_string_lossy())
         .unwrap_or("".into());
-    if file_extension.eq_ignore_ascii_case("fnl") {
+    if extension.eq_ignore_ascii_case("fnl") {
         fennel::FennelTranspiler::transpile_file(file_path)
+    } else if extension.eq_ignore_ascii_case("erde") {
+        erde::ErdeTranspiler::transpile_file(file_path)
     } else {
         Err(mlua::Error::runtime(format!(
             "Unexpected file extension for transpiler: '{}'. Supported extensions are: '{}'",
-            file_extension,
+            extension,
             transpilable_file_extensions().join(",")
         )))
     }
