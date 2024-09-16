@@ -59,7 +59,7 @@ pub use super::{
 pub use super::{
     bindings::{
         clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors,
-        new_rhythm_from_file, new_rhythm_from_string,
+        new_rhythm_from_file, new_rhythm_from_string, rhythm_script_file_extensions,
     },
     event::{scripted::ScriptedEventIter, scripted_cycle::ScriptedCycleEventIter},
     gate::scripted::ScriptedGate,

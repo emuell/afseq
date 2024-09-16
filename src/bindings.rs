@@ -101,6 +101,15 @@ pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Retuns all lua or lua transpilable file extensions that are supported.
+pub fn rhythm_script_file_extensions() -> Vec<&'static str> {
+    let mut extensions = vec!["lua"];
+    extensions.append(&mut transpiler::transpilable_file_extensions());
+    extensions
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Evaluate a lua script file which creates and returns a rhythm.
 ///
 /// ### Errors
