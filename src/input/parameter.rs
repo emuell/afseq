@@ -54,7 +54,7 @@ impl Parameter {
             name.clone_from(&id);
         }
         let description = description.to_string();
-        let param_type = ParameterType::Boolean;
+        let parameter_type = ParameterType::Boolean;
         let range = 0.0..=1.0;
         let default = match default {
             true => 1.0,
@@ -66,7 +66,7 @@ impl Parameter {
             id,
             name,
             description,
-            parameter_type: param_type,
+            parameter_type,
             range,
             default,
             value,
@@ -96,7 +96,7 @@ impl Parameter {
             name.clone_from(&id);
         }
         let description = description.to_string();
-        let param_type = ParameterType::Integer;
+        let parameter_type = ParameterType::Integer;
         let range = RangeInclusive::new(*range.start() as f64, *range.end() as f64);
         let default = default as f64;
         let value = default;
@@ -105,7 +105,7 @@ impl Parameter {
             id,
             name,
             description,
-            parameter_type: param_type,
+            parameter_type,
             range,
             default,
             value,
@@ -135,14 +135,14 @@ impl Parameter {
             name.clone_from(&id);
         }
         let description = description.to_string();
-        let param_type = ParameterType::Float;
+        let parameter_type = ParameterType::Float;
         let value = default;
         let value_strings = vec![];
         Self {
             id,
             name,
             description,
-            parameter_type: param_type,
+            parameter_type,
             range,
             default,
             value,
@@ -175,8 +175,8 @@ impl Parameter {
             name.clone_from(&id);
         }
         let description = description.to_string();
-        let param_type = ParameterType::Enum;
-        let range = 0.0..=values.len() as f64;
+        let parameter_type = ParameterType::Enum;
+        let range = 0.0..=(values.len() - 1) as f64;
         let default = values
             .iter()
             .position(|e| e.eq_ignore_ascii_case(&default))
@@ -187,7 +187,7 @@ impl Parameter {
             id,
             name,
             description,
-            parameter_type: param_type,
+            parameter_type,
             range,
             default,
             value,
