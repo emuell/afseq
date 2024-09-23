@@ -252,12 +252,15 @@ impl Parameter {
     /// String representation of the value, depending on the parameter type.
     pub fn string_value(&self) -> String {
         match self.parameter_type {
-            ParameterType::Boolean => match self.value {
-                0.5..=1.0 => "On".to_string(),
-                _ => "Off".to_string(),
-            },
+            ParameterType::Boolean => {
+                if self.value > 0.5 {
+                    "On".to_string()
+                } else {
+                    "Off".to_string()
+                }
+            }
             ParameterType::Float => self.value.to_string(),
-            ParameterType::Integer => (self.value as i64).to_string(),
+            ParameterType::Integer => (self.value.round() as i64).to_string(),
             ParameterType::Enum => self.value_strings[self.value.round() as usize].clone(),
         }
     }
@@ -266,12 +269,15 @@ impl Parameter {
     #[cfg(feature = "scripting")]
     pub fn lua_value<'lua>(&self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
         match self.parameter_type {
-            ParameterType::Boolean => match self.value {
-                0.5..=1.0 => true.into_lua(lua),
-                _ => false.into_lua(lua),
-            },
+            ParameterType::Boolean => {
+                if self.value > 0.5 {
+                    true.into_lua(lua)
+                } else {
+                    false.into_lua(lua)
+                }
+            }
             ParameterType::Float => self.value.into_lua(lua),
-            ParameterType::Integer => (self.value as LuaInteger).into_lua(lua),
+            ParameterType::Integer => (self.value.round() as LuaInteger).into_lua(lua),
             ParameterType::Enum => self.value_strings[self.value.round() as usize]
                 .clone()
                 .into_lua(lua),
