@@ -513,8 +513,10 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
 
     // cache module bytecode to speed up initialization
     lazy_static! {
-        static ref MATH_BYTECODE: LuaResult<Vec<u8>> =
-            compile_chunk(include_str!("../types/nerdo/library/math.lua"));
+        static ref MATH_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
+            include_str!("../types/nerdo/library/math.lua"),
+            "[inbuilt:math.lua]"
+        );
     }
     // implemented in lua: load and evaluate cached chunk
     match MATH_BYTECODE.as_ref() {
@@ -590,8 +592,10 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
 fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up initialization
     lazy_static! {
-        static ref TABLE_BYTECODE: LuaResult<Vec<u8>> =
-            compile_chunk(include_str!("../types/nerdo/library/table.lua"));
+        static ref TABLE_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
+            include_str!("../types/nerdo/library/table.lua"),
+            "[inbuilt:table.lua]"
+        );
     }
     // implemented in lua: load and evaluate cached chunk
     match TABLE_BYTECODE.as_ref() {
@@ -607,8 +611,10 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
 fn register_pattern_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up requires
     lazy_static! {
-        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> =
-            compile_chunk(include_str!("../types/nerdo/library/pattern.lua"));
+        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
+            include_str!("../types/nerdo/library/pattern.lua"),
+            "[inbuilt:pattern.lua]"
+        );
     }
     // implemented in lua: load and evaluate cached chunk
     match PATTERN_BYTECODE.as_ref() {
@@ -698,16 +704,17 @@ fn generate_random_number<R: rand::Rng>(
 // --------------------------------------------------------------------------------------------------
 
 #[cfg(any(feature = "lua", feature = "lua-jit"))]
-fn compile_chunk(chunk: &'static str) -> LuaResult<Vec<u8>> {
+fn compile_chunk(chunk: &'static str, name: &'static str) -> LuaResult<Vec<u8>> {
     let strip = false;
     Lua::new_with(LuaStdLib::NONE, LuaOptions::default())?
         .load(chunk)
+        .set_name(name)
         .into_function()
         .map(|x| x.dump(strip))
 }
 
 #[cfg(any(feature = "luau", feature = "luau-jit"))]
-fn compile_chunk(chunk: &'static str) -> LuaResult<Vec<u8>> {
+fn compile_chunk(chunk: &'static str, _name: &'static str) -> LuaResult<Vec<u8>> {
     Ok(mlua::Compiler::new().compile(chunk))
 }
 
