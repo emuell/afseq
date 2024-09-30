@@ -37,7 +37,7 @@ function Scale:chord(degree, note_count) end
 ---
 ---### examples:
 ---```lua
----local cmmaj = scale("c4", "major")
+---local cmin = scale("c4", "minor")
 ---cmin:degree(1) --> 48 ("c4")
 ---cmin:degree(5) --> 55
 ---cmin:degree("i", "iii", "v") --> 48, 50, 55
@@ -46,6 +46,28 @@ function Scale:chord(degree, note_count) end
 ---@return integer ...
 ---@nodiscard
 function Scale:degree(...) end
+
+---Create an iterator function that returns up to `count` notes from the scale.
+---If the count exceeds the number of notes in the scale, then notes from the next
+---octave are taken. 
+---
+---The iterator function returns nil when the maximum number of MIDI notes has been
+---reached, or when the given optional `count` parameter has been exceeded.
+---
+---### examples:
+---```lua
+-----collect 16 notes of a c major scale
+---local cmaj = scale("c4", "major")
+---local notes = {}
+---for note in cmin:notes_iter(16) do
+--- table.insert(notes, note)
+---end
+----- same using the `pattern` library
+---local notes = pattern.new(16):init(cmaj.notes_iter())
+---```
+---@param count integer?
+---@return fun():integer|nil
+function Scale:notes_iter(count) end
 
 ---Fit given note value(s) into scale by moving them to the nearest note in the scale.
 ---

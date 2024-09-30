@@ -57,6 +57,46 @@ impl LuaUserData for Scale {
         );
 
         methods.add_method(
+            "notes_iter",
+            |lua, this, count_value: LuaValue| -> LuaResult<LuaFunction> {
+                let mut max_notes = usize::MAX;
+                if !count_value.is_nil() {
+                    if let Some(value) = count_value.as_integer() {
+                        if value <= 0 {
+                            return Err(bad_argument_error(
+                                "notes_iter",
+                                "count",
+                                1,
+                                "expecting a number > 0",
+                            ));
+                        }
+                        max_notes = value as usize;
+                    } else {
+                        return Err(bad_argument_error(
+                            "notes_iter",
+                            "count",
+                            1,
+                            "expecting a number or nil",
+                        ));
+                    }
+                }
+                lua.create_function_mut({
+                    let mut iter = this.notes_iter().enumerate();
+                    move |_lua: &Lua, _args: LuaMultiValue| -> LuaResult<LuaValue> {
+                        if let Some((index, note)) = iter.next() {
+                            if index < max_notes {
+                                Ok(LuaValue::Integer(note as LuaInteger))
+                            } else {
+                                Ok(LuaNil)
+                            }
+                        } else {
+                            Ok(LuaNil)
+                        }
+                    }
+                })
+            },
+        );
+        methods.add_method(
             "degree",
             |_lua, this, args: LuaMultiValue| -> LuaResult<LuaMultiValue> {
                 let args = args.into_vec();
@@ -219,6 +259,52 @@ mod test {
             .map(|v| v.as_i32().unwrap())
             .collect::<Vec<i32>>(),
             vec![48, 51, 55]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn scale_notes_iter() -> LuaResult<()> {
+        let lua = new_test_engine()?;
+
+        assert!(lua
+            .load(r#"scale("c4", "minor"):notes_iter(0)"#)
+            .exec()
+            .is_err());
+        assert!(lua
+            .load(r#"scale("c4", "minor"):notes_iter(1)"#)
+            .exec()
+            .is_ok());
+
+        assert_eq!(
+            lua.load(
+                r#"local cmin = scale("c4", "minor")
+                local iter = cmin:notes_iter(3)
+                return iter(), iter(), iter(), iter()
+            "#
+            )
+            .eval::<LuaMultiValue>()?
+            .into_vec()
+            .iter()
+            .map(|v| v.as_i32().unwrap_or(0))
+            .collect::<Vec<i32>>(),
+            vec![48, 50, 51, 0]
+        );
+
+        assert_eq!(
+            lua.load(
+                r#"local cmin = scale("f10", "minor")
+                local iter = cmin:notes_iter()
+                return iter(), iter(), iter()
+            "#
+            )
+            .eval::<LuaMultiValue>()?
+            .into_vec()
+            .iter()
+            .map(|v| v.as_i32().unwrap_or(0))
+            .collect::<Vec<i32>>(),
+            vec![125, 127, 0]
         );
 
         Ok(())
