@@ -1,3 +1,3 @@
-# AFSEQ Overview
+# AFSEQ Lua API
 
 TODO
