@@ -1,7 +1,4 @@
-# math  
-
-<!-- toc -->
-  
+# math {#math}  
 
 ---  
 ## Functions

@@ -184,6 +184,8 @@ pub struct Field {
     #[serde(rename = "type")]
     pub lua_type: Type,
     pub file: String,
+    pub start: u32,
+    pub finish: u32,
     pub visible: VisibleType,
     #[serde(default, deserialize_with = "deserialize_extends")]
     pub extends: Option<Extend>,
@@ -203,11 +205,11 @@ impl fmt::Display for Field {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Definition {
-    pub desc: Option<String>,
-    pub rawdesc: Option<String>,
-    pub name: String,
     #[serde(rename = "type")]
     pub lua_type: Type,
+    pub name: String,
+    pub desc: Option<String>,
+    pub rawdesc: Option<String>,
     pub defines: Vec<Define>,
     #[serde(default)]
     pub fields: Vec<Field>,
@@ -280,6 +282,8 @@ pub struct Define {
     #[serde(rename = "type")]
     pub lua_type: Type,
     pub file: String,
+    pub start: u32,
+    pub finish: u32,
     #[serde(default, deserialize_with = "deserialize_extends")]
     pub extends: Option<Extend>,
 }
@@ -294,6 +298,8 @@ impl fmt::Display for Define {
 pub struct ExtendType {
     #[serde(rename = "type")]
     pub lua_type: Type,
+    pub start: u32,
+    pub finish: u32,
     pub view: String,
 }
 
@@ -302,6 +308,8 @@ pub struct Extend {
     #[serde(rename = "type")]
     pub lua_type: Type,
     pub types: Option<Vec<ExtendType>>,
+    pub start: u32,
+    pub finish: u32,
     pub view: String,
     pub desc: Option<String>,
     pub rawdesc: Option<String>,
@@ -360,19 +368,19 @@ pub enum ArgType {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ArgDef {
-    pub name: Option<String>,
     #[serde(rename = "type")]
     pub lua_type: ArgType,
+    pub name: Option<String>,
     pub view: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ReturnDef {
-    pub name: Option<String>,
-    pub view: String,
     // NB: type for returns will always be "function.return"
     #[serde(rename = "type")]
     pub lua_type: Type,
+    pub name: Option<String>,
+    pub view: String,
 }
 
 /*

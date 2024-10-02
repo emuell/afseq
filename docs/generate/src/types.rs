@@ -1,8 +1,10 @@
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
+    path::PathBuf,
 };
+
+use serde::{Deserialize, Serialize};
 
 /// enum for possible lua-ls built-in types
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq, PartialOrd, Ord)]
@@ -32,11 +34,11 @@ pub enum Kind {
     Nullable(Box<Kind>),
     Table(Box<Kind>, Box<Kind>),
     Object(HashMap<String, Box<Kind>>),
-    Alias(String),
-    Class(Scope, String),
+    Alias(Box<Alias>),
+    Class(Class),
     Function(Function),
     Enum(Vec<Kind>),
-    EnumRef(String),
+    EnumRef(Box<Enum>),
     SelfArg,
     Variadic(Box<Kind>),
     Literal(Box<LuaKind>, String),
@@ -45,6 +47,8 @@ pub enum Kind {
 /// a definition alias, rendered as a doc page
 #[derive(Debug, Clone, PartialEq)]
 pub struct Alias {
+    pub file: Option<PathBuf>,
+    pub line_number: Option<u32>,
     pub name: String,
     pub kind: Kind,
     pub desc: Option<String>,
@@ -53,6 +57,8 @@ pub struct Alias {
 /// variable definition used in fields and params and returns of functions
 #[derive(Debug, Clone, PartialEq)]
 pub struct Var {
+    pub file: Option<PathBuf>,
+    pub line_number: Option<u32>,
     pub name: Option<String>,
     pub kind: Kind,
     pub desc: Option<String>,
@@ -63,6 +69,8 @@ pub struct Var {
 /// function definition for methods, functions and lambdas
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Function {
+    pub file: Option<PathBuf>,
+    pub line_number: Option<u32>,
     pub name: Option<String>,
     pub params: Vec<Var>,
     pub returns: Vec<Var>,
@@ -74,6 +82,8 @@ pub struct Function {
 /// self.desc contains a code block string with the values
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
+    pub file: Option<PathBuf>,
+    pub line_number: Option<u32>,
     pub name: String,
     pub desc: String,
 }
@@ -90,6 +100,8 @@ pub enum Scope {
 /// class definition, rendered as a doc page
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
+    pub file: Option<PathBuf>,
+    pub line_number: Option<u32>,
     pub scope: Scope,
     pub name: String,
     pub fields: Vec<Var>,
@@ -112,58 +124,99 @@ impl Kind {
     #[allow(unused)]
     pub fn collect_local_class_types(&self) -> HashSet<String> {
         let mut types = HashSet::new();
-        if let Kind::Array(item) = self {
-            types.extend(item.collect_local_class_types());
-        } else if let Kind::Nullable(item) = self {
-            types.extend(item.collect_local_class_types());
-        } else if let Kind::Table(key, value) = self {
-            types.extend(key.collect_local_class_types());
-            types.extend(value.collect_local_class_types());
-        } else if let Kind::Class(scope, name) = self {
-            if scope == &Scope::Local {
-                types.insert(name.clone());
+        match self {
+            Kind::Unresolved(_) => {}
+            Kind::Lua(_lua_kind) => {}
+            Kind::Array(item) => {
+                types.extend(item.collect_local_class_types());
             }
-        } else if let Kind::Function(func) = self {
-            for ret in &func.returns {
-                types.extend(ret.kind.collect_local_class_types());
+            Kind::Nullable(item) => {
+                types.extend(item.collect_local_class_types());
             }
-            for param in &func.params {
-                types.extend(param.kind.collect_local_class_types());
+            Kind::Table(key, value) => {
+                types.extend(key.collect_local_class_types());
+                types.extend(value.collect_local_class_types());
             }
-        } else if let Kind::Enum(kinds) = self {
-            for kind in kinds {
-                types.extend(kind.collect_local_class_types());
+            Kind::Object(map) => {
+                for kind in map.values() {
+                    types.extend(kind.collect_local_class_types());
+                }
             }
-        } else if let Kind::Variadic(item) = self {
-            types.extend(item.collect_local_class_types());
+            Kind::Alias(alias) => {}
+            Kind::Class(class) => {
+                if class.scope == Scope::Local {
+                    types.insert(class.name.clone());
+                }
+                types.extend(class.collect_local_class_types());
+            }
+            Kind::Function(func) => {
+                for ret in &func.returns {
+                    types.extend(ret.kind.collect_local_class_types());
+                }
+                for param in &func.params {
+                    types.extend(param.kind.collect_local_class_types());
+                }
+            }
+            Kind::Enum(kinds) => {
+                for kind in kinds {
+                    types.extend(kind.collect_local_class_types());
+                }
+            }
+            Kind::EnumRef(_) => {}
+            Kind::SelfArg => {}
+            Kind::Variadic(item) => {
+                types.extend(item.collect_local_class_types());
+            }
+            Kind::Literal(_lua_kind, _) => {}
         }
         types
     }
 
     pub fn collect_alias_types(&self) -> HashSet<String> {
         let mut types = HashSet::new();
-        if let Kind::Array(item) = self {
-            types.extend(item.collect_alias_types());
-        } else if let Kind::Nullable(item) = self {
-            types.extend(item.collect_alias_types());
-        } else if let Kind::Table(key, value) = self {
-            types.extend(key.collect_alias_types());
-            types.extend(value.collect_alias_types());
-        } else if let Kind::Alias(name) = self {
-            types.insert(name.clone());
-        } else if let Kind::Function(func) = self {
-            for ret in &func.returns {
-                types.extend(ret.kind.collect_alias_types());
-            }
-            for param in &func.params {
-                types.extend(param.kind.collect_alias_types());
-            }
-        } else if let Kind::Enum(kinds) = self {
-            for kind in kinds {
+        match self {
+            Kind::Unresolved(_name) => {}
+            Kind::Lua(_lua_kind) => {}
+            Kind::Array(kind) => {
                 types.extend(kind.collect_alias_types());
             }
-        } else if let Kind::Variadic(item) = self {
-            types.extend(item.collect_alias_types());
+            Kind::Nullable(item) => {
+                types.extend(item.collect_alias_types());
+            }
+            Kind::Table(key, value) => {
+                types.extend(key.collect_alias_types());
+                types.extend(value.collect_alias_types());
+            }
+            Kind::Object(map) => {
+                for kind in map.values() {
+                    types.extend(kind.collect_alias_types());
+                }
+            }
+            Kind::Alias(alias) => {
+                types.insert(alias.name.clone());
+            }
+            Kind::Class(class) => {
+                types.extend(class.collect_alias_types());
+            }
+            Kind::Function(function) => {
+                for ret in &function.returns {
+                    types.extend(ret.kind.collect_alias_types());
+                }
+                for param in &function.params {
+                    types.extend(param.kind.collect_alias_types());
+                }
+            }
+            Kind::Enum(kinds) => {
+                for kind in kinds {
+                    types.extend(kind.collect_alias_types());
+                }
+            }
+            Kind::EnumRef(_enumref) => {}
+            Kind::SelfArg => {}
+            Kind::Variadic(item) => {
+                types.extend(item.collect_alias_types());
+            }
+            Kind::Literal(_lua_kind, _) => {}
         }
         types
     }
@@ -202,7 +255,7 @@ impl Scope {
     pub fn from_name(name: &str) -> Self {
         if ["global", "pattern"].contains(&name) {
             Scope::Global
-        } else if ["bit", "debug", "io", "math", "os"].contains(&name) {
+        } else if ["bit", "debug", "io", "math", "os", "table"].contains(&name) {
             Scope::Modules
         } else {
             Scope::Local
@@ -244,7 +297,7 @@ impl Class {
             for alias in new_local_alias_names.clone().into_iter() {
                 if let Some(alias) = aliases.get(&alias) {
                     if let Kind::Alias(alias) = &alias.kind {
-                        new_local_alias_names.insert(alias.to_string());
+                        new_local_alias_names.insert(alias.name.clone());
                     }
                 }
             }

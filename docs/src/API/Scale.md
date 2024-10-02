@@ -1,7 +1,150 @@
-# Scale  
 
 <!-- toc -->
+
+# Global {#Global}  
+
+---  
+## Functions
+### scale(key : [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md), mode : [`ScaleMode`](#ScaleMode)) {#scale}
+`->`[`Scale`](../API/scale.md#Scale)  
+
+> Create a new scale from the given key notes and a mode name.
+> 
+> Scale names can also be shortened by using the following synonyms:
+> - "8-tone" -> "eight-tone"
+> - "9-tone" -> "nine-tone"
+> - "aug" -> "augmented"
+> - "dim" -> "diminished"
+> - "dom" -> "Dominant"
+> - "egypt"  -> "egyptian"
+> - "harm"  -> "harmonic"
+> - "hungary" -> "hungarian"
+> - "roman" -> "romanian"
+> - "min" -> "minor"
+> - "maj" -> "major"
+> - "nat" -> "natural"
+> - "penta" -> "pentatonic"
+> - "span" -> "spanish",
+> 
+> #### examples:
+> ```lua
+> scale("c4", "minor").notes -> {"c4", "d4", "d#4", "f4", "g4", "g#4", "a#4"}
+> ```
+> 
+> ```lua
+> -- Available scales.
+> mode:
+>     | "chromatic"
+>     | "major"
+>     | "minor"
+>     | "natural major"
+>     | "natural minor"
+>     | "pentatonic major"
+>     | "pentatonic minor"
+>     | "pentatonic egyptian"
+>     | "blues major"
+>     | "blues minor"
+>     | "whole tone"
+>     | "augmented"
+>     | "prometheus"
+>     | "tritone"
+>     | "harmonic major"
+>     | "harmonic minor"
+>     | "melodic minor"
+>     | "all minor"
+>     | "dorian"
+>     | "phrygian"
+>     | "phrygian dominant"
+>     | "lydian"
+>     | "lydian augmented"
+>     | "mixolydian"
+>     | "locrian"
+>     | "locrian major"
+>     | "super locrian"
+>     | "neapolitan major"
+>     | "neapolitan minor"
+>     | "romanian minor"
+>     | "spanish gypsy"
+>     | "hungarian gypsy"
+>     | "enigmatic"
+>     | "overtone"
+>     | "diminished half"
+>     | "diminished whole"
+>     | "spanish eight-tone"
+>     | "nine-tone"
+> ```  
+
+
+
+---  
+## Aliases  
+### DegreeValue {#DegreeValue}
+[`integer`](../API/builtins/integer.md) | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
+> ```lua
+> -- Roman number or plain number as degree in range [1 - 7]
+> DegreeValue:
+>     | "i"
+>     | "ii"
+>     | "iii"
+>     | "iv"
+>     | "v"
+>     | "vi"
+>     | "vii"
+> ```  
   
+### NoteValue {#NoteValue}
+[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
+  
+  
+### ScaleMode {#ScaleMode}
+[`string`](../API/builtins/string.md) | `"all minor"` | `"augmented"` | `"blues major"` | `"blues minor"` | `"chromatic"` | `"diminished half"` | `"diminished whole"` | `"dorian"` | `"enigmatic"` | `"harmonic major"` | `"harmonic minor"` | `"hungarian gypsy"` | `"locrian major"` | `"locrian"` | `"lydian augmented"` | `"lydian"` | `"major"` | `"melodic minor"` | `"minor"` | `"mixolydian"` | `"natural major"` | `"natural minor"` | `"neapolitan major"` | `"neapolitan minor"` | `"nine-tone"` | `"overtone"` | `"pentatonic egyptian"` | `"pentatonic major"` | `"pentatonic minor"` | `"phrygian dominant"` | `"phrygian"` | `"prometheus"` | `"romanian minor"` | `"spanish eight-tone"` | `"spanish gypsy"` | `"super locrian"` | `"tritone"` | `"whole tone"`  
+> ```lua
+> -- Available scales.
+> ScaleMode:
+>     | "chromatic"
+>     | "major"
+>     | "minor"
+>     | "natural major"
+>     | "natural minor"
+>     | "pentatonic major"
+>     | "pentatonic minor"
+>     | "pentatonic egyptian"
+>     | "blues major"
+>     | "blues minor"
+>     | "whole tone"
+>     | "augmented"
+>     | "prometheus"
+>     | "tritone"
+>     | "harmonic major"
+>     | "harmonic minor"
+>     | "melodic minor"
+>     | "all minor"
+>     | "dorian"
+>     | "phrygian"
+>     | "phrygian dominant"
+>     | "lydian"
+>     | "lydian augmented"
+>     | "mixolydian"
+>     | "locrian"
+>     | "locrian major"
+>     | "super locrian"
+>     | "neapolitan major"
+>     | "neapolitan minor"
+>     | "romanian minor"
+>     | "spanish gypsy"
+>     | "hungarian gypsy"
+>     | "enigmatic"
+>     | "overtone"
+>     | "diminished half"
+>     | "diminished whole"
+>     | "spanish eight-tone"
+>     | "nine-tone"
+> ```  
+  
+
+
+
+# Scale {#Scale}  
 
 ---  
 ## Properties
@@ -64,16 +207,6 @@
 >     | "vi"
 >     | "vii"
 > ```
-### fit([*self*](../API/builtins/self.md), ...[`NoteValue`](#NoteValue)) {#fit}
-`->`[`integer`](../API/builtins/integer.md)[]  
-
-> Fit given note value(s) into scale by moving them to the nearest note in the scale.
-> 
-> #### examples:
-> ```lua
-> local cmin = scale("c4", "minor")
-> cmin:fit("c4", "d4", "f4") -> 48, 50, 53 (cmaj -> cmin)
-> ```
 ### notes_iter([*self*](../API/builtins/self.md), count : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)) {#notes_iter}
 `->`() `->` [`integer`](../API/builtins/integer.md) | [`nil`](../API/builtins/nil.md)  
 
@@ -94,5 +227,40 @@
 > end
 > -- same using the `pattern` library
 > local notes = pattern.new(16):init(cmaj.notes_iter())
+> ```
+### fit([*self*](../API/builtins/self.md), ...[`NoteValue`](#NoteValue)) {#fit}
+`->`[`integer`](../API/builtins/integer.md)[]  
+
+> Fit given note value(s) into scale by moving them to the nearest note in the scale.
+> 
+> #### examples:
+> ```lua
+> local cmin = scale("c4", "minor")
+> cmin:fit("c4", "d4", "f4") -> 48, 50, 53 (cmaj -> cmin)
 > ```  
+
+
+
+---  
+## Aliases  
+### DegreeValue {#DegreeValue}
+[`integer`](../API/builtins/integer.md) | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
+> ```lua
+> -- Roman number or plain number as degree in range [1 - 7]
+> DegreeValue:
+>     | "i"
+>     | "ii"
+>     | "iii"
+>     | "iv"
+>     | "v"
+>     | "vi"
+>     | "vii"
+> ```  
+  
+### NoteValue {#NoteValue}
+[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
+  
+  
+
+
 

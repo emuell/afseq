@@ -1,7 +1,9 @@
-use crate::types::{Function, Kind, LuaKind, Var};
+use std::collections::HashMap;
+
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
-use std::collections::HashMap;
+
+use crate::types::{Function, Kind, LuaKind, Var};
 
 #[derive(Parser)]
 #[grammar = "./lua_parser.pest"]
@@ -33,11 +35,15 @@ impl LuaParser {
         let next = inner.next().unwrap();
         match next.as_rule() {
             Rule::nullable_tail => Var {
+                file: None,
+                line_number: None,
                 name,
                 kind: Kind::Nullable(Box::new(Self::kind(inner.next().unwrap()))),
                 desc: None,
             },
             _ => Var {
+                file: None,
+                line_number: None,
                 name,
                 kind: Self::kind(next),
                 desc: None,
@@ -52,6 +58,8 @@ impl LuaParser {
                 returns.push(match p.as_rule() {
                     Rule::named_var => Self::named_var(p),
                     Rule::enumeration | Rule::complex_type => Var {
+                        file: None,
+                        line_number: None,
                         kind: Self::kind(p),
                         name: None,
                         desc: None,
@@ -69,6 +77,8 @@ impl LuaParser {
             match arg.as_rule() {
                 Rule::named_var => params.push(Self::named_var(arg)),
                 Rule::valid_name => params.push(Var {
+                    file: None,
+                    line_number: None,
                     name: Some(Self::as_string(&arg)),
                     kind: Kind::Lua(LuaKind::Any),
                     desc: None,
@@ -79,6 +89,8 @@ impl LuaParser {
                     }
                 }
                 Rule::vararg => params.push(Var {
+                    file: None,
+                    line_number: None,
                     name: None,
                     kind: Kind::Variadic(Box::new(Self::kind(arg.into_inner().next().unwrap()))),
                     desc: None,
@@ -142,10 +154,14 @@ impl LuaParser {
             }
             Rule::function => {
                 let mut inner = pair.into_inner();
+                let file = None;
+                let line_number = None;
                 let name = Some(Self::as_string(&inner.next().unwrap()));
                 let params = Self::args(inner.next().unwrap());
                 let returns = Self::returns(inner.next());
                 Kind::Function(Function {
+                    file,
+                    line_number,
                     name,
                     params,
                     returns,
@@ -154,9 +170,13 @@ impl LuaParser {
             }
             Rule::fun => {
                 let mut inner = pair.into_inner();
+                let file = None;
+                let line_number = None;
                 let params = Self::args(inner.next().unwrap());
                 let returns = Self::returns(inner.next());
                 Kind::Function(Function {
+                    file,
+                    line_number,
                     params,
                     returns,
                     name: None,
@@ -166,10 +186,14 @@ impl LuaParser {
             Rule::method => {
                 let mut inner = pair.into_inner();
                 let _parent = Self::as_string(&inner.next().unwrap());
+                let file = None;
+                let line_number = None;
                 let name = Some(Self::as_string(&inner.next().unwrap()));
                 let params = Self::args(inner.next().unwrap());
                 let returns = Self::returns(inner.next());
                 Kind::Function(Function {
+                    file,
+                    line_number,
                     name,
                     params,
                     returns,
@@ -196,6 +220,8 @@ mod test {
     fn var<N: Into<Option<String>>>(name: N, kind: Kind) -> Var {
         let name = name.into();
         Var {
+            file: None,
+            line_number: None,
             name,
             kind,
             desc: None,
@@ -239,6 +265,8 @@ mod test {
         assert_type(
             "function a.b.c(i: integer, ...string)",
             Kind::Function(Function {
+                file: None,
+                line_number: None,
                 name: Some(String::from("a.b.c")),
                 params: vec![
                     var("i".to_string(), Kind::Lua(LuaKind::Integer)),
@@ -251,6 +279,8 @@ mod test {
         assert_type(
             "(method) renoise.Song:test(a: integer, b:integer|string?)",
             Kind::Function(Function {
+                file: None,
+                line_number: None,
                 name: Some(String::from("test")),
                 params: vec![
                     var("a".to_string(), Kind::Lua(LuaKind::Integer)),

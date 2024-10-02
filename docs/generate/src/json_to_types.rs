@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{
     json::{ArgDef, ArgType, Definition, Doc, Extend, Field, ReturnDef, Type},
     lua_parser::LuaParser,
@@ -8,22 +10,30 @@ impl Def {
     pub fn from_definition(d: &Definition) -> Option<Self> {
         if let Some(first) = d.defines.first() {
             match first.lua_type {
-                Type::Doc(Doc::Class) => Some(Self::Class(Class::from_definition(d))),
+                Type::Doc(Doc::Class) => Some(Self::Class(Class::from_definition(
+                    d,
+                    &first.file,
+                    first.start,
+                ))),
 
                 // TODO parse fields in enum either from desc or from Type::TableField
                 Type::Doc(Doc::Enum) => Some(Self::Enum(Enum {
+                    file: Some(first.file.clone().into()),
+                    line_number: Some(first.start),
                     name: d.name.clone(),
                     desc: d.rawdesc.clone().unwrap_or_default(),
                 })),
 
                 Type::Doc(Doc::Alias) => Some(Self::Alias(Alias {
+                    file: Some(first.file.clone().into()),
+                    line_number: Some(first.start),
                     desc: d.rawdesc.clone(),
                     name: d.name.clone(),
                     kind: first
                         .clone()
                         .extends
                         .map(|e| Kind::from_string(&e.view))
-                        .unwrap_or(Kind::Alias(d.name.clone())),
+                        .unwrap_or(Kind::Unresolved(d.name.clone())),
                 })),
 
                 Type::SetField | Type::SetGlobal => {
@@ -31,6 +41,7 @@ impl Def {
                         match extend.lua_type {
                             Type::Lua(LuaKind::Function) => Function::from_extend(
                                 extend,
+                                first.file.clone().into(),
                                 d.name.clone(),
                                 d.rawdesc.clone().unwrap_or_default(),
                             )
@@ -92,6 +103,8 @@ impl From<Extend> for Kind {
 impl Var {
     fn from_field(field: Field) -> Option<Self> {
         Some(Self {
+            file: Some(field.file.clone().into()),
+            line_number: Some(field.start),
             kind: field
                 .extends
                 .map(Kind::from)
@@ -105,6 +118,8 @@ impl Var {
     }
     fn from_argdef(ad: &ArgDef) -> Option<Self> {
         Some(Self {
+            file: None,
+            line_number: None,
             kind: match ad.lua_type {
                 ArgType::SelfArg => Kind::SelfArg,
                 ArgType::Local => Kind::from_string(&ad.view),
@@ -117,6 +132,8 @@ impl Var {
 
     fn from_return(rd: &ReturnDef) -> Option<Self> {
         Some(Self {
+            file: None,
+            line_number: None,
             kind: Kind::from_string(&rd.view),
             // kind: match rd.lua_type {
             //     ArgType::SelfArg => ArgKind::SelfKind,
@@ -130,7 +147,7 @@ impl Var {
 }
 
 impl Function {
-    fn from_extend(extend: Extend, name: String, desc: String) -> Option<Self> {
+    fn from_extend(extend: Extend, file: PathBuf, name: String, desc: String) -> Option<Self> {
         match extend.lua_type {
             Type::Lua(LuaKind::Function) => {
                 let params = extend
@@ -144,6 +161,8 @@ impl Function {
                     .filter_map(Var::from_return)
                     .collect::<Vec<Var>>();
                 Some(Self {
+                    file: Some(file),
+                    line_number: Some(extend.start),
                     name: Some(name),
                     params,
                     returns,
@@ -157,6 +176,7 @@ impl Function {
         if let Some(extend) = field.extends {
             Self::from_extend(
                 extend,
+                field.file.into(),
                 field.name.clone(),
                 field.rawdesc.unwrap_or_default(),
             )
@@ -167,8 +187,10 @@ impl Function {
 }
 
 impl Class {
-    fn from_definition(d: &Definition) -> Self {
+    fn from_definition(d: &Definition, file: &str, line_number: u32) -> Self {
         Self {
+            file: Some(file.into()),
+            line_number: Some(line_number),
             scope: Scope::from_name(&d.name),
             name: d.name.clone(),
             fields: d

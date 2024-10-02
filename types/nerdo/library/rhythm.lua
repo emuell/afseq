@@ -124,7 +124,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern,
 ---gate, emitter or cycle map generator functions.
 ---
----## examples:
+---### examples:
 ---```lua
 ----- trigger a single note as specified by input parameter 'note'
 ----- when input parameter 'enabled' is true, else triggers nothing.
