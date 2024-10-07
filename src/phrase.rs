@@ -119,13 +119,25 @@ impl Phrase {
         &self.rhythm_slots
     }
 
+    /// Run rhythms to produce a single next event, calling the given `consumer` 
+    /// visitor function when an event got produced.
+    pub fn consume_event<F>(&mut self, consumer: &mut F)
+    where
+        F: FnMut(RhythmIndex, RhythmIterItem),
+    {
+        // emit and consume next event, if any
+        if let Some((rhythm_index, rhythm_item)) = self.next_event_until_time(SampleTime::MAX) {
+            consumer(rhythm_index, rhythm_item);
+        }
+    }
+
     /// Run rhythms until a given sample time is reached, calling the given `consumer`
     /// visitor function for all emitted events.
     pub fn consume_events_until_time<F>(&mut self, sample_time: SampleTime, consumer: &mut F)
     where
         F: FnMut(RhythmIndex, RhythmIterItem),
     {
-        // emit next events until we've reached the desired sample_time
+        // emit and consume next events until we've reached the desired sample_time
         while let Some((rhythm_index, rhythm_item)) = self.next_event_until_time(sample_time) {
             debug_assert!(rhythm_item.time < sample_time);
             consumer(rhythm_index, rhythm_item);
