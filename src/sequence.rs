@@ -1,6 +1,6 @@
 //! Arrange multiple `Phrase`S into a single `Rhythm`.
 
-use crate::{event::Event, phrase::RhythmIndex, BeatTimeBase, Phrase, Rhythm, SampleTime};
+use crate::{phrase::RhythmIndex, BeatTimeBase, Phrase, Rhythm, RhythmIterItem, SampleTime};
 
 #[cfg(doc)]
 use crate::EventIter;
@@ -59,16 +59,13 @@ impl Sequence {
 
     /// Run rhythms until a given sample time is reached, calling the given `visitor`
     /// function for all emitted events to consume them.
-    pub fn consume_events_until_time<F>(&mut self, sample_time: SampleTime, consumer: &mut F)
+    pub fn consume_events_until_time<F>(&mut self, time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
+        F: FnMut(RhythmIndex, RhythmIterItem),
     {
-        debug_assert!(
-            sample_time >= self.sample_position,
-            "can not rewind playback here"
-        );
-        while sample_time - self.sample_position > 0 {
-            let (next_phrase_start, samples_to_run) = self.samples_until_next_phrase(sample_time);
+        debug_assert!(time >= self.sample_position, "can not rewind playback here");
+        while time - self.sample_position > 0 {
+            let (next_phrase_start, samples_to_run) = self.samples_until_next_phrase(time);
             if next_phrase_start <= samples_to_run {
                 // run current phrase until it ends
                 let sample_position = self.sample_position;
@@ -152,11 +149,11 @@ impl Sequence {
         &mut self.phrases[self.phrase_index]
     }
 
-    fn samples_until_next_phrase(&self, run_until_time: u64) -> (u64, u64) {
+    fn samples_until_next_phrase(&self, time: u64) -> (u64, u64) {
         let phrase_length_in_samples =
             self.current_phrase().length().to_samples(&self.time_base) as SampleTime;
         let next_phrase_start = phrase_length_in_samples - self.sample_position_in_phrase;
-        let samples_to_run = run_until_time - self.sample_position;
+        let samples_to_run = time - self.sample_position;
         (next_phrase_start, samples_to_run)
     }
 }

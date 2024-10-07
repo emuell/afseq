@@ -299,20 +299,20 @@ impl SamplePlayer {
     fn run_until_time(
         &mut self,
         sequence: &mut Sequence,
-        start_offset: SampleTime,
-        sample_time: SampleTime,
+        time_offset: SampleTime,
+        time: SampleTime,
     ) {
         let time_base = *sequence.time_base();
         sequence.consume_events_until_time(
-            sample_time,
-            &mut |rhythm_index, sample_time, event: Option<Event>, event_duration| {
+            time,
+            &mut |rhythm_index, rhythm_item| {
                 // print
                 if self.show_events {
                     const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
                     println!(
                         "{}: {}",
-                        time_base.display(sample_time),
-                        match &event {
+                        time_base.display(rhythm_item.time),
+                        match &rhythm_item.event {
                             Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
                             None => "---".to_string(),
                         }
@@ -320,7 +320,7 @@ impl SamplePlayer {
                 }
                 // play
                 let playing_notes_in_rhythm = &mut self.playing_notes[rhythm_index];
-                if let Some(Event::NoteEvents(notes)) = event {
+                if let Some(Event::NoteEvents(notes)) = rhythm_item.event {
                     for (voice_index, note_event) in notes.iter().enumerate() {
                         if let Some(note_event) = note_event {
                             // stop playing samples on this voice channel
@@ -332,7 +332,7 @@ impl SamplePlayer {
                                 {
                                     if let Err(_err) = self.player.stop_source_at_sample_time(
                                         *playback_id,
-                                        start_offset + sample_time,
+                                        time_offset + rhythm_item.time,
                                     ) {
                                         // this is expected when the sample played to end
                                     }
@@ -361,13 +361,13 @@ impl SamplePlayer {
                                             voice_index: Some(voice_index),
                                         });
                                         let sample_delay = (note_event.delay
-                                            * event_duration as f32)
+                                            * rhythm_item.duration as f32)
                                             as SampleTime;
                                         let playback_id = self
                                             .player
                                             .play_file_source_with_context(
                                                 sample,
-                                                Some(start_offset + sample_time + sample_delay),
+                                                Some(time_offset + rhythm_item.time + sample_delay),
                                                 Some(context),
                                             )
                                             .expect("Failed to play file source");

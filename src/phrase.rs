@@ -3,7 +3,7 @@
 use std::{borrow::Cow, cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
-    BeatTimeBase, BeatTimeStep, Event, InputParameter, InputParameterSet, InstrumentId, Rhythm,
+    BeatTimeBase, BeatTimeStep, InputParameter, InputParameterSet, InstrumentId, Rhythm,
     RhythmIter, RhythmIterItem, SampleTime, SampleTimeDisplay,
 };
 
@@ -123,12 +123,12 @@ impl Phrase {
     /// visitor function for all emitted events.
     pub fn consume_events_until_time<F>(&mut self, sample_time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, SampleTime, Option<Event>, SampleTime),
+        F: FnMut(RhythmIndex, RhythmIterItem),
     {
         // emit next events until we've reached the desired sample_time
-        while let Some((rhythm_index, event)) = self.next_event_until_time(sample_time) {
-            debug_assert!(event.time < sample_time);
-            consumer(rhythm_index, event.time, event.event, event.duration);
+        while let Some((rhythm_index, rhythm_item)) = self.next_event_until_time(sample_time) {
+            debug_assert!(rhythm_item.time < sample_time);
+            consumer(rhythm_index, rhythm_item);
         }
     }
 
