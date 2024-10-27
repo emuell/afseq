@@ -51,9 +51,8 @@ polymeter       = { "{" ~ sections? ~ "}" ~ polymeter_tail? }
 
 group     = _{ subdivision | alternating | polymeter }
 
-// this should actually be { expr | group | single } at some point
 /// parameter for expressions with operators
-parameter = _{ single }
+parameter = _{ expression | single | group }
 
 // target       = { (ASCII_ALPHANUMERIC | "_")+ }
 
@@ -63,9 +62,14 @@ op_weight    = ${ "@" ~ single? }
 op_degrade   = ${ "?" ~ single? }
 op_target    = ${ ":" ~ single }
 
-op_fast      = ${ "*" ~ parameter }
-op_slow      = ${ "/" ~ parameter }
-op_bjorklund = { "(" ~ (parameter ~ ",")+ ~ parameter ~ ")" }
+op_fast      = { "*" ~ parameter }
+op_slow      = { "/" ~ parameter }
+
+// this should actually be parameter as well 
+// once bjorklund with patterns on the right is implemented
+single_parameter = _{ single }
+op_bjorklund = { "(" ~ (single_parameter ~ ",")+ ~ single_parameter ~ ")" }
+
 op           = _{ op_target | op_degrade | op_replicate | op_weight | op_fast | op_slow | op_bjorklund }
 
 expression  = { (single | group) ~ op+ }
