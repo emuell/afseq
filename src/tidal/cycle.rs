@@ -1474,6 +1474,8 @@ impl Cycle {
         events.normalize_spans(&span);
         Ok(events)
     }
+
+    // helper to calculate the right multiplier for polymeter and dynamic expressions
     fn output_premultiplied(
         step: &Step,
         event: &Event,
@@ -1509,6 +1511,7 @@ impl Cycle {
         }
     }
 
+    // output a multiplied pattern expression with support for patterns on the right side
     fn output_dynamic(
         right: &Step,
         step: &Step,
@@ -1516,9 +1519,12 @@ impl Cycle {
         cycle: u32,
         limit: usize,
     ) -> Result<Events, String> {
+        // generate and flatten the events for the right side of the expression
         let events = Self::output(right, state, cycle, limit)?;
         let mut channels: Vec<Vec<Event>> = vec![];
         events.flatten(&mut channels, 0);
+
+        // extract a float to use as mult from each event and output the step with it
         let mut channel_events: Vec<Events> = Vec::with_capacity(channels.len());
         for channel in channels.into_iter() {
             let mut multi_events: Vec<Events> = Vec::with_capacity(channel.len());
@@ -1534,6 +1540,8 @@ impl Cycle {
                 events: multi_events,
             }));
         }
+
+        // put all the resulting events back together
         Ok(Events::Poly(PolyEvents {
             length: events.get_length(),
             span: events.get_span(),
