@@ -1476,38 +1476,27 @@ impl Cycle {
     }
 
     // helper to calculate the right multiplier for polymeter and dynamic expressions
-    fn output_premultiplied(
-        step: &Step,
-        event: &Event,
-        state: &mut CycleState,
-        cycle: u32,
-        limit: usize,
-    ) -> Result<Events, String> {
+    fn step_multiplier(step: &Step, value: &Value) -> Fraction {
         match step {
             Step::Polymeter(pm) => {
-                let step = pm.steps.as_ref();
                 let length = pm.length() as f64;
-                let count = event.value.to_float().unwrap_or(0.0);
-                let mult = Fraction::from(count) / Fraction::from(length);
-                Self::output_multiplied(step, state, cycle, mult, limit)
+                let count = value.to_float().unwrap_or(0.0);
+                Fraction::from(count) / Fraction::from(length)
             }
-            Step::DynamicExpression(e) => {
-                if let Some(right) = event.value.to_float() {
+            Step::DynamicExpression(e) => Fraction::from(if let Some(right) = value.to_float() {
+                if e.op == DynamicOp::Slow() {
                     if right != 0.0 {
-                        let mult = Fraction::from(if e.op == DynamicOp::Slow() {
-                            1.0 / right
-                        } else {
-                            right
-                        });
-                        Self::output_multiplied(e.left.as_ref(), state, cycle, mult, limit)
+                        1.0 / right
                     } else {
-                        Ok(Events::empty())
+                        0.0
                     }
                 } else {
-                    Ok(Events::empty())
+                    right
                 }
-            }
-            _ => Self::output_multiplied(step, state, cycle, Fraction::from(1), limit),
+            } else {
+                0.0
+            }),
+            _ => Fraction::from(1),
         }
     }
 
@@ -1519,34 +1508,49 @@ impl Cycle {
         cycle: u32,
         limit: usize,
     ) -> Result<Events, String> {
-        // generate and flatten the events for the right side of the expression
-        let events = Self::output(right, state, cycle, limit)?;
-        let mut channels: Vec<Vec<Event>> = vec![];
-        events.flatten(&mut channels, 0);
-
-        // extract a float to use as mult from each event and output the step with it
-        let mut channel_events: Vec<Events> = Vec::with_capacity(channels.len());
-        for channel in channels.into_iter() {
-            let mut multi_events: Vec<Events> = Vec::with_capacity(channel.len());
-            for event in channel {
-                let mut partial_events =
-                    Self::output_premultiplied(step, &event, state, cycle, limit)?;
-                partial_events.crop(&event.span);
-                multi_events.push(partial_events);
+        let left = match step {
+            Step::Polymeter(pm) => pm.steps.as_ref(),
+            Step::DynamicExpression(exp) => exp.left.as_ref(),
+            _ => step,
+        };
+        match right {
+            // multiply with single values to avoid generating events
+            Step::Single(single) => {
+                let mult = Self::step_multiplier(step, &single.value);
+                Self::output_multiplied(left, state, cycle, mult, limit)
             }
-            channel_events.push(Events::Multi(MultiEvents {
-                length: events.get_length(),
-                span: events.get_span(),
-                events: multi_events,
-            }));
-        }
+            _ => {
+                // generate and flatten the events for the right side of the expression
+                let events = Self::output(right, state, cycle, limit)?;
+                let mut channels: Vec<Vec<Event>> = vec![];
+                events.flatten(&mut channels, 0);
 
-        // put all the resulting events back together
-        Ok(Events::Poly(PolyEvents {
-            length: events.get_length(),
-            span: events.get_span(),
-            channels: channel_events,
-        }))
+                // extract a float to use as mult from each event and output the step with it
+                let mut channel_events: Vec<Events> = Vec::with_capacity(channels.len());
+                for channel in channels.into_iter() {
+                    let mut multi_events: Vec<Events> = Vec::with_capacity(channel.len());
+                    for event in channel {
+                        let mult = Self::step_multiplier(step, &event.value);
+                        let mut partial_events =
+                            Self::output_multiplied(left, state, cycle, mult, limit)?;
+                        partial_events.crop(&event.span);
+                        multi_events.push(partial_events);
+                    }
+                    channel_events.push(Events::Multi(MultiEvents {
+                        length: events.get_length(),
+                        span: events.get_span(),
+                        events: multi_events,
+                    }));
+                }
+
+                // put all the resulting events back together
+                Ok(Events::Poly(PolyEvents {
+                    length: events.get_length(),
+                    span: events.get_span(),
+                    channels: channel_events,
+                }))
+            }
+        }
     }
 
     // recursively output events for the entire cycle based on some state (random seed)
