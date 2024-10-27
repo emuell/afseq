@@ -56,15 +56,15 @@ parameter = _{ expression | single | group }
 
 // target       = { (ASCII_ALPHANUMERIC | "_")+ }
 
-/// operators
+/// static operators
 op_replicate = ${ "!" ~ single }
 op_weight    = ${ "@" ~ single? }
 op_degrade   = ${ "?" ~ single? }
 op_target    = ${ ":" ~ single }
 
+/// dynamic operators
 op_fast      = { "*" ~ parameter }
 op_slow      = { "/" ~ parameter }
-
 // this should actually be parameter as well 
 // once bjorklund with patterns on the right is implemented
 single_parameter = _{ single }

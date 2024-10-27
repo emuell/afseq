@@ -1379,11 +1379,6 @@ impl CycleParser {
             right: Box::new(right),
             op,
         }))
-        // ,
-        // match right {
-        //     Step::Single(_) =>
-        //     _ => Err("only single values are supported on the right hand side".to_string()),
-        // }
     }
 
     fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
