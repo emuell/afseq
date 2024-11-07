@@ -111,7 +111,7 @@ pub(crate) fn string_from_value(
     arg_index: usize,
 ) -> LuaResult<String> {
     if let Some(string) = value.as_string_lossy() {
-        Ok(string.into())
+        Ok(string)
     } else {
         Err(bad_argument_error(
             function,
@@ -130,7 +130,7 @@ pub(crate) fn optional_string_from_value(
     arg_index: usize,
 ) -> LuaResult<String> {
     if let Some(string) = value.as_string_lossy() {
-        Ok(string.into())
+        Ok(string)
     } else if value.is_nil() {
         Ok(String::new())
     } else {

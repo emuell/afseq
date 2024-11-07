@@ -303,7 +303,7 @@ impl LuaCallback {
             let result = self
                 .function
                 .call::<LuaValue>((&self.context, arg.clone()))?;
-            if let Some(inner_function) = result.as_function().cloned().map(|f| f) {
+            if let Some(inner_function) = result.as_function().cloned() {
                 // function returned a function -> is a generator. use the inner function instead.
                 let environment = self.function.environment();
                 self.environment = environment;

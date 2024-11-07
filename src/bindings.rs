@@ -638,6 +638,7 @@ fn generate_random_number<R: rand::Rng>(
     if args.is_empty() {
         Ok(rand.gen::<LuaNumber>())
     } else if args.len() == 1 {
+        #[allow(clippy::get_first)]
         let max = args.get(0).unwrap().as_integer();
         if let Some(max) = max {
             if max >= 1 {
@@ -660,6 +661,7 @@ fn generate_random_number<R: rand::Rng>(
             ))
         }
     } else if args.len() == 2 {
+        #[allow(clippy::get_first)]
         let min = args.get(0).unwrap().as_integer();
         let max = args.get(1).unwrap().as_integer();
         if let Some(min) = min {
