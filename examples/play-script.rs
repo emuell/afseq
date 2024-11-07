@@ -99,10 +99,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut watcher = notify::recommended_watcher({
         let script_files_changed = script_files_changed.clone();
-        move |res| match res {
+        move |res: Result<notify::Event, notify::Error>| match res {
             Ok(event) => {
-                log::info!("File change event: {:?}", event);
-                script_files_changed.store(true, Ordering::Relaxed);
+                if !event.kind.is_access() {
+                    log::info!("File change event: {:?}", event);
+                    script_files_changed.store(true, Ordering::Relaxed);
+                }
             }
             Err(err) => log::error!("File watch error: {}", err),
         }
