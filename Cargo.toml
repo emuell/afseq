@@ -36,7 +36,7 @@ mlua = { version = "^0.10", default-features = false, features = [
 ], optional = true }
 
 [dev-dependencies]
-notify = { version = "^6.1" }
+notify = { version = "^7.0" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
 
