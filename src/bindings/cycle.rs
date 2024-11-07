@@ -11,7 +11,7 @@ use super::unwrap::{bad_argument_error, note_events_from_value};
 pub struct CycleUserData {
     pub cycle: Cycle,
     pub mappings: Vec<(String, Vec<Option<NoteEvent>>)>,
-    pub mapping_function: Option<LuaOwnedFunction>,
+    pub mapping_function: Option<LuaFunction>,
 }
 
 impl CycleUserData {
@@ -31,12 +31,12 @@ impl CycleUserData {
 }
 
 impl LuaUserData for CycleUserData {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("map", |_lua, this, value: LuaValue| match value {
             LuaValue::Function(func) => {
                 let cycle = this.cycle.clone();
                 let mappings = Vec::new();
-                let mapping_function = Some(func.into_owned());
+                let mapping_function = Some(func);
                 Ok(CycleUserData {
                     cycle,
                     mappings,
@@ -198,7 +198,7 @@ mod test {
                 end)"#,
         )?;
         let mapping_callback =
-            LuaCallback::with_owned(&lua, mapped_cycle.mapping_function.unwrap().clone())?;
+            LuaCallback::new(&lua, mapped_cycle.mapping_function.unwrap().clone())?;
         let mut event_iter = ScriptedCycleEventIter::with_mapping_callback(
             mapped_cycle.cycle,
             &timeout_hook,

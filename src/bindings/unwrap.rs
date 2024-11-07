@@ -32,13 +32,10 @@ pub(crate) fn bad_argument_error<'a, 'b, S1: Into<Option<&'a str>>, S2: Into<Opt
 // -------------------------------------------------------------------------------------------------
 
 // Check for known table properties
-pub(crate) fn validate_table_properties(
-    table: &LuaTable<'_>,
-    properties: &[&str],
-) -> LuaResult<()> {
+pub(crate) fn validate_table_properties(table: &LuaTable, properties: &[&str]) -> LuaResult<()> {
     for (key, _) in table.clone().pairs::<LuaValue, LuaValue>().flatten() {
         if let Some(key) = key.as_str() {
-            if !properties.contains(&key) {
+            if !properties.contains(&key.as_ref()) {
                 return Err(LuaError::RuntimeError(format!(
                     "invalid/unknown table property: '{}'. valid properties are: '{}'",
                     key,
@@ -57,28 +54,28 @@ pub(crate) fn validate_table_properties(
 
 // ---------------------------------------------------------------------------------------------
 
-impl<'lua> IntoLua<'lua> for Note {
-    fn into_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+impl IntoLua for Note {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         self.to_string().into_lua(lua)
     }
 }
 
-impl<'lua> FromLua<'lua> for Note {
-    fn from_lua(value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
+impl FromLua for Note {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
         match value {
             LuaValue::Integer(note_value) => Ok(Note::from(note_value as u8)),
             LuaValue::String(str) => {
                 Note::try_from(&str.to_string_lossy() as &str).map_err(|err| {
                     LuaError::FromLuaConversionError {
                         from: "string",
-                        to: "note",
+                        to: "note".to_string(),
                         message: Some(err.to_string()),
                     }
                 })
             }
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
-                to: "note",
+                to: "note".to_string(),
                 message: Some("expected a note number or note string".to_string()),
             }),
         }
@@ -87,8 +84,8 @@ impl<'lua> FromLua<'lua> for Note {
 
 // ---------------------------------------------------------------------------------------------
 
-impl<'lua> IntoLua<'lua> for NoteEvent {
-    fn into_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+impl IntoLua for NoteEvent {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         table.set("key", self.note.into_lua(lua)?)?;
         if let Some(instrument) = self.instrument {
@@ -149,9 +146,7 @@ pub(crate) fn optional_string_from_value(
 // ---------------------------------------------------------------------------------------------
 
 // Check if a lua value is a sequence (an array alike table).
-pub(crate) fn sequence_from_value<'lua>(
-    value: &'lua LuaValue<'lua>,
-) -> Option<Vec<LuaValue<'lua>>> {
+pub(crate) fn sequence_from_value(value: &LuaValue) -> Option<Vec<LuaValue>> {
     if let Some(table) = value.as_table() {
         sequence_from_table(table)
     } else {
@@ -160,9 +155,7 @@ pub(crate) fn sequence_from_value<'lua>(
 }
 
 // Check if a lua table is a sequence (an array alike table).
-pub(crate) fn sequence_from_table<'lua>(
-    table: &'lua LuaTable<'lua>,
-) -> Option<Vec<LuaValue<'lua>>> {
+pub(crate) fn sequence_from_table(table: &LuaTable) -> Option<Vec<LuaValue>> {
     let sequence = table
         .clone()
         .sequence_values::<LuaValue>()
@@ -300,7 +293,7 @@ fn float_value_from_table<Range>(
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
-    let value = table.get::<_, LuaValue>(name)?;
+    let value = table.get::<LuaValue>(name)?;
     if value.is_nil() {
         Ok(default)
     } else if let Some(value) = value
@@ -318,14 +311,14 @@ where
     } else {
         Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "number",
+            to: "number".to_string(),
             message: Some(format!("'{}' property must be a number", name)),
         })
     }
 }
 
 pub(crate) fn instrument_value_from_table(table: &LuaTable) -> LuaResult<Option<InstrumentId>> {
-    let value = table.get::<_, LuaValue>("instrument")?;
+    let value = table.get::<LuaValue>("instrument")?;
     if value.is_nil() {
         Ok(None)
     } else if let Some(value) = value.as_integer() {
@@ -340,7 +333,7 @@ pub(crate) fn instrument_value_from_table(table: &LuaTable) -> LuaResult<Option<
     } else {
         Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "number",
+            to: "number".to_string(),
             message: Some("'instrument' property must be an integer".to_string()),
         })
     }
@@ -378,7 +371,7 @@ where
         } else {
             return Err(LuaError::FromLuaConversionError {
                 from: "string",
-                to: "number",
+                to: "number".to_string(),
                 message: Some(format!("{} property '{}' is not a number", name, str)),
             });
         }
@@ -407,7 +400,7 @@ pub(crate) fn instrument_value_from_string(str: &str) -> LuaResult<Option<Instru
     } else {
         Err(LuaError::FromLuaConversionError {
             from: "string",
-            to: "number",
+            to: "number".to_string(),
             message: Some(format!("instrument property '{}' is not a number", str)),
         })
     }
@@ -512,7 +505,7 @@ pub(crate) fn note_event_from_table_map(table: &LuaTable) -> LuaResult<Option<No
     if table.is_empty() {
         return Ok(None);
     }
-    let key = table.get::<_, LuaValue>("key")?;
+    let key = table.get::<LuaValue>("key")?;
     if key.is_nil() {
         Err(LuaError::RuntimeError(
             "missing 'key' property in note table".to_string(),
@@ -534,13 +527,13 @@ pub(crate) fn note_event_from_table_map(table: &LuaTable) -> LuaResult<Option<No
         }
         // { key = "C4", [instrument = 1, volume = 1.0, panning = 0.0, delay = 0.0] }
         else if let Some(note_str) = key.as_str() {
-            let note =
-                Note::try_from(note_str).map_err(|err| LuaError::RuntimeError(err.to_string()))?;
+            let note = Note::try_from(&*note_str)
+                .map_err(|err| LuaError::RuntimeError(err.to_string()))?;
             Ok(new_note((note, instrument, volume, panning, delay)))
         } else {
             Err(LuaError::FromLuaConversionError {
                 from: key.type_name(),
-                to: "note",
+                to: "note".to_string(),
                 message: Some("invalid 'key' property in note table".to_string()),
             })
         }
@@ -558,7 +551,7 @@ pub(crate) fn note_event_from_value(
         LuaValue::Table(table) => note_event_from_table_map(table),
         _ => Err(LuaError::FromLuaConversionError {
             from: arg.type_name(),
-            to: "note",
+            to: "note".to_string(),
             message: if let Some(index) = arg_index {
                 Some(format!("arg #{} is not a valid note property", index + 1).to_string())
             } else {
@@ -580,13 +573,13 @@ pub(crate) fn note_events_from_value(
             } else if userdata.is::<SequenceUserData>() {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
-                    to: "note",
+                    to: "note".to_string(),
                     message: Some("can't nest sequences in sequences".to_string()),
                 })
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
-                    to: "note",
+                    to: "note".to_string(),
                     message: if let Some(index) = arg_index {
                         Some(
                             format!(
@@ -691,7 +684,7 @@ pub(crate) fn chord_events_from_mode(
     } else {
         Err(LuaError::FromLuaConversionError {
             from: note.type_name(),
-            to: "note",
+            to: "note".to_string(),
             message: Some("invalid note in chord: note value is undefined".to_string()),
         })
     }
@@ -718,7 +711,7 @@ pub(crate) fn chord_events_from_intervals(
     } else {
         Err(LuaError::FromLuaConversionError {
             from: note.type_name(),
-            to: "note",
+            to: "note".to_string(),
             message: Some("invalid note in chord: note value is undefined".to_string()),
         })
     }
@@ -743,7 +736,7 @@ pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "string",
-                    to: "pattern pulse",
+                    to: "pattern pulse".to_string(),
                     message: Some("Invalid pattern pulse string value".to_string()),
                 })
             }
@@ -758,7 +751,7 @@ pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "pattern pulse",
+            to: "pattern pulse".to_string(),
             message: Some("Invalid pattern pulse value".to_string()),
         }),
     }
@@ -778,7 +771,7 @@ pub(crate) fn pattern_repeat_count_from_value(value: &LuaValue) -> LuaResult<Opt
     } else {
         Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "repeats",
+            to: "repeats".to_string(),
             message: Some("must be a boolean or integer value > 0".to_string()),
         })
     }
@@ -803,14 +796,14 @@ pub fn gate_trigger_from_value(value: &LuaValue) -> LuaResult<bool> {
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "string",
-                    to: "gate value",
+                    to: "gate value".to_string(),
                     message: Some("Invalid boolean gate string value".to_string()),
                 })
             }
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "gate value",
+            to: "gate value".to_string(),
             message: Some("Invalid boolean gate value".to_string()),
         }),
     }
@@ -826,7 +819,7 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
             if parameter_id.is_empty() {
                 return Err(LuaError::FromLuaConversionError {
                     from: "user_data",
-                    to: "input parameter",
+                    to: "input parameter".to_string(),
                     message: Some("Parameter id's can not be empty.".to_string()),
                 });
             }
@@ -834,7 +827,7 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
             if parameters.iter().any(|p| p.borrow().id() == parameter_id) {
                 return Err(LuaError::FromLuaConversionError {
                     from: "user_data",
-                    to: "input parameter",
+                    to: "input parameter".to_string(),
                     message: Some(format!(
                         "Parameter id's must be unique: an input with id '{}' already exists.",
                         parameter_id
@@ -845,7 +838,7 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
         } else {
             return Err(LuaError::FromLuaConversionError {
                 from: "user_data",
-                to: "input parameter",
+                to: "input parameter".to_string(),
                 message: Some("Invalid input parameter".to_string()),
             });
         }
@@ -877,7 +870,7 @@ pub(crate) fn pattern_from_value(
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "pattern",
+            to: "pattern".to_string(),
             message: Some("pattern must either be an array or a function".to_string()),
         }),
     }
@@ -899,7 +892,7 @@ pub(crate) fn gate_from_value(
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "gate",
+            to: "gate".to_string(),
             message: Some("gate must either be nil or a function".to_string()),
         }),
     }
@@ -925,7 +918,7 @@ pub(crate) fn event_iter_from_value(
                 let userdata = userdata.borrow::<CycleUserData>()?;
                 let cycle = userdata.cycle.clone();
                 if let Some(mapping_function) = userdata.mapping_function.clone() {
-                    let mapping_callback = LuaCallback::with_owned(lua, mapping_function)?;
+                    let mapping_callback = LuaCallback::new(lua, mapping_function)?;
                     let event_iter = ScriptedCycleEventIter::with_mapping_callback(
                         cycle,
                         timeout_hook,
@@ -941,7 +934,7 @@ pub(crate) fn event_iter_from_value(
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
-                    to: "note",
+                    to: "note".to_string(),
                     message: Some("given user data can't be converted to a note array".to_string()),
                 })
             }

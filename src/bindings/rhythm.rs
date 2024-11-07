@@ -31,7 +31,7 @@ pub(crate) fn rhythm_from_userdata(
             )))
         } else {
             Err(LuaError::ToLuaConversionError {
-                from: "userdata",
+                from: "userdata".to_string(),
                 to: "rhythm",
                 message: Some(
                     "Expected script to return a rhythm, got some other userdata".to_string(),
@@ -40,7 +40,7 @@ pub(crate) fn rhythm_from_userdata(
         }
     } else {
         Err(LuaError::ToLuaConversionError {
-            from: "userdata",
+            from: "userdata".to_string(),
             to: "rhythm",
             message: Some(format!(
                 "Expected script to return a rhythm, got {}",

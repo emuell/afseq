@@ -23,10 +23,9 @@ pub struct NoteUserData {
 impl NoteUserData {
     pub fn from(args: LuaMultiValue) -> LuaResult<Self> {
         // a single value, probably a sequence
-        let args = args.into_vec();
         if args.len() == 1 {
             let arg = args
-                .first()
+                .front()
                 .ok_or(LuaError::RuntimeError(
                     "Failed to access table content".to_string(),
                 ))
@@ -76,7 +75,7 @@ impl NoteUserData {
 }
 
 impl LuaUserData for NoteUserData {
-    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("notes", |lua, this| -> LuaResult<LuaTable> {
             let sequence = lua.create_table()?;
             for (index, note_event) in this.notes.iter().enumerate() {
@@ -90,7 +89,7 @@ impl LuaUserData for NoteUserData {
         });
     }
 
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_function(
             "transpose",
             |lua, (ud, value): (LuaAnyUserData, LuaValue)| {
