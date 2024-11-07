@@ -98,25 +98,24 @@ impl ContextPlaybackState {
 /// too, but this uses debug functionality and may break some upvalues.
 #[derive(Debug, Clone)]
 pub(crate) struct LuaCallback {
-    environment: Option<LuaOwnedTable>,
-    context: LuaOwnedAnyUserData,
-    generator: Option<LuaOwnedFunction>,
-    function: LuaOwnedFunction,
+    environment: Option<LuaTable>,
+    context: LuaAnyUserData,
+    generator: Option<LuaFunction>,
+    function: LuaFunction,
     initialized: bool,
+    #[allow(unused)]
+    lua: Lua,
 }
 
 impl LuaCallback {
-    /// Create a new Callback from an unowned lua function.
+    /// Create a new Callback from a lua function.
     pub fn new(lua: &Lua, function: LuaFunction) -> LuaResult<Self> {
-        Self::with_owned(lua, function.into_owned())
-    }
-
-    /// Create a new Callback from an owned lua function.
-    pub fn with_owned(lua: &Lua, function: LuaOwnedFunction) -> LuaResult<Self> {
+        // create a strong lua ref, to ensure the function stays valid
+        let lua = lua.clone();
         // create a new callback context
-        let context = lua.create_userdata(CallbackContext::new())?.into_owned();
+        let context = lua.create_userdata(CallbackContext::new())?;
         // and memorize the function without calling it
-        let environment = function.to_ref().environment().map(LuaTable::into_owned);
+        let environment = function.environment();
         let generator = None;
         let initialized = false;
         Ok(Self {
@@ -125,6 +124,7 @@ impl LuaCallback {
             generator,
             function,
             initialized,
+            lua,
         })
     }
 
@@ -142,7 +142,6 @@ impl LuaCallback {
     /// Name of the inner function for errors. Usually will be an anonymous function.
     pub fn name(&self) -> String {
         self.function
-            .to_ref()
             .info()
             .name
             .unwrap_or("anonymous function".to_string())
@@ -296,30 +295,20 @@ impl LuaCallback {
     }
 
     /// Invoke the Lua function or generator with an additional argument and return its result as LuaValue.
-    pub fn call_with_arg<'lua, A: IntoLua<'lua> + Clone>(
-        &'lua mut self,
-        arg: A,
-    ) -> LuaResult<LuaValue<'lua>> {
+    pub fn call_with_arg<A: IntoLua + Clone>(&mut self, arg: A) -> LuaResult<LuaValue> {
         if self.initialized {
             self.function.call((&self.context, arg))
         } else {
             self.initialized = true;
-            let result = {
-                // HACK: don't borrow self here, so we can borrow mut again to assign the generator function
-                // see https://stackoverflow.com/questions/73641155/how-to-force-rust-to-drop-a-mutable-borrow
-                let function = unsafe { &*(&self.function as *const LuaOwnedFunction) };
-                function.call::<_, LuaValue>((&self.context, arg.clone()))?
-            };
-            if let Some(inner_function) = result.as_function().cloned().map(|f| f.into_owned()) {
+            let result = self
+                .function
+                .call::<LuaValue>((&self.context, arg.clone()))?;
+            if let Some(inner_function) = result.as_function().cloned().map(|f| f) {
                 // function returned a function -> is a generator. use the inner function instead.
-                let environment = self
-                    .function
-                    .to_ref()
-                    .environment()
-                    .map(LuaTable::into_owned);
+                let environment = self.function.environment();
                 self.environment = environment;
                 self.generator = Some(std::mem::replace(&mut self.function, inner_function));
-                self.function.call::<_, LuaValue>((&self.context, arg))
+                self.function.call::<LuaValue>((&self.context, arg))
             } else {
                 // function returned some value. use this function directly.
                 self.environment = None;
@@ -342,14 +331,12 @@ impl LuaCallback {
             if let Some(function_generator) = &self.generator {
                 // restore generator environment
                 if let Some(env) = &self.environment {
-                    function_generator.to_ref().set_environment(env.to_ref())?;
+                    function_generator.set_environment(env.clone())?;
                 }
                 // then fetch a new fresh function from the generator
-                let value = function_generator
-                    .to_ref()
-                    .call::<_, LuaValue>(&self.context)?;
+                let value = function_generator.call::<LuaValue>(&self.context)?;
                 if let Some(function) = value.as_function() {
-                    self.function = function.clone().into_owned();
+                    self.function = function.clone();
                 } else {
                     return Err(LuaError::runtime(format!(
                         "Failed to reset custom generator function '{}' \
@@ -387,11 +374,11 @@ impl CallbackContext {
 }
 
 impl LuaUserData for CallbackContext {
-    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_meta_field_with("__index", |lua| {
             lua.create_function(|lua, (this, key): (LuaUserDataRef<Self>, LuaString)| {
                 // values (most likely, least overhead)
-                if let Some(value) = this.values.get(key.as_bytes()) {
+                if let Some(value) = this.values.get(key.as_bytes().as_ref()) {
                     value.into_lua(lua)
                 }
                 // inputs value table (also likely, small overhead)
@@ -400,8 +387,7 @@ impl LuaUserData for CallbackContext {
                         .into_lua(lua)
                 }
                 // external values
-                else if let Some(value) = this.external_values.get(key.to_string_lossy().as_ref())
-                {
+                else if let Some(value) = this.external_values.get(key.to_str()?.as_ref()) {
                     value.into_lua(lua)
                 } else {
                     Err(mlua::Error::RuntimeError(format!(
@@ -439,11 +425,11 @@ impl CallbackInputsContext {
 }
 
 impl LuaUserData for CallbackInputsContext {
-    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_meta_field_with("__index", |lua| {
             lua.create_function(
                 |lua, (this, key): (mlua::UserDataRef<Self>, mlua::String)| {
-                    if let Some(parameter) = this.parameters_map.get(key.as_bytes()) {
+                    if let Some(parameter) = this.parameters_map.get(key.as_bytes().as_ref()) {
                         Ok(parameter.borrow().lua_value(lua)?)
                     } else {
                         Err(mlua::Error::RuntimeError(format!(
@@ -473,8 +459,8 @@ enum ContextValue {
     String(&'static [u8]),
 }
 
-impl<'lua> IntoLua<'lua> for &ContextValue {
-    fn into_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+impl IntoLua for &ContextValue {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         match *self {
             ContextValue::Number(num) => Ok(LuaValue::Number(num)),
             ContextValue::String(str) => Ok(LuaValue::String(lua.create_string(str)?)),
@@ -543,13 +529,13 @@ mod test {
                 r#"
                 return rhythm {
                     unit = "seconds",
-                    pattern = function(context) 
-                      return (context.pulse_step == 2) and 0 or 1 
+                    pattern = function(context)
+                      return (context.pulse_step == 2) and 0 or 1
                     end,
                     emit = function(context)
                       local notes = {"c4", "d#4", "g4"}
                       local step = 1
-                      return function(context) 
+                      return function(context)
                         local note = notes[step - 1 % #notes + 1]
                         step = step + 1
                         return note

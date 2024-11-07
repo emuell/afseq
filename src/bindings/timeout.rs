@@ -64,7 +64,7 @@ impl LuaTimeoutHook {
                         if remove_hook {
                             lua.remove_hook();
                         }
-                        Ok(())
+                        Ok(LuaVmState::Continue)
                     }
                     Err(err) => Err(err),
                 },
@@ -78,7 +78,7 @@ impl LuaTimeoutHook {
                     if remove_hook {
                         lua.remove_interrupt();
                     }
-                    Ok(mlua::VmState::Continue)
+                    Ok(LuaVmState::Continue)
                 }
                 Err(err) => Err(err),
             });

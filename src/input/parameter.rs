@@ -267,7 +267,7 @@ impl Parameter {
 
     /// Lua value representation of the internal value, depending on the parameter type.
     #[cfg(feature = "scripting")]
-    pub fn lua_value<'lua>(&self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+    pub fn lua_value(&self, lua: &Lua) -> LuaResult<LuaValue> {
         match self.parameter_type {
             ParameterType::Boolean => {
                 if self.value > 0.5 {

@@ -176,7 +176,7 @@ fn register_global_bindings(
             |lua, (note, mode_or_intervals): (LuaValue, LuaValue)| -> LuaResult<Scale> {
                 let note = FromLua::from_lua(note, lua)?;
                 if let Some(mode) = mode_or_intervals.as_str() {
-                    match Scale::try_from((note, mode)) {
+                    match Scale::try_from((note, mode.as_ref())) {
                         Ok(scale) => Ok(scale),
                         Err(err) => Err(bad_argument_error(
                             "scale",
@@ -278,7 +278,7 @@ fn register_global_bindings(
                 ];
                 validate_table_properties(&table, &RHYTHM_PROPERTIES)?;
                 // check which time unit is specified
-                let second_time_unit = match table.get::<&str, String>("unit") {
+                let second_time_unit = match table.get::<String>("unit") {
                     Ok(unit) => matches!(unit.as_str(), "seconds" | "ms"),
                     Err(_) => false,
                 };
@@ -356,8 +356,8 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 })? as i32;
                 let range = {
                     if let Some(range) = range {
-                        let start = range.get::<LuaInteger, LuaInteger>(1)? as i32;
-                        let end = range.get::<LuaInteger, LuaInteger>(2)? as i32;
+                        let start = range.get::<LuaInteger>(1)? as i32;
+                        let end = range.get::<LuaInteger>(2)? as i32;
                         start..=end
                     } else {
                         0..=100
@@ -422,8 +422,8 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                     })? as f64;
                 let range = {
                     if let Some(range) = range {
-                        let start = range.get::<LuaInteger, f64>(1)?;
-                        let end = range.get::<LuaInteger, f64>(2)?;
+                        let start = range.get::<f64>(1)?;
+                        let end = range.get::<f64>(2)?;
                         start..=end
                     } else {
                         0.0..=1.0
@@ -503,13 +503,13 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
         )?,
     )?;
 
-    lua.globals().set::<_, LuaTable>("parameter", parameter)?;
+    lua.globals().set("parameter", parameter)?;
 
     Ok(())
 }
 
 fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
-    let math = lua.globals().get::<_, LuaTable>("math")?;
+    let math = lua.globals().get::<LuaTable>("math")?;
 
     // cache module bytecode to speed up initialization
     lazy_static! {

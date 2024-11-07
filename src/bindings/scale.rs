@@ -10,17 +10,16 @@ use super::{
 // ---------------------------------------------------------------------------------------------
 
 impl LuaUserData for Scale {
-    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("notes", |lua, this| -> LuaResult<LuaTable> {
             lua.create_sequence_from(this.notes().iter().map(|n| LuaInteger::from(*n as u8)))
         });
     }
 
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method(
             "chord",
             |lua, this, args: LuaMultiValue| -> LuaResult<LuaTable> {
-                let args = args.into_vec();
                 // parse degree
                 let mut degree = 1;
                 #[allow(clippy::get_first)]
@@ -99,32 +98,30 @@ impl LuaUserData for Scale {
         methods.add_method(
             "degree",
             |_lua, this, args: LuaMultiValue| -> LuaResult<LuaMultiValue> {
-                let args = args.into_vec();
-                let mut ret = Vec::new();
+                let mut ret = LuaMultiValue::new();
                 for (arg_index, arg) in args.iter().enumerate() {
                     let degree = note_degree_from_value(arg, arg_index)?;
                     if let Some(note) = this.notes_iter().nth(degree - 1) {
-                        ret.push(LuaValue::Integer(u8::from(note) as LuaInteger));
+                        ret.push_back(LuaValue::Integer(u8::from(note) as LuaInteger));
                     }
                 }
-                Ok(LuaMultiValue::from_vec(ret))
+                Ok(ret)
             },
         );
 
         methods.add_method(
             "fit",
             |_lua, this, args: LuaMultiValue| -> LuaResult<LuaMultiValue> {
-                let args = args.into_vec();
-                let mut ret = Vec::new();
+                let mut ret = LuaMultiValue::new();
                 for (arg_index, arg) in args.iter().enumerate() {
                     if let Some(note_event) = note_event_from_value(arg, Some(arg_index))? {
                         let fit_note = this.transpose(note_event.note, 0);
-                        ret.push(LuaValue::Integer(u8::from(fit_note) as LuaInteger));
+                        ret.push_back(LuaValue::Integer(u8::from(fit_note) as LuaInteger));
                     } else {
-                        ret.push(LuaValue::Nil);
+                        ret.push_back(LuaValue::Nil);
                     }
                 }
-                Ok(LuaMultiValue::from_vec(ret))
+                Ok(ret)
             },
         );
     }
@@ -285,7 +282,6 @@ mod test {
             "#
             )
             .eval::<LuaMultiValue>()?
-            .into_vec()
             .iter()
             .map(|v| v.as_i32().unwrap_or(0))
             .collect::<Vec<i32>>(),
@@ -300,7 +296,6 @@ mod test {
             "#
             )
             .eval::<LuaMultiValue>()?
-            .into_vec()
             .iter()
             .map(|v| v.as_i32().unwrap_or(0))
             .collect::<Vec<i32>>(),
@@ -320,7 +315,6 @@ mod test {
                 return cmin:fit("c4", 50, { key = 54 })"#
             )
             .eval::<LuaMultiValue>()?
-            .into_vec()
             .iter()
             .map(|v| v.as_i32().unwrap())
             .collect::<Vec<i32>>(),
