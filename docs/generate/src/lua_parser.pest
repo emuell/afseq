@@ -1,0 +1,63 @@
+WHITESPACE = _{ " " | "\t" | "\u{A0}" | "\n" }
+W = _{ WHITESPACE* }
+
+lua_type = ${("integer" | "number" | "string" | "table" | "nil" | "any" | "boolean" | "function" | "userdata" | "unknown" | "fun()") ~ !(ASCII_ALPHANUMERIC)}
+
+valid_name = @{ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" )*}
+
+id = @{ valid_name ~ ("." ~ valid_name)*}
+string = { (!"\"" ~ ANY)* }
+string_literal = ${"\"" ~ string ~ "\""}
+number_literal = ${ ASCII_DIGIT+ }
+
+_value = _{ number_literal | string_literal }
+
+_simple = _{ lua_type | _value | id }
+
+
+_key = _{("[" ~ number_literal ~ "]") | ("[" ~ "string" ~ "]") | id}
+field  = ${ _key ~ W ~ ":" ~ W ~ _enum_or_complex }
+
+object = ${"{" ~ W ~ field ~ W ~ (","  ~ W ~ field )* ~ W ~ "}"}
+
+table_type = { "table" ~ "<" ~ complex_type ~ ", " ~ _enum_or_complex ~ ">"}
+
+array_tail = {"[]"}
+nullable_tail = {"?"}
+
+_types = _{ fun | function | method | table_type | object | _grouped | _simple }
+
+complex_type = ${ _types ~ (nullable_tail | array_tail)* }
+
+enumeration = { complex_type ~ ("|" ~ complex_type)+ }
+
+_enum_or_complex = _{ enumeration | complex_type }
+
+_grouped = _{ "(" ~ _enum_or_complex ~ ")" }
+
+named_var = ${ valid_name ~ nullable_tail? ~ W ~ ":" ~ W ~ _enum_or_complex}
+
+_arg = _{named_var | (valid_name ~ nullable_tail?)}
+vararg = ${"..." ~ W ~ _enum_or_complex}
+
+_return_type = _{ named_var | _enum_or_complex }
+returns = ${_return_type ~ W ~ ("," ~ W ~ _return_type)*}
+
+// TODO varargs should only be allowed at the end and only once
+args = ${ "(" ~ (vararg | (_arg ~ W ~ ("," ~ W ~ (_arg | vararg))*))? ~ ")"}
+
+// "fun(x: integer, ...integer): integer, string"
+fun = {"fun" ~  args ~ ( ":" ~ returns )?}
+
+// parse LUALS views for functions and methods
+// if this was a pure lua-doc parser these wouldn't be here
+
+// "function bit.bnot(x: integer, ...integer)\n  -> integer"
+function = {"function" ~ " " ~ id ~  args ~ ("\n" ~ "->" ~ returns)?}
+
+// "(method) renoise.Song:pattern(index: integer, ...integer)\n  -> renoise.Pattern"
+method = ${"(method)" ~ W ~ id ~ ":" ~ valid_name ~ args ~ ("\n"  ~ W ~ "->" ~ W ~ returns)?}
+
+// --------------------------------------------------------
+
+type_def = { SOI ~ _enum_or_complex ~ EOI }

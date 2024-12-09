@@ -17,5 +17,8 @@
     "Lua.workspace.library": [
         "types/nerdo"
     ],
+    "Lua.workspace.ignoreDir": [
+        "docs"
+    ],
     "Lua.hint.arrayIndex": "Disable"
 }
