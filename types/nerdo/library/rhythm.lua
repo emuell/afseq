@@ -28,11 +28,11 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---Transport & playback time context passed to `pattern`, `gate` and `emit` functions.
 ---@class TimeContext : TriggerContext
 ---
------Project's tempo in beats per minutes.
+---Project's tempo in beats per minutes.
 ---@field beats_per_min number
------Project's beats per bar setting.
+---Project's beats per bar setting.
 ---@field beats_per_bar integer
------Project's sample rate in samples per second.
+---Project's sample rate in samples per second.
 ---@field samples_per_sec integer
 
 ----------------------------------------------------------------------------------------------------
@@ -124,7 +124,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern,
 ---gate, emitter or cycle map generator functions.
 ---
----## examples:
+---### examples:
 ---```lua
 ----- trigger a single note as specified by input parameter 'note'
 ----- when input parameter 'enabled' is true, else triggers nothing.
@@ -163,12 +163,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```lua
 ----- a fixed pattern
 ---pattern = { 1, 0, 0, 1 }
------ maybe trigger with probabilities
----pattern = { 1, 0, 0.5, 0.9 }
 ----- "cram" pulses into a single pulse slot via subdivisions
 ---pattern = { 1, { 1, 1, 1 } }
 ---
------ fixed patterns created via "patterns"
+----- fixed patterns created via the "patterns" lib
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
@@ -179,10 +177,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ----- stateful generator function
 ---pattern = function(context)
----  local my_pattern = table.create({0, 6, 10})
----  ---@param context EmitterContext
+---  local triggers = table.create({0, 6, 10})
+---  ---@param context PatternContext
 ---  return function(context)
----    return my_pattern:find((context.step - 1) % 16) ~= nil
+---    return triggers:find((context.step - 1) % 16) ~= nil
 ---  end
 ---end
 ---
@@ -221,7 +219,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  return context.pulse_value > math.random()
 ---end
 ---```
----@field gate Pulse[]|(fun(context: GateContext):boolean)|(fun(context: GateContext):fun(context: GateContext):boolean)?
+---@field gate (fun(context: GateContext):boolean)|(fun(context: GateContext):fun(context: GateContext):boolean)?
 ---
 ---Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the event
 ---from the specified emit sequence. When the end of the sequence is reached, it starts again from
@@ -244,7 +242,6 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---emit = sequence{"c4", "g4"}:volume(0.5)
 ---
 ----- stateless generator function
------ a function
 ---emit = function(context)
 ---  return 48 + math.random(1, 4) * 5
 ---end
