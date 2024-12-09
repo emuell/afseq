@@ -18,4 +18,4 @@ sed -i.bak -e '/if \#view > 200 then/,/end/s/^/-- /' "script/vm/infer.lua"
 popd # lua-language-server
 
 echo "generating api docs..."
-cargo run -- ../definitions/library ../docs
+cargo run -- "../../types/nerdo/library" "../src"
