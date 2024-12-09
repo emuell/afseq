@@ -71,10 +71,9 @@ local Cycle = {}
 ---  end
 ---end)
 ---```
----@param map { [string]: CycleMapNoteValue }
+---@param map { [string]: CycleMapNoteValue }|CycleMapFunction|CycleMapGenerator
 ---@return Cycle
 ---@nodiscard
----@overload fun(self, function: CycleMapFunction|CycleMapGenerator): Cycle
 function Cycle:map(map) end
 
 ----------------------------------------------------------------------------------------------------

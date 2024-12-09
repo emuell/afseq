@@ -250,7 +250,7 @@ end
 ---local p = pattern.from{1,2,3,4}
 ---local v1, v2, v3, v4 = p:unpack()
 ---```
----@return (PulseValue)[]
+---@return PulseValue ...
 ---@nodiscard
 function pattern.unpack(self)
   return table.unpack(self)

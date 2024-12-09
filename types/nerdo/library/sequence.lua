@@ -78,8 +78,10 @@ function Sequence:delay(delay) end
 ---
 ---### examples:
 ---```lua
----sequence(48, "c5", {}) -- sequence of C4, C5 and an empty note
----sequence("c4'maj", "g4'maj"):transpose(5) -- sequence of a +5 transposed C4 and G4 major chord
+----- sequence of C4, C5 and an empty note
+---sequence(48, "c5", {})
+----- sequence of a +5 transposed C4 and G4 major chord
+---sequence("c4'maj", "g4'maj"):transpose(5)
 --- ```
 ---@param ... NoteValue|Note
 ---@return Sequence
