@@ -12,9 +12,7 @@ It is based on [matt-allan's](https://github.com/matt-allan) [mdbook-luacat](htt
 - [rust](https://www.rust-lang.org/tools/install) v1.56 or higher
 - [LuaLS](https://github.com/luals/lua-language-server) installation
 
-Note: The LuaLS installation must be placed into the folder [./lua-language-server](./lua-language-server) folder and **must be patched**. 
-
-See [build.sh](./build.sh) for details.
+Note: The LuaLS installation must be placed into the folder [./lua-language-server](./lua-language-server) folder and **must be patched**. Use [get-lua-ls.sh](./get-lua-ls.sh) to do so before building!
 
 ### Building
 
@@ -31,7 +29,7 @@ mdbook serve
 
 ---
 
-Alternatively, if you have vscode installed, open the XRNX repository folder and use the provided build task to build the API and the book:
+Alternatively, if you have vscode installed, open the afseq `./docs` folder and use the provided build task to build the API and the book:
 
 - `build: API Docs`: compiles and runs the API docs generator
 - `build: book`: compiles the mdbook
@@ -40,6 +38,6 @@ Alternatively, if you have vscode installed, open the XRNX repository folder and
 
 ## Debugging
 
-If you have vscode installed, open the XRNX root repository folder in vscode and use the `Debug: 'Generate API'` launch action.
+If you have vscode installed, open the afseq `./docs` folder in vscode and use the `Debug: 'Generate API'` launch action.
 
 To debug and build the full API definition, change the launch arguments in the file [.vscode/launch.json](../.vscode/launch.json).

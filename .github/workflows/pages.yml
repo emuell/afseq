@@ -1,4 +1,4 @@
-name: Build and Deploy mdBook
+name: Build & Deploy Docs
 
 on:
   # automatically update docs when pushing to master
@@ -19,11 +19,17 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Build the book
+      - name: Generate API
         run: |
           cd docs
-          ./generate/build.sh "3.9.3"
-          cargo install mdbook mdbook-linkcheck mdbook-toc mdbook-alerts
+          ./generate/get-lua-ls.sh
+          cargo run -- "../types/nerdo/library" "./src"
+
+      - name: Build
+        run: |
+          cd docs
+          cargo install mdbook --no-default-features --features search --vers "^0.4" --locked
+          cargo install mdbook-linkcheck mdbook-toc mdbook-alerts
           mdbook build
 
       - name: Upload
