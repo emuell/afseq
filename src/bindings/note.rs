@@ -354,6 +354,11 @@ mod test {
         assert!(evaluate_note_userdata(&lua, r#"note("c4'maj'")"#).is_err());
         assert!(evaluate_note_userdata(&lua, r#"note("c4'maj xx")"#).is_err());
 
+        assert!(
+            evaluate_note_userdata(&lua, r#"note(string.format("c4'%s", chord_names()[1]))"#)
+                .is_ok()
+        );
+
         assert_eq!(
             evaluate_note_userdata(&lua, r#"note("c'maj")"#)?.notes,
             vec![new_note("c4"), new_note("e4"), new_note("g4"),]

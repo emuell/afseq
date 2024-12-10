@@ -49,7 +49,7 @@ function Scale:degree(...) end
 
 ---Create an iterator function that returns up to `count` notes from the scale.
 ---If the count exceeds the number of notes in the scale, then notes from the next
----octave are taken. 
+---octave are taken.
 ---
 ---The iterator function returns nil when the maximum number of MIDI notes has been
 ---reached, or when the given optional `count` parameter has been exceeded.
@@ -83,12 +83,12 @@ function Scale:fit(...) end
 
 ----------------------------------------------------------------------------------------------------
 
----Available scales.
+---Available scale mode names.
 ---@alias ScaleMode "chromatic"|"major"|"minor"|"natural major"|"natural minor"|"pentatonic major"|"pentatonic minor"|"pentatonic egyptian"|"blues major"|"blues minor"|"whole tone"|"augmented"|"prometheus"|"tritone"|"harmonic major"|"harmonic minor"|"melodic minor"|"all minor"|"dorian"|"phrygian"|"phrygian dominant"|"lydian"|"lydian augmented"|"mixolydian"|"locrian"|"locrian major"|"super locrian"|"neapolitan major"|"neapolitan minor"|"romanian minor"|"spanish gypsy"|"hungarian gypsy"|"enigmatic"|"overtone"|"diminished half"|"diminished whole"|"spanish eight-tone"|"nine-tone"|string
 
 ---Create a new scale from the given key notes and a mode name.
 ---
----Scale names can also be shortened by using the following synonyms:
+---Mode names can also be shortened by using the following synonyms:
 ---- "8-tone" -> "eight-tone"
 ---- "9-tone" -> "nine-tone"
 ---- "aug" -> "augmented"
@@ -125,3 +125,7 @@ function scale(key, mode) end
 ---@return Scale
 ---@nodiscard
 function scale(key, intervals) end
+
+---Return supported scale mode names.
+---@return string[]
+function scale_names() end

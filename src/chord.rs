@@ -162,7 +162,7 @@ lazy_static! {
             ("minorMajor7", Vec::from(MINOR_MAJOR7)),
             ("minMaj7", Vec::from(MINOR_MAJOR7)),
             ("mM7", Vec::from(MINOR_MAJOR7)),
-            ("−^7", Vec::from(MINOR_MAJOR7)),
+            ("-^7", Vec::from(MINOR_MAJOR7)),
             ("five", Vec::from(FIVE)),
             ("5", Vec::from(FIVE)),
             ("sus2", Vec::from(SUS2)),
@@ -183,12 +183,32 @@ pub fn chords() -> HashMap<&'static str, Vec<u8>> {
 }
 
 /// return list of all known chord names.
-pub fn chord_names() -> String {
-    CHORD_TABLE
+pub fn chord_names() -> Vec<String> {
+    let mut chords = CHORD_TABLE
         .keys()
         .map(|name| String::from(*name))
-        .collect::<Vec<_>>()
-        .join(", ")
+        .collect::<Vec<_>>();
+    chords.sort();
+    chords
+}
+
+/// return list of all known chord names with unique intervals.
+pub fn unique_chord_names() -> Vec<String> {
+    let mut unique_chords = CHORD_TABLE.iter().collect::<Vec<_>>();
+    // prefere longer names, then dedup
+    unique_chords.sort_by(|(an, _), (bn, _)| bn.len().cmp(&an.len()));
+    unique_chords.sort_by(|(_, ai), (_, bi)| ai.cmp(bi));
+    // dedup, but keep add/dom duplicates
+    unique_chords.dedup_by(|(an, ai), (_, bi)| {
+        ai == bi && !(an.starts_with("dom") || an.starts_with("add"))
+    });
+    // get names and sort
+    let mut chords = unique_chords
+        .into_iter()
+        .map(|(name, _)| String::from(*name))
+        .collect::<Vec<_>>();
+    chords.sort();
+    chords
 }
 
 /// return chord intervals for the given chord string or []
@@ -241,8 +261,8 @@ impl TryFrom<&str> for Chord {
                 }
                 let note = Note::try_from(note_part)?;
                 let intervals = CHORD_TABLE.get(chord_part).ok_or(format!(
-                    "invalid mode, valid modes are: {}",
-                    chord_names()
+                    "invalid chord mode, valid modes are: {}",
+                    chord_names().join(",")
                 ))?;
                 return Ok(Self::new(note, intervals.clone()));
             }
@@ -263,7 +283,7 @@ where
     fn try_from((note, mode): (N, &str)) -> Result<Self, String> {
         let intervals = CHORD_TABLE.get(mode).ok_or(format!(
             "Invalid chord mode, valid chords are: {}",
-            chord_names()
+            chord_names().join(",")
         ))?;
         Ok(Self::new(note, intervals.clone()))
     }
