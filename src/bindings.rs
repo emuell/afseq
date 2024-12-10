@@ -22,6 +22,7 @@ use self::{
 };
 
 use crate::{
+    chord::unique_chord_names,
     event::InstrumentId,
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::BeatTimeBase,
@@ -218,6 +219,13 @@ fn register_global_bindings(
         )?,
     )?;
 
+    globals.raw_set(
+        "scale_names",
+        lua.create_function(|lua, _args: ()| -> LuaResult<LuaTable> {
+            lua.create_sequence_from(Scale::mode_names())
+        })?,
+    )?;
+
     // function note(args...)
     globals.raw_set(
         "note",
@@ -234,6 +242,14 @@ fn register_global_bindings(
                 NoteUserData::from_chord(&note, &mode_or_intervals)
             },
         )?,
+    )?;
+
+    // function chord_names()
+    globals.raw_set(
+        "chord_names",
+        lua.create_function(|lua, _args: LuaMultiValue| -> LuaResult<LuaTable> {
+            lua.create_sequence_from(unique_chord_names())
+        })?,
     )?;
 
     // function sequence(args...)

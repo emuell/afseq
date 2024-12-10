@@ -153,6 +153,12 @@ mod test {
     fn scale() -> LuaResult<()> {
         let lua = new_test_engine()?;
 
+        // scale_names ()
+        assert!(lua
+            .load(r#"scale_names()[1]"#)
+            .eval::<LuaString>()
+            .is_ok_and(|v| v.to_str().is_ok_and(|s| s == "chromatic")));
+
         // Scale (note, mode_name)
         assert!(lua
             .load(r#"scale("c", "wurst")"#)
