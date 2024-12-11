@@ -1,6 +1,6 @@
 # Parameters
 
-Rhythm [`inputs`](../API/rhythm.md#inputs) allow user-defined parameter values to be injected into a rhythm. This allows you to write more flexible rhythms that can be used as templates or to automate functions within the rhythm.
+Rhythm [`inputs`](../API/rhythm.md#inputs) allow user controlled parameter values to be injected into a rhythm. This allows you to write more flexible rhythms that can be used as templates or to automate functions within the rhythm.
 
 Parameters can be accessed in dynamic pattern, gate, emitter or cycle function [`contexts`](../API/rhythm.md#EmitterContext).
 
@@ -23,10 +23,14 @@ Definition:
 
 Usage:
 
-» `emit = function(context) context.enabled and "c5" or nil }`
+» `emit = function(context) context.inputs.enabled and "c5" or nil }`
+
+Usage, if you've got spaces in your ids (not recommended):
+
+» `emit = function(context) context.inputs["enabled"] and "c5" or nil }`
+
 
 ## Examples
-
 
 Euclidean pattern generator with user configurable steps, pulses, offset value.
 
