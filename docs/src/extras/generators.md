@@ -40,7 +40,7 @@ A `context` passed to *pattern* functions only contains the global playback stat
 
 See [pattern context API](../API/rhythm.md#PatternContext), [gate context API](../API/rhythm.md#GateContext), [emitter context API](../API/rhythm.md#EmitterContext) for details.
 
-Contexts also may contain user defined input variables. See [parameters](../guide/parameters.md) for more info about this. 
+Contexts also may contain user controlled input variables. See [parameters](../guide/parameters.md) for more info about this. 
 
 By making use of the context we can now rewrite the example above to:
 

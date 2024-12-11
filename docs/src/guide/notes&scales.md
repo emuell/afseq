@@ -6,9 +6,21 @@ Note values, such as those specified in the [emitter](./emitter.md), can be expr
 
 ### Note Numbers
 
-Raw integer values like `48`, are interpreted as MIDI note numbers in the `note()` function and emitter. Valid MIDI notes are `0-127`.  
+Raw integer values like `48`, are interpreted as MIDI note numbers in the `note` function and emitter. Valid MIDI notes are `0-127`.  
 
-» `emit = { 48 }` *emit a single c4 note*
+» `emit = 48` *emit a single c4 note*
+
+### Note Tables
+
+Instead of using a string, you can also specify notes via a Lua table with the following properties.
+
+- `"key"` - REQUIRED - MIDI Note number such as `48` or a string, such as `"c4"`
+- `"instrument"` OPTIONAL - Instrument/Sample/Patch number >= 0
+- `"volume"`  - OPTIONAL - Volume number in range [0.0 - 1.0]
+- `"panning"` - OPTIONAL - Panning factor in range [-1.0 - 1.0] where 0 is center
+- `"delay"` - OPTIONAL - Delay factor in range [0.0 - 1.0]
+
+» `emit = { key = 48, volume = 0.1 }` *a c4 with volume 0.1*
 
 ### Note Strings
 
@@ -26,7 +38,7 @@ Other note properties can be specified in the string notation as well.
 
 » `emit = { "f#4 #1 v0.2" }` *emit a f sharp with instrument 1 and volume 0.2*
 
-### Chord Strings
+### Note Chord Strings
 
 To create a chords from a note string, append a `'` character to the key and specify a chord mode.
 
@@ -37,20 +49,6 @@ See [chord Lua API](../API/chord.md#ChordName) for a list of all supported modes
 Just like regular notes, additional note properties can be added to the chord string as well.
 
 » `emit = "c4'69 #1 v0.5"` *patch 1, volume 0.5*
-
-
-### Note Tables
-
-Instead of using a string, you can also specify notes via a Lua table with the following properties.
-
-- `"key"` - REQUIRED - MIDI Note number such as `48` or a string, such as `"c4"`
-- `"instrument"` OPTIONAL - Instrument/Sample/Patch number >= 0
-- `"volume"`  - OPTIONAL - Volume number in range [0.0 - 1.0]
-- `"panning"` - OPTIONAL - Panning factor in range [-1.0 - 1.0] where 0 is center
-- `"delay"` - OPTIONAL - Delay factor in range [0.0 - 1.0]
-
-» `emit = { key = 48, volume = 0.1 }` *a c4 with volume 0.1*
-
 
 ### Note Objects
 
@@ -66,18 +64,25 @@ This is especially handy for chords, but also can be more verbose than using not
 
 See [note Lua API](../API/note.md) for details.
 
-The [sequence Lua API](../API/note.md) has a similar interface to modify notes within a sequence.
+### Note Chord Objects
+
+Notes objects can also be created using the `chords` function.
+
+» `emit = chord(48, "major")` *c4 major notes*
+
+This also allows the use of custom interval tables.
+
+» `emit = chord(48, {0,4,7})):volume(0.2)` *custom c4 major chord with volume 0.2*
+
+See [chord Lua API](../API/chord.md) for details.
+
+NB: The [sequence Lua API](../API/note.md) has a similar interface to modify notes within a sequence.
 
 ### Note Offs and Rests
 
 To create rest values use a Lua `nil` value, an empty tables `{}` or `"-"` strings.
 
 To create off notes use the string `"off"` or `"~"`.
-
----
-
-See [note Lua API](../API/note.md) and [chord Lua API](../API/chord.md) for more information about notes and chords.
-
 
 ## Scales
 

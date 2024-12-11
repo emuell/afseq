@@ -10,8 +10,8 @@
 
 > Create a new chord from the given key notes and a chord name or an array of custom intervals.
 > 
-> NB: Chords also can also be defined via strings in function `note` and via the a scale's 
-> `chord` function. See examples below. 
+> NB: Chords also can also be defined via strings in function `note` and via the a scale's
+> `chord` function. See examples below.
 > 
 > Chord names also can be shortened by using the following synonyms:
 > - "min" | "m" | "-" -> "minor"
@@ -46,30 +46,11 @@
 > -- Available chords.
 > mode:
 >     | "major"
->     | "augmented"
->     | "six"
->     | "sixNine"
 >     | "major7"
 >     | "major9"
->     | "add9"
 >     | "major11"
->     | "add11"
 >     | "major13"
->     | "add13"
->     | "dom7"
->     | "dom9"
->     | "dom11"
->     | "dom13"
->     | "7b5"
->     | "7#5"
->     | "7b9"
->     | "9"
->     | "nine"
->     | "eleven"
->     | "thirteen"
 >     | "minor"
->     | "diminished"
->     | "dim"
 >     | "minor#5"
 >     | "minor6"
 >     | "minor69"
@@ -78,54 +59,56 @@
 >     | "minor7#5"
 >     | "minor7b9"
 >     | "minor7#9"
->     | "diminished7"
 >     | "minor9"
 >     | "minor11"
 >     | "minor13"
 >     | "minorMajor7"
+>     | "add9"
+>     | "add11"
+>     | "add13"
+>     | "dom7"
+>     | "dom9"
+>     | "dom11"
+>     | "dom13"
+>     | "7b5"
+>     | "7#5"
+>     | "7b9"
 >     | "five"
+>     | "six"
+>     | "sixNine"
+>     | "nine"
+>     | "eleven"
+>     | "thirteen"
+>     | "augmented"
+>     | "diminished"
+>     | "diminished7"
 >     | "sus2"
 >     | "sus4"
 >     | "7sus2"
 >     | "7sus4"
 >     | "9sus2"
 >     | "9sus4"
-> ```  
+> ```
+### `chord_names()` {#chord_names}
+`->`[`string`](../API/builtins/string.md)[]  
+
+> Return supported chord names.  
 
 
 
 ---  
 ## Aliases  
 ### ChordName {#ChordName}
-[`string`](../API/builtins/string.md) | `"7#5"` | `"7b5"` | `"7b9"` | `"7sus2"` | `"7sus4"` | `"9"` | `"9sus2"` | `"9sus4"` | `"add11"` | `"add13"` | `"add9"` | `"augmented"` | `"dim"` | `"diminished"` | `"diminished7"` | `"dom11"` | `"dom13"` | `"dom7"` | `"dom9"` | `"eleven"` | `"five"` | `"major"` | `"major11"` | `"major13"` | `"major7"` | `"major9"` | `"minor"` | `"minor#5"` | `"minor11"` | `"minor13"` | `"minor6"` | `"minor69"` | `"minor7"` | `"minor7#5"` | `"minor7#9"` | `"minor7b5"` | `"minor7b9"` | `"minor9"` | `"minorMajor7"` | `"nine"` | `"six"` | `"sixNine"` | `"sus2"` | `"sus4"` | `"thirteen"`  
+[`string`](../API/builtins/string.md) | `"7#5"` | `"7b5"` | `"7b9"` | `"7sus2"` | `"7sus4"` | `"9sus2"` | `"9sus4"` | `"add11"` | `"add13"` | `"add9"` | `"augmented"` | `"diminished"` | `"diminished7"` | `"dom11"` | `"dom13"` | `"dom7"` | `"dom9"` | `"eleven"` | `"five"` | `"major"` | `"major11"` | `"major13"` | `"major7"` | `"major9"` | `"minor"` | `"minor#5"` | `"minor11"` | `"minor13"` | `"minor6"` | `"minor69"` | `"minor7"` | `"minor7#5"` | `"minor7#9"` | `"minor7b5"` | `"minor7b9"` | `"minor9"` | `"minorMajor7"` | `"nine"` | `"six"` | `"sixNine"` | `"sus2"` | `"sus4"` | `"thirteen"`  
 > ```lua
 > -- Available chords.
 > ChordName:
 >     | "major"
->     | "augmented"
->     | "six"
->     | "sixNine"
 >     | "major7"
 >     | "major9"
->     | "add9"
 >     | "major11"
->     | "add11"
 >     | "major13"
->     | "add13"
->     | "dom7"
->     | "dom9"
->     | "dom11"
->     | "dom13"
->     | "7b5"
->     | "7#5"
->     | "7b9"
->     | "9"
->     | "nine"
->     | "eleven"
->     | "thirteen"
 >     | "minor"
->     | "diminished"
->     | "dim"
 >     | "minor#5"
 >     | "minor6"
 >     | "minor69"
@@ -134,12 +117,29 @@
 >     | "minor7#5"
 >     | "minor7b9"
 >     | "minor7#9"
->     | "diminished7"
 >     | "minor9"
 >     | "minor11"
 >     | "minor13"
 >     | "minorMajor7"
+>     | "add9"
+>     | "add11"
+>     | "add13"
+>     | "dom7"
+>     | "dom9"
+>     | "dom11"
+>     | "dom13"
+>     | "7b5"
+>     | "7#5"
+>     | "7b9"
 >     | "five"
+>     | "six"
+>     | "sixNine"
+>     | "nine"
+>     | "eleven"
+>     | "thirteen"
+>     | "augmented"
+>     | "diminished"
+>     | "diminished7"
 >     | "sus2"
 >     | "sus4"
 >     | "7sus2"

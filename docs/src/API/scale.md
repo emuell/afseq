@@ -10,7 +10,7 @@
 
 > Create a new scale from the given key notes and a mode name.
 > 
-> Scale names can also be shortened by using the following synonyms:
+> Mode names can also be shortened by using the following synonyms:
 > - "8-tone" -> "eight-tone"
 > - "9-tone" -> "nine-tone"
 > - "aug" -> "augmented"
@@ -32,7 +32,7 @@
 > ```
 > 
 > ```lua
-> -- Available scales.
+> -- Available scale mode names.
 > mode:
 >     | "chromatic"
 >     | "major"
@@ -72,7 +72,11 @@
 >     | "diminished whole"
 >     | "spanish eight-tone"
 >     | "nine-tone"
-> ```  
+> ```
+### `scale_names()` {#scale_names}
+`->`[`string`](../API/builtins/string.md)[]  
+
+> Return supported scale mode names.  
 
 
 
@@ -99,7 +103,7 @@
 ### ScaleMode {#ScaleMode}
 [`string`](../API/builtins/string.md) | `"all minor"` | `"augmented"` | `"blues major"` | `"blues minor"` | `"chromatic"` | `"diminished half"` | `"diminished whole"` | `"dorian"` | `"enigmatic"` | `"harmonic major"` | `"harmonic minor"` | `"hungarian gypsy"` | `"locrian major"` | `"locrian"` | `"lydian augmented"` | `"lydian"` | `"major"` | `"melodic minor"` | `"minor"` | `"mixolydian"` | `"natural major"` | `"natural minor"` | `"neapolitan major"` | `"neapolitan minor"` | `"nine-tone"` | `"overtone"` | `"pentatonic egyptian"` | `"pentatonic major"` | `"pentatonic minor"` | `"phrygian dominant"` | `"phrygian"` | `"prometheus"` | `"romanian minor"` | `"spanish eight-tone"` | `"spanish gypsy"` | `"super locrian"` | `"tritone"` | `"whole tone"`  
 > ```lua
-> -- Available scales.
+> -- Available scale mode names.
 > ScaleMode:
 >     | "chromatic"
 >     | "major"
@@ -212,7 +216,7 @@
 
 > Create an iterator function that returns up to `count` notes from the scale.
 > If the count exceeds the number of notes in the scale, then notes from the next
-> octave are taken. 
+> octave are taken.
 > 
 > The iterator function returns nil when the maximum number of MIDI notes has been
 > reached, or when the given optional `count` parameter has been exceeded.
