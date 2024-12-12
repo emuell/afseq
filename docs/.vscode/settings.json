@@ -1,0 +1,8 @@
+{
+    "search.exclude": {
+        "**/lua-language-server": true
+    },
+    "Lua.workspace.ignoreDir": [
+        "**/lua-language-server"
+    ]
+}
