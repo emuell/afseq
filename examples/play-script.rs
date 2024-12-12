@@ -48,11 +48,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Searching for wav/script files in path '{}'...", DEMO_PATH);
     let mut entry_stems = HashSet::<String>::new();
     let paths = fs::read_dir(DEMO_PATH).expect("Failed to access demo content directory");
+    let audio_extensions = ["wav"];
+    let script_extensions = rhythm_script_file_extensions();
     for path in paths {
         let path = path?.path();
         if let Some(extension) = path.extension() {
-            let extension = extension.to_string_lossy().to_string();
-            if matches!(extension.as_str(), "lua" | "wav") {
+            let extension = extension.to_string_lossy().to_ascii_lowercase();
+            if script_extensions.contains(&extension.as_str())
+                || audio_extensions.contains(&extension.as_str())
+            {
                 if let Some(stem) = path.file_stem() {
                     entry_stems.insert(stem.to_string_lossy().to_string());
                 }
@@ -69,17 +73,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut entries = vec![];
     for stem in entry_stems.iter() {
         let base_path = PathBuf::new().join(DEMO_PATH).join(stem);
-        let wave_file = base_path.with_extension("wav");
-        let lua_file = base_path.with_extension("lua");
-        if wave_file.exists() && lua_file.exists() {
+        let audio_files = audio_extensions
+            .iter()
+            .map(|e| base_path.with_extension(e))
+            .collect::<Vec<_>>();
+        let audio_files_exists = audio_files.iter().any(|f| f.exists());
+        let script_files = script_extensions
+            .iter()
+            .map(|e| base_path.with_extension(e))
+            .collect::<Vec<_>>();
+        let script_file_exists = script_files.iter().any(|f| f.exists());
+        if audio_files_exists && script_file_exists {
             log::info!("Found file/script: '{}'...", stem);
-            let instrument_id = sample_pool.load_sample(&wave_file.to_string_lossy())?;
-            let script_path = lua_file.to_string_lossy().to_string();
+            let audio_path = audio_files
+                .iter()
+                .find(|f| f.exists())
+                .cloned()
+                .unwrap_or_default();
+            let instrument_id = sample_pool.load_sample(&audio_path.to_string_lossy())?;
+            let script_path = script_files
+                .iter()
+                .find(|f| f.exists())
+                .cloned()
+                .unwrap_or_default();
+            let script_path = script_path.to_string_lossy().to_string();
             entries.push(RhythmEntry {
                 instrument_id,
                 script_path,
             });
-        } else if lua_file.exists() || wave_file.exists() {
+        } else if audio_files_exists || script_file_exists {
             log::warn!("Ignoring file/script: '{}'...", stem);
         }
     }
