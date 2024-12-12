@@ -212,9 +212,14 @@ impl Library {
             if let Some((_, class)) = library
                 .classes
                 .iter_mut()
-                .find(|(name, c)| *name == &class_name && c.file == f.file)
+                // NB eq_ignore_ascii_case to ignore classes which are defined via a table with the same name
+                // e.g. pattern {} and class Pattern 
+                .find(|(name, c)| name.eq_ignore_ascii_case(&class_name) && c.file == f.file)
             {
-                class.functions.push(f.strip_base())
+                let f = f.strip_base();
+                if !class.functions.iter().any(|f2| f2.name == f.name) {
+                    class.functions.push(f)
+                }
             } else {
                 library.classes.insert(
                     class_name,
