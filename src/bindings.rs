@@ -1,6 +1,6 @@
 //! Lua bindings for the entire crate.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -40,6 +40,7 @@ mod rhythm;
 mod scale;
 mod sequence;
 mod timeout;
+mod transpiler;
 mod unwrap;
 
 // public re-exports
@@ -50,6 +51,7 @@ pub use callback::{
 // internal re-exports
 pub(crate) use callback::{ContextPlaybackState, LuaCallback};
 pub(crate) use timeout::LuaTimeoutHook;
+pub(crate) use transpiler::{is_transpilable_file, transpile};
 pub(crate) use unwrap::{
     gate_trigger_from_value, note_events_from_value, pattern_pulse_from_value,
 };
@@ -100,6 +102,15 @@ pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Retuns all lua or lua transpilable file extensions that are supported.
+pub fn rhythm_script_file_extensions() -> Vec<&'static str> {
+    let mut extensions = vec!["lua"];
+    extensions.append(&mut transpiler::transpilable_file_extensions());
+    extensions
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Evaluate a lua script file which creates and returns a rhythm.
 ///
 /// ### Errors
@@ -117,7 +128,12 @@ pub fn new_rhythm_from_file(
     // restart the timeout hook
     timeout_hook.reset();
     // compile and evaluate script
-    let chunk = lua.load(std::path::PathBuf::from(file_name));
+    let file_name = PathBuf::from(file_name);
+    let chunk = if is_transpilable_file(&file_name) {
+        lua.load(transpile(&file_name)?)
+    } else {
+        lua.load(file_name)
+    };
     let result = chunk.eval::<LuaValue>()?;
     // convert result
     rhythm_from_userdata(&result, instrument).map_err(Into::into)
