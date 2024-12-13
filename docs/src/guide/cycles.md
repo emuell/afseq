@@ -69,7 +69,7 @@ afseq's general random number generator is also used in cycles. So when you seed
 
 Notes and chords in cycles are expressed as [note strings](./notes&scales.md#note-strings) in afseq. But you can also dynamically evaluate and map cycle identifiers using the cycle [`map`](../API/cycle.md#map) function.
 
-This allows you, for example, to inject [parameters](./parameters.md) into cycles or to use custom identifiers.
+This allows you, for example, to inject [input parameters](./parameters.md) into cycles or to use custom identifiers.
 
 Using custom identifiers with a static map (a Lua table):
 

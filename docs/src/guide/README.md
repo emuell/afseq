@@ -44,7 +44,7 @@ By separating the rhythmical pattern from the tonal part of a musical sequence, 
 
 All content in rhythms can be either static, a Lua table of events, or dynamic, a Lua function that [generates](../extras/generators.md) events on the fly. 
 
-Dynamic functions or generators can also be controlled, automated via [parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
+Dynamic functions or generators can also be controlled, automated via [input parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
 
 
 ## Examples
