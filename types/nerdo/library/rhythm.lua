@@ -156,21 +156,21 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---When no pattern is defined, a constant pulse of `1` is triggered by the rhythm.
 ---
----Just like the `emitter` property, patterns can either be a fixed array of values or a
----function or iterator which produces values dynamically.
+---Just like the `emitter` property, patterns can either be a static array of values
+---or a function or generators which produces values dynamically.
 ---
 ---### examples:
 ---```lua
------ a fixed pattern
+----- static pattern
 ---pattern = { 1, 0, 0, 1 }
 ----- "cram" pulses into a single pulse slot via subdivisions
 ---pattern = { 1, { 1, 1, 1 } }
 ---
------ fixed patterns created via the "patterns" lib
+----- patterns created via the "patterns" lib
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
------ stateless generator function
+----- stateless pattern function
 ---pattern = function(context)
 ---  return math.random(0, 1)
 ---end
@@ -223,10 +223,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the event
 ---from the specified emit sequence. When the end of the sequence is reached, it starts again from
----the beginning.<br>
+---the beginning.
 ---
 ---To generate notes dynamically, you can pass a function or a function iterator, instead of a
----fixed array or sequence of notes.<br>
+---static array or sequence of notes.
 ---
 ---Events can also be generated using the tidal cycle mini-notation. Cycles are repeated endlessly
 ---by default, and have the duration of a single pulse in the pattern. Patterns can be used to

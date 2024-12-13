@@ -39,12 +39,12 @@ local Cycle = {}
 ---
 ---### examples:
 ---```lua
------Using a fixed mapping table
+-----Using a static map table
 ---cycle("bd [bd, sn]"):map({
 ---  bd = "c4",
 ---  sn = "e4 #1 v0.2"
 ---})
------Using a fixed mapping table with targets
+-----Using a static map table with targets
 ---cycle("bd:1 <bd:5, bd:7>"):map({
 ---  bd = { key = "c4", volume = 0.5 }, -- instrument #1,5,7 will be set as specified
 ---})

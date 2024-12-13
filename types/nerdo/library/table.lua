@@ -60,7 +60,8 @@ function table.is_empty(t)
 end
 
 ---Find first match of *value* in the given table, starting from element
----number *start_index*.<br>
+---number *start_index*.
+---
 ---Returns the first *key* that matches the value or nil
 ---
 ---### examples:

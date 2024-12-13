@@ -11,7 +11,7 @@ The Lua API uses configuration tables to define the rhythm and their sub-compone
 
 - [TimeBase](./timebase.md) defines the time unit of a rhythm.
 - [Pattern](./pattern.md) -> [Gate](./gate.md) -> [Emitter](./emitter.md) do perform the basic event generation in 3 stages.
-- [Parameters](./parameters.md) change behaviour of all components during runtime.
+- [Parameters](./parameters.md) change behaviour of components during runtime.
 
 ```md
      *Inputs*
@@ -40,11 +40,11 @@ The Lua API uses configuration tables to define the rhythm and their sub-compone
    *Event Stream*
 ```
 
-By separating the **rhythmic** from the **tonal** or parameter value part of a musical sequence, each part of the sequence can be freely modified, composed and (re)combined. We're basically treating music in two dimensions here: the *rhythmic* part as one dimension, and the *tonal* part as another. 
+By separating the rhythmical pattern from the tonal part of a musical sequence, each part of a sequence can be freely modified, composed and (re)combined.
 
-All content in rhythms can be either fixed -> e.g. a Lua table of events, or dynamic -> a Lua function that [generates](../extras/generators.md) events on the fly. 
+All content in rhythms can be either static, a Lua table of events, or dynamic, a Lua function that [generates](../extras/generators.md) events on the fly. 
 
-All dynamic functions or generators can also be controlled, automated via [parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
+Dynamic functions or generators can also be controlled, automated via [parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
 
 
 ## Examples

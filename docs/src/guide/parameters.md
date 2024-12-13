@@ -1,16 +1,16 @@
-# Parameters
+# Input Parameters
 
 Rhythm [`inputs`](../API/rhythm.md#inputs) allow user controlled parameter values to be injected into a rhythm. This allows you to write more flexible rhythms that can be used as templates or to automate functions within the rhythm.
 
-Parameters can be accessed in dynamic pattern, gate, emitter or cycle function [`contexts`](../API/rhythm.md#EmitterContext).
+Input parameters can be accessed in dynamic pattern, gate, emitter or cycle function [`contexts`](../API/rhythm.md#EmitterContext).
 
 ## Parameter Types
 
 Currenty available parameter types are:
 
 - boolean - on/off switches - [`parameter.boolean`](../API/input.md#boolean)
-- integer - continues quantized values - [`parameter.integer`](../API/input.md#integer)
-- number - continues values -[`parameter.number`](../API/input.md#number)
+- integer - integer value ranges - [`parameter.integer`](../API/input.md#integer)
+- number - real number value ranges -[`parameter.number`](../API/input.md#number)
 - string - enumeration value sets - [`parameter.enum`](../API/input.md#enum)
 
 ## Parameter access
