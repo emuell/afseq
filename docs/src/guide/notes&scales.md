@@ -80,7 +80,7 @@ NB: The [sequence Lua API](../API/note.md) has a similar interface to modify not
 
 ### Note Offs and Rests
 
-To create rest values use a Lua `nil` value, an empty tables `{}` or `"-"` strings.
+To create rest values use Lua `nil` values, empty tables `{}`, empty strings `""`, or `"-"` strings.
 
 To create off notes use the string `"off"` or `"~"`.
 

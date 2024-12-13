@@ -16,8 +16,8 @@ Note values can be expressed as:
 - Raw note strings such as `"c4"` (single notes) or `"d#4'maj"` (chords).
 - Lua note tables like `{ key = 48, volume = 0.1 }`.
 - Lua API note objects such as `note(48):volume(0.1)` or `note("c4", "g4")` or `note("c4'min"):transpose({-12, 0, 0})`.
-- Lua `nil` values, empty table `{}` or `"-"` strings are interpreted as rests.
-- The string `"off"` or `"~"` is interpreted as note off. 
+- Lua `nil` values, empty tables `{}`, empty strings `""`, or `"-"` strings are interpreted as rests.
+- The string `"off"` or `"~"` is interpreted as note off.
 
 See [notes & scales](./notes&scales.md) for more information about the different ways to create and manipulate notes and chords.
 
@@ -46,6 +46,8 @@ Dynamic emitter functions return **single note events**. Each incoming, possibly
 » `emit = function(_context) return math.random() > 0.5 and "c4" or "c5" end` *randomly emit c4 or c5 notes*
 
 » `emit = function(context) return context.pulse_count % 2 == 1 and "c4" or "c5" end` *alternate c4 and c5 notes*
+
+The expected return value of a dynamic emitter function is a single monophonic or polyphonic note value, or a value that can be converted into a note.
 
 See API docs for [context](../API/rhythm.md#EmitterContext) for more info about the context passed to dynamic functions. 
 

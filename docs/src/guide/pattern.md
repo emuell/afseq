@@ -48,6 +48,8 @@ When using a Lua function instead of a table as a pattern generator, you can dyn
 
 » `pattern = function(_context) return math.random() end` *randomly emit pulse values between 0 and 1*
 
+The expected return value of a dynamic pattern function is a pulse value (`true`, `false`, `0`, `1`) or `nil`.
+
 Use functions in order to create dynamic patterns that can interact with user interaction, or to create probability based pattern rules. To connect the functions to its runtime use the passed [`context`](../API/rhythm.md#PatternContext) argument.
 
 See [generators](../extras/generators.md) for more info about using functions as generators.
