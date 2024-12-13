@@ -33,7 +33,7 @@ The [`resolution`](../API/rhythm.md#resolution) parameter acts as an additional 
 
 A slightly off beat time unit.
 ```lua
-rhythm {
+return rhythm {
   unit = "beats", 
   resolution = 1.01,
   emit = "c4"
@@ -42,7 +42,7 @@ rhythm {
 
 Sixteenth tripplets
 ```lua
-rhythm {
+return rhythm {
   unit = "1/16", 
   resolution = 4/3,
   emit = "c4"
@@ -52,7 +52,7 @@ rhythm {
 
 2 Seconds
 ```lua
-rhythm {
+return rhythm {
   unit = "seconds", 
   resolution = 2,
   emit = "c4"

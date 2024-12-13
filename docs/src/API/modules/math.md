@@ -41,10 +41,10 @@
 > 
 > ```lua
 > return rhythm {
->   emit = function(context)
+>   emit = function(_init_context)
 >     -- use a unique random sequence every time the rhythm gets (re)triggered
 >     local rand = math.randomstate(12345)
->     return function(context)
+>     return function(_context)
 >       if rand(1, 10) > 5 then
 >         return "c5"
 >       else

@@ -2,7 +2,7 @@
 
 [Patterns](../guide/pattern.md), [Gates](../guide/gate.md) and [Emitters](../guide/emitter.md) can use Lua functions to dynamically generate or evaluate content.
 
-Annonymous Lua functions, as used in rhythms, are actually [closures](https://www.lua.org/pil/6.1.html). They keep a record of their environment, so all (up)values which are declared outside of the annonymous function are accessible from within the function itself. 
+Anonymous Lua functions, as used in rhythms, are actually [closures](https://www.lua.org/pil/6.1.html). They keep a record of their environment, so all (up)values which are declared outside of the anonymous function are accessible from within the function itself. 
 
 We can use this in afseq scripts to keep track of a rhythm's *global* or *local* state.   
 
@@ -22,7 +22,7 @@ In the following example, an emitter function keeps track of its state by refere
 ```lua
 local counter = 0
 return rhythm {
-  emit = function(context)
+  emit = function(_context)
     local midi_note = counter 
     counter = (counter + 1) % 128 
     return note(midi_note) 
@@ -40,7 +40,7 @@ A `context` passed to *pattern* functions only contains the global playback stat
 
 See [pattern context API](../API/rhythm.md#PatternContext), [gate context API](../API/rhythm.md#GateContext), [emitter context API](../API/rhythm.md#EmitterContext) for details.
 
-Contexts also may contain user controlled input variables. See [parameters](../guide/parameters.md) for more info about this. 
+Contexts also may contain user controlled input variables. See [input parameters](../guide/parameters.md) for more info about this. 
 
 By making use of the context we can now rewrite the example above to:
 
@@ -65,7 +65,7 @@ Let's use our counter example again with such a *generator*:
 
 ```lua
 return rhythm {
-  emit = function(_initial_context)
+  emit = function(_init_context)
     local counter = 0 -- local state!
     return function(_context)
       local midi_note = counter

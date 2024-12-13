@@ -19,7 +19,6 @@ local random_notes = pattern.new(10, function()
   return cmin.notes[math.random(#cmin.notes)] 
 end)
 
--- play notes
 return rhythm {
   emit = random_notes
 }
@@ -32,7 +31,8 @@ You can use `math.randomseed()` to seed the global random number generator.
 ```lua
 -- create a scale to pick notes from
 local cmin = scale("c", "minor")
--- pick **the same** random 10 notes from the scale every time
+
+-- pick the same random 10 notes from the scale every time
 math.randomseed(1234)
 local random_notes = pattern.new(10, function() 
   return cmin.notes[math.random(#cmin.notes)] 
@@ -54,9 +54,9 @@ To create multiple separate local random states, use the non standard [`math.ran
 ```lua
 local cmin = scale("c", "minor")
 return rhythm {
-  emit = function(context) 
+  emit = function(_init_context) 
     local rand = math.randomstate(1234) -- a local random number generator
-    return function(context) 
+    return function(_context) 
       return note(cmin.notes[rand(#cmin.notes)])
     end
   end

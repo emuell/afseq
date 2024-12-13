@@ -10,11 +10,10 @@ The default gate is a *threshold gate*, which passes all pulse values > 0.
 Seeded probability gate, using the pattern pulse values as probability.
 
 ```lua
-rhythm {
+return rhythm {
   pattern = { 0, { 0.5, 1 }, 1, { 1, 0.8 } },
-  gate = function(context)
+  gate = function(_init_context)
     local rand = math.randomstate(12366)
-    ---@param context PatternContext
     return function(context)
       return context.pulse_value > rand()
     end
@@ -26,7 +25,7 @@ rhythm {
 A gate which filters out pulse values with on a configurable threshold.
 
 ```lua
-rhythm {
+return rhythm {
   inputs = { 
     parameter.number("threshold", 0.5, {0, 1}) 
   },

@@ -7,7 +7,7 @@
 
 ***afseq***, also known as **nerdo-rhythm**, is an experimental imperative-style music sequence generator engine. 
 
-It allows you to programmatically create music sequences either in plain Rust as library (*-> static, compiled*) or in Lua as a scripting engine (*-> dynamic, interpreted*). So it's also suitable for [live coding music](https://github.com/pjagielski/awesome-live-coding-music). 
+It allows you to programmatically create music sequences either in plain Rust as library (*static, compiled*) or in Lua as a scripting engine (*dynamic, interpreted*). So it's also suitable for [live coding music](https://github.com/pjagielski/awesome-live-coding-music). 
 
 In addition to its imperative event generator approach, it also supports the creation of musical events using [tidalcycle](https://tidalcycles.org/)'s mini-notation.
 

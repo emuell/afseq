@@ -11,7 +11,7 @@ The Lua API uses configuration tables to define the rhythm and their sub-compone
 
 - [TimeBase](./timebase.md) defines the time unit of a rhythm.
 - [Pattern](./pattern.md) -> [Gate](./gate.md) -> [Emitter](./emitter.md) do perform the basic event generation in 3 stages.
-- [Parameters](./parameters.md) change behaviour of all components during runtime.
+- [Parameters](./parameters.md) change behaviour of components during runtime.
 
 ```md
      *Inputs*
@@ -40,11 +40,11 @@ The Lua API uses configuration tables to define the rhythm and their sub-compone
    *Event Stream*
 ```
 
-By separating the **rhythmic** from the **tonal** or parameter value part of a musical sequence, each part of the sequence can be freely modified, composed and (re)combined. We're basically treating music in two dimensions here: the *rhythmic* part as one dimension, and the *tonal* part as another. 
+By separating the rhythmical pattern from the tonal part of a musical sequence, each part of a sequence can be freely modified, composed and (re)combined.
 
-All content in rhythms can be either fixed -> e.g. a Lua table of events, or dynamic -> a Lua function that [generates](../extras/generators.md) events on the fly. 
+All content in rhythms can be either static, a Lua table of events, or dynamic, a Lua function that [generates](../extras/generators.md) events on the fly. 
 
-All dynamic functions or generators can also be controlled, automated via [parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
+Dynamic functions or generators can also be controlled, automated via [input parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
 
 
 ## Examples
@@ -53,7 +53,7 @@ A simple rhythm with a static pattern and emitter, using the default gate implem
 
 ```lua
 -- sequence of 1/4th c4 and two 1/8 c5 notes.
-rhythm {
+return rhythm {
   unit = "1/4",
   pattern = { 1, { 1, 1 } },
   emit = { "c4", "c5", "c5" }
@@ -64,7 +64,7 @@ A rhythm with default pattern and gate, emitting a Tidal Cycle.
 
 ```lua
 -- emit a tidal cycle every bar
-rhythm {
+return rhythm {
   unit = "1/1",
   emit = cycle("a4 e4@2 <c4 c5>")
 }
@@ -74,10 +74,10 @@ A rhythm, using a Lua function as dynamic pattern generator.
 
 ```lua
 -- maybe trigger a c4 on every 2nd 1/4.
-rhythm {
+return rhythm {
   unit = "1/4",
-  pattern = function (context) 
-    if (context.pulse_step % 2 == 1) then
+  pattern = function(context) 
+    if context.pulse_step % 2 == 1 then
       return math.random() > 0.5 and 1 or 0
     else
       return 1
@@ -99,19 +99,19 @@ return rhythm {
 
   pattern = { 1, { 1, 0.1, 0.5 }, 1, { 1, 0, 0, 0.5 } },
 
-  gate = function (context)
+  gate = function(_init_context)
     -- create a local random number generator for the probability
     local rand = math.randomstate(seed)
-    return function (context)
+    return function(context)
       -- use pulse value as trigger probability
       return context.pulse_value >= rand() 
     end
   end,
   
-  emit = function (context)
+  emit = function(_init_context)
     -- create a local random number generator for the humanizing delay
     local rand = math.randomstate(seed)
-    return function (context)
+    return function(context)
       local volume, delay = 1.0, 0.0
       if context.pulse_time < 1 then
         -- lower volume and add a delay for events in sub patterns

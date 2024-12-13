@@ -156,29 +156,28 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---When no pattern is defined, a constant pulse of `1` is triggered by the rhythm.
 ---
----Just like the `emitter` property, patterns can either be a fixed array of values or a
----function or iterator which produces values dynamically.
+---Just like the `emitter` property, patterns can either be a static array of values
+---or a function or generators which produces values dynamically.
 ---
 ---### examples:
 ---```lua
------ a fixed pattern
+----- static pattern
 ---pattern = { 1, 0, 0, 1 }
 ----- "cram" pulses into a single pulse slot via subdivisions
 ---pattern = { 1, { 1, 1, 1 } }
 ---
------ fixed patterns created via the "patterns" lib
+----- patterns created via the "patterns" lib
 ---pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
------ stateless generator function
----pattern = function(context)
+----- stateless pattern function
+---pattern = function(_context)
 ---  return math.random(0, 1)
 ---end
 ---
 ----- stateful generator function
----pattern = function(context)
+---pattern = function(_init_context)
 ---  local triggers = table.create({0, 6, 10})
----  ---@param context PatternContext
 ---  return function(context)
 ---    return triggers:find((context.step - 1) % 16) ~= nil
 ---  end
@@ -223,10 +222,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the event
 ---from the specified emit sequence. When the end of the sequence is reached, it starts again from
----the beginning.<br>
+---the beginning.
 ---
 ---To generate notes dynamically, you can pass a function or a function iterator, instead of a
----fixed array or sequence of notes.<br>
+---static array or sequence of notes.
 ---
 ---Events can also be generated using the tidal cycle mini-notation. Cycles are repeated endlessly
 ---by default, and have the duration of a single pulse in the pattern. Patterns can be used to
@@ -242,15 +241,14 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---emit = sequence{"c4", "g4"}:volume(0.5)
 ---
 ----- stateless generator function
----emit = function(context)
+---emit = function(_context)
 ---  return 48 + math.random(1, 4) * 5
 ---end
 ---
 ----- stateful generator function
----emit = function(initial_context)
+---emit = function(_init_context)
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
----  ---@param context EmitterContext
----  return function(context)
+---  return function(_context)
 ---    local key = notes[count]
 ---    count = (count + step - 1) % #notes + 1
 ---    return { key = key, volume = 0.5 }
@@ -306,9 +304,9 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  pattern = function(context)
 ---    return (context.pulse_step % 4 == 1) or (math.random() > 0.8)
 ---  end,
----  emit = function(context)
+---  emit = function(_init_context)
 ---    local cmin = scale("c5", "pentatonic minor").notes
----    return function(context)
+---    return function(_context)
 ---      return { key = cmin[math.random(#cmin)], volume = 0.7 }
 ---    end
 ---  end

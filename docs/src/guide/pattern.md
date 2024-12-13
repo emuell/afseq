@@ -46,7 +46,9 @@ Each number value in the specified Lua table represents a single pulse in the rh
 
 When using a Lua function instead of a table as a pattern generator, you can dynamically generate pulse values.
 
-» `pattern = function(context) return math.random() end` *randomly emit pulse values between 0 and 1*
+» `pattern = function(_context) return math.random() end` *randomly emit pulse values between 0 and 1*
+
+The expected return value of a dynamic pattern function is a pulse value (`true`, `false`, `0`, `1`) or `nil`.
 
 Use functions in order to create dynamic patterns that can interact with user interaction, or to create probability based pattern rules. To connect the functions to its runtime use the passed [`context`](../API/rhythm.md#PatternContext) argument.
 
@@ -58,7 +60,7 @@ afseq comes with a built-in pattern library, which contains a bunch of helper fu
 
 » `pattern = pattern.from{0, 1} * 3 + {1, 0}` *combine sub patterns*
 
-» `pattern = pattern.new(12, function (k, v) return k % 3 == 1 end),` *functionally create patterns*
+» `pattern = pattern.new(12, function(k, v) return k % 3 == 1 end),` *functionally create patterns*
 
 » `pattern = pattern.euclidean{3, 8, -1}` *create euclidean patterns*
 
@@ -68,7 +70,7 @@ See [Pattern API Lua reference](../API/pattern.md) for more info and examples.
 
 Static pattern.
 ```lua
-rhythm {
+return rhythm {
   pattern = { 1, 0, 0, 1 },
   -- ...
 }
@@ -76,7 +78,7 @@ rhythm {
 
 *Cram* pulses into a single pulse slot via subdivisions in static patterns.
 ```lua
-rhythm {
+return rhythm {
   pattern = { 1, { 1, 1, 1 } },
   -- ...
 }
@@ -84,7 +86,7 @@ rhythm {
 
 Static pattern created using the "pattern" lib
 ```lua
-rhythm {
+return rhythm {
   pattern = pattern.from{1, 0} * 5 + {1, 1}
   -- ...
 }
@@ -92,7 +94,7 @@ rhythm {
 
 Euclidean pattern created using the "patterns" lib.
 ```lua
-rhythm {
+return rhythm {
   pattern = pattern.euclidean(7, 16, 2),
   -- ...
 }
@@ -100,8 +102,8 @@ rhythm {
 
 Stateless function.
 ```lua
-rhythm {
-  pattern = function(context)
+return rhythm {
+  pattern = function(_context)
     return math.random(0, 1)
   end
   -- ...
@@ -110,11 +112,10 @@ rhythm {
 
 Stateful generator.
 ```lua
-rhythm {
-  pattern = function(context)
+return rhythm {
+  pattern = function(_init_context)
     local rand = math.randomstate(12345)
     local triggers = table.create({0, 6, 10})
-    ---@param context PatternContext
     return function(context)
       return rand() > 0.8 and 
         triggers:find((context.pulse_step - 1) % 16) ~= nil
