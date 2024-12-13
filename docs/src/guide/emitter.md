@@ -69,14 +69,14 @@ See [cycles](./cycles.md) for more info about Tidal Cycles support in afseq.
 Sequence of c4, g4 notes.
 
 ```lua
-rhythm {
+return rhythm {
   emit = { "c4", "g4" }
 }
 ```
 
 Chord of c4, d#4, g4 notes.
 ```lua
-rhythm {
+return rhythm {
   emit = sequence(
     { "c4",  "d#4",  "g4"  }, -- or "c4'min"
     { "---", "off",  "off" }
@@ -86,7 +86,7 @@ rhythm {
 
 Sequence of c4, g4 with volume 0.5.
 ```lua
-rhythm {
+return rhythm {
   emit = sequence{"c4", "g4"}:volume(0.5)
 }
 ```
@@ -94,7 +94,7 @@ rhythm {
 
 Stateless function.
 ```lua
-rhythm {
+return rhythm {
   emit = function(context)
     return 48 + math.random(1, 4) * 5
   end
@@ -103,7 +103,7 @@ rhythm {
 
 Stateful generator.
 ```lua
-rhythm {
+return rhythm {
   emit = function(initial_context)
     local count, step, notes = 1, 2, scale("c5", "minor").notes
     ---@param context EmitterContext
@@ -127,7 +127,7 @@ return rhythm {
 
 Tidal cycle.
 ```lua
-rhythm {
+return rhythm {
   emit = cycle("<[a3 c4 e4 a4]*3 [d4 g3 g4 c4]>")
 }
 ```

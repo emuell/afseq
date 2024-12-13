@@ -68,7 +68,7 @@ See [Pattern API Lua reference](../API/pattern.md) for more info and examples.
 
 Static pattern.
 ```lua
-rhythm {
+return rhythm {
   pattern = { 1, 0, 0, 1 },
   -- ...
 }
@@ -76,7 +76,7 @@ rhythm {
 
 *Cram* pulses into a single pulse slot via subdivisions in static patterns.
 ```lua
-rhythm {
+return rhythm {
   pattern = { 1, { 1, 1, 1 } },
   -- ...
 }
@@ -84,7 +84,7 @@ rhythm {
 
 Static pattern created using the "pattern" lib
 ```lua
-rhythm {
+return rhythm {
   pattern = pattern.from{1, 0} * 5 + {1, 1}
   -- ...
 }
@@ -92,7 +92,7 @@ rhythm {
 
 Euclidean pattern created using the "patterns" lib.
 ```lua
-rhythm {
+return rhythm {
   pattern = pattern.euclidean(7, 16, 2),
   -- ...
 }
@@ -100,7 +100,7 @@ rhythm {
 
 Stateless function.
 ```lua
-rhythm {
+return rhythm {
   pattern = function(context)
     return math.random(0, 1)
   end
@@ -110,7 +110,7 @@ rhythm {
 
 Stateful generator.
 ```lua
-rhythm {
+return rhythm {
   pattern = function(context)
     local rand = math.randomstate(12345)
     local triggers = table.create({0, 6, 10})

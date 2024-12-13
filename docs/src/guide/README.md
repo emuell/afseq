@@ -53,7 +53,7 @@ A simple rhythm with a static pattern and emitter, using the default gate implem
 
 ```lua
 -- sequence of 1/4th c4 and two 1/8 c5 notes.
-rhythm {
+return rhythm {
   unit = "1/4",
   pattern = { 1, { 1, 1 } },
   emit = { "c4", "c5", "c5" }
@@ -64,7 +64,7 @@ A rhythm with default pattern and gate, emitting a Tidal Cycle.
 
 ```lua
 -- emit a tidal cycle every bar
-rhythm {
+return rhythm {
   unit = "1/1",
   emit = cycle("a4 e4@2 <c4 c5>")
 }
@@ -74,7 +74,7 @@ A rhythm, using a Lua function as dynamic pattern generator.
 
 ```lua
 -- maybe trigger a c4 on every 2nd 1/4.
-rhythm {
+return rhythm {
   unit = "1/4",
   pattern = function (context) 
     if (context.pulse_step % 2 == 1) then

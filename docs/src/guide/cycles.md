@@ -29,8 +29,8 @@ There's no exact specification for how tidal cycles work, and it's constantly ev
 The base time of a pattern in tidal is specified as *cycles per second*. In afseq, the time of a cycle instead is given in *cycles per pattern pulse units*. 
 
 ```lua
--- emits an entire cycle every *bar*
-rhythm {
+-- emits an entire cycle every bar
+return rhythm {
   unit = "bars",
   emit = cycle("c d e f")
 }
@@ -41,8 +41,8 @@ rhythm {
 An emitter in afseq gets triggered for each incoming non-gated pattern pulse. This is true for cycles are well and allows you to sequence entire cycles too. 
 
 ```lua
--- emit an entire cycle's every *bar*, then pause for a bar, then repeat
-rhythm {
+-- emit an entire cycle's every bar, then pause for a bar, then repeat
+return rhythm {
   unit = "bars",
   pattern = {1, 0},
   emit = cycle("c d e f")
@@ -53,7 +53,7 @@ You can also use the mini notation to emit single notes only, making use of tida
 
 ```lua
 -- emit a single note from a cycle in an euclidean pattern
-rhythm {
+return rhythm {
   unit = "beats",
   pattern = pattern.euclidean(5, 8),
   emit = cycle("<c d e f g|b>")
@@ -74,7 +74,7 @@ This allows you, for example, to inject [parameters](./parameters.md) into cycle
 Using custom identifiers with a static map (a Lua table):
 
 ```lua
-rhythm {
+return rhythm {
   unit = "bars",
   emit = cycle("[bd*4], [_ sn]*2"):map({ 
     ["bd"] = note("c4 #0"), 
@@ -86,7 +86,7 @@ rhythm {
 Using custom identifiers with a dynamic map function (a Lua function):
 
 ```lua
-rhythm {
+return rhythm {
   unit = "bars",
   emit = cycle("[bd*4], [_ sn]*2"):map(function(context, value)
     if value == "bd" then
