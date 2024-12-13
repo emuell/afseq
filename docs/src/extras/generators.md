@@ -22,7 +22,7 @@ In the following example, an emitter function keeps track of its state by refere
 ```lua
 local counter = 0
 return rhythm {
-  emit = function(context)
+  emit = function(_context)
     local midi_note = counter 
     counter = (counter + 1) % 128 
     return note(midi_note) 
@@ -65,7 +65,7 @@ Let's use our counter example again with such a *generator*:
 
 ```lua
 return rhythm {
-  emit = function(_initial_context)
+  emit = function(_init_context)
     local counter = 0 -- local state!
     return function(_context)
       local midi_note = counter

@@ -23,11 +23,11 @@ Definition:
 
 Usage:
 
-» `emit = function(context) context.inputs.enabled and "c5" or nil }`
+» `emit = function(context) return context.inputs.enabled and "c5" or nil }`
 
 Usage, if you've got spaces in your ids (not recommended):
 
-» `emit = function(context) context.inputs["enabled"] and "c5" or nil }`
+» `emit = function(context) return context.inputs["enabled"] and "c5" or nil }`
 
 
 ## Examples
@@ -66,7 +66,7 @@ return rhythm {
     parameter.integer('variation', 0, {0, 0xff}, "Variation"),
   },
   unit = "1/1",
-  pattern = function (context)
+  pattern = function(context)
     local rand = math.randomstate(2345 + context.inputs.variation)
     return pattern.euclidean(rand(3, 16), 16, 0)
   end,
@@ -95,7 +95,7 @@ return rhythm {
     [bd1 ~]*2 ~ [~ bd2] ~,
     [~ sn1]*2,
     [~ sn2]*8
-  ]]):map(function (context, value)
+  ]]):map(function(context, value)
     for _, id in pairs{"bd", "sn", "hh"} do
       local number = value:match(id.."(%d+)")
       if number then

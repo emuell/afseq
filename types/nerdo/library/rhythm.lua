@@ -171,14 +171,13 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
 ----- stateless pattern function
----pattern = function(context)
+---pattern = function(_context)
 ---  return math.random(0, 1)
 ---end
 ---
 ----- stateful generator function
----pattern = function(context)
+---pattern = function(_init_context)
 ---  local triggers = table.create({0, 6, 10})
----  ---@param context PatternContext
 ---  return function(context)
 ---    return triggers:find((context.step - 1) % 16) ~= nil
 ---  end
@@ -242,15 +241,14 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---emit = sequence{"c4", "g4"}:volume(0.5)
 ---
 ----- stateless generator function
----emit = function(context)
+---emit = function(_context)
 ---  return 48 + math.random(1, 4) * 5
 ---end
 ---
 ----- stateful generator function
----emit = function(initial_context)
+---emit = function(_init_context)
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
----  ---@param context EmitterContext
----  return function(context)
+---  return function(_context)
 ---    local key = notes[count]
 ---    count = (count + step - 1) % #notes + 1
 ---    return { key = key, volume = 0.5 }
@@ -306,9 +304,9 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  pattern = function(context)
 ---    return (context.pulse_step % 4 == 1) or (math.random() > 0.8)
 ---  end,
----  emit = function(context)
+---  emit = function(_init_context)
 ---    local cmin = scale("c5", "pentatonic minor").notes
----    return function(context)
+---    return function(_context)
 ---      return { key = cmin[math.random(#cmin)], volume = 0.7 }
 ---    end
 ---  end

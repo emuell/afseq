@@ -14,11 +14,12 @@ return rhythm {
       end
     end
   end,
-  gate = function (context)
+  gate = function(context)
     return context.pulse_value > math.random()
   end,
-  emit = function(context)
+  emit = function(_init_context)
     local rand = math.randomstate(0x8879)
+    ---@param context EmitterContext
     return function(context)
       local note = rand(1, 10) >= 8 and "c6" or "c7"
       local _, fraction = math.modf(context.pulse_time_step)

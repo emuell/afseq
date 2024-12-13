@@ -76,8 +76,8 @@ A rhythm, using a Lua function as dynamic pattern generator.
 -- maybe trigger a c4 on every 2nd 1/4.
 return rhythm {
   unit = "1/4",
-  pattern = function (context) 
-    if (context.pulse_step % 2 == 1) then
+  pattern = function(context) 
+    if context.pulse_step % 2 == 1 then
       return math.random() > 0.5 and 1 or 0
     else
       return 1
@@ -99,19 +99,19 @@ return rhythm {
 
   pattern = { 1, { 1, 0.1, 0.5 }, 1, { 1, 0, 0, 0.5 } },
 
-  gate = function (context)
+  gate = function(_init_context)
     -- create a local random number generator for the probability
     local rand = math.randomstate(seed)
-    return function (context)
+    return function(context)
       -- use pulse value as trigger probability
       return context.pulse_value >= rand() 
     end
   end,
   
-  emit = function (context)
+  emit = function(_init_context)
     -- create a local random number generator for the humanizing delay
     local rand = math.randomstate(seed)
-    return function (context)
+    return function(context)
       local volume, delay = 1.0, 0.0
       if context.pulse_time < 1 then
         -- lower volume and add a delay for events in sub patterns

@@ -54,9 +54,9 @@ To create multiple separate local random states, use the non standard [`math.ran
 ```lua
 local cmin = scale("c", "minor")
 return rhythm {
-  emit = function(context) 
+  emit = function(_init_context) 
     local rand = math.randomstate(1234) -- a local random number generator
-    return function(context) 
+    return function(_context) 
       return note(cmin.notes[rand(#cmin.notes)])
     end
   end
