@@ -1,6 +1,6 @@
 //! Lua bindings for the entire crate.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -64,15 +64,19 @@ pub(crate) struct LuaAppData {
     pub(crate) rand_seed: Option<u64>,
     /// Global random number generator, used for our math.random() impl.
     pub(crate) rand_rgn: Xoshiro256PlusPlus,
+    /// Declared global variables for the strict checks
+    pub(crate) declared_globals: HashSet<Vec<u8>>,
 }
 
 impl LuaAppData {
     fn new() -> Self {
         let rand_seed = None;
         let rand_rgn = Xoshiro256PlusPlus::from_seed(rand::thread_rng().gen());
+        let declared_globals = HashSet::new();
         Self {
             rand_seed,
             rand_rgn,
+            declared_globals,
         }
     }
 }
@@ -309,6 +313,51 @@ fn register_global_bindings(
         })?,
     )?;
 
+    // set a globals metatable to catch access to undeclared variables
+    let globals_mt = lua.create_table()?;
+    globals_mt.set(
+        "__index",
+        lua.create_function(
+            |lua, (table, key): (LuaTable, LuaValue)| -> LuaResult<LuaValue> {
+                if let Some(key) = key.as_str() {
+                    if key.as_bytes() != b"pattern" {
+                        let declared_globals = &lua
+                            .app_data_ref::<LuaAppData>()
+                            .expect("Failed to access Lua app data")
+                            .declared_globals;
+                        if !declared_globals.contains(key.as_bytes()) {
+                            return Err(LuaError::runtime(format!(
+                                "trying to access undeclared variable '{}'",
+                                key
+                            )));
+                        }
+                    }
+                }
+                table.raw_get(key)
+            },
+        )?,
+    )?;
+    globals_mt.set(
+        "__newindex",
+        lua.create_function(|lua, (table, key, value): (LuaTable, LuaValue, LuaValue)| {
+            if let Some(key) = key.as_str() {
+                if key.as_bytes() != b"pattern" {
+                    let declared_globals = &mut lua
+                        .app_data_mut::<LuaAppData>()
+                        .expect("Failed to access Lua app data")
+                        .declared_globals;
+                    declared_globals.insert(key.as_bytes().into());
+                }
+            }
+            table.raw_set(key, value)
+        })?,
+    )?;
+    debug_assert!(
+        globals.metatable().is_none(),
+        "Globals already have a meta table set"
+    );
+    globals.set_metatable(Some(globals_mt));
+
     Ok(())
 }
 
@@ -519,7 +568,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
         )?,
     )?;
 
-    lua.globals().set("parameter", parameter)?;
+    lua.globals().raw_set("parameter", parameter)?;
 
     Ok(())
 }
@@ -759,6 +808,16 @@ mod test {
 
         // reset timeout
         timeout_hook.reset();
+
+        // undeclated globals strict checks are present and do their job
+        assert!(lua
+            .load(r#"return this_does_not_exist == nil"#)
+            .eval::<LuaValue>()
+            .is_err());
+        assert!(lua
+            .load(r#"this_now_exists = 2; return this_now_exists == 2"#)
+            .eval::<LuaValue>()
+            .is_ok_and(|v| v.as_boolean().unwrap_or(false)));
 
         // table.lua is present
         assert!(lua.load(r#"return table.new()"#).eval::<LuaTable>().is_ok());
