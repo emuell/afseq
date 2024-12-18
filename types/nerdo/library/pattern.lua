@@ -21,22 +21,47 @@ local empty_pulse_values = {
   ["number"] = 0
 }
 
+---Guess empty pulse values from an existing pattern (implementation detail).
+local function empty_pulse_value(table)
+  if type(table) == "table" then
+    for _, v in pairs(table) do
+      -- special case for numbers, which are more likely notes when > 1
+      if type(v) == "number" then
+        if v > 1 then
+          return {}
+        end
+      end
+      local value = empty_pulse_values[type(v)]
+      if value ~= nil then
+        return value
+      end
+    end
+  end
+  return 0
+end
+
 ---Array alike table with helper functions to ease creating rhythmic patterns.
 ---
 ---### examples:
 ---```lua
 ----- using + and * operators to combine patterns
 ---pattern.from{ 0, 1 } * 3 + { 1, 0 }
+---
 ----- repeating, spreading and subsets
 ---pattern.from{ 0, 1, { 1, 1 } }:repeat_n(4):spread(1.25):take(16)
+---
 ----- euclidean patterns
 ---pattern.euclidean(12, 16)
 ---pattern.from{ 1, 0.5, 1, 1 }:euclidean(12)
+---
 ----- generate/init from functions
+---pattern.new(8):init(1) --> 1,1,1,1,1,1,1,1
 ---pattern.new(12):init(function() return math.random(0.5, 1.0) end )
 ---pattern.new(16):init(scale("c", "minor").notes_iter())
+---
 ----- generate note patterns
 ---pattern.from{ "c4", "g4", "a4" } * 7 + { "a4", "g4", "c4" }
+---
 ----- generate chord patterns
 ---pattern.from{ 1, 5, 6, 4 }:map(function(index, degree)
 ---  return scale("c", "minor"):chord(degree)
@@ -51,7 +76,14 @@ pattern = {}
 --- Pattern creation
 ----------------------------------------------------------------------------------------------------
 
----Create a new empty pattern or pattern with the given length.
+---Create a new empty pattern or pattern with the given length and pulse value.
+---
+---
+---### examples:
+---```lua
+---pattern.new(4,1) --> {1,1,1,1}
+---pattern.new(4, function() return math.random() end)
+---```
 ---@param length integer? Initial length of the pattern. When undefined, an empty pattern is created.
 ---@param value (PulseValue|(fun(index: integer):PulseValue))? Value or generator function, which sets the initial values in the pattern.
 ---@return Pattern
@@ -77,13 +109,13 @@ function pattern.new(length, value)
   return t
 end
 
----Create a new pattern from a set of values or tables.
+---Create a new pattern from an existing set of values or tables.
 ---When passing tables, those will be flattened.
 ---
 ---### examples:
 ---```lua
----local p = pattern.from(1,0,1,0) -- {1,0,1,0} 
----p = pattern.from({1,0},{1,0}) -- {1,0,1,0} 
+---pattern.from(1,0,1,0) --> {1,0,1,0}
+---pattern.from({1,0},{1,0}) --> {1,0,1,0}
 ---```
 ---@param ... PulseValue|(PulseValue[])
 ---@return Pattern
@@ -97,7 +129,7 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from(1, 0)
----local p2 = p:copy() --- {1,0}
+---local p2 = p:copy() --> {1,0}
 ---```
 ---@return Pattern
 ---@nodiscard
@@ -105,15 +137,15 @@ function pattern.copy(self)
   return pattern.from(self:unpack())
 end
 
----Create an new pattern or spread and existing pattern evenly within the given length. 
+---Create an new pattern or spread and existing pattern evenly within the given length.
 ---Similar, but not exactly like `euclidean`.
 ---
 ---Shortcut for `pattern.from{1,1,1}:spread(length / #self):rotate(offset)`
 ---
 ---### examples:
 ---```lua
----local p = pattern.distributed(3, 8) --- {1,0,0,1,0,1,0}
----p = pattern.from{1,1}:distributed(4, 1) --- {0,1,0,1}
+---pattern.distributed(3, 8) --> {1,0,0,1,0,1,0}
+---pattern.from{1,1}:distributed(4, 1) --> {0,1,0,1}
 ---```
 ---@param steps table|integer Existing pattern or number of on steps in the pattern.
 ---@param length integer Number of total steps in the pattern.
@@ -135,54 +167,16 @@ function pattern.distributed(steps, length, offset, empty_value)
   return from:spread(length / #from, empty_value):rotate(offset or 0)
 end
 
----Guess empty pulse values from an existing pattern (implementation detail).
-local function empty_pulse_value(table)
-  if type(table) == "table" then
-    for _, v in pairs(table) do
-      -- special case for numbers, which are more likely notes when > 1
-      if type(v) == "number" then
-        if v > 1 then
-          return {}
-        end
-      end
-      local value = empty_pulse_values[type(v)]
-      if value ~= nil then
-        return value
-      end
-    end
-  end
-  return 0
-end
-
----Merge/add two tables (implementation detail).
-local function join_tables(a, b)
-  local c = { table.unpack(a) }
-  for i = 1, #b do
-    table.insert(c, b[i])
-  end
-  return c
-end
-
----Recursive euclidean pattern impl (implementation detail).
-local function euclidean_impl(front, back)
-  if #back < 2 then
-    return join_tables(front, back)
-  end
-  local newFront = {}
-  while #front > 0 and #back > 0 do
-    table.insert(newFront, join_tables(table.remove(front), table.remove(back)))
-  end
-  return euclidean_impl(newFront, join_tables(front, back))
-end
-
 ---Create a new euclidean rhythm pattern with the given pulses or number of new pulses
 ---in the given length and optionally rotate the contents.
 ---[Euclidean Rhythm](https://en.wikipedia.org/wiki/Euclidean_rhythm)
 ---
 ---### examples:
 ---```lua
----local p = pattern.euclidean(3, 8) -- {1,0,0,1,0,0,1,0} 
----p = pattern.from{"x", "x", "x"}:euclidean(8, 0, "-") -- {"x","-","-","x","-","-","x","-"} 
+---pattern.euclidean(3, 8)
+--- --> {1,0,0,1,0,0,1,0}
+---pattern.from{"a", "b", "c"}:euclidean(8, 0, "-")
+--- --> {"a","-","-","b","-","-","c","-"}
 ---```
 ---@param steps table|integer Existing pattern or number of on steps in the pattern.
 ---@param length integer Number of total steps in the pattern.
@@ -207,6 +201,26 @@ function pattern.euclidean(steps, length, offset, empty_value)
   assert(type(offset) == "number" or offset == nil,
     "invalid offset argument (must be an integer or nil)")
   empty_value = empty_value or empty_pulse_value(steps)
+  -- merge/add two tables
+  local function join_tables(a, b)
+    local c = { table.unpack(a) }
+    for i = 1, #b do
+      table.insert(c, b[i])
+    end
+    return c
+  end
+  -- recursive euclidean pattern impl
+  local function euclidean_impl(front, back)
+    if #back < 2 then
+      return join_tables(front, back)
+    end
+    local newFront = {}
+    while #front > 0 and #back > 0 do
+      table.insert(newFront, join_tables(table.remove(front), table.remove(back)))
+    end
+    return euclidean_impl(newFront, join_tables(front, back))
+  end
+  -- apply
   if #front == 0 then
     local result = pattern.new();
     for _ = 1, length do
@@ -262,8 +276,8 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,2,3,4}
----p = p:subrange(2,3) -- {2,3}
----p = p:subrange(1,4,"X") -- {2,3,"X","X"}
+---p = p:subrange(2,3) --> {2,3}
+---p = p:subrange(1,4,"X") --> {2,3,"X","X"}
 ---```
 ---@param i integer Subrange start
 ---@param j integer? Subrange end (defaults to pattern length)
@@ -288,8 +302,8 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,2,3,4}
----p = p:take(2) -- {1,2}
----p = p:take(4, "") -- {1,2,"",""}
+---p = p:take(2) --> {1,2}
+---p = p:take(4, "") --> {1,2,"",""}
 ---```
 ---@param length integer
 ---@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
@@ -307,8 +321,8 @@ end
 ---
 ---### examples:
 ---```lua
----local p = pattern.from{0,0}
----p:clear() -- {}
+---local p = pattern.from{1,0}
+---p:clear() --> {}
 ---```
 function pattern.clear(self)
   while #self > 0 do
@@ -322,8 +336,8 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{0,0}
----p:init(1) -- {1,1}
----p:init("X", 3) -- {"X","X", "X"}
+---p:init(1) --> {1,1}
+---p:init("X", 3) --> {"X","X", "X"}
 ---```
 ---@param value PulseValue|fun(index: integer):PulseValue
 ---@param length integer?
@@ -351,9 +365,9 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,3,5}
----p:map(function(k, v) 
+---p:map(function(k, v)
 ---  return scale("c", "minor"):degree(v)
----end) -- {48, 51, 55}
+---end) --> {48, 51, 55}
 ---```
 ---@param fun fun(index: integer, value: PulseValue): PulseValue
 function pattern.map(self, fun)
@@ -369,7 +383,7 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,2,3}
----p:reverse() -- {3,2,1}
+---p:reverse() --> {3,2,1}
 ---```
 function pattern.reverse(self)
   local num = #self
@@ -385,8 +399,8 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,0,0}
----p:rotate(1) -- {0,1,0}
----p:rotate(-2) -- {0,0,1}
+---p:rotate(1) --> {0,1,0}
+---p:rotate(-2) --> {0,0,1}
 ---```
 ---@param amount integer
 function pattern.rotate(self, amount)
@@ -414,10 +428,10 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.new()
----p:push_back(1) -- {1}
----p:push_back(2,3) -- {1,2,3}
----p:push_back{4} -- {1,2,3,4}
----p:push_back({5,{6,7}) -- {1,2,3,4,5,6,7}
+---p:push_back(1) --> {1}
+---p:push_back(2,3) --> {1,2,3}
+---p:push_back{4} --> {1,2,3,4}
+---p:push_back({5,{6,7}) --> {1,2,3,4,5,6,7}
 ---```
 ---@param ... PulseValue|(PulseValue)[]
 function pattern.push_back(self, ...)
@@ -445,9 +459,9 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from({1,2})
----p:pop_back() -- {1}
----p:pop_back() -- {}
----p:pop_back() -- {}
+---p:pop_back() --> {1}
+---p:pop_back() --> {}
+---p:pop_back() --> {}
 ---```
 ---@return PulseValue
 function pattern.pop_back(self)
@@ -459,7 +473,7 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,2,3}
----patterns:repeat_n(2) -- {1,2,3,1,2,3}
+---patterns:repeat_n(2) --> {1,2,3,1,2,3}
 ---```
 ---@param count integer
 function pattern.repeat_n(self, count)
@@ -481,8 +495,8 @@ end
 ---### examples:
 ---```lua
 ---local p = pattern.from{1,1}
----p:spread(2) -- {1,0,1,0}
----p:spread(0.5) -- {1,1}
+---p:spread(2) --> {1,0,1,0}
+---p:spread(1/2) --> {1,1}
 ---```
 ---@param amount number Spread factor (2 = double, 0.5 = half the size).
 ---@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
@@ -501,4 +515,20 @@ function pattern.spread(self, amount, empty_value)
     end
   end
   return self
+end
+
+----------------------------------------------------------------------------------------------------
+--- Conversion
+----------------------------------------------------------------------------------------------------
+
+---Serialze a pattern for display/debugging purposes.
+---
+---### examples:
+---```lua
+---pattern.euclidean(3, 8):tostring() --> "{1, 1, 1, 0}"
+---```
+---@return string
+---@nodiscard
+pattern.tostring = function(self)
+  return table.tostring(self)
 end
