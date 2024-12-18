@@ -54,6 +54,6 @@
 > }
 > ```
 > See:
->   * [math.random](file:///c%3A/Users/emuell/Development/Crates/afseq/types/nerdo/library/math.lua#36#9) function arguments
->   * [math.randomseed](file:///c%3A/Users/emuell/Development/Crates/afseq/types/nerdo/library/math.lua#46#9) seeding  
+>   * [math.random](file:///c%3A/Users/emuell/Development/Crates/afseq/types/nerdo/library/extensions/math.lua#36#9) function arguments
+>   * [math.randomseed](file:///c%3A/Users/emuell/Development/Crates/afseq/types/nerdo/library/extensions/math.lua#46#9) seeding  
 

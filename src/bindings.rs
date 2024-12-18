@@ -579,7 +579,7 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up initialization
     lazy_static! {
         static ref MATH_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
-            include_str!("../types/nerdo/library/math.lua"),
+            include_str!("../types/nerdo/library/extensions/math.lua"),
             "[inbuilt:math.lua]"
         );
     }
@@ -658,7 +658,7 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up initialization
     lazy_static! {
         static ref TABLE_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
-            include_str!("../types/nerdo/library/table.lua"),
+            include_str!("../types/nerdo/library/extensions/table.lua"),
             "[inbuilt:table.lua]"
         );
     }
