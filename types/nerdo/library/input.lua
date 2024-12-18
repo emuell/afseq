@@ -43,7 +43,7 @@ local InputParameter = {}
 ---Contains functions to construct new input parameters. Input parameter values can be accessed
 ---via functionn `contexts` in pattern, gate and emitter functions or generators.
 ---@class Parameter
-local parameter = {}
+parameter = {}
 
 ---Creates an InputParameter with "boolean" Lua type with the given default value
 ---and other optional properties.
