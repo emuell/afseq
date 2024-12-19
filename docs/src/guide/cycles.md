@@ -139,8 +139,8 @@ return rhythm {
     parameter.enum("mode", "major", {"major", "minor"})
   },
   emit = cycle("I V III VI"):map(
-    function(context, value)
-      local s = scale("c4", context.inputs.mode)
+    function(init_context, value)
+      local s = scale("c4", init_context.inputs.mode)
       return function(context, value)
         return value ~= "_" and s:chord(value) or value
       end
