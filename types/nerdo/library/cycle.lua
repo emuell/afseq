@@ -46,7 +46,8 @@ local Cycle = {}
 ---})
 -----Using a static map table with targets
 ---cycle("bd:1 <bd:5, bd:7>"):map({
----  bd = { key = "c4", volume = 0.5 }, -- instrument #1,5,7 will be set as specified
+---  -- instrument #1,5,7 will be set as specified
+---  bd = { key = "c4", volume = 0.5 },
 ---})
 -----Using a dynamic map function
 ---cycle("4 5 4 <5 [4|6]>"):map(function(context, value)

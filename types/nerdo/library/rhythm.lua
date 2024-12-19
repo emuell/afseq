@@ -177,9 +177,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ----- stateful generator function
 ---pattern = function(_init_context)
----  local triggers = table.create({0, 6, 10})
+---  local triggers = table.new{ 0, 6, 10 }
 ---  return function(context)
----    return triggers:find((context.step - 1) % 16) ~= nil
+---    local step = (context.step - 1) % 16
+---    return triggers:contains(step)
 ---  end
 ---end
 ---
@@ -257,7 +258,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ----- a note pattern
 ---local tritone = scale("c5", "tritone")
----...
+---.. -- instrument #1,5,7 will be set as specified.
 ---emit = pattern.from(tritone:chord(1, 4)):euclidean(6) +
 ---  pattern.from(tritone:chord(5, 4)):euclidean(6)
 ---

@@ -72,7 +72,7 @@ Static pattern.
 ```lua
 return rhythm {
   pattern = { 1, 0, 0, 1 },
-  -- ...
+  emit = "c4"
 }
 ```
 
@@ -80,7 +80,7 @@ return rhythm {
 ```lua
 return rhythm {
   pattern = { 1, { 1, 1, 1 } },
-  -- ...
+  emit = "c4"
 }
 ```
 
@@ -88,7 +88,7 @@ Static pattern created using the "pattern" lib
 ```lua
 return rhythm {
   pattern = pattern.from{1, 0} * 5 + {1, 1}
-  -- ...
+  emit = "c4"
 }
 ```
 
@@ -96,7 +96,7 @@ Euclidean pattern created using the "patterns" lib.
 ```lua
 return rhythm {
   pattern = pattern.euclidean(7, 16, 2),
-  -- ...
+  emit = "c4"
 }
 ```
 
@@ -106,7 +106,7 @@ return rhythm {
   pattern = function(_context)
     return math.random(0, 1)
   end
-  -- ...
+  emit = "c4"
 }
 ```
 
@@ -115,13 +115,13 @@ Stateful generator.
 return rhythm {
   pattern = function(_init_context)
     local rand = math.randomstate(12345)
-    local triggers = table.create({0, 6, 10})
+    local triggers = table.new{ 0, 6, 10 }
     return function(context)
-      return rand() > 0.8 and 
-        triggers:find((context.pulse_step - 1) % 16) ~= nil
+      local step = (context.pulse_step - 1) % 16
+      return rand() > 0.8 and triggers:contains(step)
     end
   end
-  -- ...
+  emit = "c4"
 }
 ```
 
