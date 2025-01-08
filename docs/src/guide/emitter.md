@@ -43,7 +43,7 @@ To ease distinguishing polyponic contents, use [`sequence`](../API/sequence.md) 
 
 Dynamic emitter functions return **single note events**. Each incoming, possibly filtered, [gated](./gate.md) impulse from the [pattern](./pattern.md) will trigger the emit function to create the next event as long as the pattern is running.   
 
-» `emit = function(_context) return math.random() > 0.5 and "c4" or "c5" end` *randomly emit c4 or c5 notes*
+» `emit = function(context) return math.random() > 0.5 and "c4" or "c5" end` *randomly emit c4 or c5 notes*
 
 » `emit = function(context) return context.pulse_count % 2 == 1 and "c4" or "c5" end` *alternate c4 and c5 notes*
 
@@ -97,7 +97,7 @@ return rhythm {
 Stateless function.
 ```lua
 return rhythm {
-  emit = function(_context)
+  emit = function(context)
     return 48 + math.random(1, 4) * 5
   end
 }
@@ -106,9 +106,9 @@ return rhythm {
 Stateful generator.
 ```lua
 return rhythm {
-  emit = function(_init_context)
+  emit = function(init_context)
     local count, step, notes = 1, 2, scale("c5", "minor").notes
-    return function(_context)
+    return function(context)
       local key = notes[count]
       count = (count + step - 1) % #notes + 1
       return { key = key, volume = 0.5 }

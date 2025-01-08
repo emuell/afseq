@@ -143,18 +143,15 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field inputs? InputParameter[]
 ---
----Specify the rhythmical pattern of the emitter. Each pulse with a value of 1 or true
----will cause an event from the `emitter` property to be triggered in the emitters
----time unit. 0 or nil values never trigger, and values in-between do *maybe* trigger.
+---Specify the rhythmical pattern of the rhythm. With the default `gate` implementation, 
+---each pulse with a value of `1` or `true` will cause an event from the `emitter` property
+---to be triggered in the emitters time unit. `0`, `false` or `nil` values do not trigger.
 ---
----To create deterministic random patterns, seed the random number generator before
----creating the rhythm via `math.randomseed(some_seed)`
----
----Patterns can contains subdivisions, sub tables of pulses, to "cram" multiple pulses
+---Patterns may contains subdivisions, sub tables of pulses, to "cram" multiple pulses
 ---into a single pulse's time interval. This way more complex rhythmical patterns can
 ---be created.
 ---
----When no pattern is defined, a constant pulse of `1` is triggered by the rhythm.
+---When no pattern is defined, a constant pulse value of `1` is triggered.
 ---
 ---Just like the `emitter` property, patterns can either be a static array of values
 ---or a function or generators which produces values dynamically.
@@ -171,12 +168,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---pattern = pattern.euclidean(7, 16, 2)
 ---
 ----- stateless pattern function
----pattern = function(_context)
+---pattern = function(context)
 ---  return math.random(0, 1)
 ---end
 ---
 ----- stateful generator function
----pattern = function(_init_context)
+---pattern = function(init_context)
 ---  local triggers = table.new{ 0, 6, 10 }
 ---  return function(context)
 ---    local step = (context.step - 1) % 16
@@ -242,14 +239,14 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---emit = sequence{"c4", "g4"}:volume(0.5)
 ---
 ----- stateless generator function
----emit = function(_context)
+---emit = function(context)
 ---  return 48 + math.random(1, 4) * 5
 ---end
 ---
 ----- stateful generator function
----emit = function(_init_context)
+---emit = function(init_context)
 ---  local count, step, notes = 1, 2, scale("c5", "minor").notes
----  return function(_context)
+---  return function(context)
 ---    local key = notes[count]
 ---    count = (count + step - 1) % #notes + 1
 ---    return { key = key, volume = 0.5 }
@@ -275,48 +272,54 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---### examples:
 ---```lua
+-----trigger notes in an euclidean triplet pattern
+---return rhythm {
+---  unit = "1/16",
+---  resolution = 4/3,
+---  pattern = pattern.euclidean(12, 16),
+---  emit = { "c4", "g4", { "c5 v0.7", "g5 v0.4" }, "a#4" }
+---}
+---
 ----- trigger a chord sequence every 4 bars after 4 bars
 ---return rhythm {
 ---  unit = "bars",
 ---  resolution = 4,
 ---  offset = 1,
----  emit = sequence("c4'm", note("g3'm7"):transpose({0, 12, 0, 0}))
----}
----
------trigger notes in an euclidean triplet pattern
----return rhythm {
----  unit = "1/8",
----  resolution = 3/2,
----  pattern = pattern.euclidean(6, 16, 2),
----  emit = sequence("c3", "c3", note{ "c4", "a4" }:volume(0.75))
+---  emit = { 
+---    note("c4'm"), 
+---    note("g3'm7"):transpose({ 0, 12, 0, 0 })
+---  }
 ---}
 ---
 -----trigger notes in a seeded, random subdivision pattern
----math.randomseed(23498)
+---local seed = 23498
 ---return rhythm {
 ---  unit = "1/8",
 ---  pattern = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
----  emit = { "c4" },
+---  gate = function(init_context) 
+---    local rand = math.randomstate(seed)
+---    return function(context)
+---      return context.pulse_value > rand()
+---    end
+---  end,
+---  emit = { "c4" }
 ---}
 ---
------trigger random notes in a random pattern from a pentatonic scale
+-----trigger random notes in a seeded random pattern from a pentatonic scale
+---local cmin = scale("c5", "pentatonic minor").notes
 ---return rhythm {
 ---  unit = "1/16",
 ---  pattern = function(context)
 ---    return (context.pulse_step % 4 == 1) or (math.random() > 0.8)
 ---  end,
----  emit = function(_init_context)
----    local cmin = scale("c5", "pentatonic minor").notes
----    return function(_context)
----      return { key = cmin[math.random(#cmin)], volume = 0.7 }
----    end
+---  emit = function(context)
+---    return { key = cmin[math.random(#cmin)], volume = 0.7 }
 ---  end
 ---}
 ---
------play a seeded tidal cycle
----math.randomseed(9347565)
+-----emit a tidal cycle every new bar
 ---return rhythm {
----  unit = "bars", -- emit one cycle per bar
+---  unit = "bars",
 ---  emit = cycle("[c4 [f5 f4]*2]|[c4 [g5 g4]*3]")
 ---}
 -----

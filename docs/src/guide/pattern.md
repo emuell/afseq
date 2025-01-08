@@ -46,7 +46,7 @@ Each number value in the specified Lua table represents a single pulse in the rh
 
 When using a Lua function instead of a table as a pattern generator, you can dynamically generate pulse values.
 
-» `pattern = function(_context) return math.random() end` *randomly emit pulse values between 0 and 1*
+» `pattern = function(context) return math.random() end` *randomly emit pulse values between 0 and 1*
 
 The expected return value of a dynamic pattern function is a pulse value (`true`, `false`, `0`, `1`) or `nil`.
 
@@ -87,7 +87,7 @@ return rhythm {
 Static pattern created using the "pattern" lib
 ```lua
 return rhythm {
-  pattern = pattern.from{1, 0} * 5 + {1, 1}
+  pattern = pattern.from{1, 0} * 5 + {1, 1},
   emit = "c4"
 }
 ```
@@ -103,9 +103,9 @@ return rhythm {
 Stateless function.
 ```lua
 return rhythm {
-  pattern = function(_context)
+  pattern = function(context)
     return math.random(0, 1)
-  end
+  end,
   emit = "c4"
 }
 ```
@@ -113,14 +113,14 @@ return rhythm {
 Stateful generator.
 ```lua
 return rhythm {
-  pattern = function(_init_context)
+  pattern = function(init_context)
     local rand = math.randomstate(12345)
     local triggers = table.new{ 0, 6, 10 }
     return function(context)
       local step = (context.pulse_step - 1) % 16
       return rand() > 0.8 and triggers:contains(step)
     end
-  end
+  end,
   emit = "c4"
 }
 ```
