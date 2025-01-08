@@ -31,7 +31,7 @@ The Lua API uses configuration tables to define the rhythm and their sub-compone
 │ Passes or suppresses pattern pulses.                   │
 │        ↓                                               │
 │ ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┐                                        │
-│ │  *Emitter*  │ e.g. sequence{ "c4", "d#4", "g#" }     │
+│ │  *Emitter*  │ e.g. sequence{ "c4", "d#4", "g#4" }    │
 │ └┄┄┄┄┄┄┄┄┄┄┄┄┄┘                                        │
 │ Generates events for each incoming filtered pulse.     │
 └────────────────────────────────────────────────────────┘
@@ -87,40 +87,23 @@ return rhythm {
 }
 ```
 
-A rhythm with a static pattern, dynamic seeded probablility gate and a dynamic emitter.
+A rhythm with a static pattern and emitter and a dynamic seeded probablility gate.
 
 ```lua
 -- change for other variations or set to nil to get *really* random behavior 
-local seed = 2234
+local seed = 12345678
 
--- maybe emits events, using pulse values as probability
 return rhythm {
-  unit = "1/8",
-
-  pattern = { 1, { 1, 0.1, 0.5 }, 1, { 1, 0, 0, 0.5 } },
-
-  gate = function(_init_context)
-    -- create a local random number generator for the probability
+  unit = "1/4",
+  pattern = { 1, { 1, 0.1, 0.2 }, 1, { 1, 0, 0, 0.3 } },
+  gate = function(init_context)
     local rand = math.randomstate(seed)
     return function(context)
-      -- use pulse value as trigger probability
+      -- use pulse values as trigger probabilities
       return context.pulse_value >= rand() 
     end
   end,
-  
-  emit = function(_init_context)
-    -- create a local random number generator for the humanizing delay
-    local rand = math.randomstate(seed)
-    return function(context)
-      local volume, delay = 1.0, 0.0
-      if context.pulse_time < 1 then
-        -- lower volume and add a delay for events in sub patterns
-        volume = context.pulse_time
-        delay = rand() * 0.05
-      end
-      return { key = "c4", volume = volume, delay = delay }
-    end
-  end,
+  emit = { "c4'-7 v0.6", "d#4'M v0.4", "g4'- v0.3" },
 }
 ```
 

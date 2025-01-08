@@ -95,7 +95,7 @@
 >   return math.random(0, 11) + value * 12
 > end)
 > --Using a dynamic map function generator
-> cycle("4 5 4 <4 [5|7]>"):map(function(_init_context)
+> cycle("4 5 4 <4 [5|7]>"):map(function(init_context)
 >   local notes = scale("c", "minor").notes
 >   return function(context, value)
 >     -- emit a 'cmin' note arp with 'value' as octave
@@ -105,9 +105,9 @@
 >   end
 > end)
 > --Using a dynamic map function to map values to chord degrees
-> cycle("1 5 1 [6|7]"):map(function(_init_context)
+> cycle("1 5 1 [6|7]"):map(function(init_context)
 >   local cmin = scale("c", "minor")
->   return function(_context, value)
+>   return function(context, value)
 >     return note(cmin:chord(tonumber(value)))
 >   end
 > end)

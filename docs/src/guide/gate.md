@@ -12,7 +12,7 @@ Seeded probability gate, using the pattern pulse values as probability.
 ```lua
 return rhythm {
   pattern = { 0, { 0.5, 1 }, 1, { 1, 0.8 } },
-  gate = function(_init_context)
+  gate = function(init_context)
     local rand = math.randomstate(12366)
     return function(context)
       return context.pulse_value > rand()
