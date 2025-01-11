@@ -493,7 +493,8 @@ impl Value {
             Value::Hold => Target::None,
             Value::Integer(i) => Target::Index(*i),
             Value::Float(f) => Target::Index(*f as i32),
-            Value::Pitch(p) => Target::Name(Rc::from(format!("{:?}", p))), // TODO might not be the best conversion idea
+            // TODO might not be the best conversion idea
+            Value::Pitch(p) => Target::Name(Rc::from(format!("{:?}", p))),
             Value::Chord(p, m) => Target::Name(Rc::from(format!("{:?}'{}", p, m))),
             Value::Name(n) => Target::Name(Rc::clone(n)),
         }
@@ -733,6 +734,22 @@ impl Events {
             value: Value::Rest,
             target: Target::None,
         })
+    }
+
+    fn get_length(&self) -> Fraction {
+        match self {
+            Events::Single(s) => s.length,
+            Events::Multi(m) => m.length,
+            Events::Poly(p) => p.length,
+        }
+    }
+
+    fn get_span(&self) -> Span {
+        match self {
+            Events::Single(s) => s.span.clone(),
+            Events::Multi(m) => m.span.clone(),
+            Events::Poly(p) => p.span.clone(),
+        }
     }
 
     /// Fits a list of events into a Span of 0..1
@@ -1228,16 +1245,9 @@ impl CycleParser {
         }
     }
 
-    // TODO allow for polymeter count other than single
     fn polymeter_tail(pair: Pair<Rule>) -> Result<Step, String> {
         if let Some(count) = pair.clone().into_inner().next() {
-            Self::step(count).and_then(|step| match &step {
-                Step::Single(s) => match s.value {
-                    Value::Integer(_) | Value::Float(_) => Ok(step),
-                    _ => Err(format!("invalid multiplier: {:?}", step)),
-                },
-                _ => Err(format!("invalid multiplier: {:?}", step)),
-            })
+            Self::step(count)
         } else {
             Err(format!("missing polymeter count '{}'", pair.as_str()))
         }
@@ -1364,14 +1374,11 @@ impl CycleParser {
             .next()
             .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
             .and_then(Self::step)?;
-        match right {
-            Step::Single(_) => Ok(Step::DynamicExpression(DynamicExpression {
-                left: Box::new(left),
-                right: Box::new(right),
-                op,
-            })),
-            _ => Err("only single values are supported on the right hand side".to_string()),
-        }
+        Ok(Step::DynamicExpression(DynamicExpression {
+            left: Box::new(left),
+            right: Box::new(right),
+            op,
+        }))
     }
 
     fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
@@ -1468,6 +1475,84 @@ impl Cycle {
         Ok(events)
     }
 
+    // helper to calculate the right multiplier for polymeter and dynamic expressions
+    fn step_multiplier(step: &Step, value: &Value) -> Fraction {
+        match step {
+            Step::Polymeter(pm) => {
+                let length = pm.length() as f64;
+                let count = value.to_float().unwrap_or(0.0);
+                Fraction::from(count) / Fraction::from(length)
+            }
+            Step::DynamicExpression(e) => Fraction::from(if let Some(right) = value.to_float() {
+                if e.op == DynamicOp::Slow() {
+                    if right != 0.0 {
+                        1.0 / right
+                    } else {
+                        0.0
+                    }
+                } else {
+                    right
+                }
+            } else {
+                0.0
+            }),
+            _ => Fraction::from(1),
+        }
+    }
+
+    // output a multiplied pattern expression with support for patterns on the right side
+    fn output_dynamic(
+        right: &Step,
+        step: &Step,
+        state: &mut CycleState,
+        cycle: u32,
+        limit: usize,
+    ) -> Result<Events, String> {
+        let left = match step {
+            Step::Polymeter(pm) => pm.steps.as_ref(),
+            Step::DynamicExpression(exp) => exp.left.as_ref(),
+            _ => step,
+        };
+        match right {
+            // multiply with single values to avoid generating events
+            Step::Single(single) => {
+                let mult = Self::step_multiplier(step, &single.value);
+                Self::output_multiplied(left, state, cycle, mult, limit)
+            }
+            _ => {
+                // generate and flatten the events for the right side of the expression
+                let events = Self::output(right, state, cycle, limit)?;
+                let mut channels: Vec<Vec<Event>> = vec![];
+                events.flatten(&mut channels, 0);
+
+                // extract a float to use as mult from each event and output the step with it
+                let mut channel_events: Vec<Events> = Vec::with_capacity(channels.len());
+                for channel in channels.into_iter() {
+                    let mut multi_events: Vec<Events> = Vec::with_capacity(channel.len());
+                    for event in channel {
+                        let mult = Self::step_multiplier(step, &event.value);
+                        let mut partial_events =
+                            Self::output_multiplied(left, state, cycle, mult, limit)?;
+                        partial_events.crop(&event.span);
+                        multi_events.push(partial_events);
+                    }
+                    channel_events.push(Events::Multi(MultiEvents {
+                        length: events.get_length(),
+                        span: events.get_span(),
+                        events: multi_events,
+                    }));
+                }
+
+                // put all the resulting events back together
+                Ok(Events::Poly(PolyEvents {
+                    length: events.get_length(),
+                    span: events.get_span(),
+                    channels: channel_events,
+                }))
+            }
+        }
+    }
+
     // recursively output events for the entire cycle based on some state (random seed)
     fn output(
         step: &Step,
@@ -1532,14 +1617,7 @@ impl Cycle {
                 Self::output(&cs.choices[choice], state, cycle, limit)?
             }
             Step::Polymeter(pm) => {
-                let step = pm.steps.as_ref();
-                let length = pm.length();
-                let count: usize = match pm.count.as_ref() {
-                    Step::Single(s) => s.value.to_integer().unwrap_or(1) as usize,
-                    _ => 1,
-                };
-                let mult = Fraction::from(count) / Fraction::from(length);
-                Self::output_multiplied(step, state, cycle, mult, limit)?
+                Self::output_dynamic(pm.count.as_ref(), step, state, cycle, limit)?
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1581,23 +1659,7 @@ impl Cycle {
                 }
             }
             Step::DynamicExpression(e) => {
-                #[allow(clippy::single_match)]
-                // TODO support something other than Step::Single as the right hand side
-                match e.right.as_ref() {
-                    Step::Single(s) => {
-                        if let Some(right) = s.value.to_float() {
-                            let mult = Fraction::from(if e.op == DynamicOp::Slow() {
-                                1.0 / right
-                            } else {
-                                right
-                            });
-                            Self::output_multiplied(e.left.as_ref(), state, cycle, mult, limit)?
-                        } else {
-                            Events::empty()
-                        }
-                    }
-                    _ => Events::empty(),
-                }
+                Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?
             }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
@@ -1758,7 +1820,6 @@ mod test {
         assert!(Cycle::from("a b--- c [d").is_err());
         assert!(Cycle::from("*a b c [d").is_err());
         assert!(Cycle::from("a {{{}}").is_err());
-        assert!(Cycle::from("a*[]").is_err());
         assert!(Cycle::from("] a z [").is_err());
         assert!(Cycle::from("->err").is_err());
         assert!(Cycle::from("(a, b)").is_err());
@@ -1779,6 +1840,7 @@ mod test {
 
     #[test]
     fn generate() -> Result<(), String> {
+        assert_eq!(Cycle::from("a*[]")?.generate()?, [[]]);
         assert_eq!(
             Cycle::from("a b c d")?.generate()?,
             [[
@@ -1972,7 +2034,7 @@ mod test {
                     Event::at(F::from(0), F::from(1)).with_chord(0, 4, "chord")
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "-^7"),
+                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "-^7")
                 ]],
                 vec![vec![Event::at(F::from(0), F::from(1)).with_name("c6a_name")]],
             ],
@@ -2183,6 +2245,41 @@ mod test {
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(2u8, 3u8)).with_int(0),
+                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                ]],
+            ],
+        )?;
+
+        assert_cycles(
+            "0*<1 2>",
+            vec![
+                vec![vec![Event::at(F::from(0), F::from(1)).with_int(0)]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 2u8)).with_int(0),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_int(0),
+                ]],
+            ],
+        )?;
+
+        assert_eq!(
+            Cycle::from("0*[4 3]")?.generate()?,
+            [[
+                Event::at(F::from(0), F::new(1u8, 4u8)).with_int(0),
+                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(0),
+                Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(0),
+            ]]
+        );
+
+        assert_cycles(
+            "{0 1 2 3}%<2 3>",
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 2u8)).with_int(0),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_int(1),
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 3u8)).with_int(3),
+                    Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_int(0),
                     Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
                 ]],
             ],
