@@ -74,7 +74,7 @@ function Scale:notes_iter(count) end
 ---### examples:
 ---```lua
 ---local cmin = scale("c4", "minor")
----cmin:fit("c4", "d4", "f4") -> 48, 50, 53 (cmaj -> cmin)
+---cmin:fit("c4", "d4", "f4") --> 48, 50, 53 (cmaj -> cmin)
 ---```
 ---@param ... NoteValue
 ---@return integer[]

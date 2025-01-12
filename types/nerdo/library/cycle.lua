@@ -44,16 +44,22 @@ local Cycle = {}
 ---  bd = "c4",
 ---  sn = "e4 #1 v0.2"
 ---})
+---```
+---```lua
 -----Using a static map table with targets
 ---cycle("bd:1 <bd:5, bd:7>"):map({
----  -- instrument #1,5,7 will be set as specified
+---  -- instrument #1,5,7 are set additionally, as specified
 ---  bd = { key = "c4", volume = 0.5 },
 ---})
+---```
+---```lua
 -----Using a dynamic map function
 ---cycle("4 5 4 <5 [4|6]>"):map(function(context, value)
 ---  -- emit a random note with 'value' as octave
 ---  return math.random(0, 11) + value * 12
 ---end)
+---```
+---```lua
 -----Using a dynamic map function generator
 ---cycle("4 5 4 <4 [5|7]>"):map(function(init_context)
 ---  local notes = scale("c", "minor").notes
@@ -64,6 +70,8 @@ local Cycle = {}
 ---    return { key = note + octave * 12 }
 ---  end
 ---end)
+---```
+---```lua
 -----Using a dynamic map function to map values to chord degrees
 ---cycle("1 5 1 [6|7]"):map(function(init_context)
 ---  local cmin = scale("c", "minor")
@@ -91,12 +99,16 @@ function Cycle:map(map) end
 --- ```lua
 -----A chord sequence
 ---cycle("[c4, e4, g4] [e4, g4, b4] [g4, b4, d5] [b4, d5, f#5]")
+---```
+---```lua
 -----Arpeggio pattern with variations
 ---cycle("<c4 e4 g4> <e4 g4> <g4 b4 d5> <b4 f5>")
+---```
+---```lua
 -----Euclidean Rhythms
 ---cycle("c4(3,8) e4(5,8) g4(7,8)")
------Polyrhythm
----cycle("{c4 e4 g4 b4}%2, {f4 d4 a4}%4")
+---```
+---```lua
 -----Map custom identifiers to notes
 ---cycle("bd(3,8)"):map({ bd = "c4 #1" })
 --- ```
