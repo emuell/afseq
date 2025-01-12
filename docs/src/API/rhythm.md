@@ -19,7 +19,8 @@
 >   pattern = pattern.euclidean(12, 16),
 >   emit = { "c4", "g4", { "c5 v0.7", "g5 v0.4" }, "a#4" }
 > }
-> 
+> ```
+> ```lua
 > -- trigger a chord sequence every 4 bars after 4 bars
 > return rhythm {
 >   unit = "bars",
@@ -30,7 +31,8 @@
 >     note("g3'm7"):transpose({ 0, 12, 0, 0 })
 >   }
 > }
-> 
+> ```
+> ```lua
 > --trigger notes in a seeded, random subdivision pattern
 > local seed = 23498
 > return rhythm {
@@ -44,7 +46,8 @@
 >   end,
 >   emit = { "c4" }
 > }
-> 
+> ```
+> ```lua
 > --trigger random notes in a seeded random pattern from a pentatonic scale
 > local cmin = scale("c5", "pentatonic minor").notes
 > return rhythm {
@@ -56,13 +59,13 @@
 >     return { key = cmin[math.random(#cmin)], volume = 0.7 }
 >   end
 > }
-> 
+> ```
+> ```lua
 > --emit a tidal cycle every new bar
 > return rhythm {
 >   unit = "bars",
 >   emit = cycle("[c4 [f5 f4]*2]|[c4 [g5 g4]*3]")
 > }
-> --
 > ```  
 
 
@@ -95,16 +98,28 @@
 > create other less common rhythm bases.
 > #### examples:
 > ```lua
-> unit = "beats", resolution = 1.01 --> slightly off beat pulse
-> unit = "1/16", resolution = 4/3 --> triplet
+> -- slightly off beat pulse
+> unit = "beats", 
+> resolution = 1.01
+> ```
+> ```lua
+> -- triplet
+> unit = "1/16", 
+> resolution = 4/3
 > ```
 
 ### resolution : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#resolution}
 > Factor which is applied on `unit` to specify the final time resolution of the emitter.
 > #### examples:
 > ```lua
-> unit = "beats", resolution = 1.01 --> slightly off beat pulse
-> unit = "1/16", resolution = 4/3 --> triplet
+> -- slightly off beat pulse
+> unit = "beats",
+> resolution = 1.01
+> ```
+> ```lua
+> -- triplet
+> unit = "1/16",
+> resolution = 4/3
 > ```
 
 ### offset : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#offset}
@@ -112,9 +127,10 @@
 > When set, the rhythm's event output will be delayed by the given offset value.
 > #### examples:
 > ```lua
+> -- start emitting after 4*4 beats
 > unit = "1/4",
 > resolution = 4,
-> offset = 4 -- start emitting after 4*4 beats
+> offset = 4
 > ```
 
 ### inputs : [`InputParameter`](../API/input.md#InputParameter)[] {#inputs}
@@ -126,11 +142,11 @@
 > ```lua
 > -- trigger a single note as specified by input parameter 'note'
 > -- when input parameter 'enabled' is true, else triggers nothing.
+> return rhythm {
 >   inputs = {
 >     parameter.boolean("enabled", true),
 >     parameter.integer("note", 48, { 0, 127 })
 >   },
-> -- [...]
 >   emit = function(context)
 >     if context.inputs.enabled then -- boolean value
 >       return note(context.inputs.note) -- integer value
@@ -138,6 +154,7 @@
 >       return nil
 >     end
 >   end
+> }
 > ```
 
 ### pattern : [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)[] | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md) | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md) {#pattern}
@@ -158,27 +175,31 @@
 > ```lua
 > -- static pattern
 > pattern = { 1, 0, 0, 1 }
+> ```
+> ```lua
 > -- "cram" pulses into a single pulse slot via subdivisions
 > pattern = { 1, { 1, 1, 1 } }
-> 
+> ```
+> ```lua
 > -- patterns created via the "patterns" lib
 > pattern = pattern.from{ 1, 0 } * 3 + { 1, 1 }
 > pattern = pattern.euclidean(7, 16, 2)
-> 
+> ```
+> ```lua
 > -- stateless pattern function
 > pattern = function(context)
 >   return math.random(0, 1)
 > end
-> 
+> ```
+> ```lua
 > -- stateful generator function
 > pattern = function(init_context)
 >   local triggers = table.new{ 0, 6, 10 }
 >   return function(context)
->     local step = (context.step - 1) % 16
+>     local step = (context.pulse_step - 1) % 16
 >     return triggers:contains(step)
 >   end
 > end
-> 
 > ```
 
 ### repeats : [`boolean`](../API/builtins/boolean.md) | [`integer`](../API/builtins/integer.md) {#repeats}
@@ -192,10 +213,14 @@
 > 
 > #### examples:
 > ```lua
-> repeat = 0 -- one-shot
-> repeat = false -- also a one-shot
-> repeat = 3 -- play the pattern 4 times
-> repeat = true -- play & repeat forever
+> -- one-shot
+> repeat = 0
+> -- also a one-shot
+> repeat = false
+> -- play the pattern 4 times
+> repeat = 3
+> -- play & repeat forever (default)
+> repeat = true
 > ```
 
 ### gate : (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) | (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) {#gate}
@@ -212,6 +237,12 @@
 > -- maybe passed, using the pulse value as probablility.
 > gate = function(context)
 >   return context.pulse_value > math.random()
+> end
+> ```
+> ```lua
+> -- threshold gate: skips all pulse values below a given threshold value
+> gate = function(context)
+>   return context.pulse_value > 0.5
 > end
 > ```
 
@@ -231,16 +262,22 @@
 > ```lua
 > -- a sequence of c4, g4
 > emit = {"c4", "g4"}
+> ```
+> ```lua
 > -- a chord of c4, d#4, g4
 > emit = {{"c4", "d#4", "g4"}} -- or {"c4'min"}
+> ```
+> ```lua
 > -- a sequence of c4, g4 with volume 0.5
 > emit = sequence{"c4", "g4"}:volume(0.5)
-> 
+> ```
+> ```lua
 > -- stateless generator function
 > emit = function(context)
 >   return 48 + math.random(1, 4) * 5
 > end
-> 
+> ```
+> ```lua
 > -- stateful generator function
 > emit = function(init_context)
 >   local count, step, notes = 1, 2, scale("c5", "minor").notes
@@ -250,16 +287,17 @@
 >     return { key = key, volume = 0.5 }
 >   end
 > end
-> 
+> ```
+> ```lua
 > -- a note pattern
 > local tritone = scale("c5", "tritone")
-> .. -- instrument #1,5,7 will be set as specified.
+> --[...]
 > emit = pattern.from(tritone:chord(1, 4)):euclidean(6) +
 >   pattern.from(tritone:chord(5, 4)):euclidean(6)
-> 
+> ```
+> ```lua
 > -- a tidal cycle
-> emit = cycle("<[a3 c4 e4 a4]*3 [d4 g3 g4 c4]>")
-> --
+> emit = cycle("<[a3 c4 e4 a4]*3 [d4 g3 g4 c4]>"),
 > ```
 
   
