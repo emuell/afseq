@@ -9,7 +9,7 @@ run:
     cargo run --release --example=play-script --features=player
 
 docs-generate-api:
-    cd docs/generate && cargo run -- "../../types/nerdo/library" "../src"
+    cd docs && cargo run
 
 docs-build: docs-generate-api
     cd docs && mdbook build

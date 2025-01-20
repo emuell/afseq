@@ -7,10 +7,6 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"args": [
-				"${workspaceFolder}/../types/nerdo/library",
-				"${workspaceFolder}/src"
-			],
 			"group": "build",
 			"label": "build: API docs"
 		},

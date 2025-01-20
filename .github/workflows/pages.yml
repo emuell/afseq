@@ -20,18 +20,16 @@ jobs:
         with: 
           cache-workspaces: "docs"
 
-      - name: Generate API
+      - name: Install mdbook
         run: |
-          cd docs
-          ./generate/get-lua-ls.sh
-          cargo run -- "../types/nerdo/library" "./src"
-
-      - name: Build
-        run: |
-          cd docs
           cargo install mdbook --no-default-features --features search --vers "^0.4" --locked
           cargo install mdbook-linkcheck mdbook-toc mdbook-alerts
-          mdbook build
+
+      - name: Generate API
+        run: cd docs && cargo run
+
+      - name: Build Book
+        run: cd docs && mdbook build
 
       - name: Upload
         uses: actions/upload-pages-artifact@v3
