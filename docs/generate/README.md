@@ -1,20 +1,12 @@
 # AFSEQ API Documentation Generator
 
-This is a rust app that generates the API definition chapters in the [AFSEQ book](https://emuell.github.io/afseq/) from the [Lua API definition](../../types/nerdo/) files.
+This app generates the API definition chapters in the [AFSEQ book](https://emuell.github.io/afseq/) from the [Lua API definition](../../types/nerdo/) files using [luals-docs-gen](https://github.com/emuell/luals-docs-gen).
 
-It is based on [matt-allan's](https://github.com/matt-allan) [mdbook-luacat](https://github.com/matt-allan/mdbook-luacats)  tool.
+## Requirements
 
+[Rust](https://www.rust-lang.org/tools/install) v1.78 or higher
 
-## Building 
-
-### Requirements
-
-- [rust](https://www.rust-lang.org/tools/install) v1.56 or higher
-- [LuaLS](https://github.com/luals/lua-language-server) installation
-
-Note: The LuaLS installation must be placed into the folder [./lua-language-server](./lua-language-server) folder and **must be patched**. Use [get-lua-ls.sh](./get-lua-ls.sh) to do so before building!
-
-### Building
+## Building
 
 To create or update the API definitions chapter, build and run the app, then build the book:
 
@@ -22,9 +14,9 @@ To create or update the API definitions chapter, build and run the app, then bui
 # in the afseq root directory
 cd docs 
 # build and run the generate app to create the API definition
-cargo run -- ../../types/nerdo/ ./src 
-# serve or build the book
-mdbook serve 
+cargo run
+# build or serve the book with the updated API definition
+mdbook serve
 ```
 
 ---
@@ -34,10 +26,3 @@ Alternatively, if you have vscode installed, open the afseq `./docs` folder and 
 - `build: API Docs`: compiles and runs the API docs generator
 - `build: book`: compiles the mdbook
 - `serve: book`: serve and live update the book at //localhost:3000 
-
-
-## Debugging
-
-If you have vscode installed, open the afseq `./docs` folder in vscode and use the `Debug: 'Generate API'` launch action.
-
-To debug and build the full API definition, change the launch arguments in the file [.vscode/launch.json](../.vscode/launch.json).
