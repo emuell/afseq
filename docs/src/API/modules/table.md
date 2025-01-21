@@ -1,8 +1,8 @@
-# table {#table}  
+# table<a name="table"></a>  
 
 ---  
 ## Functions
-### new(t : [`table`](../../API/builtins/table.md)[`?`](../../API/builtins/nil.md)) {#new}
+### new(t : [`table`](../../API/builtins/table.md)[`?`](../../API/builtins/nil.md))<a name="new"></a>
 `->`[`table`](../../API/builtins/table.md) | tablelib  
 
 > Create a new empty table, or convert an exiting table to an object that uses the global
@@ -13,7 +13,7 @@
 > t = table.new(); t:insert("a"); print(t[1]) -> "a";
 > t = table.new{1,2,3}; print(t:concat("|")); -> "1|2|3";
 > ```
-### contains(t : [`table`](../../API/builtins/table.md), value : [`any`](../../API/builtins/any.md), start_index : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md)) {#contains}
+### contains(t : [`table`](../../API/builtins/table.md), value : [`any`](../../API/builtins/any.md), start_index : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md))<a name="contains"></a>
 `->`[`boolean`](../../API/builtins/boolean.md)  
 
 > Test if the table contains an entry matching the given value,
@@ -25,7 +25,7 @@
 > t = {a=1, b=2}; table.contains(t, 2) --> true
 > t = {"a", "b"}; table.contains(t, "c") --> false
 > ```
-### find(t : [`table`](../../API/builtins/table.md), value : [`any`](../../API/builtins/any.md), start_index : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md)) {#find}
+### find(t : [`table`](../../API/builtins/table.md), value : [`any`](../../API/builtins/any.md), start_index : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md))<a name="find"></a>
 `->`key : [`any`](../../API/builtins/any.md)  
 
 > Find first match of given value, starting from element
@@ -40,11 +40,11 @@
 > t = {"a", "b", "a"}; table.find(t, "a", 2) --> "3"
 > t = {"a", "b"}; table.find(t, "c") --> nil
 > ```
-### tostring(t : [`table`](../../API/builtins/table.md)) {#tostring}
+### tostring(t : [`table`](../../API/builtins/table.md))<a name="tostring"></a>
 `->`[`string`](../../API/builtins/string.md)  
 
 > Serialze a table to a string for display/debugging purposes.
-### copy(t : [`table`](../../API/builtins/table.md)) {#copy}
+### copy(t : [`table`](../../API/builtins/table.md))<a name="copy"></a>
 `->`[`table`](../../API/builtins/table.md)  
 
 > Copy the metatable and all elements non recursively into a new table.

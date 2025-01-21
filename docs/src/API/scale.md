@@ -1,11 +1,10 @@
-
+# scale
 <!-- toc -->
-
-# Global {#Global}  
+# Global<a name="Global"></a>  
 
 ---  
 ## Functions
-### scale(key : [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md), mode : [`ScaleMode`](#ScaleMode)) {#scale}
+### scale(key : [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md), mode : [`ScaleMode`](#ScaleMode))<a name="scale"></a>
 `->`[`Scale`](../API/scale.md#Scale)  
 
 > Create a new scale from the given key notes and a mode name.
@@ -73,7 +72,7 @@
 >     | "spanish eight-tone"
 >     | "nine-tone"
 > ```
-### `scale_names()` {#scale_names}
+### `scale_names()`<a name="scale_names"></a>
 `->`[`string`](../API/builtins/string.md)[]  
 
 > Return supported scale mode names.  
@@ -82,7 +81,7 @@
 
 ---  
 ## Aliases  
-### DegreeValue {#DegreeValue}
+### DegreeValue<a name="DegreeValue"></a>
 [`integer`](../API/builtins/integer.md) | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
 > ```lua
 > -- Roman number or plain number as degree in range [1 - 7]
@@ -96,11 +95,11 @@
 >     | "vii"
 > ```  
   
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
-### ScaleMode {#ScaleMode}
+### ScaleMode<a name="ScaleMode"></a>
 [`string`](../API/builtins/string.md) | `"all minor"` | `"augmented"` | `"blues major"` | `"blues minor"` | `"chromatic"` | `"diminished half"` | `"diminished whole"` | `"dorian"` | `"enigmatic"` | `"harmonic major"` | `"harmonic minor"` | `"hungarian gypsy"` | `"locrian major"` | `"locrian"` | `"lydian augmented"` | `"lydian"` | `"major"` | `"melodic minor"` | `"minor"` | `"mixolydian"` | `"natural major"` | `"natural minor"` | `"neapolitan major"` | `"neapolitan minor"` | `"nine-tone"` | `"overtone"` | `"pentatonic egyptian"` | `"pentatonic major"` | `"pentatonic minor"` | `"phrygian dominant"` | `"phrygian"` | `"prometheus"` | `"romanian minor"` | `"spanish eight-tone"` | `"spanish gypsy"` | `"super locrian"` | `"tritone"` | `"whole tone"`  
 > ```lua
 > -- Available scale mode names.
@@ -148,18 +147,18 @@
 
 
 
-# Scale {#Scale}  
+# Scale<a name="Scale"></a>  
 
 ---  
 ## Properties
-### notes : [`integer`](../API/builtins/integer.md)[] {#notes}
+### notes : [`integer`](../API/builtins/integer.md)[]<a name="notes"></a>
 > Scale note values as integers, in ascending order of the mode, starting from the scale's key note.
 
   
 
 ---  
 ## Functions
-### chord([*self*](../API/builtins/self.md), degree : [`DegreeValue`](#DegreeValue), note_count : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)) {#chord}
+### chord([*self*](../API/builtins/self.md), degree : [`DegreeValue`](#DegreeValue), note_count : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md))<a name="chord"></a>
 `->`notes : [`integer`](../API/builtins/integer.md)[]  
 
 > Create a chord from the given degree, built from the scale's intervals.
@@ -184,7 +183,7 @@
 >     | "vi"
 >     | "vii"
 > ```
-### degree([*self*](../API/builtins/self.md), ...[`DegreeValue`](#DegreeValue)) {#degree}
+### degree([*self*](../API/builtins/self.md), ...[`DegreeValue`](#DegreeValue))<a name="degree"></a>
 `->`... : [`integer`](../API/builtins/integer.md)  
 
 > Get a single or multiple notes by its degree from the scale, using the given roman
@@ -211,7 +210,7 @@
 >     | "vi"
 >     | "vii"
 > ```
-### notes_iter([*self*](../API/builtins/self.md), count : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)) {#notes_iter}
+### notes_iter([*self*](../API/builtins/self.md), count : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md))<a name="notes_iter"></a>
 `->`() `->` [`integer`](../API/builtins/integer.md) | [`nil`](../API/builtins/nil.md)  
 
 > Create an iterator function that returns up to `count` notes from the scale.
@@ -232,7 +231,7 @@
 > -- same using the `pattern` library
 > local notes = pattern.new(16):init(cmaj.notes_iter())
 > ```
-### fit([*self*](../API/builtins/self.md), ...[`NoteValue`](#NoteValue)) {#fit}
+### fit([*self*](../API/builtins/self.md), ...[`NoteValue`](#NoteValue))<a name="fit"></a>
 `->`[`integer`](../API/builtins/integer.md)[]  
 
 > Fit given note value(s) into scale by moving them to the nearest note in the scale.
@@ -247,7 +246,7 @@
 
 ---  
 ## Aliases  
-### DegreeValue {#DegreeValue}
+### DegreeValue<a name="DegreeValue"></a>
 [`integer`](../API/builtins/integer.md) | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
 > ```lua
 > -- Roman number or plain number as degree in range [1 - 7]
@@ -261,7 +260,7 @@
 >     | "vii"
 > ```  
   
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   

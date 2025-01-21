@@ -1,11 +1,10 @@
-
+# chord
 <!-- toc -->
-
-# Global {#Global}  
+# Global<a name="Global"></a>  
 
 ---  
 ## Functions
-### chord(key : [`NoteValue`](#NoteValue), mode : [`ChordName`](#ChordName)) {#chord}
+### chord(key : [`NoteValue`](#NoteValue), mode : [`ChordName`](#ChordName))<a name="chord"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Create a new chord from the given key notes and a chord name or an array of custom intervals.
@@ -89,7 +88,7 @@
 >     | "9sus2"
 >     | "9sus4"
 > ```
-### `chord_names()` {#chord_names}
+### `chord_names()`<a name="chord_names"></a>
 `->`[`string`](../API/builtins/string.md)[]  
 
 > Return supported chord names.  
@@ -98,7 +97,7 @@
 
 ---  
 ## Aliases  
-### ChordName {#ChordName}
+### ChordName<a name="ChordName"></a>
 [`string`](../API/builtins/string.md) | `"7#5"` | `"7b5"` | `"7b9"` | `"7sus2"` | `"7sus4"` | `"9sus2"` | `"9sus4"` | `"add11"` | `"add13"` | `"add9"` | `"augmented"` | `"diminished"` | `"diminished7"` | `"dom11"` | `"dom13"` | `"dom7"` | `"dom9"` | `"eleven"` | `"five"` | `"major"` | `"major11"` | `"major13"` | `"major7"` | `"major9"` | `"minor"` | `"minor#5"` | `"minor11"` | `"minor13"` | `"minor6"` | `"minor69"` | `"minor7"` | `"minor7#5"` | `"minor7#9"` | `"minor7b5"` | `"minor7b9"` | `"minor9"` | `"minorMajor7"` | `"nine"` | `"six"` | `"sixNine"` | `"sus2"` | `"sus4"` | `"thirteen"`  
 > ```lua
 > -- Available chords.
@@ -148,7 +147,7 @@
 >     | "9sus4"
 > ```  
   
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   

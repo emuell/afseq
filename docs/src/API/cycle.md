@@ -1,11 +1,10 @@
-
+# cycle
 <!-- toc -->
-
-# Global {#Global}  
+# Global<a name="Global"></a>  
 
 ---  
 ## Functions
-### cycle(input : [`string`](../API/builtins/string.md)) {#cycle}
+### cycle(input : [`string`](../API/builtins/string.md))<a name="cycle"></a>
 `->`[`Cycle`](../API/cycle.md#Cycle)  
 
 >  Create a note sequence from a Tidal Cycles mini-notation string.
@@ -38,23 +37,23 @@
 
 ---  
 ## Aliases  
-### CycleMapFunction {#CycleMapFunction}
+### CycleMapFunction<a name="CycleMapFunction"></a>
 (context : [`CycleMapContext`](../API/cycle.md#CycleMapContext), value : [`string`](../API/builtins/string.md)) `->` [`CycleMapNoteValue`](#CycleMapNoteValue)  
   
   
-### CycleMapGenerator {#CycleMapGenerator}
+### CycleMapGenerator<a name="CycleMapGenerator"></a>
 (context : [`CycleMapContext`](../API/cycle.md#CycleMapContext), value : [`string`](../API/builtins/string.md)) `->` [`CycleMapFunction`](#CycleMapFunction)  
   
   
-### CycleMapNoteValue {#CycleMapNoteValue}
+### CycleMapNoteValue<a name="CycleMapNoteValue"></a>
 [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`NoteValue`](#NoteValue)[]  
   
   
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
-### PlaybackState {#PlaybackState}
+### PlaybackState<a name="PlaybackState"></a>
 `"running"` | `"seeking"`  
 > ```lua
 > -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
@@ -68,11 +67,11 @@
 
 
 
-# Cycle {#Cycle}  
+# Cycle<a name="Cycle"></a>  
 
 ---  
 ## Functions
-### map([*self*](../API/builtins/self.md), map : [`CycleMapFunction`](#CycleMapFunction) | [`CycleMapGenerator`](#CycleMapGenerator) | {  }) {#map}
+### map([*self*](../API/builtins/self.md), map : [`CycleMapFunction`](#CycleMapFunction) | [`CycleMapGenerator`](#CycleMapGenerator) | {  })<a name="map"></a>
 `->`[`Cycle`](../API/cycle.md#Cycle)  
 
 > Map names in in the cycle to custom note events.
@@ -129,23 +128,23 @@
 
 ---  
 ## Aliases  
-### CycleMapFunction {#CycleMapFunction}
+### CycleMapFunction<a name="CycleMapFunction"></a>
 (context : [`CycleMapContext`](../API/cycle.md#CycleMapContext), value : [`string`](../API/builtins/string.md)) `->` [`CycleMapNoteValue`](#CycleMapNoteValue)  
   
   
-### CycleMapGenerator {#CycleMapGenerator}
+### CycleMapGenerator<a name="CycleMapGenerator"></a>
 (context : [`CycleMapContext`](../API/cycle.md#CycleMapContext), value : [`string`](../API/builtins/string.md)) `->` [`CycleMapFunction`](#CycleMapFunction)  
   
   
-### CycleMapNoteValue {#CycleMapNoteValue}
+### CycleMapNoteValue<a name="CycleMapNoteValue"></a>
 [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`NoteValue`](#NoteValue)[]  
   
   
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
-### PlaybackState {#PlaybackState}
+### PlaybackState<a name="PlaybackState"></a>
 `"running"` | `"seeking"`  
 > ```lua
 > -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
@@ -159,45 +158,45 @@
 
 
 
-# CycleMapContext {#CycleMapContext}  
+# CycleMapContext<a name="CycleMapContext"></a>  
 > Context passed to 'cycle:map` functions.  
 
 ---  
 ## Properties
-### playback : [`PlaybackState`](#PlaybackState) {#playback}
+### playback : [`PlaybackState`](#PlaybackState)<a name="playback"></a>
 > Specifies how the cycle currently is running.
 
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_note}
-> Note value that triggered, started the rhythm, if any.
-
-### channel : [`integer`](../API/builtins/integer.md) {#channel}
+### channel : [`integer`](../API/builtins/integer.md)<a name="channel"></a>
 > channel/voice index within the cycle. each channel in the cycle gets emitted and thus mapped
 > separately, starting with the first channel index 1.
 
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#trigger_volume}
-> Note volume that triggered, started the rhythm, if any.
-
-### step : [`integer`](../API/builtins/integer.md) {#step}
+### step : [`integer`](../API/builtins/integer.md)<a name="step"></a>
 > Continues step counter for each channel, incrementing with each new mapped value in the cycle.
 > Starts from 1 when the cycle starts running or after it got reset.
 
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_offset}
-> Note slice offset value that triggered, started the rhythm, if any.
-
-### step_length : [`number`](../API/builtins/number.md) {#step_length}
+### step_length : [`number`](../API/builtins/number.md)<a name="step_length"></a>
 > step length fraction within the cycle, where 1 is the total duration of a single cycle run.
 
-### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)> {#inputs}
+### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
+> Note value that triggered, started the rhythm, if any.
+
+### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
+> Note volume that triggered, started the rhythm, if any.
+
+### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
+> Note slice offset value that triggered, started the rhythm, if any.
+
+### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
 > Current input parameter values, using parameter ids as keys
 > and the actual parameter value as value.
 
-### beats_per_min : [`number`](../API/builtins/number.md) {#beats_per_min}
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
 > Project's tempo in beats per minutes.
 
-### beats_per_bar : [`integer`](../API/builtins/integer.md) {#beats_per_bar}
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
 > Project's beats per bar setting.
 
-### samples_per_sec : [`integer`](../API/builtins/integer.md) {#samples_per_sec}
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
 > Project's sample rate in samples per second.
 
   
@@ -206,7 +205,7 @@
 
 ---  
 ## Aliases  
-### PlaybackState {#PlaybackState}
+### PlaybackState<a name="PlaybackState"></a>
 `"running"` | `"seeking"`  
 > ```lua
 > -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
