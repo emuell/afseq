@@ -20,11 +20,12 @@ jobs:
         with: 
           cache-workspaces: "docs"
 
+      - name: Install binstall
+        uses: cargo-bins/cargo-binstall@main
+        
       - name: Install mdbook
-        run: |
-          cargo install mdbook --no-default-features --features search --vers "^0.4" --locked
-          cargo install mdbook-linkcheck mdbook-toc mdbook-alerts
-
+        run: cargo binstall -y mdbook mdbook-linkcheck mdbook-toc mdbook-alerts
+  
       - name: Generate API
         run: cd docs && cargo run
 
