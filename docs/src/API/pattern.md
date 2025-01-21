@@ -1,7 +1,6 @@
-
+# pattern
 <!-- toc -->
-
-# Pattern {#Pattern}  
+# Pattern<a name="Pattern"></a>  
 > Array alike table with helper functions to ease creating rhythmic patterns.
 > 
 > #### examples:
@@ -37,7 +36,7 @@
 
 ---  
 ## Functions
-### new(length : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), value : [`PulseValue`](#PulseValue) | (index : [`integer`](../API/builtins/integer.md)) `->` [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md)) {#new}
+### new(length : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), value : [`PulseValue`](#PulseValue) | (index : [`integer`](../API/builtins/integer.md)) `->` [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="new"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Create a new empty pattern or pattern with the given length and pulse value.
@@ -48,7 +47,7 @@
 > pattern.new(4,1) --> {1,1,1,1}
 > pattern.new(4, function() return math.random() end)
 > ```
-### from(...[`PulseValue`](#PulseValue) | [`PulseValue`](#PulseValue)[]) {#from}
+### from(...[`PulseValue`](#PulseValue) | [`PulseValue`](#PulseValue)[])<a name="from"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Create a new pattern from an existing set of values or tables.
@@ -59,7 +58,7 @@
 > pattern.from(1,0,1,0) --> {1,0,1,0}
 > pattern.from({1,0},{1,0}) --> {1,0,1,0}
 > ```
-### copy(self : [`Pattern`](../API/pattern.md#Pattern)) {#copy}
+### copy(self : [`Pattern`](../API/pattern.md#Pattern))<a name="copy"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 >  create a shallow-copy of the given pattern (or self)
@@ -69,7 +68,7 @@
 > local p = pattern.from(1, 0)
 > local p2 = p:copy() --> {1,0}
 > ```
-### distributed(steps : [`integer`](../API/builtins/integer.md) | [`table`](../API/builtins/table.md), length : [`integer`](../API/builtins/integer.md), offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md)) {#distributed}
+### distributed(steps : [`integer`](../API/builtins/integer.md) | [`table`](../API/builtins/table.md), length : [`integer`](../API/builtins/integer.md), offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="distributed"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Create an new pattern or spread and existing pattern evenly within the given length.
@@ -82,7 +81,7 @@
 > pattern.distributed(3, 8) --> {1,0,0,1,0,1,0}
 > pattern.from{1,1}:distributed(4, 1) --> {0,1,0,1}
 > ```
-### euclidean(steps : [`integer`](../API/builtins/integer.md) | [`table`](../API/builtins/table.md), length : [`integer`](../API/builtins/integer.md), offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md)) {#euclidean}
+### euclidean(steps : [`integer`](../API/builtins/integer.md) | [`table`](../API/builtins/table.md), length : [`integer`](../API/builtins/integer.md), offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="euclidean"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Create a new euclidean rhythm pattern with the given pulses or number of new pulses
@@ -96,7 +95,7 @@
 > pattern.from{"a", "b", "c"}:euclidean(8, 0, "-")
 >  --> {"a","-","-","b","-","-","c","-"}
 > ```
-### unpack(self : [`Pattern`](../API/pattern.md#Pattern)) {#unpack}
+### unpack(self : [`Pattern`](../API/pattern.md#Pattern))<a name="unpack"></a>
 `->`... : [`PulseValue`](#PulseValue)  
 
 > Shortcut for table.unpack(pattern): returns elements from this pattern as var args.
@@ -106,7 +105,7 @@
 > local p = pattern.from{1,2,3,4}
 > local v1, v2, v3, v4 = p:unpack()
 > ```
-### subrange(self : [`Pattern`](../API/pattern.md#Pattern), i : [`integer`](../API/builtins/integer.md), j : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md)) {#subrange}
+### subrange(self : [`Pattern`](../API/pattern.md#Pattern), i : [`integer`](../API/builtins/integer.md), j : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="subrange"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Get sub range from the pattern as new pattern.
@@ -118,7 +117,7 @@
 > p = p:subrange(2,3) --> {2,3}
 > p = p:subrange(1,4,"X") --> {2,3,"X","X"}
 > ```
-### take(self : [`Pattern`](../API/pattern.md#Pattern), length : [`integer`](../API/builtins/integer.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md)) {#take}
+### take(self : [`Pattern`](../API/pattern.md#Pattern), length : [`integer`](../API/builtins/integer.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="take"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Get first n items from the pattern as new pattern.
@@ -130,7 +129,7 @@
 > p = p:take(2) --> {1,2}
 > p = p:take(4, "") --> {1,2,"",""}
 > ```
-### clear(self : [`Pattern`](../API/pattern.md#Pattern)) {#clear}
+### clear(self : [`Pattern`](../API/pattern.md#Pattern))<a name="clear"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Clear a pattern, remove all its contents.
@@ -140,7 +139,7 @@
 > local p = pattern.from{1,0}
 > p:clear() --> {}
 > ```
-### init(self : [`Pattern`](../API/pattern.md#Pattern), value : [`PulseValue`](#PulseValue) | (index : [`integer`](../API/builtins/integer.md)) `->` [`PulseValue`](#PulseValue), length : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)) {#init}
+### init(self : [`Pattern`](../API/pattern.md#Pattern), value : [`PulseValue`](#PulseValue) | (index : [`integer`](../API/builtins/integer.md)) `->` [`PulseValue`](#PulseValue), length : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md))<a name="init"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Fill pattern with the given value or generator function in length.
@@ -151,7 +150,7 @@
 > p:init(1) --> {1,1}
 > p:init("X", 3) --> {"X","X", "X"}
 > ```
-### map(self : [`Pattern`](../API/pattern.md#Pattern), fun : (index : [`integer`](../API/builtins/integer.md), value : [`PulseValue`](#PulseValue)) `->` [`PulseValue`](#PulseValue)) {#map}
+### map(self : [`Pattern`](../API/pattern.md#Pattern), fun : (index : [`integer`](../API/builtins/integer.md), value : [`PulseValue`](#PulseValue)) `->` [`PulseValue`](#PulseValue))<a name="map"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Apply the given function to every item in the pattern.
@@ -163,7 +162,7 @@
 >   return scale("c", "minor"):degree(v)
 > end) --> {48, 51, 55}
 > ```
-### reverse(self : [`Pattern`](../API/pattern.md#Pattern)) {#reverse}
+### reverse(self : [`Pattern`](../API/pattern.md#Pattern))<a name="reverse"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Invert the order of items.
@@ -173,7 +172,7 @@
 > local p = pattern.from{1,2,3}
 > p:reverse() --> {3,2,1}
 > ```
-### rotate(self : [`Pattern`](../API/pattern.md#Pattern), amount : [`integer`](../API/builtins/integer.md)) {#rotate}
+### rotate(self : [`Pattern`](../API/pattern.md#Pattern), amount : [`integer`](../API/builtins/integer.md))<a name="rotate"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Shift contents by the given amount to the left (negative amount) or right.
@@ -184,7 +183,7 @@
 > p:rotate(1) --> {0,1,0}
 > p:rotate(-2) --> {0,0,1}
 > ```
-### push_back(self : [`Pattern`](../API/pattern.md#Pattern), ...[`PulseValue`](#PulseValue)[] | [`PulseValue`](#PulseValue)) {#push_back}
+### push_back(self : [`Pattern`](../API/pattern.md#Pattern), ...[`PulseValue`](#PulseValue)[] | [`PulseValue`](#PulseValue))<a name="push_back"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Push a single or multiple number of items or other pattern contents to the end of the pattern.
@@ -198,7 +197,7 @@
 > p:push_back{4} --> {1,2,3,4}
 > p:push_back({5,{6,7}) --> {1,2,3,4,5,6,7}
 > ```
-### pop_back(self : [`Pattern`](../API/pattern.md#Pattern)) {#pop_back}
+### pop_back(self : [`Pattern`](../API/pattern.md#Pattern))<a name="pop_back"></a>
 `->`[`PulseValue`](#PulseValue)  
 
 > Remove an entry from the back of the pattern. returns the popped item.
@@ -210,7 +209,7 @@
 > p:pop_back() --> {}
 > p:pop_back() --> {}
 > ```
-### repeat_n(self : [`Pattern`](../API/pattern.md#Pattern), count : [`integer`](../API/builtins/integer.md)) {#repeat_n}
+### repeat_n(self : [`Pattern`](../API/pattern.md#Pattern), count : [`integer`](../API/builtins/integer.md))<a name="repeat_n"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Duplicate the pattern n times.
@@ -220,7 +219,7 @@
 > local p = pattern.from{1,2,3}
 > patterns:repeat_n(2) --> {1,2,3,1,2,3}
 > ```
-### spread(self : [`Pattern`](../API/pattern.md#Pattern), amount : [`number`](../API/builtins/number.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md)) {#spread}
+### spread(self : [`Pattern`](../API/pattern.md#Pattern), amount : [`number`](../API/builtins/number.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="spread"></a>
 `->`[`Pattern`](../API/pattern.md#Pattern)  
 
 > Expand (with amount > 1) or shrink (amount < 1) the length of the pattern by the
@@ -233,7 +232,7 @@
 > p:spread(2) --> {1,0,1,0}
 > p:spread(1/2) --> {1,1}
 > ```
-### tostring(self : [`Pattern`](../API/pattern.md#Pattern)) {#tostring}
+### tostring(self : [`Pattern`](../API/pattern.md#Pattern))<a name="tostring"></a>
 `->`[`string`](../API/builtins/string.md)  
 
 > Serialze a pattern for display/debugging purposes.
@@ -247,7 +246,7 @@
 
 ---  
 ## Aliases  
-### PulseValue {#PulseValue}
+### PulseValue<a name="PulseValue"></a>
 [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`table`](../API/builtins/table.md)  
 > Valid pulse value in a pattern  
   

@@ -1,11 +1,10 @@
-
+# note
 <!-- toc -->
-
-# Global {#Global}  
+# Global<a name="Global"></a>  
 
 ---  
 ## Functions
-### note(...[`NoteValue`](#NoteValue)) {#note}
+### note(...[`NoteValue`](#NoteValue))<a name="note"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 >  Create a new monophonic or polyphonic note (a chord) from a number value,
@@ -34,23 +33,23 @@
 
 ---  
 ## Aliases  
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
 
 
 
-# Note {#Note}  
+# Note<a name="Note"></a>  
 
 ---  
 ## Properties
-### notes : [`NoteTable`](../API/note.md#NoteTable)[] {#notes}
+### notes : [`NoteTable`](../API/note.md#NoteTable)[]<a name="notes"></a>
   
 
 ---  
 ## Functions
-### transpose([*self*](../API/builtins/self.md), step : [`integer`](../API/builtins/integer.md) | [`integer`](../API/builtins/integer.md)[]) {#transpose}
+### transpose([*self*](../API/builtins/self.md), step : [`integer`](../API/builtins/integer.md) | [`integer`](../API/builtins/integer.md)[])<a name="transpose"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Transpose the notes key with the specified step or steps.
@@ -63,7 +62,7 @@
 > note("c'maj"):transpose(5)
 > note("c'maj"):transpose({0, 0, -12})
 > ```
-### amplify([*self*](../API/builtins/self.md), factor : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[]) {#amplify}
+### amplify([*self*](../API/builtins/self.md), factor : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[])<a name="amplify"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Multiply the note's volume attribute with the specified factor or factors.
@@ -75,7 +74,7 @@
 > note({"c4 0.5", "g4"}):amplify(0.5)
 > note("c'maj 0.5"):amplify({2.0, 1.0, 0.3})
 > ```
-### volume([*self*](../API/builtins/self.md), volume : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[]) {#volume}
+### volume([*self*](../API/builtins/self.md), volume : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[])<a name="volume"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Set the note's volume attribute to the specified value or values.
@@ -86,38 +85,38 @@
 > note("c'maj"):volume(0.5)
 > note("c'maj"):volume({0.1, 0.2, 0.3})
 > ```
-### instrument([*self*](../API/builtins/self.md), instrument : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[]) {#instrument}
+### instrument([*self*](../API/builtins/self.md), instrument : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[])<a name="instrument"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Set the note's instrument attribute to the specified value or values.
-### panning([*self*](../API/builtins/self.md), panning : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[]) {#panning}
+### panning([*self*](../API/builtins/self.md), panning : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[])<a name="panning"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Set the note's panning attribute to the specified value or values.
-### delay([*self*](../API/builtins/self.md), delay : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[]) {#delay}
+### delay([*self*](../API/builtins/self.md), delay : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[])<a name="delay"></a>
 `->`[`Note`](../API/note.md#Note)  
 
 > Set the note's delay attribute to the specified value or values.  
 
 
 
-# NoteTable {#NoteTable}  
+# NoteTable<a name="NoteTable"></a>  
 
 ---  
 ## Properties
-### key : [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) {#key}
+### key : [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)<a name="key"></a>
 > Note Key
 
-### instrument : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#instrument}
+### instrument : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="instrument"></a>
 > Instrument/Sample/Patch >= 0
 
-### volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#volume}
+### volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="volume"></a>
 > Volume in range [0.0 - 1.0]
 
-### panning : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#panning}
+### panning : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="panning"></a>
 > Panning factor in range [-1.0 - 1.0] where 0 is center
 
-### delay : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#delay}
+### delay : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="delay"></a>
 > Delay factor in range [0.0 - 1.0]
 
   

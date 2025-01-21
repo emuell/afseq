@@ -1,11 +1,10 @@
-
+# rhythm
 <!-- toc -->
-
-# Global {#Global}  
+# Global<a name="Global"></a>  
 
 ---  
 ## Functions
-### rhythm(options : [`RhythmOptions`](../API/rhythm.md#RhythmOptions)) {#rhythm}
+### rhythm(options : [`RhythmOptions`](../API/rhythm.md#RhythmOptions))<a name="rhythm"></a>
 `->`[`userdata`](../API/builtins/userdata.md)  
 
 > Create a new rhythm with the given configuration.
@@ -72,11 +71,11 @@
 
 ---  
 ## Aliases  
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
-### Pulse {#Pulse}
+### Pulse<a name="Pulse"></a>
 [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)[] | `0` | `1` | [`nil`](../API/builtins/nil.md)  
 > ```lua
 > -- Single pulse value or a nested subdivision of pulses within a pattern.
@@ -88,12 +87,185 @@
 
 
 
-# RhythmOptions {#RhythmOptions}  
+# EmitterContext<a name="EmitterContext"></a>  
+> Context passed to 'emit' functions.  
+
+---  
+## Properties
+### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
+> Note value that triggered, started the rhythm, if any.
+
+### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
+> Note volume that triggered, started the rhythm, if any.
+
+### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
+> Note slice offset value that triggered, started the rhythm, if any.
+
+### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
+> Current input parameter values, using parameter ids as keys
+> and the actual parameter value as value.
+
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
+> Project's tempo in beats per minutes.
+
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
+> Project's beats per bar setting.
+
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
+> Project's sample rate in samples per second.
+
+### pulse_step : [`integer`](../API/builtins/integer.md)<a name="pulse_step"></a>
+> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+> Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
+> not emit events. Starts from 1 when the rhythm starts running or is reset.
+
+### pulse_time_step : [`number`](../API/builtins/number.md)<a name="pulse_time_step"></a>
+> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+> Starts from 0 and increases with each new pulse by the pulse's step time duration.
+
+### pulse_time : [`number`](../API/builtins/number.md)<a name="pulse_time"></a>
+> Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
+> will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
+> subdivision, relative to the parent subdivisions pulse step time.
+> #### examples:
+> ```lua
+> {1, {1, 1}} --> step times: {1, {0.5, 0.5}}
+> ```
+
+### pulse_value : [`number`](../API/builtins/number.md)<a name="pulse_value"></a>
+> Current pulse value. For binary pulses this will be 1, 0 pulse values will not cause the emitter
+> to be called, so they never end up here.
+> Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
+
+### playback : [`PlaybackState`](#PlaybackState)<a name="playback"></a>
+> Specifies how the emitter currently is running.
+
+### step : [`integer`](../API/builtins/integer.md)<a name="step"></a>
+> Continues step counter, incrementing with each new *emitted* pulse.
+> Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
+> how often the emit function already got called.
+> Starts from 1 when the rhythm starts running or is reset.
+
+  
+
+
+
+---  
+## Aliases  
+### PlaybackState<a name="PlaybackState"></a>
+`"running"` | `"seeking"`  
+> ```lua
+> -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
+> --   unnecessary computations while seeking, and only maintain your generator's internal state.
+> -- - *running*: The emitter is played back regularly. Results are audible.
+> PlaybackState:
+>     | "seeking"
+>     | "running"
+> ```  
+  
+
+
+
+# GateContext<a name="GateContext"></a>  
+> Context passed to `gate` functions.  
+
+---  
+## Properties
+### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
+> Note value that triggered, started the rhythm, if any.
+
+### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
+> Note volume that triggered, started the rhythm, if any.
+
+### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
+> Note slice offset value that triggered, started the rhythm, if any.
+
+### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
+> Current input parameter values, using parameter ids as keys
+> and the actual parameter value as value.
+
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
+> Project's tempo in beats per minutes.
+
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
+> Project's beats per bar setting.
+
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
+> Project's sample rate in samples per second.
+
+### pulse_step : [`integer`](../API/builtins/integer.md)<a name="pulse_step"></a>
+> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+> Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
+> not emit events. Starts from 1 when the rhythm starts running or is reset.
+
+### pulse_time_step : [`number`](../API/builtins/number.md)<a name="pulse_time_step"></a>
+> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+> Starts from 0 and increases with each new pulse by the pulse's step time duration.
+
+### pulse_time : [`number`](../API/builtins/number.md)<a name="pulse_time"></a>
+> Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
+> will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
+> subdivision, relative to the parent subdivisions pulse step time.
+> #### examples:
+> ```lua
+> {1, {1, 1}} --> step times: {1, {0.5, 0.5}}
+> ```
+
+### pulse_value : [`number`](../API/builtins/number.md)<a name="pulse_value"></a>
+> Current pulse value. For binary pulses this will be 1, 0 pulse values will not cause the emitter
+> to be called, so they never end up here.
+> Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
+
+  
+
+
+
+# PatternContext<a name="PatternContext"></a>  
+> Context passed to `pattern` and `gate` functions.  
+
+---  
+## Properties
+### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
+> Note value that triggered, started the rhythm, if any.
+
+### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
+> Note volume that triggered, started the rhythm, if any.
+
+### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
+> Note slice offset value that triggered, started the rhythm, if any.
+
+### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
+> Current input parameter values, using parameter ids as keys
+> and the actual parameter value as value.
+
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
+> Project's tempo in beats per minutes.
+
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
+> Project's beats per bar setting.
+
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
+> Project's sample rate in samples per second.
+
+### pulse_step : [`integer`](../API/builtins/integer.md)<a name="pulse_step"></a>
+> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+> Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
+> not emit events. Starts from 1 when the rhythm starts running or is reset.
+
+### pulse_time_step : [`number`](../API/builtins/number.md)<a name="pulse_time_step"></a>
+> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+> Starts from 0 and increases with each new pulse by the pulse's step time duration.
+
+  
+
+
+
+# RhythmOptions<a name="RhythmOptions"></a>  
 > Construction options for a new rhythm.  
 
 ---  
 ## Properties
-### unit : `"ms"` | `"seconds"` | `"bars"` | `"beats"` | `"1/1"` | `"1/2"` | `"1/4"` | `"1/8"` | `"1/16"` | `"1/32"` | `"1/64"` {#unit}
+### unit : `"ms"` | `"seconds"` | `"bars"` | `"beats"` | `"1/1"` | `"1/2"` | `"1/4"` | `"1/8"` | `"1/16"` | `"1/32"` | `"1/64"`<a name="unit"></a>
 > Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
 > create other less common rhythm bases.
 > #### examples:
@@ -108,7 +280,7 @@
 > resolution = 4/3
 > ```
 
-### resolution : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#resolution}
+### resolution : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="resolution"></a>
 > Factor which is applied on `unit` to specify the final time resolution of the emitter.
 > #### examples:
 > ```lua
@@ -122,7 +294,7 @@
 > resolution = 4/3
 > ```
 
-### offset : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#offset}
+### offset : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="offset"></a>
 > Optional offset in `unit * resolution` time units. By default 0.
 > When set, the rhythm's event output will be delayed by the given offset value.
 > #### examples:
@@ -133,7 +305,7 @@
 > offset = 4
 > ```
 
-### inputs : [`InputParameter`](../API/input.md#InputParameter)[] {#inputs}
+### inputs : [`InputParameter`](../API/input.md#InputParameter)[]<a name="inputs"></a>
 > Define optional input parameters for the rhythm. Input parameters can dynamically
 > change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern,
 > gate, emitter or cycle map generator functions.
@@ -157,7 +329,7 @@
 > }
 > ```
 
-### pattern : [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)[] | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md) | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md) {#pattern}
+### pattern : [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)[] | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md) | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)<a name="pattern"></a>
 > Specify the rhythmical pattern of the rhythm. With the default `gate` implementation, 
 > each pulse with a value of `1` or `true` will cause an event from the `emitter` property
 > to be triggered in the emitters time unit. `0`, `false` or `nil` values do not trigger.
@@ -202,7 +374,7 @@
 > end
 > ```
 
-### repeats : [`boolean`](../API/builtins/boolean.md) | [`integer`](../API/builtins/integer.md) {#repeats}
+### repeats : [`boolean`](../API/builtins/boolean.md) | [`integer`](../API/builtins/integer.md)<a name="repeats"></a>
 > If and how many times a pattern should repeat. When 0 or false, the pattern does not repeat
 > and plays back only once. When true, the pattern repeats endlessly, which is the default.
 > When a number > 0, this specifies the number of times the pattern repeats until it stops.
@@ -223,7 +395,7 @@
 > repeat = true
 > ```
 
-### gate : (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) | (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) {#gate}
+### gate : (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) | (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md)<a name="gate"></a>
 > Optional pulse train filter function or generator function which filters events between
 > the pattern and emitter. By default a threshold gate, which passes all pulse values
 > greater than zero. 
@@ -246,7 +418,7 @@
 > end
 > ```
 
-### emit : [`Cycle`](../API/cycle.md#Cycle) | [`Sequence`](../API/sequence.md#Sequence) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue)[] | (context : [`EmitterContext`](../API/rhythm.md#EmitterContext)) `->` [`NoteValue`](#NoteValue) | (context : [`EmitterContext`](../API/rhythm.md#EmitterContext)) `->` (context : [`EmitterContext`](../API/rhythm.md#EmitterContext)) `->` [`NoteValue`](#NoteValue) {#emit}
+### emit : [`Cycle`](../API/cycle.md#Cycle) | [`Sequence`](../API/sequence.md#Sequence) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue)[] | (context : [`EmitterContext`](../API/rhythm.md#EmitterContext)) `->` [`NoteValue`](#NoteValue) | (context : [`EmitterContext`](../API/rhythm.md#EmitterContext)) `->` (context : [`EmitterContext`](../API/rhythm.md#EmitterContext)) `->` [`NoteValue`](#NoteValue)<a name="emit"></a>
 > Specify the melodic pattern of the rhythm. For every pulse in the rhythmical pattern, the event
 > from the specified emit sequence. When the end of the sequence is reached, it starts again from
 > the beginning.
@@ -306,11 +478,11 @@
 
 ---  
 ## Aliases  
-### NoteValue {#NoteValue}
+### NoteValue<a name="NoteValue"></a>
 [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
-### Pulse {#Pulse}
+### Pulse<a name="Pulse"></a>
 [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)[] | `0` | `1` | [`nil`](../API/builtins/nil.md)  
 > ```lua
 > -- Single pulse value or a nested subdivision of pulses within a pattern.
@@ -318,179 +490,6 @@
 >     | 0
 >     | 1
 > ```  
-  
-
-
-
-# EmitterContext {#EmitterContext}  
-> Context passed to 'emit' functions.  
-
----  
-## Properties
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_note}
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#trigger_volume}
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_offset}
-> Note slice offset value that triggered, started the rhythm, if any.
-
-### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)> {#inputs}
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
-
-### beats_per_min : [`number`](../API/builtins/number.md) {#beats_per_min}
-> Project's tempo in beats per minutes.
-
-### beats_per_bar : [`integer`](../API/builtins/integer.md) {#beats_per_bar}
-> Project's beats per bar setting.
-
-### samples_per_sec : [`integer`](../API/builtins/integer.md) {#samples_per_sec}
-> Project's sample rate in samples per second.
-
-### pulse_step : [`integer`](../API/builtins/integer.md) {#pulse_step}
-> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
-> Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
-> not emit events. Starts from 1 when the rhythm starts running or is reset.
-
-### pulse_time_step : [`number`](../API/builtins/number.md) {#pulse_time_step}
-> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
-> Starts from 0 and increases with each new pulse by the pulse's step time duration.
-
-### pulse_time : [`number`](../API/builtins/number.md) {#pulse_time}
-> Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
-> will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
-> subdivision, relative to the parent subdivisions pulse step time.
-> #### examples:
-> ```lua
-> {1, {1, 1}} --> step times: {1, {0.5, 0.5}}
-> ```
-
-### pulse_value : [`number`](../API/builtins/number.md) {#pulse_value}
-> Current pulse value. For binary pulses this will be 1, 0 pulse values will not cause the emitter
-> to be called, so they never end up here.
-> Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
-
-### playback : [`PlaybackState`](#PlaybackState) {#playback}
-> Specifies how the emitter currently is running.
-
-### step : [`integer`](../API/builtins/integer.md) {#step}
-> Continues step counter, incrementing with each new *emitted* pulse.
-> Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
-> how often the emit function already got called.
-> Starts from 1 when the rhythm starts running or is reset.
-
-  
-
-
-
----  
-## Aliases  
-### PlaybackState {#PlaybackState}
-`"running"` | `"seeking"`  
-> ```lua
-> -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
-> --   unnecessary computations while seeking, and only maintain your generator's internal state.
-> -- - *running*: The emitter is played back regularly. Results are audible.
-> PlaybackState:
->     | "seeking"
->     | "running"
-> ```  
-  
-
-
-
-# GateContext {#GateContext}  
-> Context passed to `gate` functions.  
-
----  
-## Properties
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_note}
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#trigger_volume}
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_offset}
-> Note slice offset value that triggered, started the rhythm, if any.
-
-### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)> {#inputs}
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
-
-### beats_per_min : [`number`](../API/builtins/number.md) {#beats_per_min}
-> Project's tempo in beats per minutes.
-
-### beats_per_bar : [`integer`](../API/builtins/integer.md) {#beats_per_bar}
-> Project's beats per bar setting.
-
-### samples_per_sec : [`integer`](../API/builtins/integer.md) {#samples_per_sec}
-> Project's sample rate in samples per second.
-
-### pulse_step : [`integer`](../API/builtins/integer.md) {#pulse_step}
-> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
-> Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
-> not emit events. Starts from 1 when the rhythm starts running or is reset.
-
-### pulse_time_step : [`number`](../API/builtins/number.md) {#pulse_time_step}
-> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
-> Starts from 0 and increases with each new pulse by the pulse's step time duration.
-
-### pulse_time : [`number`](../API/builtins/number.md) {#pulse_time}
-> Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
-> will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in the
-> subdivision, relative to the parent subdivisions pulse step time.
-> #### examples:
-> ```lua
-> {1, {1, 1}} --> step times: {1, {0.5, 0.5}}
-> ```
-
-### pulse_value : [`number`](../API/builtins/number.md) {#pulse_value}
-> Current pulse value. For binary pulses this will be 1, 0 pulse values will not cause the emitter
-> to be called, so they never end up here.
-> Values between 0 and 1 will be used as probabilities and thus are maybe emitted or skipped.
-
-  
-
-
-
-# PatternContext {#PatternContext}  
-> Context passed to `pattern` and `gate` functions.  
-
----  
-## Properties
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_note}
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md) {#trigger_volume}
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md) {#trigger_offset}
-> Note slice offset value that triggered, started the rhythm, if any.
-
-### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)> {#inputs}
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
-
-### beats_per_min : [`number`](../API/builtins/number.md) {#beats_per_min}
-> Project's tempo in beats per minutes.
-
-### beats_per_bar : [`integer`](../API/builtins/integer.md) {#beats_per_bar}
-> Project's beats per bar setting.
-
-### samples_per_sec : [`integer`](../API/builtins/integer.md) {#samples_per_sec}
-> Project's sample rate in samples per second.
-
-### pulse_step : [`integer`](../API/builtins/integer.md) {#pulse_step}
-> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
-> Unlike `step` in emitter this includes all pulses, so it also counts pulses which do
-> not emit events. Starts from 1 when the rhythm starts running or is reset.
-
-### pulse_time_step : [`number`](../API/builtins/number.md) {#pulse_time_step}
-> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
-> Starts from 0 and increases with each new pulse by the pulse's step time duration.
-
   
 
 
