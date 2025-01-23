@@ -1,20 +1,25 @@
 ## AFSEQ Book
 
+
 ### Requirements
 
-The docs are generated using [mdBook](https://github.com/rust-lang/mdBook). To preview the pages locally you will need [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to install mdbook, mdbook-linkcheck and mdbook-toc.
+The documentations are generated with [mdBook](https://github.com/rust-lang/mdBook). To preview the pages locally, you need [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to install mdbook:
 
 ```sh
-cargo install mdbook mdbook-linkcheck mdbook-toc
+cargo install mdbook mdbook-linkcheck mdbook-toc mdbook-alerts
 ```
+
+Or use [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) to avoid compiling the binaries.
+
 
 ### Building
 
-Afterwards you can serve the docs at `localhost:3000` using mdbook, this will automatically refresh the browser tab whenever you change markdown files.
+Then you can serve the docs to `localhost:3000` using mdbook, this will automatically update the browser tab when you change the markdown files.
 
 ```sh
 mdbook serve --open
 ```
+
 
 ### Generate API reference
 
