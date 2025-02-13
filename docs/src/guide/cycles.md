@@ -60,6 +60,16 @@ return rhythm {
 }
 ```
 
+### Shorthand Notation
+
+If all you want to define in a script is a cycle, you can also skip the rhythm definition and just return a cycle in scripts. This will wrap the cycle in a standard rhythm with a `bar` unit.
+
+```lua
+-- shorthand notation, using a default rhythm definition. 
+-- parenthesis for the cycle argument can also be skipped here...
+return cycle "c4 d4 g4|a4"
+```
+
 ### Seeding
 
 afseq's general random number generator is also used in cycles. So when you seed the global number generator, you can also seed the cycle's random operations with `math.randomseed(12345)`.  
@@ -100,33 +110,34 @@ return rhythm {
 
 ## Examples
 
-A simple polyrhythm
+
+Chord progression 
 
 ```lua
-return rhythm {
-  unit = "1/1",
-  emit = cycle("[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63")
-}
+return cycle("[c'M g'M a'm f'M]/4")
+```
+
+A polyrhythm
+
+```lua
+return cycle("[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63")
 ```
 
 Mapped multi channel beats
 
 ```lua
-return rhythm {
-  unit = "1/1",
-  emit = cycle([[
-    [<h1 h2 h2>*12],
-    [kd ~]*2 ~ [~ kd] ~,
-    [~ s1]*2,
-    [~ s2]*8
-  ]]):map({
-    kd = "c4 #0", -- Kick
-    s1 = "c4 #1", -- Snare
-    s2 = "c4 #1 v0.1", -- Ghost snare
-    h1 = "c4 #2", -- Hat
-    h2 = "c4 #2 v0.2", -- Hat
-  })
-}
+return cycle([[
+  [<h1 h2 h2>*12],
+  [kd ~]*2 ~ [~ kd] ~,
+  [~ s1]*2,
+  [~ s2]*8
+]]):map({
+  kd = "c4 #0", -- Kick
+  s1 = "c4 #1", -- Snare
+  s2 = "c4 #1 v0.1", -- Ghost snare
+  h1 = "c4 #2", -- Hat
+  h2 = "c4 #2 v0.2", -- Hat
+})
 ```
 
 Dynamically mapped roman chord numbers with user defined scale
@@ -136,7 +147,7 @@ return rhythm {
   unit = "1/1",
   resolution = 4,
   inputs = {
-    parameter.enum("mode", "major", {"major", "minor"})
+    parameter.enum("mode", "major", { "major", "minor" })
   },
   emit = cycle("I V III VI"):map(
     function(init_context, value)
