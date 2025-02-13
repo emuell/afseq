@@ -3,8 +3,10 @@ use std::{cell::RefCell, rc::Rc};
 use mlua::prelude::*;
 
 use crate::{
+    bindings::{cycle::CycleUserData, unwrap::event_iter_from_value, LuaTimeoutHook},
     event::InstrumentId,
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
+    BeatTimeBase,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -17,35 +19,49 @@ mod second_time;
 // unwrap a BeatTimeRhythm or SecondTimeRhythm from the given LuaValue,
 // which is expected to be a user data
 pub(crate) fn rhythm_from_userdata(
+    lua: &Lua,
+    timeout_hook: &LuaTimeoutHook,
     value: &LuaValue,
+    time_base: &BeatTimeBase,
     instrument: Option<InstrumentId>,
 ) -> LuaResult<Rc<RefCell<dyn Rhythm>>> {
     if let Some(user_data) = value.as_userdata() {
-        if let Ok(beat_time_rhythm) = user_data.take::<BeatTimeRhythm>() {
+        if user_data.is::<BeatTimeRhythm>() {
+            // NB: take instead of cloning: rhythm userdata has no other usage than being defined
             Ok(Rc::new(RefCell::new(
-                beat_time_rhythm.with_instrument(instrument),
+                user_data
+                    .take::<BeatTimeRhythm>()?
+                    .with_instrument(instrument),
             )))
-        } else if let Ok(second_time_rhythm) = user_data.take::<SecondTimeRhythm>() {
+        } else if user_data.is::<SecondTimeRhythm>() {
             Ok(Rc::new(RefCell::new(
-                second_time_rhythm.with_instrument(instrument),
+                // NB: take instead of cloning: rhythm userdata has no other usage than being defined
+                user_data
+                    .take::<SecondTimeRhythm>()?
+                    .with_instrument(instrument),
+            )))
+        } else if user_data.is::<CycleUserData>() {
+            // create a default rhythm from the given cycle
+            Ok(Rc::new(RefCell::new(
+                BeatTimeRhythm::new(*time_base, crate::BeatTimeStep::Bar(1.0))
+                    .with_instrument(instrument)
+                    .trigger_dyn(event_iter_from_value(lua, timeout_hook, value, time_base)?),
             )))
         } else {
-            Err(LuaError::ToLuaConversionError {
-                from: "userdata".to_string(),
-                to: "rhythm",
+            Err(LuaError::FromLuaConversionError {
+                from: "userdata",
+                to: "rhythm".to_string(),
                 message: Some(
-                    "Expected script to return a rhythm, got some other userdata".to_string(),
+                    "script must return a rhythm or cycle, got some other userdata instead"
+                        .to_string(),
                 ),
             })
         }
     } else {
-        Err(LuaError::ToLuaConversionError {
-            from: "userdata".to_string(),
-            to: "rhythm",
-            message: Some(format!(
-                "Expected script to return a rhythm, got {}",
-                value.type_name()
-            )),
+        Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "rhythm".to_string(),
+            message: Some("script must return a rhythm or cycle".to_string()),
         })
     }
 }

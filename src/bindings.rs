@@ -124,7 +124,7 @@ pub fn new_rhythm_from_file(
     let chunk = lua.load(std::path::PathBuf::from(file_name));
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(&result, instrument).map_err(Into::into)
+    rhythm_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)
 }
 
 /// Evaluate a Lua string expression which creates and returns a rhythm.
@@ -147,7 +147,7 @@ pub fn new_rhythm_from_string(
     let chunk = lua.load(script).set_name(script_name);
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(&result, instrument).map_err(Into::into)
+    rhythm_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -791,20 +791,29 @@ fn compile_chunk(chunk: &'static str, _name: &'static str) -> LuaResult<Vec<u8>>
 mod test {
     use super::*;
 
-    #[test]
-    fn extensions() -> LuaResult<()> {
-        // create a new engine and register bindings
+    fn new_test_engine(
+        beats_per_min: f32,
+        beats_per_bar: u32,
+        samples_per_sec: u32,
+    ) -> Result<(Lua, LuaTimeoutHook), LuaError> {
         let (mut lua, mut timeout_hook) = new_engine()?;
         register_bindings(
             &mut lua,
             &timeout_hook,
             &BeatTimeBase {
-                beats_per_min: 160.0,
-                beats_per_bar: 6,
-                samples_per_sec: 96000,
+                beats_per_min,
+                beats_per_bar,
+                samples_per_sec,
             },
-        )
-        .unwrap();
+        )?;
+        timeout_hook.reset();
+        Ok((lua, timeout_hook))
+    }
+
+    #[test]
+    fn extensions() -> LuaResult<()> {
+        // create a new engine and register bindings
+        let (lua, mut timeout_hook) = new_test_engine(160.0, 6, 96000)?;
 
         // reset timeout
         timeout_hook.reset();
@@ -859,6 +868,41 @@ mod test {
             )
             .exec()
             .is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn create_rhythm() -> Result<(), Box<dyn std::error::Error>> {
+        // create a new engine and register bindings
+        let time_base = BeatTimeBase {
+            beats_per_min: 160.0,
+            beats_per_bar: 6,
+            samples_per_sec: 44100,
+        };
+
+        // beat time rhythm
+        new_rhythm_from_string(
+            time_base,
+            None,
+            r#"return rhythm { unit = "1/4", emit = "c4" }"#,
+            "[test beat rhythm]",
+        )?;
+
+        // second time rhythm
+        new_rhythm_from_string(
+            time_base,
+            None,
+            r#"return rhythm { unit = "ms", emit = "c4" }"#,
+            "[test second time rhythm]",
+        )?;
+
+        // cycle as beat time rhythm
+        new_rhythm_from_string(
+            time_base,
+            None,
+            r#"return cycle("c4 d4 e4 f4 g4")"#,
+            "[test cycle]",
+        )?;
         Ok(())
     }
 }

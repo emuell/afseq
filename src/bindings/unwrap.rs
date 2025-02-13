@@ -909,15 +909,16 @@ pub(crate) fn event_iter_from_value(
     match value {
         LuaValue::UserData(userdata) => {
             if userdata.is::<NoteUserData>() {
-                let note = userdata.borrow::<NoteUserData>()?;
-                Ok(Box::new(note.notes.clone().to_event()))
+                let note = userdata.borrow::<NoteUserData>()?.clone();
+                Ok(Box::new(note.notes.to_event()))
             } else if userdata.is::<SequenceUserData>() {
-                let sequence = userdata.borrow::<SequenceUserData>()?;
-                Ok(Box::new(sequence.notes.clone().to_event_sequence()))
+                let sequence = userdata.borrow::<SequenceUserData>()?.clone();
+                Ok(Box::new(sequence.notes.to_event_sequence()))
             } else if userdata.is::<CycleUserData>() {
-                let userdata = userdata.borrow::<CycleUserData>()?;
-                let cycle = userdata.cycle.clone();
-                if let Some(mapping_function) = userdata.mapping_function.clone() {
+                // NB: take instead of cloning: cycle userdata has no other usage than being defined
+                let userdata = userdata.take::<CycleUserData>()?;
+                let cycle = userdata.cycle;
+                if let Some(mapping_function) = userdata.mapping_function {
                     let mapping_callback = LuaCallback::new(lua, mapping_function)?;
                     let event_iter = ScriptedCycleEventIter::with_mapping_callback(
                         cycle,
@@ -927,15 +928,15 @@ pub(crate) fn event_iter_from_value(
                     )?;
                     Ok(Box::new(event_iter))
                 } else {
-                    let mappings = userdata.mappings.clone();
+                    let mappings = userdata.mappings;
                     let event_iter = ScriptedCycleEventIter::with_mappings(cycle, mappings);
                     Ok(Box::new(event_iter))
                 }
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "userdata",
-                    to: "note".to_string(),
-                    message: Some("given user data can't be converted to a note array".to_string()),
+                    to: "notes".to_string(),
+                    message: Some("expecting a note, sequence or cycle here".to_string()),
                 })
             }
         }
