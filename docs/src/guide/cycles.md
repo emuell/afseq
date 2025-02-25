@@ -20,9 +20,9 @@ There's no exact specification for how tidal cycles work, and it's constantly ev
 
 * Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
 
-* Operators currently only accept numbers on the right side (`a3*2` is valid, `a3*<1 2>` is not)
+* `:` sets the instrument or remappable target instead of selecting samples
 
-* `:` - Sets the instrument or remappable target instead of selecting samples
+* In bjorklund expressions, operators *within* and on the *right side* are not supported (e.g. `bd(<3 2>, 8)` and `bd(3, 8)*2` are *not* supported)
 
 ### Timing 
 

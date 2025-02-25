@@ -87,13 +87,15 @@ function Cycle:map(map) end
 
 ----------------------------------------------------------------------------------------------------
 
---- Create a note sequence from a Tidal Cycles mini-notation string.
+---Create a note sequence from a Tidal Cycles mini-notation string.
 ---
---- `cycle` accepts a mini-notation as used by Tidal Cycles, with the following differences:
---- * Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
---- * Operators currently only accept numbers on the right side (`a3*2` is valid, `a3*<1 2>` is not)
---- * `:` - Sets the instrument or remappable target instead of selecting samples
---- [Tidal Cycles Reference](https://tidalcycles.org/docs/reference/mini_notation/)
+---`cycle` accepts a mini-notation as used by Tidal Cycles, with the following differences:
+---* Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
+---* `:` sets the instrument or remappable target instead of selecting samples
+---* In bjorklund expressions, operators *within* and on the *right side* are not supported
+---  (e.g. `bd(<3 2>, 8)` and `bd(3, 8)*2` are *not* supported)
+---
+---[Tidal Cycles Reference](https://tidalcycles.org/docs/reference/mini_notation/)
 ---
 ---### examples:
 --- ```lua
