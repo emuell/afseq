@@ -178,6 +178,13 @@ pub struct Span {
     end: Fraction,
 }
 
+#[cfg(test)]
+impl Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:.3} -> {:.3}", self.start, self.end)
+    }
+}
+
 impl Span {
     pub fn start(&self) -> Fraction {
         self.start
@@ -578,9 +585,9 @@ impl Span {
         start..end
     }
 
-    // fn overlaps(&self, span: &Span) -> bool {
-    //     (self.start <= span.start && span.start < self.end) || (self.start < span.end && span.end <= self.end)
-    // }
+    fn overlaps(&self, span: &Span) -> bool {
+        self.start < span.end && span.start < self.end
+    }
 
     fn includes(&self, span: &Span) -> bool {
         self.start <= span.start && span.start < self.end
@@ -697,8 +704,8 @@ impl PartialEq<Event> for Event {
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "{:.3} -> {:.3} | {:?} {}",
-            self.span.start, self.span.end, self.value, self.target
+            "{} | {:?} {}",
+            self.span, self.value, self.target
         ))
     }
 }
@@ -1485,21 +1492,6 @@ impl Cycle {
         }
     }
 
-    // helper to calculate the target for polymeter and dynamic expressions
-    fn step_target(step: &Step, value: &Rc<str>) -> Target {
-        match step {
-            Step::Polymeter(_) => Target::default(),
-            Step::DynamicExpression(e) => {
-                if e.op == DynamicOp::Target() {
-                    Target::from(value)
-                } else {
-                    Target::default()
-                }
-            }
-            _ => Target::default(),
-        }
-    }
-
     // helper to calculate the right multiplier for polymeter and dynamic expressions
     fn step_multiplier(step: &Step, value: &Value) -> Fraction {
         match step {
@@ -1533,6 +1525,80 @@ impl Cycle {
         }
     }
 
+    // overlay two lists of events and apply the targets from the second to the first
+    fn apply_targets(events: &mut [Event], target_events: &[Event]) {
+        for target_event in target_events.iter() {
+            let target = Target::from(&target_event.string);
+            // skip target events that can't be parsed as a valid target
+            if target != Target::None {
+                for event in events.iter_mut() {
+                    // don't overwrite existing targets
+                    if event.target == Target::None && event.span.overlaps(&target_event.span) {
+                        event.target = target.clone()
+                    }
+                }
+            }
+        }
+    }
+
+    // helper to output a Step as channels of flat event lists
+    fn output_flat(
+        step: &Step,
+        state: &mut CycleState,
+        cycle: u32,
+        limit: usize,
+    ) -> Result<(Vec<Vec<Event>>, Span), String> {
+        let mut events = Self::output(step, state, cycle, limit)?;
+        events.transform_spans(&events.get_span());
+        let mut channels: Vec<Vec<Event>> = vec![];
+        events.flatten(&mut channels, 0);
+        Ok((channels, events.get_span()))
+    }
+
+    // generate events from Target expressions
+    fn output_with_target(
+        left: &Step,
+        right: &Step,
+        state: &mut CycleState,
+        cycle: u32,
+        limit: usize,
+    ) -> Result<Events, String> {
+        match right {
+            // multiply with single values to avoid generating events
+            Step::Single(single) => {
+                let mut events = Self::output(left, state, cycle, limit)?;
+                Self::apply_target(&mut events, Target::from(&single.string));
+                Ok(events)
+            }
+            _ => {
+                // generate all the events as flat vecs from both the left and right side of the expression
+                let (left_channels, left_span) = Self::output_flat(left, state, cycle, limit)?;
+                let (target_channels, _) = Self::output_flat(right, state, cycle, limit)?;
+
+                // iterate over channels from both sides to create necessary new stacks if the right side is polyphonic
+                let mut channel_events: Vec<Events> = Vec::with_capacity(target_channels.len());
+                for channel in target_channels.into_iter() {
+                    for left_channel in left_channels.iter() {
+                        let mut cloned_left = left_channel.clone();
+                        Self::apply_targets(&mut cloned_left, &channel);
+                        channel_events.push(Events::Multi(MultiEvents {
+                            length: left_span.length(),
+                            span: left_span.clone(),
+                            events: cloned_left.into_iter().map(Events::Single).collect(),
+                        }));
+                    }
+                }
+
+                // put all the resulting events back together
+                Ok(Events::Poly(PolyEvents {
+                    length: left_span.length(),
+                    span: left_span,
+                    channels: channel_events,
+                }))
+            }
+        }
+    }
+
     // output a multiplied pattern expression with support for patterns on the right side
     fn output_dynamic(
         right: &Step,
@@ -1551,12 +1617,9 @@ impl Cycle {
             Step::Single(single) => {
                 // apply mutiplier
                 let multiplier = Self::step_multiplier(step, &single.value);
-                let mut multiplied =
-                    Self::output_multiplied(left, state, cycle, multiplier, limit)?;
-                // apply target
-                let target = Self::step_target(step, &single.string);
-                Self::apply_target(&mut multiplied, target);
-                Ok(multiplied)
+                Ok(Self::output_multiplied(
+                    left, state, cycle, multiplier, limit,
+                )?)
             }
             _ => {
                 // generate and flatten the events for the right side of the expression
@@ -1573,9 +1636,6 @@ impl Cycle {
                         let multiplier = Self::step_multiplier(step, &event.value);
                         let mut partial_events =
                             Self::output_multiplied(left, state, cycle, multiplier, limit)?;
-                        // apply target
-                        let target = Self::step_target(step, &event.string);
-                        Self::apply_target(&mut partial_events, target);
                         // crop and push to multi events
                         partial_events.crop(&event.span);
                         multi_events.push(partial_events);
@@ -1695,9 +1755,16 @@ impl Cycle {
                     Events::empty()
                 }
             },
-            Step::DynamicExpression(e) => {
-                Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?
-            }
+            Step::DynamicExpression(e) => match e.op {
+                DynamicOp::Target() => Self::output_with_target(
+                    e.left.as_ref(),
+                    e.right.as_ref(),
+                    state,
+                    cycle,
+                    limit,
+                )?,
+                _ => Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?,
+            },
             Step::Bjorklund(b) => {
                 let mut events = vec![];
                 #[allow(clippy::single_match)]
@@ -2257,6 +2324,82 @@ mod test {
                 vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
                     .with_note(9, 4)
                     .with_target(Target::Index(2))]],
+            ],
+        )?;
+
+        // target expression preserves the structure from the left side
+        assert_eq!(
+            Cycle::from("[a b c d]:[1 2 3]")?.generate()?,
+            [[
+                Event::at(F::from(0), F::new(1u8, 4u8))
+                    .with_note(9, 4)
+                    .with_target(Target::Index(1)),
+                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8))
+                    .with_note(11, 4)
+                    .with_target(Target::Index(1)),
+                Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8))
+                    .with_note(0, 4)
+                    .with_target(Target::Index(2)),
+                Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                    .with_note(2, 4)
+                    .with_target(Target::Index(3)),
+            ]]
+        );
+
+        // when using ~ as a target, it's possible selectively skip overriding the outer target from within
+        assert_cycles(
+            "[a [b:<~ 7> b:<8 9>]]:[1 [2 3], 4]",
+            vec![
+                vec![
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(1)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            // this iteration lets the outer context set the target
+                            .with_target(Target::Index(2)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(8)),
+                    ],
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(4)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(4)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(8)),
+                    ],
+                ],
+                vec![
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(1)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            // this iteration uses the more specific target
+                            .with_target(Target::Index(7)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(9)),
+                    ],
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(4)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(7)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(9)),
+                    ],
+                ],
             ],
         )?;
 
