@@ -221,7 +221,7 @@ pub enum Target {
 
 impl From<&Rc<str>> for Target {
     fn from(value: &Rc<str>) -> Self {
-        if value.is_empty() || *value == "~".into() || *value == "-".into() {
+        if value.is_empty() || value.as_bytes() == b"~" || value.as_bytes() == b"-" {
             Self::None
         } else if let Ok(i) = value.parse::<i32>() {
             Self::Index(i)
