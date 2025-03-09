@@ -178,6 +178,13 @@ pub struct Span {
     end: Fraction,
 }
 
+#[cfg(test)]
+impl Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:.3} -> {:.3}", self.start, self.end)
+    }
+}
+
 impl Span {
     pub fn start(&self) -> Fraction {
         self.start
@@ -210,6 +217,18 @@ pub enum Target {
     None,
     Index(i32),
     Name(Rc<str>),
+}
+
+impl From<&Rc<str>> for Target {
+    fn from(value: &Rc<str>) -> Self {
+        if value.is_empty() || value.as_bytes() == b"~" || value.as_bytes() == b"-" {
+            Self::None
+        } else if let Ok(i) = value.parse::<i32>() {
+            Self::Index(i)
+        } else {
+            Self::Name(Rc::clone(value))
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -336,12 +355,12 @@ struct Stack {
 enum DynamicOp {
     Fast(),      // *
     Slow(),      // /
+    Target(),    // :
     Bjorklund(), // (p,s,r)
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum StaticOp {
-    Target(),    // :
     Degrade(),   // ?
     Replicate(), // !
     Weight(),    // @
@@ -352,7 +371,6 @@ impl StaticOp {
         match self {
             StaticOp::Weight() | StaticOp::Replicate() => Value::Integer(2),
             StaticOp::Degrade() => Value::Float(0.5),
-            StaticOp::Target() => Value::Rest,
         }
     }
 }
@@ -366,10 +384,10 @@ enum Operator {
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Self, String> {
         match pair.as_rule() {
-            Rule::op_target => Ok(Self::Static(StaticOp::Target())),
             Rule::op_degrade => Ok(Self::Static(StaticOp::Degrade())),
             Rule::op_replicate => Ok(Self::Static(StaticOp::Replicate())),
             Rule::op_weight => Ok(Self::Static(StaticOp::Weight())),
+            Rule::op_target => Ok(Self::Dynamic(DynamicOp::Target())),
             Rule::op_fast => Ok(Self::Dynamic(DynamicOp::Fast())),
             Rule::op_slow => Ok(Self::Dynamic(DynamicOp::Slow())),
             Rule::op_bjorklund => Ok(Self::Dynamic(DynamicOp::Bjorklund())),
@@ -487,18 +505,6 @@ impl Display for Pitch {
 }
 
 impl Value {
-    fn to_target(&self) -> Target {
-        match &self {
-            Value::Rest => Target::None,
-            Value::Hold => Target::None,
-            Value::Integer(i) => Target::Index(*i),
-            Value::Float(f) => Target::Index(*f as i32),
-            // TODO might not be the best conversion idea
-            Value::Pitch(p) => Target::Name(Rc::from(format!("{:?}", p))),
-            Value::Chord(p, m) => Target::Name(Rc::from(format!("{:?}'{}", p, m))),
-            Value::Name(n) => Target::Name(Rc::clone(n)),
-        }
-    }
     fn to_integer(&self) -> Option<i32> {
         match &self {
             Value::Rest => None,
@@ -579,9 +585,9 @@ impl Span {
         start..end
     }
 
-    // fn overlaps(&self, span: &Span) -> bool {
-    //     (self.start <= span.start && span.start < self.end) || (self.start < span.end && span.end <= self.end)
-    // }
+    fn overlaps(&self, span: &Span) -> bool {
+        self.start < span.end && span.start < self.end
+    }
 
     fn includes(&self, span: &Span) -> bool {
         self.start <= span.start && span.start < self.end
@@ -698,8 +704,8 @@ impl PartialEq<Event> for Event {
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "{:.3} -> {:.3} | {:?} {}",
-            self.span.start, self.span.end, self.value, self.target
+            "{} | {:?} {}",
+            self.span, self.value, self.target
         ))
     }
 }
@@ -1046,12 +1052,17 @@ impl CycleParser {
     /// parse a pair inside a single as a value
     fn value(pair: Pair<Rule>) -> Result<Value, String> {
         match pair.as_rule() {
+            Rule::integer => Ok(Value::Integer(pair.as_str().parse::<i32>().unwrap_or(0))),
+            Rule::float | Rule::normal => {
+                Ok(Value::Float(pair.as_str().parse::<f64>().unwrap_or(0.0)))
+            }
             Rule::number => {
                 if let Some(n) = pair.into_inner().next() {
                     match n.as_rule() {
                         Rule::integer => Ok(Value::Integer(n.as_str().parse::<i32>().unwrap_or(0))),
-                        Rule::float => Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
-                        Rule::normal => Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
+                        Rule::float | Rule::normal => {
+                            Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
+                        }
                         _ => Err(format!("unrecognized number\n{:?}", n)),
                     }
                 } else {
@@ -1383,17 +1394,12 @@ impl CycleParser {
 
     fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
         let right = if let Some(right_pair) = pair.into_inner().next() {
-            let value = right_pair
+            right_pair
                 .clone()
                 .into_inner()
                 .next()
                 .ok_or_else(|| format!("invalid right hand {:?}", right_pair))
-                .and_then(Self::value)?;
-            if matches!(op, StaticOp::Target()) && matches!(value, Value::Pitch(_)) {
-                Value::Name(Rc::from(right_pair.as_str()))
-            } else {
-                value
-            }
+                .and_then(Self::value)?
         } else {
             op.default_value()
         };
@@ -1475,6 +1481,17 @@ impl Cycle {
         Ok(events)
     }
 
+    fn apply_target(events: &mut Events, target: Target) {
+        if target != Target::None {
+            events.mutate_events(&mut |event: &mut Event| {
+                // don't overwrite existing targets
+                if event.target == Target::None {
+                    event.target = target.clone()
+                }
+            });
+        }
+    }
+
     // helper to calculate the right multiplier for polymeter and dynamic expressions
     fn step_multiplier(step: &Step, value: &Value) -> Fraction {
         match step {
@@ -1483,20 +1500,102 @@ impl Cycle {
                 let count = value.to_float().unwrap_or(0.0);
                 Fraction::from(count) / Fraction::from(length)
             }
-            Step::DynamicExpression(e) => Fraction::from(if let Some(right) = value.to_float() {
-                if e.op == DynamicOp::Slow() {
-                    if right != 0.0 {
-                        1.0 / right
+            Step::DynamicExpression(e) => match e.op {
+                DynamicOp::Fast() => {
+                    if let Some(right) = value.to_float() {
+                        Fraction::from(right)
                     } else {
-                        0.0
+                        Fraction::from(0)
                     }
-                } else {
-                    right
                 }
-            } else {
-                0.0
-            }),
+                DynamicOp::Slow() => {
+                    if let Some(right) = value.to_float() {
+                        if right != 0.0 {
+                            Fraction::from(1.0 / right)
+                        } else {
+                            Fraction::from(0.0)
+                        }
+                    } else {
+                        Fraction::from(0)
+                    }
+                }
+                _ => Fraction::from(1),
+            },
             _ => Fraction::from(1),
+        }
+    }
+
+    // overlay two lists of events and apply the targets from the second to the first
+    fn apply_targets(events: &mut [Event], target_events: &[Event]) {
+        for target_event in target_events.iter() {
+            let target = Target::from(&target_event.string);
+            // skip target events that can't be parsed as a valid target
+            if target != Target::None {
+                for event in events.iter_mut() {
+                    // don't overwrite existing targets
+                    if event.target == Target::None && event.span.overlaps(&target_event.span) {
+                        event.target = target.clone()
+                    }
+                }
+            }
+        }
+    }
+
+    // helper to output a Step as channels of flat event lists
+    fn output_flat(
+        step: &Step,
+        state: &mut CycleState,
+        cycle: u32,
+        limit: usize,
+    ) -> Result<(Vec<Vec<Event>>, Span), String> {
+        let mut events = Self::output(step, state, cycle, limit)?;
+        events.transform_spans(&events.get_span());
+        let mut channels: Vec<Vec<Event>> = vec![];
+        events.flatten(&mut channels, 0);
+        Ok((channels, events.get_span()))
+    }
+
+    // generate events from Target expressions
+    fn output_with_target(
+        left: &Step,
+        right: &Step,
+        state: &mut CycleState,
+        cycle: u32,
+        limit: usize,
+    ) -> Result<Events, String> {
+        match right {
+            // multiply with single values to avoid generating events
+            Step::Single(single) => {
+                let mut events = Self::output(left, state, cycle, limit)?;
+                Self::apply_target(&mut events, Target::from(&single.string));
+                Ok(events)
+            }
+            _ => {
+                // generate all the events as flat vecs from both the left and right side of the expression
+                let (left_channels, left_span) = Self::output_flat(left, state, cycle, limit)?;
+                let (target_channels, _) = Self::output_flat(right, state, cycle, limit)?;
+
+                // iterate over channels from both sides to create necessary new stacks if the right side is polyphonic
+                let mut channel_events: Vec<Events> = Vec::with_capacity(target_channels.len());
+                for channel in target_channels.into_iter() {
+                    for left_channel in left_channels.iter() {
+                        let mut cloned_left = left_channel.clone();
+                        Self::apply_targets(&mut cloned_left, &channel);
+                        channel_events.push(Events::Multi(MultiEvents {
+                            length: left_span.length(),
+                            span: left_span.clone(),
+                            events: cloned_left.into_iter().map(Events::Single).collect(),
+                        }));
+                    }
+                }
+
+                // put all the resulting events back together
+                Ok(Events::Poly(PolyEvents {
+                    length: left_span.length(),
+                    span: left_span,
+                    channels: channel_events,
+                }))
+            }
         }
     }
 
@@ -1516,8 +1615,11 @@ impl Cycle {
         match right {
             // multiply with single values to avoid generating events
             Step::Single(single) => {
-                let mult = Self::step_multiplier(step, &single.value);
-                Self::output_multiplied(left, state, cycle, mult, limit)
+                // apply mutiplier
+                let multiplier = Self::step_multiplier(step, &single.value);
+                Ok(Self::output_multiplied(
+                    left, state, cycle, multiplier, limit,
+                )?)
             }
             _ => {
                 // generate and flatten the events for the right side of the expression
@@ -1530,9 +1632,11 @@ impl Cycle {
                 for channel in channels.into_iter() {
                     let mut multi_events: Vec<Events> = Vec::with_capacity(channel.len());
                     for event in channel {
-                        let mult = Self::step_multiplier(step, &event.value);
+                        // apply multiplier
+                        let multiplier = Self::step_multiplier(step, &event.value);
                         let mut partial_events =
-                            Self::output_multiplied(left, state, cycle, mult, limit)?;
+                            Self::output_multiplied(left, state, cycle, multiplier, limit)?;
+                        // crop and push to multi events
                         partial_events.crop(&event.span);
                         multi_events.push(partial_events);
                     }
@@ -1634,33 +1738,33 @@ impl Cycle {
                     })
                 }
             }
-            Step::StaticExpression(e) => {
-                match e.op {
-                    StaticOp::Target() => {
-                        let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
-                        out.mutate_events(&mut |event| event.target = e.right.to_target());
-                        out
-                    }
-                    StaticOp::Degrade() => {
-                        let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
-                        out.mutate_events(&mut |event: &mut Event| {
-                            if let Some(chance) = e.right.to_chance() {
-                                if chance < state.rng.gen_range(0.0..1.0) {
-                                    event.value = Value::Rest
-                                }
+            Step::StaticExpression(e) => match e.op {
+                StaticOp::Degrade() => {
+                    let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
+                    out.mutate_events(&mut |event: &mut Event| {
+                        if let Some(chance) = e.right.to_chance() {
+                            if chance < state.rng.gen_range(0.0..1.0) {
+                                event.value = Value::Rest
                             }
-                        });
-                        out
-                    }
-                    _ => {
-                        // unreachable, these expressions were immediately applied in Self::push_applied
-                        Events::empty()
-                    }
+                        }
+                    });
+                    out
                 }
-            }
-            Step::DynamicExpression(e) => {
-                Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?
-            }
+                _ => {
+                    // unreachable, other expressions should have been applied in Self::push_applied");
+                    Events::empty()
+                }
+            },
+            Step::DynamicExpression(e) => match e.op {
+                DynamicOp::Target() => Self::output_with_target(
+                    e.left.as_ref(),
+                    e.right.as_ref(),
+                    state,
+                    cycle,
+                    limit,
+                )?,
+                _ => Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?,
+            },
             Step::Bjorklund(b) => {
                 let mut events = vec![];
                 #[allow(clippy::single_match)]
@@ -2195,6 +2299,150 @@ mod test {
                     Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)).with_int(1),
                     Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)).with_int(0),
                     Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)).with_int(1),
+                ]],
+            ],
+        )?;
+
+        assert_eq!(
+            Cycle::from("a:1 b:target")?.generate()?,
+            [[
+                Event::at(F::from(0), F::new(1u8, 2u8))
+                    .with_note(9, 4)
+                    .with_target(Target::Index(1)),
+                Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                    .with_note(11, 4)
+                    .with_target(Target::Name("target".into()))
+            ]]
+        );
+
+        assert_cycles(
+            "a:<1 2>",
+            vec![
+                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                    .with_note(9, 4)
+                    .with_target(Target::Index(1))]],
+                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                    .with_note(9, 4)
+                    .with_target(Target::Index(2))]],
+            ],
+        )?;
+
+        // target expression preserves the structure from the left side
+        assert_eq!(
+            Cycle::from("[a b c d]:[1 2 3]")?.generate()?,
+            [[
+                Event::at(F::from(0), F::new(1u8, 4u8))
+                    .with_note(9, 4)
+                    .with_target(Target::Index(1)),
+                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8))
+                    .with_note(11, 4)
+                    .with_target(Target::Index(1)),
+                Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8))
+                    .with_note(0, 4)
+                    .with_target(Target::Index(2)),
+                Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                    .with_note(2, 4)
+                    .with_target(Target::Index(3)),
+            ]]
+        );
+
+        // when using ~ as a target, it's possible selectively skip overriding the outer target from within
+        assert_cycles(
+            "[a [b:<~ 7> b:<8 9>]]:[1 [2 3], 4]",
+            vec![
+                vec![
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(1)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            // this iteration lets the outer context set the target
+                            .with_target(Target::Index(2)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(8)),
+                    ],
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(4)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(4)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(8)),
+                    ],
+                ],
+                vec![
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(1)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            // this iteration uses the more specific target
+                            .with_target(Target::Index(7)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(9)),
+                    ],
+                    vec![
+                        Event::at(F::from(0), F::new(1u8, 2u8))
+                            .with_note(9, 4)
+                            .with_target(Target::Index(4)),
+                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(7)),
+                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                            .with_note(11, 4)
+                            .with_target(Target::Index(9)),
+                    ],
+                ],
+            ],
+        )?;
+
+        assert_cycles(
+            "[a b]:<1 target>",
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 2u8))
+                        .with_note(9, 4)
+                        .with_target(Target::Index(1)),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                        .with_note(11, 4)
+                        .with_target(Target::Index(1)),
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 2u8))
+                        .with_note(9, 4)
+                        .with_target(Target::Name("target".into())),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                        .with_note(11, 4)
+                        .with_target(Target::Name("target".into())),
+                ]],
+            ],
+        )?;
+
+        assert_cycles(
+            "[a:1 b]:<3 4>",
+            vec![
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 2u8))
+                        .with_note(9, 4)
+                        .with_target(Target::Index(1)),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                        .with_note(11, 4)
+                        .with_target(Target::Index(3)),
+                ]],
+                vec![vec![
+                    Event::at(F::from(0), F::new(1u8, 2u8))
+                        .with_note(9, 4)
+                        .with_target(Target::Index(1)),
+                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                        .with_note(11, 4)
+                        .with_target(Target::Index(4)),
                 ]],
             ],
         )?;
