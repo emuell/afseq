@@ -71,7 +71,7 @@ pub(crate) struct LuaAppData {
 impl LuaAppData {
     fn new() -> Self {
         let rand_seed = None;
-        let rand_rgn = Xoshiro256PlusPlus::from_seed(rand::thread_rng().gen());
+        let rand_rgn = Xoshiro256PlusPlus::from_seed(rand::rng().random());
         let declared_globals = HashSet::new();
         Self {
             rand_seed,
@@ -632,7 +632,7 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
                     let app_data = lua
                         .app_data_mut::<LuaAppData>()
                         .expect("Failed to access Lua app data");
-                    app_data.rand_seed.unwrap_or(rand::thread_rng().gen())
+                    app_data.rand_seed.unwrap_or(rand::rng().random())
                 } else {
                     return Err(bad_argument_error(
                         "randomstate",
@@ -701,13 +701,13 @@ fn generate_random_number<R: rand::Rng>(
     args: LuaMultiValue,
 ) -> LuaResult<LuaNumber> {
     if args.is_empty() {
-        Ok(rand.gen::<LuaNumber>())
+        Ok(rand.random::<LuaNumber>())
     } else if args.len() == 1 {
         #[allow(clippy::get_first)]
         let max = args.get(0).unwrap().as_integer();
         if let Some(max) = max {
             if max >= 1 {
-                let rand_int: LuaInteger = rand.gen_range(1..=max);
+                let rand_int: LuaInteger = rand.random_range(1..=max);
                 Ok(rand_int as LuaNumber)
             } else {
                 Err(bad_argument_error(
@@ -732,7 +732,7 @@ fn generate_random_number<R: rand::Rng>(
         if let Some(min) = min {
             if let Some(max) = max {
                 if max >= min {
-                    let rand_int: LuaInteger = rand.gen_range(min..=max);
+                    let rand_int: LuaInteger = rand.random_range(min..=max);
                     Ok(rand_int as LuaNumber)
                 } else {
                     Err(bad_argument_error(

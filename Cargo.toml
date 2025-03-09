@@ -11,11 +11,11 @@ categories = ["audio", "midi", "sequencer"]
 lazy_static = { version = "^1.4" }
 anyhow = { version = "^1.0" }
 paste = { version = "^1.0" }
-derive_more = { version = "^1.0", features = ["from", "into", "display"] }
+derive_more = { version = "^2.0", features = ["from", "into", "display"] }
 log = { version = "^0.4" }
 simplelog = { version = "^0.12" }
-rand = { version = "^0.8" }
-rand_xoshiro = { version = "^0.6" }
+rand = { version = "^0.9" }
+rand_xoshiro = { version = "^0.7" }
 fraction = { version = "^0.15" }
 pest = { version = "^2.7" }
 pest_derive = { version = "^2.7" }
@@ -36,7 +36,7 @@ mlua = { version = "^0.10", default-features = false, features = [
 ], optional = true }
 
 [dev-dependencies]
-notify = { version = "^7.0" }
+notify = { version = "^8.0" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
 

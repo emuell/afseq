@@ -6,7 +6,7 @@ use std::fmt::Display;
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 
-use rand::{thread_rng, Rng, SeedableRng};
+use rand::{rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use fraction::ToPrimitive;
@@ -46,7 +46,7 @@ impl Cycle {
                     let state = CycleState {
                         events: 0,
                         iteration: 0,
-                        rng: Xoshiro256PlusPlus::from_seed(thread_rng().gen()),
+                        rng: Xoshiro256PlusPlus::from_seed(rng().random()),
                     };
                     let seed = None;
                     let event_limit = Self::EVENT_LIMIT_DEFAULT;
@@ -1717,7 +1717,7 @@ impl Cycle {
                 }
             }
             Step::Choices(cs) => {
-                let choice = state.rng.gen_range(0..cs.choices.len());
+                let choice = state.rng.random_range(0..cs.choices.len());
                 Self::output(&cs.choices[choice], state, cycle, limit)?
             }
             Step::Polymeter(pm) => {
@@ -1743,7 +1743,7 @@ impl Cycle {
                     let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
                     out.mutate_events(&mut |event: &mut Event| {
                         if let Some(chance) = e.right.to_chance() {
-                            if chance < state.rng.gen_range(0.0..1.0) {
+                            if chance < state.rng.random_range(0.0..1.0) {
                                 event.value = Value::Rest
                             }
                         }
@@ -1887,7 +1887,7 @@ mod test {
     }
 
     fn assert_cycle_equality(a: &str, b: &str) -> Result<(), String> {
-        let seed = rand::thread_rng().gen();
+        let seed = rand::rng().random();
         assert_eq!(
             Cycle::from(a)?.with_seed(seed).generate()?,
             Cycle::from(b)?.with_seed(seed).generate()?,
@@ -1896,7 +1896,7 @@ mod test {
     }
 
     fn assert_cycle_advancing(input: &str) -> Result<(), String> {
-        let seed = rand::thread_rng().gen();
+        let seed = rand::rng().random();
         for number_of_runs in 1..9 {
             let mut cycle1 = Cycle::from(input)?.with_seed(seed);
             let mut cycle2 = Cycle::from(input)?.with_seed(seed);

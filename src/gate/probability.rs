@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rand::{thread_rng, Rng, SeedableRng};
+use rand::{rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::{BeatTimeBase, Gate, InputParameterSet, PulseIterItem};
@@ -17,7 +17,7 @@ pub struct ProbabilityGate {
 
 impl ProbabilityGate {
     pub fn new(seed: Option<u64>) -> Self {
-        let rand_seed = seed.unwrap_or_else(|| thread_rng().gen());
+        let rand_seed = seed.unwrap_or_else(|| rng().random());
         let rand_gen = Xoshiro256PlusPlus::seed_from_u64(rand_seed);
         Self { rand_gen, seed }
     }
@@ -37,7 +37,7 @@ impl Gate for ProbabilityGate {
     }
 
     fn run(&mut self, pulse: &PulseIterItem) -> bool {
-        pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand_gen.gen_range(0.0..1.0))
+        pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand_gen.random_range(0.0..1.0))
     }
 
     fn duplicate(&self) -> Box<dyn Gate> {
