@@ -130,7 +130,7 @@ pub struct Event {
     span: Span,
     value: Value,
     string: Rc<str>,
-    target: Target,
+    targets: Vec<Target>,
 }
 
 impl Default for Event {
@@ -140,7 +140,7 @@ impl Default for Event {
             span: Span::default(),
             value: Value::default(),
             string: Rc::from("~"),
-            target: Target::default(),
+            targets: vec![],
         }
     }
 }
@@ -166,9 +166,9 @@ impl Event {
         &self.length
     }
 
-    /// The step's optional value target.
-    pub fn target(&self) -> &Target {
-        &self.target
+    /// The step's optional targets.
+    pub fn targets(&self) -> &[Target] {
+        &self.targets
     }
 }
 
@@ -625,7 +625,7 @@ impl Event {
             },
             string: Rc::from("~"),
             value: Value::Rest,
-            target: Target::None,
+            targets: vec![],
         }
     }
 
@@ -679,7 +679,15 @@ impl Event {
     #[cfg(test)]
     fn with_target(&self, target: Target) -> Self {
         Self {
-            target,
+            targets: vec![target],
+            ..self.clone()
+        }
+    }
+
+    #[cfg(test)]
+    fn with_targets(&self, targets: Vec<Target>) -> Self {
+        Self {
+            targets,
             ..self.clone()
         }
     }
@@ -696,7 +704,7 @@ impl PartialEq<Event> for Event {
         self.length == other.length
             && self.span == other.span
             && self.value == other.value
-            && self.target == other.target
+            && self.targets == other.targets
     }
 }
 
@@ -704,8 +712,8 @@ impl PartialEq<Event> for Event {
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "{} | {:?} {}",
-            self.span, self.value, self.target
+            "{} | {:?} {:?}",
+            self.span, self.value, self.targets
         ))
     }
 }
@@ -738,7 +746,7 @@ impl Events {
             span: Span::default(),
             string: Rc::from("~"),
             value: Value::Rest,
-            target: Target::None,
+            targets: vec![],
         })
     }
 
@@ -1409,23 +1417,41 @@ impl CycleParser {
 
     fn expression(pair: Pair<Rule>) -> Result<Step, String> {
         let mut inner = pair.clone().into_inner();
-
-        let left = inner
-            .next()
-            .ok_or_else(|| format!("empty expression\n{:?}", pair))
-            .and_then(Self::step)?;
-
-        let op_pair = inner
-            .next()
-            .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
-
-        match Operator::parse(op_pair.clone())? {
-            Operator::Static(op) => Self::static_expression(left, op, op_pair),
-            Operator::Dynamic(op) => match op {
-                DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair),
-                _ => Self::speed_expression(left, op, op_pair),
-            },
+        // Initialize 'left' with the first step (single or group).
+        let mut left = Self::step(
+            inner
+                .next()
+                .ok_or_else(|| format!("empty expression\n{:?}", pair))?,
+        )?;
+        // Loop over operators and parameters.
+        for op_pair in inner {
+            match op_pair.as_rule() {
+                // Handle op_target chains
+                Rule::op_target => {
+                    if let Some(param_pair) = op_pair.clone().into_inner().next() {
+                        let right = Self::step(param_pair)?;
+                        left = Step::DynamicExpression(DynamicExpression {
+                            op: DynamicOp::Target(),
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        });
+                    } else {
+                        return Err(format!("missing parameter after op_target\n{:?}", op_pair));
+                    }
+                }
+                // Handle other dynamic and static operators.
+                _ => {
+                    left = match Operator::parse(op_pair.clone())? {
+                        Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
+                        Operator::Dynamic(op) => match op {
+                            DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
+                            _ => Self::speed_expression(left, op, op_pair)?,
+                        },
+                    }
+                }
+            }
         }
+        Ok(left)
     }
 }
 
@@ -1479,12 +1505,7 @@ impl Cycle {
 
     fn apply_target(events: &mut Events, target: Target) {
         if target != Target::None {
-            events.mutate_events(&mut |event: &mut Event| {
-                // don't overwrite existing targets
-                if event.target == Target::None {
-                    event.target = target.clone()
-                }
-            });
+            events.mutate_events(&mut |event: &mut Event| event.targets.push(target.clone()));
         }
     }
 
@@ -1528,9 +1549,16 @@ impl Cycle {
             // skip target events that can't be parsed as a valid target
             if target != Target::None {
                 for event in events.iter_mut() {
-                    // don't overwrite existing targets
-                    if event.target == Target::None && event.span.overlaps(&target_event.span) {
-                        event.target = target.clone()
+                    if event.span.overlaps(&target_event.span) {
+                        event.targets.push(target.clone())
+                    }
+                }
+            }
+            // add targets of the target value too, if there are any
+            if !target_event.targets.is_empty() {
+                for event in events.iter_mut() {
+                    if event.span.overlaps(&target_event.span) {
+                        event.targets.append(&mut target_event.targets.clone())
                     }
                 }
             }
@@ -1675,10 +1703,10 @@ impl Cycle {
                 }
                 Events::Single(Event {
                     length: Fraction::one(),
-                    target: Target::None,
                     span: Span::default(),
                     string: Rc::clone(&s.string),
                     value: s.value.clone(),
+                    targets: vec![],
                 })
             }
             Step::Subdivision(sd) => {
@@ -1879,7 +1907,7 @@ mod test {
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
         let mut cycle = Cycle::from(input)?;
         for out in outputs {
-            assert_eq!(cycle.generate()?, out);
+            assert_eq!(cycle.generate()?, out, "with input: '{}'", input);
         }
         Ok(())
     }
@@ -1908,7 +1936,6 @@ mod test {
     }
 
     #[test]
-
     fn span() -> Result<(), String> {
         assert!(Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
             .includes(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
@@ -2337,6 +2364,37 @@ mod test {
             ],
         )?;
 
+        assert_cycles(
+            "a:1:2:Target",
+            vec![vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                .with_note(9, 4)
+                .with_targets(vec![
+                    Target::Index(1),
+                    Target::Index(2),
+                    Target::Name("Target".into()),
+                ])]]],
+        )?;
+
+        assert_cycles(
+            "[a:1:2]:<3 4>",
+            vec![
+                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                    .with_note(9, 4)
+                    .with_targets(vec![
+                        Target::Index(1),
+                        Target::Index(2),
+                        Target::Index(3),
+                    ])]],
+                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                    .with_note(9, 4)
+                    .with_targets(vec![
+                        Target::Index(1),
+                        Target::Index(2),
+                        Target::Index(4),
+                    ])]],
+            ],
+        )?;
+
         // target expression preserves the structure from the left side
         assert_eq!(
             Cycle::from("[a b c d]:[1 2 3]")?.generate()?,
@@ -2346,10 +2404,10 @@ mod test {
                     .with_target(Target::Index(1)),
                 Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8))
                     .with_note(11, 4)
-                    .with_target(Target::Index(1)),
+                    .with_targets(vec![Target::Index(1), Target::Index(2)]),
                 Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8))
                     .with_note(0, 4)
-                    .with_target(Target::Index(2)),
+                    .with_targets(vec![Target::Index(2), Target::Index(3)]),
                 Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                     .with_note(2, 4)
                     .with_target(Target::Index(3)),
@@ -2371,7 +2429,7 @@ mod test {
                             .with_target(Target::Index(2)),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(8)),
+                            .with_targets(vec![Target::Index(8), Target::Index(3)]),
                     ],
                     vec![
                         Event::at(F::from(0), F::new(1u8, 2u8))
@@ -2382,7 +2440,7 @@ mod test {
                             .with_target(Target::Index(4)),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(8)),
+                            .with_targets(vec![Target::Index(8), Target::Index(4)]),
                     ],
                 ],
                 vec![
@@ -2393,10 +2451,10 @@ mod test {
                         Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
                             // this iteration uses the more specific target
-                            .with_target(Target::Index(7)),
+                            .with_targets(vec![Target::Index(7), Target::Index(2)]),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(9)),
+                            .with_targets(vec![Target::Index(9), Target::Index(3)]),
                     ],
                     vec![
                         Event::at(F::from(0), F::new(1u8, 2u8))
@@ -2404,10 +2462,10 @@ mod test {
                             .with_target(Target::Index(4)),
                         Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(7)),
+                            .with_targets(vec![Target::Index(7), Target::Index(4)]),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(9)),
+                            .with_targets(vec![Target::Index(9), Target::Index(4)]),
                     ],
                 ],
             ],
@@ -2441,7 +2499,7 @@ mod test {
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8))
                         .with_note(9, 4)
-                        .with_target(Target::Index(1)),
+                        .with_targets(vec![Target::Index(1), Target::Index(3)]),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                         .with_note(11, 4)
                         .with_target(Target::Index(3)),
@@ -2449,7 +2507,7 @@ mod test {
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8))
                         .with_note(9, 4)
-                        .with_target(Target::Index(1)),
+                        .with_targets(vec![Target::Index(1), Target::Index(4)]),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                         .with_note(11, 4)
                         .with_target(Target::Index(4)),
