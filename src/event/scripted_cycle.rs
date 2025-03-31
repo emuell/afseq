@@ -119,10 +119,12 @@ impl ScriptedCycleEventIter {
             )));
         }
         // inject target instrument, if present
-        if let Some(instrument) = event.target().into() {
-            for mut note_event in &mut note_events {
-                if let Some(note_event) = &mut note_event {
-                    note_event.instrument = Some(instrument);
+        if let Some(target) = event.targets().first() {
+            if let Some(instrument) = target.into() {
+                for mut note_event in &mut note_events {
+                    if let Some(note_event) = &mut note_event {
+                        note_event.instrument = Some(instrument);
+                    }
                 }
             }
         }
