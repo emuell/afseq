@@ -56,23 +56,23 @@ op_replicate = ${ "!" ~ number }
 op_weight    = ${ "@" ~ number? }
 op_degrade   = ${ "?" ~ number? }
 
-/// dynamic operators
+/// dynamic operators (only o_target can be chained)
 op_fast      = { "*" ~ parameter }
 op_slow      = { "/" ~ parameter }
-op_target    = { ":" ~ parameter }
+op_target    = { ":" ~ parameter ~ (":" ~ parameter)* }
 
 // this should actually be parameter as well 
 // once bjorklund with patterns on the right is implemented
 single_parameter = _{ single }
 op_bjorklund = { "(" ~ (single_parameter ~ ",")+ ~ single_parameter ~ ")" }
 
-op           = _{ op_target | op_degrade | op_replicate | op_weight | op_fast | op_slow | op_bjorklund }
+op = _{ op_target | op_degrade | op_replicate | op_weight | op_fast | op_slow | op_bjorklund }
 
-expression  = { (single | group) ~ op+ }
-range       = ${ integer ~ ".." ~ integer }
+expression = { (single | group) ~ op+ }
+range = ${ integer ~ ".." ~ integer }
 
 /// helper container that splits steps into sections
-section   = _{ ( expression | range | single | repeat | group)+ }
+section = _{ ( expression | range | single | repeat | group)+ }
 
 /// the root of the cycle
 mini = { SOI ~ sections? ~ EOI }
