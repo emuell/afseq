@@ -1876,6 +1876,8 @@ impl Cycle {
 mod test {
     use super::*;
 
+    use pretty_assertions::assert_eq;
+
     type F = fraction::Fraction;
 
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {

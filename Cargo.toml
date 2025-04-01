@@ -36,6 +36,7 @@ mlua = { version = "^0.10", default-features = false, features = [
 ], optional = true }
 
 [dev-dependencies]
+pretty_assertions = "^1.4"
 notify = { version = "^8.0" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
