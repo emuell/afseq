@@ -1053,16 +1053,12 @@ impl CycleParser {
     fn value(pair: Pair<Rule>) -> Result<Value, String> {
         match pair.as_rule() {
             Rule::integer => Ok(Value::Integer(pair.as_str().parse::<i32>().unwrap_or(0))),
-            Rule::float | Rule::normal => {
-                Ok(Value::Float(pair.as_str().parse::<f64>().unwrap_or(0.0)))
-            }
+            Rule::float => Ok(Value::Float(pair.as_str().parse::<f64>().unwrap_or(0.0))),
             Rule::number => {
                 if let Some(n) = pair.into_inner().next() {
                     match n.as_rule() {
                         Rule::integer => Ok(Value::Integer(n.as_str().parse::<i32>().unwrap_or(0))),
-                        Rule::float | Rule::normal => {
-                            Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0)))
-                        }
+                        Rule::float => Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
                         _ => Err(format!("unrecognized number\n{:?}", n)),
                     }
                 } else {
@@ -1946,6 +1942,18 @@ mod test {
 
     #[test]
     fn generate() -> Result<(), String> {
+        assert_eq!(
+            Cycle::from("[0] [1] [1.01] [0.01] [0.] [.01]")?.generate()?,
+            [[
+                Event::at(F::new(0u8, 6u8), F::new(1u8, 6u8)).with_int(0),
+                Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_int(1),
+                Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_float(1.01),
+                Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_float(0.01),
+                Event::at(F::new(4u8, 6u8), F::new(1u8, 6u8)).with_float(0.0),
+                Event::at(F::new(5u8, 6u8), F::new(1u8, 6u8)).with_float(0.01),
+            ]]
+        );
+
         assert_eq!(Cycle::from("a*[]")?.generate()?, [[]]);
         assert_eq!(
             Cycle::from("a b c d")?.generate()?,

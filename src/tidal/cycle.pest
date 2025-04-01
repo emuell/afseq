@@ -5,12 +5,10 @@
 WHITESPACE = _{ " " | "\t" | "\u{A0}" | NEWLINE }
 
 /// numbers types allowing [ "1" "1.0" "1." ".1" ]
-digit   = @{("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
+digit   = _{("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
 integer = @{ "-"? ~ digit}
-normal  = @{ "-"? ~ "." ~ digit }
-float   = @{ "-"? ~ digit ~ "." ~ (digit)* }
-// exp           = _{ ^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+ }
-number  = ${ (normal | float | integer) ~ !(ASCII_ALPHA) }
+float   = @{ "-"? ~ (digit ~ "." ~ ASCII_DIGIT*) | ("." ~ ASCII_DIGIT+) }
+number  = ${ (float | integer) ~ !(ASCII_ALPHA) }
 
 /// case-insensitive pitch type with note, optional octave and sharp or flat mark
 octave  = { "10" | ASCII_DIGIT }
