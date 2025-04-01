@@ -1113,6 +1113,10 @@ impl CycleParser {
                 }
                 Ok(Value::Chord(pitch, Rc::from(mode)))
             }
+            Rule::pitch_property => {
+                // use as target strings only - not parsed here
+                Ok(Value::Name(Rc::from(pair.as_str())))
+            }
             Rule::name => Ok(Value::Name(Rc::from(pair.as_str()))),
             _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
         }
