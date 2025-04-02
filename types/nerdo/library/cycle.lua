@@ -91,7 +91,8 @@ function Cycle:map(map) end
 ---
 ---`cycle` accepts a mini-notation as used by Tidal Cycles, with the following differences:
 ---* Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
----* `:` sets the instrument or remappable target instead of selecting samples
+---* `:` sets the instrument or remappable target instead of selecting samples but also 
+---  allows setting note attributes such as instrument/volume/pan/delay (e.g. `c4:v0.1:p0.5`)
 ---* In bjorklund expressions, operators *within* and on the *right side* are not supported
 ---  (e.g. `bd(<3 2>, 8)` and `bd(3, 8)*2` are *not* supported)
 ---
