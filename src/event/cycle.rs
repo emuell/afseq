@@ -1,4 +1,8 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    ops::RangeBounds,
+};
 
 use fraction::Fraction;
 
@@ -8,17 +12,6 @@ use crate::{
 };
 
 // -------------------------------------------------------------------------------------------------
-
-/// Default conversion of a cycle target to an optional instrument id, as used by [`EventIter`].
-impl From<&CycleTarget> for Option<InstrumentId> {
-    fn from(value: &CycleTarget) -> Self {
-        match value {
-            CycleTarget::None => None,
-            CycleTarget::Index(i) => Some(InstrumentId::from(*i as usize)),
-            CycleTarget::Name(_) => None, // unsupported
-        }
-    }
-}
 
 /// Default conversion of a CycleValue into a note stack.
 ///
@@ -50,6 +43,133 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
             }
         }
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// Conversion helpers for cycle targets
+fn float_value_from_string<Range>(
+    str: &str,
+    name: &'static str,
+    range: Range,
+) -> Result<f32, String>
+where
+    Range: RangeBounds<f32> + std::fmt::Debug,
+{
+    let value;
+    if let Ok(int) = str.parse::<i32>() {
+        value = int as f32;
+    } else if let Ok(float) = str.parse::<f32>() {
+        value = float;
+    } else {
+        return Err(format!("{} property '{}' is not a number", name, str));
+    }
+    if range.contains(&value) {
+        Ok(value)
+    } else {
+        Err(format!(
+            "{} property must be in range [{:?}] but is '{}'",
+            name, range, value
+        ))
+    }
+}
+
+fn instrument_value_from_string(str: &str) -> Result<InstrumentId, String> {
+    if let Ok(value) = str.parse::<i64>() {
+        if value < 0 {
+            return Err(format!(
+                "instrument property must be >= 0 but is '{}'",
+                value
+            ));
+        }
+        Ok(InstrumentId::from(value as usize))
+    } else {
+        Err(format!("instrument property '{}' is not a number", str))
+    }
+}
+
+fn volume_value_from_string(str: &str) -> Result<f32, String> {
+    float_value_from_string(str, "volume", 0.0..=1.0)
+}
+
+fn panning_value_from_string(str: &str) -> Result<f32, String> {
+    float_value_from_string(str, "panning", -1.0..=1.0)
+}
+
+fn delay_value_from_string(str: &str) -> Result<f32, String> {
+    float_value_from_string(str, "delay", 0.0..1.0)
+}
+
+/// Apply cycle targets as note properties to the given note events
+pub(crate) fn apply_cycle_note_properties(
+    note_events: &mut [Option<NoteEvent>],
+    targets: &[CycleTarget],
+) -> Result<(), String> {
+    // quickly return if there are no targets or notes to process
+    if targets.is_empty() || note_events.is_empty() {
+        return Ok(());
+    }
+    // apply first occurence of the proerty only: don't override
+    let mut applied_targets = HashSet::<char>::new();
+    // apply for all non empty note events
+    for target in targets {
+        match target {
+            CycleTarget::None => {}
+            CycleTarget::Index(index) => {
+                if !applied_targets.contains(&'#') {
+                    applied_targets.insert('#');
+                    if *index < 0 {
+                        return Err(format!(
+                            "instrument property must be >= 0 but is '{}'",
+                            index
+                        ));
+                    }
+                    let instrument = InstrumentId::from(*index as usize);
+                    for note_event in note_events.iter_mut().flatten() {
+                        note_event.instrument = Some(instrument);
+                    }
+                }
+            }
+            CycleTarget::Name(name) => {
+                let prefix = name.chars().next().unwrap_or('\0');
+                let suffix = if name.len() >= 2 { &name[1..] } else { "" };
+                if !applied_targets.contains(&prefix) {
+                    applied_targets.insert(prefix);
+                    match prefix {
+                        '#' => {
+                            let instrument = instrument_value_from_string(suffix)?;
+                            for note_event in note_events.iter_mut().flatten() {
+                                note_event.instrument = Some(instrument);
+                            }
+                        }
+                        'v' => {
+                            let volume = volume_value_from_string(suffix)?;
+                            for note_event in note_events.iter_mut().flatten() {
+                                note_event.volume = volume;
+                            }
+                        }
+                        'p' => {
+                            let panning = panning_value_from_string(suffix)?;
+                            for note_event in note_events.iter_mut().flatten() {
+                                note_event.panning = panning;
+                            }
+                        }
+                        'd' => {
+                            let delay = delay_value_from_string(suffix)?;
+                            for note_event in note_events.iter_mut().flatten() {
+                                note_event.delay = delay;
+                            }
+                        }
+                        _ => {
+                            return Err(format!("invalid note property: '{}'. ", name) + 
+                                "expecting number values with '#' (instrument),'v' (volume), 'p' (panning) or 'd' (delay) prefixes here.")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -201,14 +321,8 @@ impl CycleEventIter {
                 event.value().try_into()?
             }
         };
-        // inject target instrument, if present
-        if let Some(instrument) = event.target().into() {
-            for mut note_event in &mut note_events {
-                if let Some(note_event) = &mut note_event {
-                    note_event.instrument = Some(instrument);
-                }
-            }
-        }
+        // apply note properties from targets
+        apply_cycle_note_properties(&mut note_events, event.targets())?;
         Ok(note_events)
     }
 
