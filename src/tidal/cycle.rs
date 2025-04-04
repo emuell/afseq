@@ -223,6 +223,10 @@ impl From<&Rc<str>> for Target {
     fn from(value: &Rc<str>) -> Self {
         if value.is_empty() || value.as_bytes() == b"~" || value.as_bytes() == b"-" {
             Self::None
+        } else if let Some(hex) = value.strip_prefix("0x").or(value.strip_prefix("0X")) {
+            Self::Index(i32::from_str_radix(hex, 16).unwrap_or(0))
+        } else if let Some(hex) = value.strip_prefix("-0x").or(value.strip_prefix("-0X")) {
+            Self::Index(-i32::from_str_radix(hex, 16).unwrap_or(0))
         } else if let Ok(i) = value.parse::<i32>() {
             Self::Index(i)
         } else {
@@ -505,6 +509,25 @@ impl Display for Pitch {
 }
 
 impl Value {
+    fn from_float(str: &str) -> Result<Value, String> {
+        Ok(Value::Float(
+            str.parse::<f64>().map_err(|err| err.to_string())?,
+        ))
+    }
+
+    fn from_integer(str: &str) -> Result<Value, String> {
+        let integer = if let Some(hex) = str.strip_prefix("0x").or(str.strip_prefix("0X")) {
+            i32::from_str_radix(hex, 16).map_err(|err| err.to_string())
+        } else if let Some(hex) = str.strip_prefix("-0x").or(str.strip_prefix("-0X")) {
+            i32::from_str_radix(hex, 16)
+                .map(|v| -v)
+                .map_err(|err| err.to_string())
+        } else {
+            str.parse::<i32>().map_err(|err| err.to_string())
+        };
+        Ok(Value::Integer(integer?))
+    }
+
     fn to_integer(&self) -> Option<i32> {
         match &self {
             Value::Rest => None,
@@ -1052,13 +1075,13 @@ impl CycleParser {
     /// parse a pair inside a single as a value
     fn value(pair: Pair<Rule>) -> Result<Value, String> {
         match pair.as_rule() {
-            Rule::integer => Ok(Value::Integer(pair.as_str().parse::<i32>().unwrap_or(0))),
-            Rule::float => Ok(Value::Float(pair.as_str().parse::<f64>().unwrap_or(0.0))),
+            Rule::integer => Value::from_integer(pair.as_str()),
+            Rule::float => Value::from_float(pair.as_str()),
             Rule::number => {
                 if let Some(n) = pair.into_inner().next() {
                     match n.as_rule() {
-                        Rule::integer => Ok(Value::Integer(n.as_str().parse::<i32>().unwrap_or(0))),
-                        Rule::float => Ok(Value::Float(n.as_str().parse::<f64>().unwrap_or(0.0))),
+                        Rule::integer => Value::from_integer(n.as_str()),
+                        Rule::float => Value::from_float(n.as_str()),
                         _ => Err(format!("unrecognized number\n{:?}", n)),
                     }
                 } else {
@@ -1943,6 +1966,18 @@ mod test {
     #[test]
     fn generate() -> Result<(), String> {
         assert_eq!(
+            Cycle::from("[0x0] [0x1A] [0XA] [-0X5] [-0XA0] [-0Xaa]")?.generate()?,
+            [[
+                Event::at(F::new(0u8, 6u8), F::new(1u8, 6u8)).with_int(0x0),
+                Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_int(0x1a),
+                Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_int(0xa),
+                Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_int(-0x5),
+                Event::at(F::new(4u8, 6u8), F::new(1u8, 6u8)).with_int(-0xa0),
+                Event::at(F::new(5u8, 6u8), F::new(1u8, 6u8)).with_int(-0xaa),
+            ]]
+        );
+
+        assert_eq!(
             Cycle::from("[0] [1] [1.01] [0.01] [0.] [.01]")?.generate()?,
             [[
                 Event::at(F::new(0u8, 6u8), F::new(1u8, 6u8)).with_int(0),
@@ -2098,14 +2133,14 @@ mod test {
         )?;
 
         assert_cycles(
-            "{<0 0 d#8:test> 1 <c d e>:3 [<.5 0.95> 1.]}%3",
+            "{<0 0 d#8:test> 1 <c d e>:0xB [<.5 0.95> 1.]}%3",
             vec![
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 3u8)).with_int(0),
                     Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_int(1),
                     Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
                         .with_note(0, 4)
-                        .with_target(Target::Index(3)),
+                        .with_target(Target::Index(0xB)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 6u8)).with_float(0.5),
@@ -2116,7 +2151,7 @@ mod test {
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 3u8))
                         .with_note(2, 4)
-                        .with_target(Target::Index(3)),
+                        .with_target(Target::Index(0xB)),
                     Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_float(0.95),
                     Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_float(1.0),
                     Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
