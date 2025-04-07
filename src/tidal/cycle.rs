@@ -219,18 +219,16 @@ pub enum Target {
     Name(Rc<str>),
 }
 
-impl From<&Rc<str>> for Target {
-    fn from(value: &Rc<str>) -> Self {
-        if value.is_empty() || value.as_bytes() == b"~" || value.as_bytes() == b"-" {
-            Self::None
-        } else if let Some(hex) = value.strip_prefix("0x").or(value.strip_prefix("0X")) {
-            Self::Index(i32::from_str_radix(hex, 16).unwrap_or(0))
-        } else if let Some(hex) = value.strip_prefix("-0x").or(value.strip_prefix("-0X")) {
-            Self::Index(-i32::from_str_radix(hex, 16).unwrap_or(0))
-        } else if let Ok(i) = value.parse::<i32>() {
-            Self::Index(i)
-        } else {
-            Self::Name(Rc::clone(value))
+impl Target {
+    fn from_value(value: &Value, value_string: &Rc<str>) -> Self {
+        match value {
+            Value::Rest | Value::Hold => Target::None,
+            Value::Integer(i) => Target::Index(*i),
+            Value::Name(name) => Self::Name(Rc::clone(name)),
+            Value::Float(_) | Value::Pitch(_) | Value::Chord(_, _) => {
+                // pass raw string and let clients deal with conversions or errors
+                Self::Name(Rc::clone(value_string))
+            }
         }
     }
 }
@@ -1547,7 +1545,7 @@ impl Cycle {
     // overlay two lists of events and apply the targets from the second to the first
     fn apply_targets(events: &mut [Event], target_events: &[Event]) {
         for target_event in target_events.iter() {
-            let target = Target::from(&target_event.string);
+            let target = Target::from_value(&target_event.value, &target_event.string);
             // skip target events that can't be parsed as a valid target
             if target != Target::None {
                 for event in events.iter_mut() {
@@ -1586,7 +1584,10 @@ impl Cycle {
             // multiply with single values to avoid generating events
             Step::Single(single) => {
                 let mut events = Self::output(left, state, cycle, limit)?;
-                Self::apply_target(&mut events, Target::from(&single.string));
+                Self::apply_target(
+                    &mut events,
+                    Target::from_value(&single.value, &single.string),
+                );
                 Ok(events)
             }
             _ => {
