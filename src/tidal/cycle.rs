@@ -1035,49 +1035,53 @@ impl Events {
     }
 
     // filter out holds while extending preceding events
-    fn merge_holds(events: &[Event]) -> Vec<Event> {
-        let mut result: Vec<Event> = Vec::with_capacity(events.len());
-        for e in events {
-            match e.value {
-                Value::Hold => {
-                    if let Some(last) = result.last_mut() {
-                        last.extend(e)
+    fn merge_holds(events: &mut Vec<Event>) {
+        if events.iter().any(|e| e.value == Value::Hold) {
+            let mut result: Vec<Event> = Vec::with_capacity(events.len());
+            for e in events.iter() {
+                match e.value {
+                    Value::Hold => {
+                        if let Some(last) = result.last_mut() {
+                            last.extend(e)
+                        }
                     }
+                    _ => result.push(e.clone()),
                 }
-                _ => result.push(e.clone()),
             }
+            *events = result
         }
-        result
     }
 
     // filter out consecutive rests
     // so any remaining rest can be converted to a note-off later
     // rests at the beginning of a pattern also get dropped
-    fn merge_rests(events: &[Event]) -> Vec<Event> {
-        let mut result: Vec<Event> = Vec::with_capacity(events.len());
-        for e in events {
-            match e.value {
-                Value::Rest => {
-                    if let Some(last) = result.last_mut() {
-                        match last.value {
-                            Value::Rest => last.extend(e),
-                            _ => result.push(e.clone()),
+    fn merge_rests(events: &mut Vec<Event>) {
+        if events.iter().any(|e| e.value == Value::Rest) {
+            let mut result: Vec<Event> = Vec::with_capacity(events.len());
+            for e in events.iter() {
+                match e.value {
+                    Value::Rest => {
+                        if let Some(last) = result.last_mut() {
+                            match last.value {
+                                Value::Rest => last.extend(e),
+                                _ => result.push(e.clone()),
+                            }
                         }
                     }
+                    _ => result.push(e.clone()),
                 }
-                _ => result.push(e.clone()),
             }
+            *events = result
         }
-        result
     }
 
     /// Removes Holds by extending preceding events and filters out Rests
     fn merge(&self, channels: &mut [Vec<Event>]) {
         for events in &mut *channels {
-            *events = Self::merge_holds(events);
+            Self::merge_holds(events);
         }
         for events in channels {
-            *events = Self::merge_rests(events);
+            Self::merge_rests(events);
         }
     }
 
