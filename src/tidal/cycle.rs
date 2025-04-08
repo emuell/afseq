@@ -130,7 +130,7 @@ pub struct Event {
     span: Span,
     value: Value,
     string: Rc<str>,
-    target: Target,
+    targets: Vec<Target>,
 }
 
 impl Default for Event {
@@ -140,7 +140,7 @@ impl Default for Event {
             span: Span::default(),
             value: Value::default(),
             string: Rc::from("~"),
-            target: Target::default(),
+            targets: Vec::new(),
         }
     }
 }
@@ -166,9 +166,9 @@ impl Event {
         &self.length
     }
 
-    /// The step's optional value target.
-    pub fn target(&self) -> &Target {
-        &self.target
+    /// The step's optional targets.
+    pub fn targets(&self) -> &[Target] {
+        &self.targets
     }
 }
 
@@ -208,28 +208,78 @@ pub enum Value {
     Integer(i32),
     Pitch(Pitch),
     Chord(Pitch, Rc<str>),
+    Property(PropertyKey, PropertyValue),
     Name(Rc<str>),
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub enum Target {
-    #[default]
-    None,
+/// Property key of a target
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum PropertyKey {
     Index(i32),
     Name(Rc<str>),
 }
 
+/// Property value of a target
+#[derive(Clone, Debug, PartialEq)]
+pub enum PropertyValue {
+    None,
+    Float(f64),
+    Integer(i32),
+}
+
+impl PropertyValue {
+    pub fn to_integer(&self) -> Option<i32> {
+        match self {
+            Self::None => None,
+            Self::Float(f) => Some(*f as i32),
+            Self::Integer(i) => Some(*i),
+        }
+    }
+    pub fn to_float(&self) -> Option<f64> {
+        match self {
+            Self::None => None,
+            Self::Float(f) => Some(*f),
+            Self::Integer(i) => Some(*i as f64),
+        }
+    }
+}
+
+// Target property pair
+#[derive(Clone, Debug, PartialEq)]
+pub struct Target(PropertyKey, PropertyValue);
+
 impl Target {
-    fn from_value(value: &Value, value_string: &Rc<str>) -> Self {
+    pub fn key(&self) -> &PropertyKey {
+        &self.0
+    }
+
+    pub fn value(&self) -> &PropertyValue {
+        &self.1
+    }
+
+    fn parse(value: &Value, value_string: &Rc<str>) -> Option<Self> {
         match value {
-            Value::Rest | Value::Hold => Target::None,
-            Value::Integer(i) => Target::Index(*i),
-            Value::Name(name) => Self::Name(Rc::clone(name)),
+            Value::Rest | Value::Hold => None,
+            Value::Integer(i) => Some(Self::from_index(*i)),
+            Value::Name(name) => Some(Self::from_name(Rc::clone(name))),
+            Value::Property(key, value) => Some(Self::from(key.clone(), value.clone())),
             Value::Float(_) | Value::Pitch(_) | Value::Chord(_, _) => {
-                // pass raw string and let clients deal with conversions or errors
-                Self::Name(Rc::clone(value_string))
+                // pass unexpected values as raw string and let clients deal with conversions or errors
+                Some(Self::from_name(Rc::clone(value_string)))
             }
         }
+    }
+
+    fn from(key: PropertyKey, value: PropertyValue) -> Self {
+        Self(key, value)
+    }
+
+    fn from_index(index: i32) -> Self {
+        Self(PropertyKey::Index(index), PropertyValue::None)
+    }
+
+    fn from_name(str: Rc<str>) -> Self {
+        Self(PropertyKey::Name(str), PropertyValue::None)
     }
 }
 
@@ -507,14 +557,8 @@ impl Display for Pitch {
 }
 
 impl Value {
-    fn from_float(str: &str) -> Result<Value, String> {
-        Ok(Value::Float(
-            str.parse::<f64>().map_err(|err| err.to_string())?,
-        ))
-    }
-
-    fn from_integer(str: &str) -> Result<Value, String> {
-        let integer = if let Some(hex) = str.strip_prefix("0x").or(str.strip_prefix("0X")) {
+    fn parse_integer(str: &str) -> Result<i32, String> {
+        if let Some(hex) = str.strip_prefix("0x").or(str.strip_prefix("0X")) {
             i32::from_str_radix(hex, 16).map_err(|err| err.to_string())
         } else if let Some(hex) = str.strip_prefix("-0x").or(str.strip_prefix("-0X")) {
             i32::from_str_radix(hex, 16)
@@ -522,8 +566,19 @@ impl Value {
                 .map_err(|err| err.to_string())
         } else {
             str.parse::<i32>().map_err(|err| err.to_string())
-        };
-        Ok(Value::Integer(integer?))
+        }
+    }
+
+    fn parse_float(str: &str) -> Result<f64, String> {
+        str.parse::<f64>().map_err(|err| err.to_string())
+    }
+
+    fn from_float(str: &str) -> Result<Value, String> {
+        Self::parse_float(str).map(Self::Float)
+    }
+
+    fn from_integer(str: &str) -> Result<Value, String> {
+        Self::parse_integer(str).map(Self::Integer)
     }
 
     fn to_integer(&self) -> Option<i32> {
@@ -534,6 +589,10 @@ impl Value {
             Value::Float(f) => Some(*f as i32),
             Value::Pitch(n) => Some(n.midi_note() as i32),
             Value::Chord(p, _m) => Some(p.midi_note() as i32),
+            Value::Property(k, v) => match k {
+                PropertyKey::Index(i) => Some(*i),
+                PropertyKey::Name(_) => v.to_integer(),
+            },
             Value::Name(_n) => None,
         }
     }
@@ -546,6 +605,7 @@ impl Value {
             Value::Float(f) => Some(*f),
             Value::Pitch(n) => Some(n.midi_note() as f64),
             Value::Chord(n, _m) => Some(n.midi_note() as f64),
+            Value::Property(_, v) => v.to_float(),
             Value::Name(_n) => None,
         }
     }
@@ -558,22 +618,12 @@ impl Value {
             Value::Float(f) => Some(f.clamp(0.0, 1.0)),
             Value::Pitch(p) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
             Value::Chord(p, _m) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
+            Value::Property(_, v) => match v {
+                PropertyValue::Float(f) => Some(f.clamp(0.0, 1.0)),
+                PropertyValue::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
+                PropertyValue::None => None,
+            },
             Value::Name(_n) => None,
-        }
-    }
-}
-
-#[cfg(test)]
-impl Display for Target {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Target::None => f.write_fmt(format_args!("")),
-            _ => {
-                f.write_fmt(format_args!(
-                    "{:?}",
-                    self // self.span.start, self.span.end, self.value
-                ))
-            }
         }
     }
 }
@@ -646,7 +696,7 @@ impl Event {
             },
             string: Rc::from("~"),
             value: Value::Rest,
-            target: Target::None,
+            targets: Vec::new(),
         }
     }
 
@@ -700,7 +750,16 @@ impl Event {
     #[cfg(test)]
     fn with_target(&self, target: Target) -> Self {
         Self {
-            target,
+            targets: vec![target],
+            ..self.clone()
+        }
+    }
+
+    #[cfg(test)]
+    fn with_targets(&self, targets: &[Target]) -> Self {
+        let targets = targets.to_vec();
+        Self {
+            targets,
             ..self.clone()
         }
     }
@@ -717,7 +776,7 @@ impl PartialEq<Event> for Event {
         self.length == other.length
             && self.span == other.span
             && self.value == other.value
-            && self.target == other.target
+            && self.targets == other.targets
     }
 }
 
@@ -725,8 +784,8 @@ impl PartialEq<Event> for Event {
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "{} | {:?} {}",
-            self.span, self.value, self.target
+            "{} | {:?} {:?}",
+            self.span, self.value, self.targets
         ))
     }
 }
@@ -759,7 +818,7 @@ impl Events {
             span: Span::default(),
             string: Rc::from("~"),
             value: Value::Rest,
-            target: Target::None,
+            targets: Vec::new(),
         })
     }
 
@@ -818,7 +877,7 @@ impl Events {
     {
         match self {
             Events::Multi(m) => {
-                let mut filtered = vec![];
+                let mut filtered = Vec::with_capacity(m.events.len());
                 for e in &mut m.events {
                     match e {
                         Events::Single(s) => {
@@ -837,7 +896,7 @@ impl Events {
                 !m.events.is_empty()
             }
             Events::Poly(p) => {
-                let mut filtered = vec![];
+                let mut filtered = Vec::with_capacity(p.channels.len());
                 for e in &mut p.channels {
                     if e.filter_mut(predicate) {
                         filtered.push(e.clone())
@@ -1105,8 +1164,27 @@ impl CycleParser {
                 }
                 Ok(Value::Chord(pitch, Rc::from(mode)))
             }
+            Rule::property => {
+                let key = pair
+                    .as_str()
+                    .get(0..1)
+                    .map(|v| PropertyKey::Name(Rc::from(v)))
+                    .ok_or(format!("missing property key in pair\n{:?}", pair));
+                let value = if let Some(v) = pair.clone().into_inner().next() {
+                    match v.as_rule() {
+                        Rule::integer => {
+                            Value::parse_integer(v.as_str()).map(PropertyValue::Integer)
+                        }
+                        Rule::float => Value::parse_float(v.as_str()).map(PropertyValue::Float),
+                        _ => Err(format!("unrecognized property value in pair\n{:?}", pair)),
+                    }
+                } else {
+                    Err(format!("missing property value in pair\n{:?}", pair))
+                };
+                Ok(Value::Property(key?, value?))
+            }
             Rule::name => Ok(Value::Name(Rc::from(pair.as_str()))),
-            _ => Err(format!("unrecognized pair in single\n{:?}", pair)),
+            _ => Err(format!("unrecognized property value\n{:?}", pair)),
         }
     }
 
@@ -1225,7 +1303,7 @@ impl CycleParser {
 
     fn section_vec(pairs: Vec<Pair<Rule>>) -> Result<Vec<Step>, String> {
         let choiced_steps = Self::with_choices(pairs)?;
-        let mut steps = vec![];
+        let mut steps = Vec::with_capacity(choiced_steps.len());
         for step in choiced_steps.into_iter() {
             Self::push_applied(&mut steps, step)
         }
@@ -1430,23 +1508,41 @@ impl CycleParser {
 
     fn expression(pair: Pair<Rule>) -> Result<Step, String> {
         let mut inner = pair.clone().into_inner();
-
-        let left = inner
-            .next()
-            .ok_or_else(|| format!("empty expression\n{:?}", pair))
-            .and_then(Self::step)?;
-
-        let op_pair = inner
-            .next()
-            .ok_or_else(|| format!("incomplete expression\n{:?}", pair))?;
-
-        match Operator::parse(op_pair.clone())? {
-            Operator::Static(op) => Self::static_expression(left, op, op_pair),
-            Operator::Dynamic(op) => match op {
-                DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair),
-                _ => Self::speed_expression(left, op, op_pair),
-            },
+        // Initialize 'left' with the first step (single or group).
+        let mut left = Self::step(
+            inner
+                .next()
+                .ok_or_else(|| format!("empty expression\n{:?}", pair))?,
+        )?;
+        // Loop over operators and parameters.
+        for op_pair in inner {
+            match op_pair.as_rule() {
+                // Handle op_target chains
+                Rule::op_target => {
+                    if let Some(param_pair) = op_pair.clone().into_inner().next() {
+                        let right = Self::step(param_pair)?;
+                        left = Step::DynamicExpression(DynamicExpression {
+                            op: DynamicOp::Target(),
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        });
+                    } else {
+                        return Err(format!("missing parameter after op_target\n{:?}", op_pair));
+                    }
+                }
+                // Handle other dynamic and static operators.
+                _ => {
+                    left = match Operator::parse(op_pair.clone())? {
+                        Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
+                        Operator::Dynamic(op) => match op {
+                            DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
+                            _ => Self::speed_expression(left, op, op_pair)?,
+                        },
+                    }
+                }
+            }
         }
+        Ok(left)
     }
 }
 
@@ -1467,7 +1563,7 @@ impl Cycle {
         limit: usize,
     ) -> Result<Events, String> {
         let range = span.whole_range();
-        let mut cycles = vec![];
+        let mut cycles = Vec::with_capacity(range.clone().count());
         for cycle in range {
             let mut events = Self::output(step, state, cycle, limit)?;
             events.transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
@@ -1496,17 +1592,6 @@ impl Cycle {
         let mut events = Self::output_span(step, state, &span, limit)?;
         events.normalize_spans(&span);
         Ok(events)
-    }
-
-    fn apply_target(events: &mut Events, target: Target) {
-        if target != Target::None {
-            events.mutate_events(&mut |event: &mut Event| {
-                // don't overwrite existing targets
-                if event.target == Target::None {
-                    event.target = target.clone()
-                }
-            });
-        }
     }
 
     // helper to calculate the right multiplier for polymeter and dynamic expressions
@@ -1545,13 +1630,20 @@ impl Cycle {
     // overlay two lists of events and apply the targets from the second to the first
     fn apply_targets(events: &mut [Event], target_events: &[Event]) {
         for target_event in target_events.iter() {
-            let target = Target::from_value(&target_event.value, &target_event.string);
-            // skip target events that can't be parsed as a valid target
-            if target != Target::None {
+            if let Some(target) = Target::parse(&target_event.value, &target_event.string) {
                 for event in events.iter_mut() {
-                    // don't overwrite existing targets
-                    if event.target == Target::None && event.span.overlaps(&target_event.span) {
-                        event.target = target.clone()
+                    if event.span.overlaps(&target_event.span) {
+                        event.targets.push(target.clone());
+                    }
+                }
+            }
+            // add all targets of the target value too, if there are any
+            if !target_event.targets.is_empty() {
+                for event in events.iter_mut() {
+                    if event.span.overlaps(&target_event.span) {
+                        for target in &target_event.targets {
+                            event.targets.push(target.clone());
+                        }
                     }
                 }
             }
@@ -1584,10 +1676,11 @@ impl Cycle {
             // multiply with single values to avoid generating events
             Step::Single(single) => {
                 let mut events = Self::output(left, state, cycle, limit)?;
-                Self::apply_target(
-                    &mut events,
-                    Target::from_value(&single.value, &single.string),
-                );
+                if let Some(target) = Target::parse(&single.value, &single.string) {
+                    events.mutate_events(&mut |event: &mut Event| {
+                        event.targets.push(target.clone());
+                    });
+                }
                 Ok(events)
             }
             _ => {
@@ -1699,17 +1792,17 @@ impl Cycle {
                 }
                 Events::Single(Event {
                     length: Fraction::one(),
-                    target: Target::None,
                     span: Span::default(),
                     string: Rc::clone(&s.string),
                     value: s.value.clone(),
+                    targets: Vec::new(),
                 })
             }
             Step::Subdivision(sd) => {
                 if sd.steps.is_empty() {
                     Events::empty()
                 } else {
-                    let mut events = vec![];
+                    let mut events = Vec::with_capacity(sd.steps.len());
                     for s in &sd.steps {
                         let e = Self::output(s, state, cycle, limit)?;
                         events.push(e)
@@ -1747,7 +1840,7 @@ impl Cycle {
                 if st.stack.is_empty() {
                     Events::empty()
                 } else {
-                    let mut channels = vec![];
+                    let mut channels = Vec::with_capacity(st.stack.len());
                     for s in &st.stack {
                         channels.push(Self::output(s, state, cycle, limit)?)
                     }
@@ -1804,6 +1897,7 @@ impl Cycle {
                                 };
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
+                                        events.reserve(pulses as usize);
                                         let out =
                                             Self::output(b.left.as_ref(), state, cycle, limit)?;
                                         for pulse in euclidean(
@@ -1903,7 +1997,7 @@ mod test {
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
         let mut cycle = Cycle::from(input)?;
         for out in outputs {
-            assert_eq!(cycle.generate()?, out);
+            assert_eq!(cycle.generate()?, out, "with input: '{}'", input);
         }
         Ok(())
     }
@@ -1932,7 +2026,6 @@ mod test {
     }
 
     #[test]
-
     fn span() -> Result<(), String> {
         assert!(Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
             .includes(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
@@ -2141,7 +2234,7 @@ mod test {
                     Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_int(1),
                     Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
                         .with_note(0, 4)
-                        .with_target(Target::Index(0xB)),
+                        .with_target(Target::from_index(0xB)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 6u8)).with_float(0.5),
@@ -2152,12 +2245,12 @@ mod test {
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 3u8))
                         .with_note(2, 4)
-                        .with_target(Target::Index(0xB)),
+                        .with_target(Target::from_index(0xB)),
                     Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_float(0.95),
                     Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_float(1.0),
                     Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
                         .with_note(3, 8)
-                        .with_target(Target::Name(Rc::from("test"))),
+                        .with_target(Target::from_name("test".into())),
                 ]],
             ],
         )?;
@@ -2202,10 +2295,10 @@ mod test {
                 vec![
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                         .with_int(5)
-                        .with_target(Target::Index(42)),
+                        .with_target(Target::from_index(42)),
                     Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                         .with_int(6)
-                        .with_target(Target::Index(42)),
+                        .with_target(Target::from_index(42)),
                 ],
             ]],
         )?;
@@ -2263,24 +2356,24 @@ mod test {
                     Event::at(F::from(0), F::new(1u8, 10u8)).with_int(1),
                     Event::at(F::new(1u8, 10u8), F::new(1u8, 10u8))
                         .with_int(2)
-                        .with_target(Target::Name(Rc::from("a"))),
+                        .with_target(Target::from_name("a".into())),
                     Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
                     Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(1),
                     Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(2)
-                        .with_target(Target::Name(Rc::from("a"))),
+                        .with_target(Target::from_name("a".into())),
                     Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 10u8)).with_int(10),
                     Event::at(F::new(1u8, 10u8), F::new(1u8, 10u8))
                         .with_int(20)
-                        .with_target(Target::Name(Rc::from("a"))),
+                        .with_target(Target::from_name("a".into())),
                     Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
                     Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(10),
                     Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
                         .with_int(20)
-                        .with_target(Target::Name(Rc::from("a"))),
+                        .with_target(Target::from_name("a".into())),
                     Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
                 ]],
             ],
@@ -2354,10 +2447,10 @@ mod test {
             [[
                 Event::at(F::from(0), F::new(1u8, 2u8))
                     .with_note(9, 4)
-                    .with_target(Target::Index(1)),
+                    .with_target(Target::from_index(1)),
                 Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                     .with_note(11, 4)
-                    .with_target(Target::Name("target".into()))
+                    .with_target(Target::from_name("target".into()))
             ]]
         );
 
@@ -2366,10 +2459,41 @@ mod test {
             vec![
                 vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
                     .with_note(9, 4)
-                    .with_target(Target::Index(1))]],
+                    .with_target(Target::from_index(1))]],
                 vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
                     .with_note(9, 4)
-                    .with_target(Target::Index(2))]],
+                    .with_target(Target::from_index(2))]],
+            ],
+        )?;
+
+        assert_cycles(
+            "a:1:2:Target",
+            vec![vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                .with_note(9, 4)
+                .with_targets(&[
+                    Target::from_index(1),
+                    Target::from_index(2),
+                    Target::from_name("Target".into()),
+                ])]]],
+        )?;
+
+        assert_cycles(
+            "[a:1:2]:<3 4>",
+            vec![
+                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                    .with_note(9, 4)
+                    .with_targets(&[
+                        Target::from_index(1),
+                        Target::from_index(2),
+                        Target::from_index(3),
+                    ])]],
+                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                    .with_note(9, 4)
+                    .with_targets(&[
+                        Target::from_index(1),
+                        Target::from_index(2),
+                        Target::from_index(4),
+                    ])]],
             ],
         )?;
 
@@ -2379,16 +2503,16 @@ mod test {
             [[
                 Event::at(F::from(0), F::new(1u8, 4u8))
                     .with_note(9, 4)
-                    .with_target(Target::Index(1)),
+                    .with_target(Target::from_index(1)),
                 Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8))
                     .with_note(11, 4)
-                    .with_target(Target::Index(1)),
+                    .with_targets(&[Target::from_index(1), Target::from_index(2)]),
                 Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8))
                     .with_note(0, 4)
-                    .with_target(Target::Index(2)),
+                    .with_targets(&[Target::from_index(2), Target::from_index(3)]),
                 Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                     .with_note(2, 4)
-                    .with_target(Target::Index(3)),
+                    .with_target(Target::from_index(3)),
             ]]
         );
 
@@ -2400,50 +2524,49 @@ mod test {
                     vec![
                         Event::at(F::from(0), F::new(1u8, 2u8))
                             .with_note(9, 4)
-                            .with_target(Target::Index(1)),
+                            .with_target(Target::from_index(1)),
                         Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
                             // this iteration lets the outer context set the target
-                            .with_target(Target::Index(2)),
+                            .with_target(Target::from_index(2)),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(8)),
+                            .with_targets(&[Target::from_index(8), Target::from_index(3)]),
                     ],
                     vec![
                         Event::at(F::from(0), F::new(1u8, 2u8))
                             .with_note(9, 4)
-                            .with_target(Target::Index(4)),
+                            .with_target(Target::from_index(4)),
                         Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(4)),
+                            .with_target(Target::from_index(4)),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(8)),
+                            .with_targets(&[Target::from_index(8), Target::from_index(4)]),
                     ],
                 ],
                 vec![
                     vec![
                         Event::at(F::from(0), F::new(1u8, 2u8))
                             .with_note(9, 4)
-                            .with_target(Target::Index(1)),
+                            .with_target(Target::from_index(1)),
                         Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            // this iteration uses the more specific target
-                            .with_target(Target::Index(7)),
+                            .with_targets(&[Target::from_index(7), Target::from_index(2)]),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(9)),
+                            .with_targets(&[Target::from_index(9), Target::from_index(3)]),
                     ],
                     vec![
                         Event::at(F::from(0), F::new(1u8, 2u8))
                             .with_note(9, 4)
-                            .with_target(Target::Index(4)),
+                            .with_target(Target::from_index(4)),
                         Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(7)),
+                            .with_targets(&[Target::from_index(7), Target::from_index(4)]),
                         Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
                             .with_note(11, 4)
-                            .with_target(Target::Index(9)),
+                            .with_targets(&[Target::from_index(9), Target::from_index(4)]),
                     ],
                 ],
             ],
@@ -2455,18 +2578,18 @@ mod test {
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8))
                         .with_note(9, 4)
-                        .with_target(Target::Index(1)),
+                        .with_target(Target::from_index(1)),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                         .with_note(11, 4)
-                        .with_target(Target::Index(1)),
+                        .with_target(Target::from_index(1)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8))
                         .with_note(9, 4)
-                        .with_target(Target::Name("target".into())),
+                        .with_target(Target::from_name("target".into())),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                         .with_note(11, 4)
-                        .with_target(Target::Name("target".into())),
+                        .with_target(Target::from_name("target".into())),
                 ]],
             ],
         )?;
@@ -2477,21 +2600,37 @@ mod test {
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8))
                         .with_note(9, 4)
-                        .with_target(Target::Index(1)),
+                        .with_targets(&[Target::from_index(1), Target::from_index(3)]),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                         .with_note(11, 4)
-                        .with_target(Target::Index(3)),
+                        .with_target(Target::from_index(3)),
                 ]],
                 vec![vec![
                     Event::at(F::from(0), F::new(1u8, 2u8))
                         .with_note(9, 4)
-                        .with_target(Target::Index(1)),
+                        .with_targets(&[Target::from_index(1), Target::from_index(4)]),
                     Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
                         .with_note(11, 4)
-                        .with_target(Target::Index(4)),
+                        .with_target(Target::from_index(4)),
                 ]],
             ],
         )?;
+
+        assert_eq!(
+            Cycle::from("a:1 b:v0.1:v1.0:p1.0")?.generate()?,
+            [[
+                Event::at(F::from(0), F::new(1u8, 2u8))
+                    .with_note(9, 4)
+                    .with_target(Target::from_index(1)),
+                Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                    .with_note(11, 4)
+                    .with_targets(&[
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(1.0)),
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(1.0))
+                    ])
+            ]]
+        );
 
         assert_eq!(
             Cycle::from("c(3,8,9)")?.generate()?,

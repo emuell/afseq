@@ -27,6 +27,8 @@ pub use super::{
     Chord,
     Cycle,
     CycleEvent,
+    CyclePropertyKey,
+    CyclePropertyValue,
     CycleSpan,
     CycleTarget,
     CycleValue,
