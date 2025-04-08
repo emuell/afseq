@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 #[cfg(test)]
 use std::fmt::Display;
@@ -130,7 +130,7 @@ pub struct Event {
     span: Span,
     value: Value,
     string: Rc<str>,
-    targets: TargetMap,
+    targets: Vec<Target>,
 }
 
 impl Default for Event {
@@ -140,7 +140,7 @@ impl Default for Event {
             span: Span::default(),
             value: Value::default(),
             string: Rc::from("~"),
-            targets: TargetMap::new(),
+            targets: Vec::new(),
         }
     }
 }
@@ -167,7 +167,7 @@ impl Event {
     }
 
     /// The step's optional targets.
-    pub fn targets(&self) -> &TargetMap {
+    pub fn targets(&self) -> &[Target] {
         &self.targets
     }
 }
@@ -249,11 +249,11 @@ impl PropertyValue {
 pub struct Target(PropertyKey, PropertyValue);
 
 impl Target {
-    fn key(&self) -> &PropertyKey {
+    pub fn key(&self) -> &PropertyKey {
         &self.0
     }
 
-    fn value(&self) -> &PropertyValue {
+    pub fn value(&self) -> &PropertyValue {
         &self.1
     }
 
@@ -282,9 +282,6 @@ impl Target {
         Self(PropertyKey::Name(str), PropertyValue::None)
     }
 }
-
-/// Target property pairs, stored in a map
-pub type TargetMap = HashMap<PropertyKey, PropertyValue>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pitch {
@@ -699,7 +696,7 @@ impl Event {
             },
             string: Rc::from("~"),
             value: Value::Rest,
-            targets: TargetMap::new(),
+            targets: Vec::new(),
         }
     }
 
@@ -753,17 +750,14 @@ impl Event {
     #[cfg(test)]
     fn with_target(&self, target: Target) -> Self {
         Self {
-            targets: TargetMap::from([(target.0, target.1)]),
+            targets: vec![target],
             ..self.clone()
         }
     }
 
     #[cfg(test)]
     fn with_targets(&self, targets: &[Target]) -> Self {
-        let targets = targets
-            .iter()
-            .map(|v| (v.key().clone(), v.value().clone()))
-            .collect::<HashMap<_, _>>();
+        let targets = targets.to_vec();
         Self {
             targets,
             ..self.clone()
@@ -824,7 +818,7 @@ impl Events {
             span: Span::default(),
             string: Rc::from("~"),
             value: Value::Rest,
-            targets: TargetMap::new(),
+            targets: Vec::new(),
         })
     }
 
@@ -883,7 +877,7 @@ impl Events {
     {
         match self {
             Events::Multi(m) => {
-                let mut filtered = vec![];
+                let mut filtered = Vec::with_capacity(m.events.len());
                 for e in &mut m.events {
                     match e {
                         Events::Single(s) => {
@@ -902,7 +896,7 @@ impl Events {
                 !m.events.is_empty()
             }
             Events::Poly(p) => {
-                let mut filtered = vec![];
+                let mut filtered = Vec::with_capacity(p.channels.len());
                 for e in &mut p.channels {
                     if e.filter_mut(predicate) {
                         filtered.push(e.clone())
@@ -1309,7 +1303,7 @@ impl CycleParser {
 
     fn section_vec(pairs: Vec<Pair<Rule>>) -> Result<Vec<Step>, String> {
         let choiced_steps = Self::with_choices(pairs)?;
-        let mut steps = vec![];
+        let mut steps = Vec::with_capacity(choiced_steps.len());
         for step in choiced_steps.into_iter() {
             Self::push_applied(&mut steps, step)
         }
@@ -1569,7 +1563,7 @@ impl Cycle {
         limit: usize,
     ) -> Result<Events, String> {
         let range = span.whole_range();
-        let mut cycles = vec![];
+        let mut cycles = Vec::with_capacity(range.clone().count());
         for cycle in range {
             let mut events = Self::output(step, state, cycle, limit)?;
             events.transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
@@ -1639,9 +1633,7 @@ impl Cycle {
             if let Some(target) = Target::parse(&target_event.value, &target_event.string) {
                 for event in events.iter_mut() {
                     if event.span.overlaps(&target_event.span) {
-                        event
-                            .targets
-                            .insert(target.key().clone(), target.value().clone());
+                        event.targets.push(target.clone());
                     }
                 }
             }
@@ -1649,8 +1641,8 @@ impl Cycle {
             if !target_event.targets.is_empty() {
                 for event in events.iter_mut() {
                     if event.span.overlaps(&target_event.span) {
-                        for (k, v) in &target_event.targets {
-                            event.targets.insert(k.clone(), v.clone());
+                        for target in &target_event.targets {
+                            event.targets.push(target.clone());
                         }
                     }
                 }
@@ -1686,9 +1678,7 @@ impl Cycle {
                 let mut events = Self::output(left, state, cycle, limit)?;
                 if let Some(target) = Target::parse(&single.value, &single.string) {
                     events.mutate_events(&mut |event: &mut Event| {
-                        event
-                            .targets
-                            .insert(target.key().clone(), target.value().clone());
+                        event.targets.push(target.clone());
                     });
                 }
                 Ok(events)
@@ -1805,14 +1795,14 @@ impl Cycle {
                     span: Span::default(),
                     string: Rc::clone(&s.string),
                     value: s.value.clone(),
-                    targets: TargetMap::new(),
+                    targets: Vec::new(),
                 })
             }
             Step::Subdivision(sd) => {
                 if sd.steps.is_empty() {
                     Events::empty()
                 } else {
-                    let mut events = vec![];
+                    let mut events = Vec::with_capacity(sd.steps.len());
                     for s in &sd.steps {
                         let e = Self::output(s, state, cycle, limit)?;
                         events.push(e)
@@ -1850,7 +1840,7 @@ impl Cycle {
                 if st.stack.is_empty() {
                     Events::empty()
                 } else {
-                    let mut channels = vec![];
+                    let mut channels = Vec::with_capacity(st.stack.len());
                     for s in &st.stack {
                         channels.push(Self::output(s, state, cycle, limit)?)
                     }
@@ -1907,6 +1897,7 @@ impl Cycle {
                                 };
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
+                                        events.reserve(pulses as usize);
                                         let out =
                                             Self::output(b.left.as_ref(), state, cycle, limit)?;
                                         for pulse in euclidean(
@@ -2626,7 +2617,7 @@ mod test {
         )?;
 
         assert_eq!(
-            Cycle::from("a:1 b:v0.1:p-1.")?.generate()?,
+            Cycle::from("a:1 b:v0.1:v1.0:p1.0")?.generate()?,
             [[
                 Event::at(F::from(0), F::new(1u8, 2u8))
                     .with_note(9, 4)
@@ -2635,7 +2626,8 @@ mod test {
                     .with_note(11, 4)
                     .with_targets(&[
                         Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(-1.0))
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(1.0)),
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(1.0))
                     ])
             ]]
         );

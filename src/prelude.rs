@@ -30,7 +30,7 @@ pub use super::{
     CyclePropertyKey,
     CyclePropertyValue,
     CycleSpan,
-    CycleTargetMap,
+    CycleTarget,
     CycleValue,
     Event,
     EventIter,
