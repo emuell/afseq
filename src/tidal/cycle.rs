@@ -9,10 +9,14 @@ use pest_derive::Parser;
 use rand::{rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use fraction::ToPrimitive;
-use fraction::{Fraction, One, Zero};
+type Fraction = num_rational::Rational32;
+use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::pattern::euclidean::euclidean;
+
+// -------------------------------------------------------------------------------------------------
+
+const OVERFLOW_ERROR: &str = "Internal error: interger overflow in cycle";
 
 // -------------------------------------------------------------------------------------------------
 
@@ -654,21 +658,25 @@ impl Span {
         Self { start, end }
     }
 
-    // transforms a nested relative span according to an absolute span at output time
-    fn transform(&self, outer: &Span) -> Span {
-        let start = outer.start + outer.length() * self.start;
-        Span {
-            start,
-            end: start + outer.length() * self.length(),
-        }
+    /// transforms the span relative to an outer span.
+    fn transform(&mut self, outer: &Span) {
+        let outer_length = outer.length();
+        let previous_length = self.length();
+        self.start = outer.start + outer_length * self.start;
+        self.end = self.start + outer_length * previous_length;
     }
 
     /// transforms the span to 0..1 based on an outer span
     /// assumes self is inside outer
     fn normalize(&mut self, outer: &Span) {
         let outer_length = outer.length();
-        self.start = (self.start - outer.start) / outer_length;
-        self.end = (self.end - outer.start) / outer_length;
+        if outer_length != Fraction::ZERO {
+            self.start = (self.start - outer.start) / outer_length;
+            self.end = (self.end - outer.start) / outer_length;
+        } else {
+            self.start = Fraction::ZERO;
+            self.end = Fraction::ZERO;
+        }
     }
 
     fn whole_range(&self) -> std::ops::Range<u32> {
@@ -700,8 +708,8 @@ impl Span {
 impl Default for Span {
     fn default() -> Self {
         Span {
-            start: Fraction::zero(),
-            end: Fraction::one(),
+            start: Fraction::ZERO,
+            end: Fraction::ONE,
         }
     }
 }
@@ -834,7 +842,7 @@ enum Events {
 impl Events {
     fn empty() -> Events {
         Events::Single(Event {
-            length: Fraction::one(),
+            length: Fraction::ONE,
             span: Span::default(),
             string: Rc::from("~"),
             value: Value::Rest,
@@ -860,7 +868,7 @@ impl Events {
 
     /// Fits a list of events into a Span of 0..1
     fn subdivide_lengths(events: &mut Vec<Events>) {
-        let mut length = Fraction::zero();
+        let mut length = Fraction::ZERO;
         for e in &mut *events {
             match e {
                 Events::Single(s) => length += s.length,
@@ -868,8 +876,12 @@ impl Events {
                 Events::Poly(p) => length += p.length,
             }
         }
-        let step_size = Fraction::one() / length;
-        let mut start = Fraction::zero();
+        let step_size = if length != Fraction::ZERO {
+            Fraction::ONE / length
+        } else {
+            Fraction::ZERO
+        };
+        let mut start = Fraction::ZERO;
         for e in &mut *events {
             match e {
                 Events::Single(s) => {
@@ -967,19 +979,18 @@ impl Events {
         match self {
             Events::Single(s) => {
                 s.length *= unit;
-                s.span = s.span.transform(span);
+                s.span.transform(span);
             }
             Events::Multi(m) => {
                 m.length *= unit;
-                m.span = m.span.transform(span);
-
+                m.span.transform(span);
                 for e in &mut m.events {
                     e.transform_spans(&m.span);
                 }
             }
             Events::Poly(p) => {
                 p.length *= unit;
-                p.span = p.span.transform(span);
+                p.span.transform(span);
                 for e in &mut p.channels {
                     e.transform_spans(&p.span);
                 }
@@ -1590,8 +1601,12 @@ impl Cycle {
         let range = span.whole_range();
         let mut cycles = Vec::with_capacity(range.clone().count());
         for cycle in range {
+            let span = Span::new(
+                Fraction::from_u32(cycle).ok_or(OVERFLOW_ERROR)?,
+                Fraction::from_u32(cycle + 1).ok_or(OVERFLOW_ERROR)?,
+            );
             let mut events = Self::output(step, state, cycle, limit)?;
-            events.transform_spans(&Span::new(Fraction::from(cycle), Fraction::from(cycle + 1)));
+            events.transform_spans(&span);
             cycles.push(events)
         }
         let mut events = Events::Multi(MultiEvents {
@@ -1611,8 +1626,8 @@ impl Cycle {
         limit: usize,
     ) -> Result<Events, String> {
         let span = Span::new(
-            Fraction::from(cycle) * mult,
-            Fraction::from(cycle + 1) * mult,
+            Fraction::from_u32(cycle).ok_or(OVERFLOW_ERROR)? * mult,
+            Fraction::from_u32(cycle + 1).ok_or(OVERFLOW_ERROR)? * mult,
         );
         let mut events = Self::output_span(step, state, &span, limit)?;
         events.normalize_spans(&span);
@@ -1625,22 +1640,23 @@ impl Cycle {
             Step::Polymeter(pm) => {
                 let length = pm.length() as f64;
                 let count = value.to_float().unwrap_or(0.0);
-                Fraction::from(count) / Fraction::from(length)
+                Fraction::from_f64(count).unwrap_or(Fraction::ZERO)
+                    / Fraction::from_f64(length).unwrap_or(Fraction::ONE)
             }
             Step::DynamicExpression(e) => match e.op {
                 DynamicOp::Fast() => {
                     if let Some(right) = value.to_float() {
-                        Fraction::from(right)
+                        Fraction::from_f64(right).unwrap_or(Fraction::ZERO)
                     } else {
-                        Fraction::from(0)
+                        Fraction::ZERO
                     }
                 }
                 DynamicOp::Slow() => {
                     if let Some(right) = value.to_float() {
                         if right != 0.0 {
-                            Fraction::from(1.0 / right)
+                            Fraction::from_f64(1.0 / right).unwrap_or(Fraction::ZERO)
                         } else {
-                            Fraction::from(0.0)
+                            Fraction::ZERO
                         }
                     } else {
                         Fraction::from(0)
@@ -1833,7 +1849,7 @@ impl Cycle {
                     ));
                 }
                 Events::Single(Event {
-                    length: Fraction::one(),
+                    length: Fraction::ONE,
                     span: Span::default(),
                     string: Rc::clone(&s.string),
                     value: s.value.clone(),
@@ -1853,7 +1869,7 @@ impl Cycle {
                     Events::subdivide_lengths(&mut events);
                     Events::Multi(MultiEvents {
                         span: Span::default(),
-                        length: Fraction::one(),
+                        length: Fraction::ONE,
                         events,
                     })
                 }
@@ -1888,7 +1904,7 @@ impl Cycle {
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
-                        length: Fraction::one(),
+                        length: Fraction::ONE,
                         channels,
                     })
                 }
@@ -1964,7 +1980,7 @@ impl Cycle {
                 Events::subdivide_lengths(&mut events);
                 Events::Multi(MultiEvents {
                     span: Span::default(),
-                    length: Fraction::one(),
+                    length: Fraction::ONE,
                     events,
                 })
             }
@@ -2034,8 +2050,6 @@ mod test {
 
     use pretty_assertions::assert_eq;
 
-    type F = fraction::Fraction;
-
     fn assert_cycles(input: &str, outputs: Vec<Vec<Vec<Event>>>) -> Result<(), String> {
         let mut cycle = Cycle::from(input)?;
         for out in outputs {
@@ -2069,8 +2083,8 @@ mod test {
 
     #[test]
     fn span() -> Result<(), String> {
-        assert!(Span::new(F::new(0u8, 1u8), F::new(1u8, 1u8))
-            .includes(&Span::new(F::new(1u8, 2u8), F::new(2u8, 1u8))));
+        assert!(Span::new(Fraction::new(0, 1), Fraction::new(1, 1))
+            .includes(&Span::new(Fraction::new(1, 2), Fraction::new(2, 1))));
         Ok(())
     }
 
@@ -2104,35 +2118,44 @@ mod test {
         assert_eq!(
             Cycle::from("[0x0] [0x1A] [0XA] [-0X5] [-0XA0] [-0Xaa]")?.generate()?,
             [[
-                Event::at(F::new(0u8, 6u8), F::new(1u8, 6u8)).with_int(0x0),
-                Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_int(0x1a),
-                Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_int(0xa),
-                Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_int(-0x5),
-                Event::at(F::new(4u8, 6u8), F::new(1u8, 6u8)).with_int(-0xa0),
-                Event::at(F::new(5u8, 6u8), F::new(1u8, 6u8)).with_int(-0xaa),
+                Event::at(Fraction::new(0, 6), Fraction::new(1, 6)).with_int(0x0),
+                Event::at(Fraction::new(1, 6), Fraction::new(1, 6)).with_int(0x1a),
+                Event::at(Fraction::new(2, 6), Fraction::new(1, 6)).with_int(0xa),
+                Event::at(Fraction::new(3, 6), Fraction::new(1, 6)).with_int(-0x5),
+                Event::at(Fraction::new(4, 6), Fraction::new(1, 6)).with_int(-0xa0),
+                Event::at(Fraction::new(5, 6), Fraction::new(1, 6)).with_int(-0xaa),
             ]]
         );
 
         assert_eq!(
             Cycle::from("[0] [1] [1.01] [0.01] [0.] [.01]")?.generate()?,
             [[
-                Event::at(F::new(0u8, 6u8), F::new(1u8, 6u8)).with_int(0),
-                Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_int(1),
-                Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_float(1.01),
-                Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_float(0.01),
-                Event::at(F::new(4u8, 6u8), F::new(1u8, 6u8)).with_float(0.0),
-                Event::at(F::new(5u8, 6u8), F::new(1u8, 6u8)).with_float(0.01),
+                Event::at(Fraction::new(0, 6), Fraction::new(1, 6)).with_int(0),
+                Event::at(Fraction::new(1, 6), Fraction::new(1, 6)).with_int(1),
+                Event::at(Fraction::new(2, 6), Fraction::new(1, 6)).with_float(1.01),
+                Event::at(Fraction::new(3, 6), Fraction::new(1, 6)).with_float(0.01),
+                Event::at(Fraction::new(4, 6), Fraction::new(1, 6)).with_float(0.0),
+                Event::at(Fraction::new(5, 6), Fraction::new(1, 6)).with_float(0.01),
             ]]
         );
 
         assert_eq!(Cycle::from("a*[]")?.generate()?, [[]]);
+        assert_eq!(Cycle::from("[c d]/0")?.generate()?, [[]]);
+        assert_eq!(Cycle::from("[c d]*0")?.generate()?, [[]]);
+
+        assert!(Cycle::from("[c d]/1000000000000").is_err()); // too large for fraction
+        assert_eq!(
+            Cycle::from("[c d]/1000000")?.generate()?,
+            [[Event::at(Fraction::from(0), Fraction::new(1, 1)).with_note(0, 4)]]
+        );
+
         assert_eq!(
             Cycle::from("a b c d")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 4u8)).with_note(9, 4),
-                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_note(11, 4),
-                Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_note(0, 4),
-                Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_note(2, 4),
+                Event::at(Fraction::from(0), Fraction::new(1, 4)).with_note(9, 4),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_note(11, 4),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_note(0, 4),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_note(2, 4),
             ]]
         );
         assert_eq!(
@@ -2142,53 +2165,53 @@ mod test {
         assert_eq!(
             Cycle::from("a b [ c d ]")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 3u8)).with_note(9, 4),
-                Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_note(11, 4),
-                Event::at(F::new(2u8, 3u8), F::new(1u8, 6u8)).with_note(0, 4),
-                Event::at(F::new(5u8, 6u8), F::new(1u8, 6u8)).with_note(2, 4),
+                Event::at(Fraction::from(0), Fraction::new(1, 3)).with_note(9, 4),
+                Event::at(Fraction::new(1, 3), Fraction::new(1, 3)).with_note(11, 4),
+                Event::at(Fraction::new(2, 3), Fraction::new(1, 6)).with_note(0, 4),
+                Event::at(Fraction::new(5, 6), Fraction::new(1, 6)).with_note(2, 4),
             ]]
         );
         assert_eq!(
             Cycle::from("[a a] [b4 b5 b6] [c0 d1 c2 d3]")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 6u8)).with_note(9, 4),
-                Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_note(9, 4),
-                Event::at(F::new(3u8, 9u8), F::new(1u8, 9u8)).with_note(11, 4),
-                Event::at(F::new(4u8, 9u8), F::new(1u8, 9u8)).with_note(11, 5),
-                Event::at(F::new(5u8, 9u8), F::new(1u8, 9u8)).with_note(11, 6),
-                Event::at(F::new(8u8, 12u8), F::new(1u8, 12u8)).with_note(0, 0),
-                Event::at(F::new(9u8, 12u8), F::new(1u8, 12u8)).with_note(2, 1),
-                Event::at(F::new(10u8, 12u8), F::new(1u8, 12u8)).with_note(0, 2),
-                Event::at(F::new(11u8, 12u8), F::new(1u8, 12u8)).with_note(2, 3),
+                Event::at(Fraction::from(0), Fraction::new(1, 6)).with_note(9, 4),
+                Event::at(Fraction::new(1, 6), Fraction::new(1, 6)).with_note(9, 4),
+                Event::at(Fraction::new(3, 9), Fraction::new(1, 9)).with_note(11, 4),
+                Event::at(Fraction::new(4, 9), Fraction::new(1, 9)).with_note(11, 5),
+                Event::at(Fraction::new(5, 9), Fraction::new(1, 9)).with_note(11, 6),
+                Event::at(Fraction::new(8, 12), Fraction::new(1, 12)).with_note(0, 0),
+                Event::at(Fraction::new(9, 12), Fraction::new(1, 12)).with_note(2, 1),
+                Event::at(Fraction::new(10, 12), Fraction::new(1, 12)).with_note(0, 2),
+                Event::at(Fraction::new(11, 12), Fraction::new(1, 12)).with_note(2, 3),
             ]]
         );
         assert_eq!(
             Cycle::from("[a0 [bb1 [b2 c3]]] c#4 [[[d5 D#6] E7 ] F8]")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 6u8)).with_note(9, 0),
-                Event::at(F::new(1u8, 6u8), F::new(1u8, 12u8)).with_note(10, 1),
-                Event::at(F::new(3u8, 12u8), F::new(1u8, 24u8)).with_note(11, 2),
-                Event::at(F::new(7u8, 24u8), F::new(1u8, 24u8)).with_note(0, 3),
-                Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_note(1, 4),
-                Event::at(F::new(2u8, 3u8), F::new(1u8, 24u8)).with_note(2, 5),
-                Event::at(F::new(17u8, 24u8), F::new(1u8, 24u8)).with_note(3, 6),
-                Event::at(F::new(9u8, 12u8), F::new(1u8, 12u8)).with_note(4, 7),
-                Event::at(F::new(5u8, 6u8), F::new(1u8, 6u8)).with_note(5, 8),
+                Event::at(Fraction::from(0), Fraction::new(1, 6)).with_note(9, 0),
+                Event::at(Fraction::new(1, 6), Fraction::new(1, 12)).with_note(10, 1),
+                Event::at(Fraction::new(3, 12), Fraction::new(1, 24)).with_note(11, 2),
+                Event::at(Fraction::new(7, 24), Fraction::new(1, 24)).with_note(0, 3),
+                Event::at(Fraction::new(1, 3), Fraction::new(1, 3)).with_note(1, 4),
+                Event::at(Fraction::new(2, 3), Fraction::new(1, 24)).with_note(2, 5),
+                Event::at(Fraction::new(17, 24), Fraction::new(1, 24)).with_note(3, 6),
+                Event::at(Fraction::new(9, 12), Fraction::new(1, 12)).with_note(4, 7),
+                Event::at(Fraction::new(5, 6), Fraction::new(1, 6)).with_note(5, 8),
             ]]
         );
         assert_eq!(
             Cycle::from("[R [e [n o]]] , [[[i s] e ] _]")?.generate()?,
             vec![
                 vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)).with_name("R"),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8)).with_note(4, 4),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 8u8)).with_name("n"),
-                    Event::at(F::new(7u8, 8u8), F::new(1u8, 8u8)).with_name("o"),
+                    Event::at(Fraction::from(0), Fraction::new(1, 2)).with_name("R"),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 4)).with_note(4, 4),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 8)).with_name("n"),
+                    Event::at(Fraction::new(7, 8), Fraction::new(1, 8)).with_name("o"),
                 ],
                 vec![
-                    Event::at(F::from(0), F::new(1u8, 8u8)).with_name("i"),
-                    Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)).with_name("s"),
-                    Event::at(F::new(1u8, 4u8), F::new(3u8, 4u8)).with_note(4, 4),
+                    Event::at(Fraction::from(0), Fraction::new(1, 8)).with_name("i"),
+                    Event::at(Fraction::new(1, 8), Fraction::new(1, 8)).with_name("s"),
+                    Event::at(Fraction::new(1, 4), Fraction::new(3, 4)).with_note(4, 4),
                 ],
             ]
         );
@@ -2196,10 +2219,18 @@ mod test {
         assert_cycles(
             "<a b c d>",
             vec![
-                vec![vec![Event::at(F::from(0), F::from(1)).with_note(9, 4)]],
-                vec![vec![Event::at(F::from(0), F::from(1)).with_note(11, 4)]],
-                vec![vec![Event::at(F::from(0), F::from(1)).with_note(0, 4)]],
-                vec![vec![Event::at(F::from(0), F::from(1)).with_note(2, 4)]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_note(9, 4)
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_note(11, 4)
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_note(0, 4)
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_note(2, 4)
+                ]],
             ],
         )?;
 
@@ -2207,18 +2238,18 @@ mod test {
             "<a ~ ~ a0> <b <c d>>",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)).with_note(9, 4),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(11, 4),
+                    Event::at(Fraction::from(0), Fraction::new(1, 2)).with_note(9, 4),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_note(11, 4),
                 ]],
                 vec![vec![
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(0, 4)
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_note(0, 4)
                 ]],
                 vec![vec![
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(11, 4)
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_note(11, 4)
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)).with_note(9, 0),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(2, 4),
+                    Event::at(Fraction::from(0), Fraction::new(1, 2)).with_note(9, 0),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_note(2, 4),
                 ]],
             ],
         )?;
@@ -2227,19 +2258,19 @@ mod test {
             "<<a a8> b,  <c [d e]>>",
             vec![
                 vec![
-                    vec![Event::at(F::from(0), F::from(1)).with_note(9, 4)],
-                    vec![Event::at(F::from(0), F::from(1)).with_note(0, 4)],
+                    vec![Event::at(Fraction::from(0), Fraction::from(1)).with_note(9, 4)],
+                    vec![Event::at(Fraction::from(0), Fraction::from(1)).with_note(0, 4)],
                 ],
                 vec![
-                    vec![Event::at(F::from(0), F::from(1)).with_note(11, 4)],
+                    vec![Event::at(Fraction::from(0), Fraction::from(1)).with_note(11, 4)],
                     vec![
-                        Event::at(F::from(0), F::new(1u8, 2u8)).with_note(2, 4),
-                        Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_note(4, 4),
+                        Event::at(Fraction::from(0), Fraction::new(1, 2)).with_note(2, 4),
+                        Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_note(4, 4),
                     ],
                 ],
                 vec![
-                    vec![Event::at(F::from(0), F::from(1)).with_note(9, 8)],
-                    vec![Event::at(F::from(0), F::from(1)).with_note(0, 4)],
+                    vec![Event::at(Fraction::from(0), Fraction::from(1)).with_note(9, 8)],
+                    vec![Event::at(Fraction::from(0), Fraction::from(1)).with_note(0, 4)],
                 ],
             ],
         )?;
@@ -2248,22 +2279,22 @@ mod test {
             "{-3 -2 -1 0 1 2 3}%4",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 4u8)).with_int(-3),
-                    Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(-2),
-                    Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_int(-1),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_int(0),
+                    Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(-3),
+                    Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_int(-2),
+                    Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(-1),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_int(0),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 4u8)).with_int(1),
-                    Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(2),
-                    Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_int(3),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_int(-3),
+                    Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(1),
+                    Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_int(2),
+                    Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(3),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_int(-3),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 4u8)).with_int(-2),
-                    Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(-1),
-                    Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_int(0),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(-2),
+                    Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_int(-1),
+                    Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(0),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_int(1),
                 ]],
             ],
         )?;
@@ -2272,25 +2303,25 @@ mod test {
             "{<0 0 d#8:test> 1 <c d e>:0xB [<.5 0.95> 1.]}%3",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 3u8)).with_int(0),
-                    Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_int(1),
-                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 3)).with_int(0),
+                    Event::at(Fraction::new(1, 3), Fraction::new(1, 3)).with_int(1),
+                    Event::at(Fraction::new(2, 3), Fraction::new(1, 3))
                         .with_note(0, 4)
                         .with_target(Target::from_index(0xB)),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 6u8)).with_float(0.5),
-                    Event::at(F::new(1u8, 6u8), F::new(1u8, 6u8)).with_float(1.0),
-                    Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_int(0),
-                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(1, 6)).with_float(0.5),
+                    Event::at(Fraction::new(1, 6), Fraction::new(1, 6)).with_float(1.0),
+                    Event::at(Fraction::new(1, 3), Fraction::new(1, 3)).with_int(0),
+                    Event::at(Fraction::new(2, 3), Fraction::new(1, 3)).with_int(1),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 3u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 3))
                         .with_note(2, 4)
                         .with_target(Target::from_index(0xB)),
-                    Event::at(F::new(2u8, 6u8), F::new(1u8, 6u8)).with_float(0.95),
-                    Event::at(F::new(3u8, 6u8), F::new(1u8, 6u8)).with_float(1.0),
-                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8))
+                    Event::at(Fraction::new(2, 6), Fraction::new(1, 6)).with_float(0.95),
+                    Event::at(Fraction::new(3, 6), Fraction::new(1, 6)).with_float(1.0),
+                    Event::at(Fraction::new(2, 3), Fraction::new(1, 3))
                         .with_note(3, 8)
                         .with_target(Target::from_name("test".into())),
                 ]],
@@ -2300,9 +2331,9 @@ mod test {
         assert_eq!(
             Cycle::from("[1 middle _] {}%42 [] <>")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 12u8)).with_int(1),
-                Event::at(F::new(1u8, 12u8), F::new(1u8, 6u8)).with_name("middle"),
-                Event::at(F::new(1u8, 4u8), F::new(3u8, 4u8)),
+                Event::at(Fraction::from(0), Fraction::new(1, 12)).with_int(1),
+                Event::at(Fraction::new(1, 12), Fraction::new(1, 6)).with_name("middle"),
+                Event::at(Fraction::new(1, 4), Fraction::new(3, 4)),
             ]]
         );
 
@@ -2310,18 +2341,20 @@ mod test {
             "<some_name _another_one c4'chord c4'-^7 c6a_name>",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::from(1)).with_name("some_name")
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_name("some_name")
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::from(1)).with_name("_another_one")
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_name("_another_one")
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "chord")
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_chord(0, 4, "chord")
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::from(1)).with_chord(0, 4, "-^7")
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_chord(0, 4, "-^7")
                 ]],
-                vec![vec![Event::at(F::from(0), F::from(1)).with_name("c6a_name")]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_name("c6a_name")
+                ]],
             ],
         )?;
 
@@ -2329,16 +2362,16 @@ mod test {
             "[1 2] [3 4,[5 6]:42]",
             vec![vec![
                 vec![
-                    Event::at(F::from(0), F::new(1u8, 4u8)).with_int(1),
-                    Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(2),
-                    Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_int(3),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_int(4),
+                    Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(1),
+                    Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_int(2),
+                    Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(3),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_int(4),
                 ],
                 vec![
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 4))
                         .with_int(5)
                         .with_target(Target::from_index(42)),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
                         .with_int(6)
                         .with_target(Target::from_index(42)),
                 ],
@@ -2348,20 +2381,20 @@ mod test {
         assert_eq!(
             Cycle::from("1 second*2 eb3*3 [32 32]*4")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 4u8)).with_int(1),
-                Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_name("second"),
-                Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)).with_name("second"),
-                Event::at(F::new(6u8, 12u8), F::new(1u8, 12u8)).with_note(3, 3),
-                Event::at(F::new(7u8, 12u8), F::new(1u8, 12u8)).with_note(3, 3),
-                Event::at(F::new(8u8, 12u8), F::new(1u8, 12u8)).with_note(3, 3),
-                Event::at(F::new(24u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(25u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(26u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(27u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(28u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(29u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(30u8, 32u8), F::new(1u8, 32u8)).with_int(32),
-                Event::at(F::new(31u8, 32u8), F::new(1u8, 32u8)).with_int(32),
+                Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(1),
+                Event::at(Fraction::new(2, 8), Fraction::new(1, 8)).with_name("second"),
+                Event::at(Fraction::new(3, 8), Fraction::new(1, 8)).with_name("second"),
+                Event::at(Fraction::new(6, 12), Fraction::new(1, 12)).with_note(3, 3),
+                Event::at(Fraction::new(7, 12), Fraction::new(1, 12)).with_note(3, 3),
+                Event::at(Fraction::new(8, 12), Fraction::new(1, 12)).with_note(3, 3),
+                Event::at(Fraction::new(24, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(25, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(26, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(27, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(28, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(29, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(30, 32), Fraction::new(1, 32)).with_int(32),
+                Event::at(Fraction::new(31, 32), Fraction::new(1, 32)).with_int(32),
             ]]
         );
 
@@ -2369,24 +2402,24 @@ mod test {
             "tresillo(6,8), outside(4,11)",
             vec![vec![
                 vec![
-                    Event::at(F::from(0), F::new(1u8, 8u8)).with_name("tresillo"),
-                    Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)),
-                    Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_name("tresillo"),
-                    Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)).with_name("tresillo"),
-                    Event::at(F::new(4u8, 8u8), F::new(1u8, 8u8)).with_name("tresillo"),
-                    Event::at(F::new(5u8, 8u8), F::new(1u8, 8u8)),
-                    Event::at(F::new(6u8, 8u8), F::new(1u8, 8u8)).with_name("tresillo"),
-                    Event::at(F::new(7u8, 8u8), F::new(1u8, 8u8)).with_name("tresillo"),
+                    Event::at(Fraction::from(0), Fraction::new(1, 8)).with_name("tresillo"),
+                    Event::at(Fraction::new(1, 8), Fraction::new(1, 8)),
+                    Event::at(Fraction::new(2, 8), Fraction::new(1, 8)).with_name("tresillo"),
+                    Event::at(Fraction::new(3, 8), Fraction::new(1, 8)).with_name("tresillo"),
+                    Event::at(Fraction::new(4, 8), Fraction::new(1, 8)).with_name("tresillo"),
+                    Event::at(Fraction::new(5, 8), Fraction::new(1, 8)),
+                    Event::at(Fraction::new(6, 8), Fraction::new(1, 8)).with_name("tresillo"),
+                    Event::at(Fraction::new(7, 8), Fraction::new(1, 8)).with_name("tresillo"),
                 ],
                 vec![
-                    Event::at(F::from(0), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(1u8, 11u8), F::new(2u8, 11u8)),
-                    Event::at(F::new(3u8, 11u8), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(4u8, 11u8), F::new(2u8, 11u8)),
-                    Event::at(F::new(6u8, 11u8), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(7u8, 11u8), F::new(2u8, 11u8)),
-                    Event::at(F::new(9u8, 11u8), F::new(1u8, 11u8)).with_name("outside"),
-                    Event::at(F::new(10u8, 11u8), F::new(1u8, 11u8)),
+                    Event::at(Fraction::from(0), Fraction::new(1, 11)).with_name("outside"),
+                    Event::at(Fraction::new(1, 11), Fraction::new(2, 11)),
+                    Event::at(Fraction::new(3, 11), Fraction::new(1, 11)).with_name("outside"),
+                    Event::at(Fraction::new(4, 11), Fraction::new(2, 11)),
+                    Event::at(Fraction::new(6, 11), Fraction::new(1, 11)).with_name("outside"),
+                    Event::at(Fraction::new(7, 11), Fraction::new(2, 11)),
+                    Event::at(Fraction::new(9, 11), Fraction::new(1, 11)).with_name("outside"),
+                    Event::at(Fraction::new(10, 11), Fraction::new(1, 11)),
                 ],
             ]],
         )?;
@@ -2395,28 +2428,28 @@ mod test {
             "[<1 10> <2 20>:a](2,5)",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 10u8)).with_int(1),
-                    Event::at(F::new(1u8, 10u8), F::new(1u8, 10u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 10)).with_int(1),
+                    Event::at(Fraction::new(1, 10), Fraction::new(1, 10))
                         .with_int(2)
                         .with_target(Target::from_name("a".into())),
-                    Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(1),
-                    Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
+                    Event::at(Fraction::new(1, 5), Fraction::new(1, 5)),
+                    Event::at(Fraction::new(2, 5), Fraction::new(1, 10)).with_int(1),
+                    Event::at(Fraction::new(5, 10), Fraction::new(1, 10))
                         .with_int(2)
                         .with_target(Target::from_name("a".into())),
-                    Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
+                    Event::at(Fraction::new(3, 5), Fraction::new(2, 5)),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 10u8)).with_int(10),
-                    Event::at(F::new(1u8, 10u8), F::new(1u8, 10u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 10)).with_int(10),
+                    Event::at(Fraction::new(1, 10), Fraction::new(1, 10))
                         .with_int(20)
                         .with_target(Target::from_name("a".into())),
-                    Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)),
-                    Event::at(F::new(2u8, 5u8), F::new(1u8, 10u8)).with_int(10),
-                    Event::at(F::new(5u8, 10u8), F::new(1u8, 10u8))
+                    Event::at(Fraction::new(1, 5), Fraction::new(1, 5)),
+                    Event::at(Fraction::new(2, 5), Fraction::new(1, 10)).with_int(10),
+                    Event::at(Fraction::new(5, 10), Fraction::new(1, 10))
                         .with_int(20)
                         .with_target(Target::from_name("a".into())),
-                    Event::at(F::new(3u8, 5u8), F::new(2u8, 5u8)),
+                    Event::at(Fraction::new(3, 5), Fraction::new(2, 5)),
                 ]],
             ],
         )?;
@@ -2424,13 +2457,13 @@ mod test {
         assert_eq!(
             Cycle::from("1!2 3 [4!3 5]")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 4u8)).with_int(1),
-                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(1),
-                Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_int(3),
-                Event::at(F::new(12u8, 16u8), F::new(1u8, 16u8)).with_int(4),
-                Event::at(F::new(13u8, 16u8), F::new(1u8, 16u8)).with_int(4),
-                Event::at(F::new(14u8, 16u8), F::new(1u8, 16u8)).with_int(4),
-                Event::at(F::new(15u8, 16u8), F::new(1u8, 16u8)).with_int(5),
+                Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(1),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_int(1),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(3),
+                Event::at(Fraction::new(12, 16), Fraction::new(1, 16)).with_int(4),
+                Event::at(Fraction::new(13, 16), Fraction::new(1, 16)).with_int(4),
+                Event::at(Fraction::new(14, 16), Fraction::new(1, 16)).with_int(4),
+                Event::at(Fraction::new(15, 16), Fraction::new(1, 16)).with_int(5),
             ]]
         );
 
@@ -2438,20 +2471,20 @@ mod test {
             "[0 1]!2 <a b>!2",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 8u8)).with_int(0),
-                    Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)).with_int(1),
-                    Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_int(0),
-                    Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)).with_int(1),
-                    Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_note(9, 4),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_note(9, 4),
+                    Event::at(Fraction::from(0), Fraction::new(1, 8)).with_int(0),
+                    Event::at(Fraction::new(1, 8), Fraction::new(1, 8)).with_int(1),
+                    Event::at(Fraction::new(2, 8), Fraction::new(1, 8)).with_int(0),
+                    Event::at(Fraction::new(3, 8), Fraction::new(1, 8)).with_int(1),
+                    Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_note(9, 4),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_note(9, 4),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 8u8)).with_int(0),
-                    Event::at(F::new(1u8, 8u8), F::new(1u8, 8u8)).with_int(1),
-                    Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_int(0),
-                    Event::at(F::new(3u8, 8u8), F::new(1u8, 8u8)).with_int(1),
-                    Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8)).with_note(11, 4),
-                    Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8)).with_note(11, 4),
+                    Event::at(Fraction::from(0), Fraction::new(1, 8)).with_int(0),
+                    Event::at(Fraction::new(1, 8), Fraction::new(1, 8)).with_int(1),
+                    Event::at(Fraction::new(2, 8), Fraction::new(1, 8)).with_int(0),
+                    Event::at(Fraction::new(3, 8), Fraction::new(1, 8)).with_int(1),
+                    Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_note(11, 4),
+                    Event::at(Fraction::new(3, 4), Fraction::new(1, 4)).with_note(11, 4),
                 ]],
             ],
         )?;
@@ -2459,8 +2492,12 @@ mod test {
         assert_cycles(
             "[0 1]/2",
             vec![
-                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8)).with_int(0)]],
-                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8)).with_int(1)]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 1)).with_int(0)
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 1)).with_int(1)
+                ]],
             ],
         )?;
 
@@ -2468,18 +2505,18 @@ mod test {
             "[0 1]*2.5",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 5u8)).with_int(0),
-                    Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)).with_int(1),
-                    Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)).with_int(0),
-                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)).with_int(1),
-                    Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)).with_int(0),
+                    Event::at(Fraction::from(0), Fraction::new(1, 5)).with_int(0),
+                    Event::at(Fraction::new(1, 5), Fraction::new(1, 5)).with_int(1),
+                    Event::at(Fraction::new(2, 5), Fraction::new(1, 5)).with_int(0),
+                    Event::at(Fraction::new(3, 5), Fraction::new(1, 5)).with_int(1),
+                    Event::at(Fraction::new(4, 5), Fraction::new(1, 5)).with_int(0),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 5u8)).with_int(1),
-                    Event::at(F::new(1u8, 5u8), F::new(1u8, 5u8)).with_int(0),
-                    Event::at(F::new(2u8, 5u8), F::new(1u8, 5u8)).with_int(1),
-                    Event::at(F::new(3u8, 5u8), F::new(1u8, 5u8)).with_int(0),
-                    Event::at(F::new(4u8, 5u8), F::new(1u8, 5u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(1, 5)).with_int(1),
+                    Event::at(Fraction::new(1, 5), Fraction::new(1, 5)).with_int(0),
+                    Event::at(Fraction::new(2, 5), Fraction::new(1, 5)).with_int(1),
+                    Event::at(Fraction::new(3, 5), Fraction::new(1, 5)).with_int(0),
+                    Event::at(Fraction::new(4, 5), Fraction::new(1, 5)).with_int(1),
                 ]],
             ],
         )?;
@@ -2487,10 +2524,10 @@ mod test {
         assert_eq!(
             Cycle::from("a:1 b:target")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 2u8))
+                Event::at(Fraction::from(0), Fraction::new(1, 2))
                     .with_note(9, 4)
                     .with_target(Target::from_index(1)),
-                Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
                     .with_target(Target::from_name("target".into()))
             ]]
@@ -2499,10 +2536,10 @@ mod test {
         assert_cycles(
             "a:<1 2>",
             vec![
-                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                vec![vec![Event::at(Fraction::from(0), Fraction::new(1, 1))
                     .with_note(9, 4)
                     .with_target(Target::from_index(1))]],
-                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                vec![vec![Event::at(Fraction::from(0), Fraction::new(1, 1))
                     .with_note(9, 4)
                     .with_target(Target::from_index(2))]],
             ],
@@ -2510,26 +2547,29 @@ mod test {
 
         assert_cycles(
             "a:1:2:Target",
-            vec![vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
-                .with_note(9, 4)
-                .with_targets(vec![
-                    Target::from_index(1),
-                    Target::from_index(2),
-                    Target::from_name("Target".into()),
-                ])]]],
+            vec![vec![vec![Event::at(
+                Fraction::from(0),
+                Fraction::new(1, 1),
+            )
+            .with_note(9, 4)
+            .with_targets(vec![
+                Target::from_index(1),
+                Target::from_index(2),
+                Target::from_name("Target".into()),
+            ])]]],
         )?;
 
         assert_cycles(
             "[a:1:2]:<3 4>",
             vec![
-                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                vec![vec![Event::at(Fraction::from(0), Fraction::new(1, 1))
                     .with_note(9, 4)
                     .with_targets(vec![
                         Target::from_index(1),
                         Target::from_index(2),
                         Target::from_index(3),
                     ])]],
-                vec![vec![Event::at(F::from(0), F::new(1u8, 1u8))
+                vec![vec![Event::at(Fraction::from(0), Fraction::new(1, 1))
                     .with_note(9, 4)
                     .with_targets(vec![
                         Target::from_index(1),
@@ -2543,16 +2583,16 @@ mod test {
         assert_eq!(
             Cycle::from("[a b c d]:[1 2 3]")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 4u8))
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
                     .with_note(9, 4)
                     .with_target(Target::from_index(1)),
-                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8))
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
                     .with_note(11, 4)
                     .with_targets(vec![Target::from_index(1), Target::from_index(2)]),
-                Event::at(F::new(2u8, 4u8), F::new(1u8, 4u8))
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
                     .with_note(0, 4)
                     .with_targets(vec![Target::from_index(2), Target::from_index(3)]),
-                Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
                     .with_note(2, 4)
                     .with_target(Target::from_index(3)),
             ]]
@@ -2564,49 +2604,49 @@ mod test {
             vec![
                 vec![
                     vec![
-                        Event::at(F::from(0), F::new(1u8, 2u8))
+                        Event::at(Fraction::from(0), Fraction::new(1, 2))
                             .with_note(9, 4)
                             .with_target(Target::from_index(1)),
-                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(1, 2), Fraction::new(1, 4))
                             .with_note(11, 4)
                             // this iteration lets the outer context set the target
                             .with_target(Target::from_index(2)),
-                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_targets(vec![Target::from_index(8), Target::from_index(3)]),
                     ],
                     vec![
-                        Event::at(F::from(0), F::new(1u8, 2u8))
+                        Event::at(Fraction::from(0), Fraction::new(1, 2))
                             .with_note(9, 4)
                             .with_target(Target::from_index(4)),
-                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(1, 2), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_target(Target::from_index(4)),
-                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_targets(vec![Target::from_index(8), Target::from_index(4)]),
                     ],
                 ],
                 vec![
                     vec![
-                        Event::at(F::from(0), F::new(1u8, 2u8))
+                        Event::at(Fraction::from(0), Fraction::new(1, 2))
                             .with_note(9, 4)
                             .with_target(Target::from_index(1)),
-                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(1, 2), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_targets(vec![Target::from_index(7), Target::from_index(2)]),
-                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_targets(vec![Target::from_index(9), Target::from_index(3)]),
                     ],
                     vec![
-                        Event::at(F::from(0), F::new(1u8, 2u8))
+                        Event::at(Fraction::from(0), Fraction::new(1, 2))
                             .with_note(9, 4)
                             .with_target(Target::from_index(4)),
-                        Event::at(F::new(1u8, 2u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(1, 2), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_targets(vec![Target::from_index(7), Target::from_index(4)]),
-                        Event::at(F::new(3u8, 4u8), F::new(1u8, 4u8))
+                        Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
                             .with_note(11, 4)
                             .with_targets(vec![Target::from_index(9), Target::from_index(4)]),
                     ],
@@ -2618,18 +2658,18 @@ mod test {
             "[a b]:<1 target>",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
                         .with_note(9, 4)
                         .with_target(Target::from_index(1)),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_note(11, 4)
                         .with_target(Target::from_index(1)),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
                         .with_note(9, 4)
                         .with_target(Target::from_name("target".into())),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_note(11, 4)
                         .with_target(Target::from_name("target".into())),
                 ]],
@@ -2640,18 +2680,18 @@ mod test {
             "[a:1 b]:<3 4>",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
                         .with_note(9, 4)
                         .with_targets(vec![Target::from_index(1), Target::from_index(3)]),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_note(11, 4)
                         .with_target(Target::from_index(3)),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8))
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
                         .with_note(9, 4)
                         .with_targets(vec![Target::from_index(1), Target::from_index(4)]),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_note(11, 4)
                         .with_target(Target::from_index(4)),
                 ]],
@@ -2661,10 +2701,10 @@ mod test {
         assert_eq!(
             Cycle::from("a:1 b:v0.1:v1.0:p1.0")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 2u8))
+                Event::at(Fraction::from(0), Fraction::new(1, 2))
                     .with_note(9, 4)
                     .with_target(Target::from_index(1)),
-                Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
                     .with_targets(vec![
                         Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
@@ -2677,10 +2717,10 @@ mod test {
         assert_eq!(
             Cycle::from("a:1:#1 b:#1:1")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 2u8))
+                Event::at(Fraction::from(0), Fraction::new(1, 2))
                     .with_note(9, 4)
                     .with_target(Target::from_index(1)),
-                Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8))
+                Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
                     .with_target(Target::from(
                         PropertyKey::Name("#".into()),
@@ -2692,11 +2732,11 @@ mod test {
         assert_eq!(
             Cycle::from("c(3,8,9)")?.generate()?,
             [[
-                Event::at(F::new(2u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
-                Event::at(F::new(3u8, 8u8), F::new(1u8, 4u8)),
-                Event::at(F::new(5u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
-                Event::at(F::new(6u8, 8u8), F::new(1u8, 8u8)),
-                Event::at(F::new(7u8, 8u8), F::new(1u8, 8u8)).with_note(0, 4),
+                Event::at(Fraction::new(2, 8), Fraction::new(1, 8)).with_note(0, 4),
+                Event::at(Fraction::new(3, 8), Fraction::new(1, 4)),
+                Event::at(Fraction::new(5, 8), Fraction::new(1, 8)).with_note(0, 4),
+                Event::at(Fraction::new(6, 8), Fraction::new(1, 8)),
+                Event::at(Fraction::new(7, 8), Fraction::new(1, 8)).with_note(0, 4),
             ]]
         );
 
@@ -2727,15 +2767,15 @@ mod test {
             "[0 1 2]/2",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(2u8, 3u8)).with_int(0),
-                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(2, 3)).with_int(0),
+                    Event::at(Fraction::new(2, 3), Fraction::new(1, 3)).with_int(1),
                 ]],
                 vec![vec![
-                    Event::at(F::new(1u8, 3u8), F::new(2u8, 3u8)).with_int(2)
+                    Event::at(Fraction::new(1, 3), Fraction::new(2, 3)).with_int(2)
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(2u8, 3u8)).with_int(0),
-                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(2, 3)).with_int(0),
+                    Event::at(Fraction::new(2, 3), Fraction::new(1, 3)).with_int(1),
                 ]],
             ],
         )?;
@@ -2743,10 +2783,12 @@ mod test {
         assert_cycles(
             "0*<1 2>",
             vec![
-                vec![vec![Event::at(F::from(0), F::from(1)).with_int(0)]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)).with_int(0),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_int(0),
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_int(0)
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2)).with_int(0),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_int(0),
                 ]],
             ],
         )?;
@@ -2754,9 +2796,9 @@ mod test {
         assert_eq!(
             Cycle::from("0*[4 3]")?.generate()?,
             [[
-                Event::at(F::from(0), F::new(1u8, 4u8)).with_int(0),
-                Event::at(F::new(1u8, 4u8), F::new(1u8, 4u8)).with_int(0),
-                Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(0),
+                Event::at(Fraction::from(0), Fraction::new(1, 4)).with_int(0),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4)).with_int(0),
+                Event::at(Fraction::new(2, 3), Fraction::new(1, 3)).with_int(0),
             ]]
         );
 
@@ -2764,13 +2806,13 @@ mod test {
             "{0 1 2 3}%<2 3>",
             vec![
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 2u8)).with_int(0),
-                    Event::at(F::new(1u8, 2u8), F::new(1u8, 2u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(1, 2)).with_int(0),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_int(1),
                 ]],
                 vec![vec![
-                    Event::at(F::from(0), F::new(1u8, 3u8)).with_int(3),
-                    Event::at(F::new(1u8, 3u8), F::new(1u8, 3u8)).with_int(0),
-                    Event::at(F::new(2u8, 3u8), F::new(1u8, 3u8)).with_int(1),
+                    Event::at(Fraction::from(0), Fraction::new(1, 3)).with_int(3),
+                    Event::at(Fraction::new(1, 3), Fraction::new(1, 3)).with_int(0),
+                    Event::at(Fraction::new(2, 3), Fraction::new(1, 3)).with_int(1),
                 ]],
             ],
         )?;

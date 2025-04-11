@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, ops::RangeBounds};
 
-use fraction::Fraction;
+type Fraction = num_rational::Rational32;
 
 use crate::{
     event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CyclePropertyKey, CyclePropertyValue,

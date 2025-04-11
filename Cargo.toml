@@ -16,7 +16,8 @@ log = { version = "^0.4" }
 simplelog = { version = "^0.12" }
 rand = { version = "^0.9" }
 rand_xoshiro = { version = "^0.7" }
-fraction = { version = "^0.15" }
+num-rational = { version = "^0.4", default-features = false, features = ["std"] }
+num-traits = { version = "^0.2", default-features = false, features = ["std"] }
 pest = { version = "^2.7" }
 pest_derive = { version = "^2.7" }
 

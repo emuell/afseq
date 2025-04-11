@@ -8,7 +8,8 @@ use std::{
     rc::Rc,
 };
 
-use fraction::{ConstOne, ConstZero, Fraction, ToPrimitive};
+type Fraction = num_rational::Rational32;
+use num_traits::ToPrimitive;
 
 #[cfg(all(feature = "scripting", test))]
 use std::borrow::BorrowMut;
