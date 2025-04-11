@@ -10,7 +10,7 @@ use std::{
 use crate::{BeatTimeBase, InputParameterSet, Note, PulseIterItem};
 use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
 
-use fraction::{ConstOne, ConstZero, Fraction};
+type Fraction = num_rational::Rational32;
 
 // -------------------------------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use fraction::ToPrimitive;
+use num_traits::ToPrimitive;
+
 use mlua::prelude::{LuaError, LuaResult};
 
 use crate::{
