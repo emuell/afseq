@@ -15,6 +15,9 @@ mark    = { "#"|"b" }
 note    = ${ (^"a"|^"b"|^"c"|^"d"|^"e"|^"f"|^"g") }
 pitch   = ${ note ~ mark? ~ octave? ~ !name}
 
+// target properties such as volume "v0.1" (afseq extension)
+property = ${ ("#" ~ integer) | (ASCII_ALPHA ~ float) }
+
 /// chord as pitch with mode string, separated via "'"
 mode    = ${ (ASCII_ALPHANUMERIC | "#" | "-" | "+" | "^")+ }
 chord   = ${ pitch ~ "'" ~ mode }
@@ -31,7 +34,7 @@ name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 repeat = { "!" }
 
 /// possible literals for single steps
-single = { hold | rest | number | chord | pitch | name }
+single = { hold | rest | chord | property | pitch | number | name }
 
 choice_op = {"|"}
 stack_op = {","}
@@ -46,33 +49,31 @@ alternating     = { "<" ~ sections? ~ ">" }
 polymeter_tail  = { "%" ~  parameter }
 polymeter       = { "{" ~ sections? ~ "}" ~ polymeter_tail? }
 
-group     = _{ subdivision | alternating | polymeter }
+group           = _{ subdivision | alternating | polymeter }
 
 /// parameter for expressions with operators
-parameter = _{ expression | single | group }
+parameter        = _{ expression | single | group }
+single_parameter = _{ single }
 
 /// static operators
 op_replicate = ${ "!" ~ number }
 op_weight    = ${ "@" ~ number? }
 op_degrade   = ${ "?" ~ number? }
 
-/// dynamic operators (only o_target can be chained)
+/// dynamic operators (NB: only o_target can be chained)
 op_fast      = { "*" ~ parameter }
 op_slow      = { "/" ~ parameter }
 op_target    = { ":" ~ parameter ~ (":" ~ parameter)* }
-
-// this should actually be parameter as well 
-// once bjorklund with patterns on the right is implemented
-single_parameter = _{ single }
+// this should actually use `parameter` as well once bjorklund with patterns on the right is implemented
 op_bjorklund = { "(" ~ (single_parameter ~ ",")+ ~ single_parameter ~ ")" }
 
-op = _{ op_target | op_degrade | op_replicate | op_weight | op_fast | op_slow | op_bjorklund }
+/// all operators
+op           = _{ op_target | op_degrade | op_replicate | op_weight | op_fast | op_slow | op_bjorklund }
 
 expression = { (single | group) ~ op+ }
-range = ${ integer ~ ".." ~ integer }
-
+range      = ${ integer ~ ".." ~ integer }
 /// helper container that splits steps into sections
-section = _{ ( expression | range | single | repeat | group)+ }
+section    = _{ ( expression | range | single | repeat | group)+ }
 
 /// the root of the cycle
 mini = { SOI ~ sections? ~ EOI }

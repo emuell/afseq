@@ -153,6 +153,23 @@ mod test {
             ])
         );
 
+        // check note properties
+        let mapped_cycle = evaluate_cycle_userdata(&lua, r#"cycle("a:1:v0.1:p-1.0:d0.3")"#)?;
+        let mut event_iter =
+            CycleEventIter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
+        assert_eq!(
+            event_iter
+                .run(PulseIterItem::default(), true)
+                .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
+            Some(vec![Event::NoteEvents(vec![new_note((
+                Note::A4,
+                InstrumentId::from(1),
+                0.1,
+                -1.0,
+                0.3
+            ))]),])
+        );
+
         // check instrument overrides
         let mapped_cycle = evaluate_cycle_userdata(
             &lua,
@@ -170,6 +187,24 @@ mod test {
                 Event::NoteEvents(vec![new_note((Note::C4, InstrumentId::from(66)))])
             ])
         );
+
+        // check note property overrides
+        let mapped_cycle = evaluate_cycle_userdata(
+            &lua,
+            r#"cycle("a:1:v.1 a"):map({ a = { key = 48, instrument = 66, volume = 1.0 } })"#,
+        )?;
+        let mut event_iter =
+            CycleEventIter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
+        assert_eq!(
+            event_iter
+                .run(PulseIterItem::default(), true)
+                .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
+            Some(vec![
+                Event::NoteEvents(vec![new_note((Note::C4, InstrumentId::from(1), 0.1))]),
+                Event::NoteEvents(vec![new_note((Note::C4, InstrumentId::from(66), 1.0))])
+            ])
+        );
+
         Ok(())
     }
 

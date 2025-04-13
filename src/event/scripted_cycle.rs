@@ -8,7 +8,7 @@ use crate::{
         add_lua_callback_error, note_events_from_value, ContextPlaybackState, LuaCallback,
         LuaTimeoutHook,
     },
-    event::cycle::CycleNoteEvents,
+    event::cycle::{apply_cycle_note_properties, CycleNoteEvents},
     BeatTimeBase, Cycle, CycleEvent, CycleValue, EventIter, EventIterItem, InputParameterSet,
     NoteEvent, PulseIterItem,
 };
@@ -118,16 +118,10 @@ impl ScriptedCycleEventIter {
                 event.string()
             )));
         }
-        // inject target instrument, if present
-        if let Some(target) = event.targets().first() {
-            if let Some(instrument) = target.into() {
-                for mut note_event in &mut note_events {
-                    if let Some(note_event) = &mut note_event {
-                        note_event.instrument = Some(instrument);
-                    }
-                }
-            }
-        }
+        // apply note properties from targets
+        apply_cycle_note_properties(&mut note_events, event.targets())
+            .map_err(|err| LuaError::RuntimeError(err.to_string()))?;
+
         Ok(note_events)
     }
 
