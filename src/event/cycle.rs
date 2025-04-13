@@ -1,24 +1,14 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, ops::RangeBounds};
 
 use fraction::Fraction;
 
 use crate::{
-    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CycleTarget, CycleValue, Event,
-    EventIter, EventIterItem, InputParameterSet, InstrumentId, Note, NoteEvent, PulseIterItem,
+    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CyclePropertyKey, CyclePropertyValue,
+    CycleTarget, CycleValue, Event, EventIter, EventIterItem, InputParameterSet, InstrumentId,
+    Note, NoteEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
-
-/// Default conversion of a cycle target to an optional instrument id, as used by [`EventIter`].
-impl From<&CycleTarget> for Option<InstrumentId> {
-    fn from(value: &CycleTarget) -> Self {
-        match value {
-            CycleTarget::None => None,
-            CycleTarget::Index(i) => Some(InstrumentId::from(*i as usize)),
-            CycleTarget::Name(_) => None, // unsupported
-        }
-    }
-}
 
 /// Default conversion of a CycleValue into a note stack.
 ///
@@ -41,6 +31,7 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
                     .map(|i| new_note(chord.note().transposed(*i as i32)))
                     .collect())
             }
+            CycleValue::Property(_, _) => Ok(vec![None]),
             CycleValue::Name(s) => {
                 if s.eq_ignore_ascii_case("off") {
                     Ok(vec![new_note(Note::OFF)])
@@ -50,6 +41,112 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
             }
         }
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// Conversion helpers for cycle targets
+fn float_value_in_range<Range>(
+    property: &CyclePropertyValue,
+    name: &'static str,
+    range: Range,
+) -> Result<f32, String>
+where
+    Range: RangeBounds<f32> + std::fmt::Debug,
+{
+    let value = property
+        .to_float()
+        .ok_or(format!("{} property must be a number value", name))? as f32;
+    if range.contains(&value) {
+        Ok(value)
+    } else {
+        Err(format!(
+            "{} property must be in range [{:?}] but is '{}'",
+            name, range, value
+        ))
+    }
+}
+
+fn integer_value_in_range<Range>(
+    property: &CyclePropertyValue,
+    name: &'static str,
+    range: Range,
+) -> Result<i32, String>
+where
+    Range: RangeBounds<i32> + std::fmt::Debug,
+{
+    let value = property
+        .to_integer()
+        .ok_or(format!("{} property must be an integer value", name))?;
+    if range.contains(&value) {
+        Ok(value)
+    } else {
+        Err(format!(
+            "{} property must be in range [{:?}] but is '{}'",
+            name, range, value
+        ))
+    }
+}
+
+/// Apply cycle targets as note properties to the given note events
+pub(crate) fn apply_cycle_note_properties(
+    note_events: &mut [Option<NoteEvent>],
+    targets: &[CycleTarget],
+) -> Result<(), String> {
+    // quickly return if there are no targets or notes to process
+    if targets.is_empty() || note_events.is_empty() {
+        return Ok(());
+    }
+    // apply for all non empty note events
+    for target in targets {
+        match target.key() {
+            CyclePropertyKey::Index(index) => {
+                let index = integer_value_in_range(
+                    &CyclePropertyValue::Integer(*index),
+                    "instrument",
+                    0..,
+                )?;
+                let instrument = InstrumentId::from(index as usize);
+                for note_event in note_events.iter_mut().flatten() {
+                    note_event.instrument = Some(instrument);
+                }
+            }
+            CyclePropertyKey::Name(name) => {
+                match name.as_bytes() {
+                    b"#" => {
+                        let index = integer_value_in_range(target.value(), "instrument", 0..)?;
+                        let instrument = InstrumentId::from(index as usize);
+                        for note_event in note_events.iter_mut().flatten() {
+                            note_event.instrument = Some(instrument);
+                        }
+                    }
+                    b"v" => {
+                        let volume = float_value_in_range(target.value(), "volume", 0.0..=1.0)?;
+                        for note_event in note_events.iter_mut().flatten() {
+                            note_event.volume = volume;
+                        }
+                    }
+                    b"p" => {
+                        let panning = float_value_in_range(target.value(), "panning", -1.0..=1.0)?;
+                        for note_event in note_events.iter_mut().flatten() {
+                            note_event.panning = panning;
+                        }
+                    }
+                    b"d" => {
+                        let delay = float_value_in_range(target.value(), "delay", 0.0..1.0)?;
+                        for note_event in note_events.iter_mut().flatten() {
+                            note_event.delay = delay;
+                        }
+                    }
+                    _ => {
+                        return Err(format!("invalid note property: '{}'. ", name) + 
+                            "expecting number values with '#' (instrument),'v' (volume), 'p' (panning) or 'd' (delay) prefixes here.")
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -201,16 +298,8 @@ impl CycleEventIter {
                 event.value().try_into()?
             }
         };
-        // inject target instrument, if present
-        if let Some(target) = event.targets().first() {
-            if let Some(instrument) = target.into() {
-                for mut note_event in &mut note_events {
-                    if let Some(note_event) = &mut note_event {
-                        note_event.instrument = Some(instrument);
-                    }
-                }
-            }
-        }
+        // apply note properties from targets
+        apply_cycle_note_properties(&mut note_events, event.targets())?;
         Ok(note_events)
     }
 
