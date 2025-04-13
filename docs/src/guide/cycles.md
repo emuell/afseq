@@ -20,7 +20,7 @@ There's no exact specification for how tidal cycles work, and it's constantly ev
 
 * Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
 
-* `:` sets the instrument or remappable target instead of selecting samples
+* `:` sets the instrument or remappable target instead of selecting samples but also allows setting note attributes such as instrument/volume/pan/delay (e.g. `c4:v0.1:p0.5`)
 
 * In bjorklund expressions, operators *within* and on the *right side* are not supported (e.g. `bd(<3 2>, 8)` and `bd(3, 8)*2` are *not* supported)
 
@@ -74,6 +74,29 @@ return cycle "c4 d4 g4|a4"
 
 afseq's general random number generator is also used in cycles. So when you seed the global number generator, you can also seed the cycle's random operations with `math.randomseed(12345)`.  
 
+### Note Attributes
+
+You can set note attributes in cycle patterns using chained `:` expressions:
+
+```lua
+-- Set instrument (2), panning (-0.5), and delay (0.25)
+cycle("d4:2:p-0.5:d0.25")
+
+-- Set instrument (1) with alternating volumes (0.1, 0.2)
+cycle("c4:1:<v0.1 v0.2>")
+
+-- Set multiple attributes with randomization
+cycle("c4:[v0.5:d0.1|v0.8]")
+```
+
+Supported note attributes are:
+- Instrument: `:#X` - same as `:X`, without the `#`
+- Volume: `:vX` - with X \[0.0-1.0\]
+- Panning: `:pX` - with X \[-1.0 to 1.0\] 
+- Delay: `:dX` - with X \[0.0-1.0\)
+
+Note that `X` must be written as *floating point number* for volume, panning and delay:</br> `c4:p-1.0` and `c4:p.8` is valid, while `c4:p-1` **is not valid**!
+
 
 ### Mapping
 
@@ -121,6 +144,12 @@ A polyrhythm
 
 ```lua
 return cycle("[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63")
+```
+
+Alternate panning with note attributes
+
+```lua
+cycle("c4:<p-0.5 p.00 p0.5>")
 ```
 
 Mapped multi channel beats
