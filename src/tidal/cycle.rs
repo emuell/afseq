@@ -2105,6 +2105,7 @@ mod test {
         assert!(Cycle::from("c4'!mode").is_err());
         assert!(Cycle::from("y'mode").is_err());
         assert!(Cycle::from("c4'mo'de").is_err());
+        assert!(Cycle::from("_names_cannot_start_with_underscore").is_err());
 
         assert!(Cycle::from("c4'mode").is_ok());
         assert!(Cycle::from("c'm7#^-").is_ok());
@@ -2337,14 +2338,23 @@ mod test {
             ]]
         );
 
+        assert_eq!(
+            Cycle::from("[1 __ 2] 3")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(3, 8)).with_int(1),
+                Event::at(Fraction::new(3, 8), Fraction::new(1, 8)).with_int(2),
+                Event::at(Fraction::new(1, 2), Fraction::new(1, 2)).with_int(3),
+            ]]
+        );
+
         assert_cycles(
-            "<some_name _another_one c4'chord c4'-^7 c6a_name>",
+            "<some_name another_one c4'chord c4'-^7 c6a_name>",
             vec![
                 vec![vec![
                     Event::at(Fraction::from(0), Fraction::from(1)).with_name("some_name")
                 ]],
                 vec![vec![
-                    Event::at(Fraction::from(0), Fraction::from(1)).with_name("_another_one")
+                    Event::at(Fraction::from(0), Fraction::from(1)).with_name("another_one")
                 ]],
                 vec![vec![
                     Event::at(Fraction::from(0), Fraction::from(1)).with_chord(0, 4, "chord")
