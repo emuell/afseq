@@ -13,7 +13,6 @@ anyhow = { version = "^1.0" }
 paste = { version = "^1.0" }
 derive_more = { version = "^2.0", features = ["from", "into", "display"] }
 log = { version = "^0.4" }
-simplelog = { version = "^0.12" }
 rand = { version = "^0.9" }
 rand_xoshiro = { version = "^0.7" }
 num-rational = { version = "^0.4", default-features = false, features = ["std"] }
@@ -41,6 +40,7 @@ pretty_assertions = "^1.4"
 notify = { version = "^8.0" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.5" }
+simplelog = { version = "^0.12" }
 
 [profile.dev]
 debug = "full"
