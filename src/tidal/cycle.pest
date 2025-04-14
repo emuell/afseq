@@ -29,7 +29,7 @@ rest = @{ ("~" | "-") ~ !name }
 hold = @{ "_" ~ !name }
 
 /// arbitrary string identifier type
-name = @{ (ASCII_ALPHANUMERIC | "_")+ }
+name = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 
 repeat = { "!" }
 
