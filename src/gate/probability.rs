@@ -1,9 +1,7 @@
-use std::borrow::Cow;
-
 use rand::{rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use crate::{BeatTimeBase, Gate, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, Gate, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -28,7 +26,7 @@ impl Gate for ProbabilityGate {
         // nothing to do
     }
 
-    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, _event: &Event) {
         // nothing to do
     }
 
@@ -37,7 +35,8 @@ impl Gate for ProbabilityGate {
     }
 
     fn run(&mut self, pulse: &PulseIterItem) -> bool {
-        pulse.value >= 1.0 || (pulse.value > 0.0 && pulse.value > self.rand_gen.random_range(0.0..1.0))
+        pulse.value >= 1.0
+            || (pulse.value > 0.0 && pulse.value > self.rand_gen.random_range(0.0..1.0))
     }
 
     fn duplicate(&self) -> Box<dyn Gate> {

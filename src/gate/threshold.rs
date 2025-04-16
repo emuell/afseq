@@ -1,6 +1,4 @@
-use std::borrow::Cow;
-
-use crate::{BeatTimeBase, Gate, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, Gate, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -31,7 +29,7 @@ impl Gate for ThresholdGate {
         // nothing to do
     }
 
-    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, _event: &Event) {
         // nothing to do
     }
 

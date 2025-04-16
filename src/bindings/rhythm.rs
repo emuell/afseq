@@ -170,6 +170,14 @@ mod test {
     fn beat_time_callbacks() -> LuaResult<()> {
         let (lua, _) = new_test_engine(120.0, 4, 44100)?;
 
+        let trigger_event = Event::NoteEvents(vec![Some(NoteEvent {
+            note: Note::A4,
+            instrument: None,
+            volume: 0.5,
+            panning: 0.0,
+            delay: 0.25,
+        })]);
+
         // BeatTimeRhythm function Context
         let beat_time_rhythm = lua
             .load(
@@ -182,6 +190,11 @@ mod test {
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
+                        assert(#context.triggers == 1)
+                        assert(context.triggers[1].key == "A4")
+                        assert(context.triggers[1].volume == 0.5)
+                        assert(context.triggers[1].panning == 0.0)
+                        assert(context.triggers[1].delay == 0.25)
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                       end
@@ -201,6 +214,7 @@ mod test {
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
+                        assert(#context.triggers == 1 and context.triggers[1].key == "A4")
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                       end
@@ -222,6 +236,7 @@ mod test {
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
+                        assert(#context.triggers == 1 and context.triggers[1].key == "A4")
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                         assert(context.step == step)
@@ -239,12 +254,16 @@ mod test {
             )
             .eval::<LuaValue>()
             .unwrap();
+
         let beat_time_rhythm = beat_time_rhythm
             .as_userdata()
             .unwrap()
             .borrow_mut::<BeatTimeRhythm>();
         assert!(beat_time_rhythm.is_ok());
         let mut beat_time_rhythm = beat_time_rhythm.unwrap();
+
+        beat_time_rhythm.set_trigger_event(&trigger_event);
+
         let event = beat_time_rhythm.next();
         assert_eq!(
             event,
@@ -260,6 +279,7 @@ mod test {
                 duration: 11025,
             })
         );
+
         assert!(beat_time_rhythm.next().unwrap().event.is_none());
         for _ in 0..10 {
             assert!(beat_time_rhythm.next().unwrap().event.is_some());
@@ -325,6 +345,14 @@ mod test {
     fn second_time_callbacks() -> LuaResult<()> {
         let (lua, _) = new_test_engine(130.0, 8, 48000)?;
 
+        let trigger_event = Event::NoteEvents(vec![Some(NoteEvent {
+            note: Note::C4,
+            instrument: None,
+            volume: 0.25,
+            panning: 0.5,
+            delay: 0.75,
+        })]);
+
         // SecondTimeRhythm function Context
         let second_time_rhythm = lua
             .load(
@@ -350,7 +378,11 @@ mod test {
             .unwrap()
             .borrow_mut::<SecondTimeRhythm>();
         assert!(second_time_rhythm.is_ok());
-        let event = second_time_rhythm.unwrap().next();
+
+        let mut second_time_rhythm = second_time_rhythm.unwrap();
+        second_time_rhythm.set_trigger_event(&trigger_event);
+
+        let event = second_time_rhythm.next();
         assert_eq!(
             event,
             Some(RhythmIterItem {

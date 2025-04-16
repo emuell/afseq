@@ -1,7 +1,6 @@
 //! Events and event iterators which get emitted by a `Rhythm`.
 
 use std::{
-    borrow::Cow,
     fmt::Debug,
     fmt::Display,
     sync::atomic::{AtomicUsize, Ordering},
@@ -403,8 +402,8 @@ pub trait EventIter: Debug {
     /// Update the iterator's internal beat or second time base with the new time base.
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// Set optional, application specific external context data for the event iter.
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+    /// Set optional event which triggered, started the iter, if any.
+    fn set_trigger_event(&mut self, event: &Event);
 
     /// Set or update optional, input parameter map for callbacks.
     fn set_input_parameters(&mut self, parameters: InputParameterSet);

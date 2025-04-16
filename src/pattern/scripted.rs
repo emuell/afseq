@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use mlua::prelude::LuaResult;
 
 use crate::{
@@ -147,11 +145,11 @@ impl Pattern for ScriptedPattern {
         }
     }
 
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, event: &crate::Event) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context from the new time base
-        if let Err(err) = self.callback.set_context_external_data(data) {
+        if let Err(err) = self.callback.set_context_triggers(event) {
             self.callback.handle_error(&err);
         }
     }

@@ -1,11 +1,11 @@
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
 use mlua::prelude::*;
 
 use lazy_static::lazy_static;
 use std::sync::RwLock;
 
-use crate::{BeatTimeBase, InputParameter, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, InputParameter, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -180,15 +180,13 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets external emitter context for the callback.
-    pub fn set_context_external_data(&mut self, data: &[(Cow<str>, f64)]) -> LuaResult<()> {
-        let external_values = &mut self
+    /// Sets the event which triggered the rhythm containing the context.
+    pub fn set_context_triggers(&mut self, event: &Event) -> LuaResult<()> {
+        let triggers_context = &mut self
             .context
             .borrow_mut::<CallbackContext>()?
-            .external_values;
-        for (key, value) in data {
-            external_values.insert(key.to_string(), (*value).into());
-        }
+            .triggers_context;
+        triggers_context.triggers = Some(event.clone());
         Ok(())
     }
 
@@ -354,12 +352,13 @@ impl LuaCallback {
 // -------------------------------------------------------------------------------------------------
 
 /// Memorizes an optional set of values that are passed along as context with the callback.
+///
+/// NB: CallbackTriggersContext and CallbackInputsContext are not LuaOwnedAnyUserData.
+/// A userdata ref would cause reference cycles that would prevent destroying the Lua instance...
 #[derive(Debug, Clone)]
 struct CallbackContext {
     values: HashMap<&'static [u8], ContextValue>,
-    external_values: HashMap<String, ContextValue>,
-    // NB: don't make this a LuaOwnedAnyUserData. A userdata ref would cause reference
-    // cycles that would prevent destroying the Lua instance...
+    triggers_context: CallbackTriggersContext,
     inputs_context: CallbackInputsContext,
 }
 
@@ -367,7 +366,7 @@ impl CallbackContext {
     fn new() -> Self {
         Self {
             values: HashMap::new(),
-            external_values: HashMap::new(),
+            triggers_context: CallbackTriggersContext::new(),
             inputs_context: CallbackInputsContext::new(),
         }
     }
@@ -386,9 +385,9 @@ impl LuaUserData for CallbackContext {
                     lua.create_userdata(this.inputs_context.clone())?
                         .into_lua(lua)
                 }
-                // external values
-                else if let Some(value) = this.external_values.get(key.to_str()?.as_ref()) {
-                    value.into_lua(lua)
+                // trigger event values (also, medium overhead - creates copies)
+                else if key == b"triggers" {
+                    this.triggers_context.clone().into_lua(lua)
                 } else {
                     Err(mlua::Error::RuntimeError(format!(
                         "undefined field '{}' in context",
@@ -447,6 +446,30 @@ impl LuaUserData for CallbackInputsContext {
                 ))
             })
         });
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Memorizes an optional trigger event value within a CallbackContext
+#[derive(Debug, Clone)]
+struct CallbackTriggersContext {
+    triggers: Option<Event>,
+}
+
+impl CallbackTriggersContext {
+    fn new() -> Self {
+        Self { triggers: None }
+    }
+}
+
+impl IntoLua for CallbackTriggersContext {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        if let Some(event) = self.triggers {
+            event.into_lua(lua)
+        } else {
+            Ok(LuaValue::Nil)
+        }
     }
 }
 

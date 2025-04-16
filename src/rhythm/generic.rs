@@ -1,12 +1,6 @@
 //! Generic `Rhythm` implementation with custom time step and offset types.
 
-use std::{
-    borrow::{Borrow, Cow},
-    cell::RefCell,
-    collections::VecDeque,
-    fmt::Debug,
-    rc::Rc,
-};
+use std::{borrow::Borrow, cell::RefCell, collections::VecDeque, fmt::Debug, rc::Rc};
 
 type Fraction = num_rational::Rational32;
 use num_traits::ToPrimitive;
@@ -492,10 +486,10 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         self.instrument = instrument;
     }
 
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
-        self.pattern.set_external_context(data);
-        self.gate.set_external_context(data);
-        self.event_iter.set_external_context(data);
+    fn set_trigger_event(&mut self, event: &Event) {
+        self.pattern.set_trigger_event(event);
+        self.gate.set_trigger_event(event);
+        self.event_iter.set_trigger_event(event);
     }
 
     fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>> {

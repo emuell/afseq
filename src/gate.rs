@@ -1,8 +1,8 @@
 //! Defines if an `Event` should be triggered or not for a given `Pulse`.
 
-use std::{borrow::Cow, fmt::Debug};
+use std::fmt::Debug;
 
-use crate::{BeatTimeBase, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, InputParameterSet, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -19,8 +19,8 @@ pub trait Gate: Debug {
     /// Set or update the gate's internal beat or second time base with the new time base.
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// Set or update optional, application specific external context data for the gate.
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+    /// Set optional event which triggered, started the iter, if any.
+    fn set_trigger_event(&mut self, event: &Event);
 
     /// Set or update optional, input parameter map for callbacks.
     fn set_input_parameters(&mut self, parameters: InputParameterSet);
