@@ -1,9 +1,9 @@
 //! Stack multiple `Rhythm`S into a single one.
 
-use std::{borrow::Cow, cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
-    BeatTimeBase, BeatTimeStep, InputParameter, InputParameterSet, InstrumentId, Rhythm,
+    BeatTimeBase, BeatTimeStep, Event, InputParameter, InputParameterSet, InstrumentId, Rhythm,
     RhythmIter, RhythmIterItem, SampleTime, SampleTimeDisplay,
 };
 
@@ -119,7 +119,7 @@ impl Phrase {
         &self.rhythm_slots
     }
 
-    /// Run rhythms to produce a single next event, calling the given `consumer` 
+    /// Run rhythms to produce a single next event, calling the given `consumer`
     /// visitor function when an event got produced.
     pub fn consume_event<F>(&mut self, consumer: &mut F)
     where
@@ -316,10 +316,10 @@ impl Rhythm for Phrase {
         }
     }
 
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, event: &Event) {
         for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_external_context(data);
+                rhythm.borrow_mut().set_trigger_event(event);
             }
         }
     }

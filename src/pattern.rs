@@ -1,8 +1,8 @@
 //! Rhythmical pattern as sequence of pulses in a `Rhythm`.
 
-use std::{borrow::Cow, fmt::Debug};
+use std::fmt::Debug;
 
-use crate::{BeatTimeBase, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, InputParameterSet, PulseIterItem};
 
 pub mod empty;
 pub mod euclidean;
@@ -30,8 +30,8 @@ pub trait Pattern: Debug {
     /// Set or update the pattern's internal beat or second time base with the new time base.
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// Set optional, application specific external context data for the pattern.
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+    /// Set optional event which triggered, started the iter, if any, before running.
+    fn set_trigger_event(&mut self, event: &Event);
 
     /// Set or update optional, input parameter map for callbacks.
     fn set_input_parameters(&mut self, parameters: InputParameterSet);

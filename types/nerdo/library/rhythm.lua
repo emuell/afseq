@@ -7,16 +7,18 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----------------------------------------------------------------------------------------------------
 
 ---Optional trigger context passed to `pattern`, `gate` and 'emit' functions.
----Specifies which keyboard note triggered, if any, started the rhythm.
----
+---Specifies which keyboard note triggered, if any, started the rhythm and
+---info about other .
 ---@class TriggerContext
 ---
----Note value that triggered, started the rhythm, if any.
----@field trigger_note integer?
----Note volume that triggered, started the rhythm, if any.
----@field trigger_volume number?
----Note slice offset value that triggered, started the rhythm, if any.
----@field trigger_offset integer?
+---The note which triggered the rhythm or notes which are currently held down for monophonic 
+---rhythms:
+---For monophonic rhythms with `poly` mode disabled, this will contain all notes which
+---currently triggering the rhythm, in the order they got triggered. The last note stops
+---the rhythm.
+---For rhythms with `polyphonic` playback mode enabled, this will only contain a single note,
+---the note that triggered the rhythm, as each note starts a new rhythm instance.
+---@field triggers NoteTable[]?
 ---
 ---Current input parameter values, using parameter ids as keys
 ---and the actual parameter value as value.
@@ -99,12 +101,12 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---### examples:
 ---```lua
 ----- slightly off beat pulse
----unit = "beats", 
+---unit = "beats",
 ---resolution = 1.01
 ---```
 ---```lua
 ----- triplet
----unit = "1/16", 
+---unit = "1/16",
 ---resolution = 4/3
 ---```
 ---@field unit "ms"|"seconds"|"bars"|"beats"|"1/1"|"1/2"|"1/4"|"1/8"|"1/16"|"1/32"|"1/64"
@@ -157,7 +159,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```
 ---@field inputs? InputParameter[]
 ---
----Specify the rhythmical pattern of the rhythm. With the default `gate` implementation, 
+---Specify the rhythmical pattern of the rhythm. With the default `gate` implementation,
 ---each pulse with a value of `1` or `true` will cause an event from the `emitter` property
 ---to be triggered in the emitters time unit. `0`, `false` or `nil` values do not trigger.
 ---
@@ -225,10 +227,10 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---
 ---Optional pulse train filter function or generator function which filters events between
 ---the pattern and emitter. By default a threshold gate, which passes all pulse values
----greater than zero. 
+---greater than zero.
 ---
----Custom function should returns true when a pattern pulse value should be passed, 
----and false when the emitter should be skipped.  
+---Custom function should returns true when a pattern pulse value should be passed,
+---and false when the emitter should be skipped.
 ---
 ---### examples:
 ---```lua
@@ -321,8 +323,8 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---  unit = "bars",
 ---  resolution = 4,
 ---  offset = 1,
----  emit = { 
----    note("c4'm"), 
+---  emit = {
+---    note("c4'm"),
 ---    note("g3'm7"):transpose({ 0, 12, 0, 0 })
 ---  }
 ---}
@@ -333,7 +335,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---return rhythm {
 ---  unit = "1/8",
 ---  pattern = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
----  gate = function(init_context) 
+---  gate = function(init_context)
 ---    local rand = math.randomstate(seed)
 ---    return function(context)
 ---      return context.pulse_value > rand()

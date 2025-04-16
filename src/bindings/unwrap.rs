@@ -103,6 +103,32 @@ impl IntoLua for NoteEvent {
 
 // ---------------------------------------------------------------------------------------------
 
+impl IntoLua for ParameterChangeEvent {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        if let Some(id) = self.parameter {
+            table.set("parameter", usize::from(id).into_lua(lua)?)?;
+        }
+        table.set("value", self.value as f64)?;
+        Ok(LuaValue::Table(table))
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
+impl IntoLua for Event {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        match self {
+            Event::NoteEvents(note_events) => note_events.into_lua(lua),
+            Event::ParameterChangeEvent(parameter_change_event) => {
+                parameter_change_event.into_lua(lua)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
 // Check if a lua value is a string, without using implicit conversions.
 pub(crate) fn string_from_value(
     value: &LuaValue,

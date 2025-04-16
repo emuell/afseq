@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::collections::HashMap;
 
 use num_traits::ToPrimitive;
 
@@ -10,8 +10,8 @@ use crate::{
         LuaTimeoutHook,
     },
     event::cycle::{apply_cycle_note_properties, CycleNoteEvents},
-    BeatTimeBase, Cycle, CycleEvent, CycleValue, EventIter, EventIterItem, InputParameterSet,
-    NoteEvent, PulseIterItem,
+    BeatTimeBase, Cycle, CycleEvent, CycleValue, Event, EventIter, EventIterItem,
+    InputParameterSet, NoteEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -264,12 +264,12 @@ impl EventIter for ScriptedCycleEventIter {
         }
     }
 
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, event: &Event) {
         if let Some(timeout_hook) = &mut self.timeout_hook {
             timeout_hook.reset();
         }
         if let Some(callback) = &mut self.mapping_callback {
-            if let Err(err) = callback.set_context_external_data(data) {
+            if let Err(err) = callback.set_context_triggers(event) {
                 callback.handle_error(&err);
             }
         }

@@ -1,7 +1,5 @@
-use std::borrow::Cow;
-
 use super::euclidean::euclidean;
-use crate::{BeatTimeBase, InputParameterSet, Pattern, Pulse, PulseIter, PulseIterItem};
+use crate::{BeatTimeBase, Event, InputParameterSet, Pattern, Pulse, PulseIter, PulseIterItem};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -97,7 +95,7 @@ impl Pattern for FixedPattern {
         // nothing to do
     }
 
-    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, _event: &Event) {
         // nothing to do
     }
 

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, ops::RangeBounds};
+use std::{collections::HashMap, ops::RangeBounds};
 
 type Fraction = num_rational::Rational32;
 
@@ -345,7 +345,7 @@ impl EventIter for CycleEventIter {
         // nothing to do
     }
 
-    fn set_external_context(&mut self, _data: &[(Cow<str>, f64)]) {
+    fn set_trigger_event(&mut self, _event: &Event) {
         // nothing to do
     }
 
