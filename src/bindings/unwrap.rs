@@ -745,6 +745,22 @@ pub(crate) fn chord_events_from_intervals(
 
 // -------------------------------------------------------------------------------------------------
 
+pub fn trigger_mode_from_value(value: &LuaValue) -> LuaResult<RhythmTriggerMode> {
+    match value.as_str() {
+        Some(value) if value == "poly" => Ok(RhythmTriggerMode::Poly),
+        Some(value) if value == "mono" => Ok(RhythmTriggerMode::Mono),
+        _ => Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "trigger_mode".to_string(),
+            message: Some(
+                "expected a string value as `trigger` property: 'mono' or 'poly'".to_string(),
+            ),
+        }),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
     match value {
         LuaValue::Nil => Ok(Pulse::Pulse(0.0)),

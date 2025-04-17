@@ -11,13 +11,14 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---info about other .
 ---@class TriggerContext
 ---
----The note which triggered the rhythm or notes which are currently held down for monophonic 
----rhythms:
----For monophonic rhythms with `poly` mode disabled, this will contain all notes which
----currently triggering the rhythm, in the order they got triggered. The last note stops
----the rhythm.
----For rhythms with `polyphonic` playback mode enabled, this will only contain a single note,
----the note that triggered the rhythm, as each note starts a new rhythm instance.
+---The note which triggered the rhythm, or multiple notes which are currently held down for
+---monophonic rhythms:
+---
+---For monophonic rhythms this will contain all notes which currently trigger the rhythm, in the
+---order they got triggered. The last note stops the rhythm.
+---
+---For polyphonic rhythms this will only contain a single note, the note that triggered the rhythm,
+---as each note starts a new rhythm instance.
 ---@field triggers NoteTable[]?
 ---
 ---Current input parameter values, using parameter ids as keys
@@ -134,6 +135,28 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---offset = 4
 ---```
 ---@field offset number?
+---
+---Set optional trigger mode for the rhythm. By default "poly"
+---
+---When triggering rhythms via notes, "poly" mode will trigger a new rhythm for every new note
+---and will stop the rhythm when the note is released.
+---
+---Rhythms with "mono" trigger mode will start with the first note that got triggered and will
+---pass all subsequent notes to the existing rhythm instance until all notes get released.
+---
+---Monophonic trigger modes can be used to create arpeggio or chord mapping alike rhythms, which
+---consume multiple notes.
+---
+------### examples:
+---```lua
+----- start emitting after 4*4 beats
+---unit = "1/4",
+---trigger = "mono",
+---emit = function(context)
+--- -- TODO: add simple arp example
+---end
+---```
+---@field trigger "mono"|"poly"?
 ---
 ---Define optional input parameters for the rhythm. Input parameters can dynamically
 ---change a rhythms behavior everywhere where `context`s are passed, e.g. in pattern,
