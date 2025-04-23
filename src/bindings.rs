@@ -16,7 +16,7 @@ use self::{
     rhythm::rhythm_from_userdata,
     sequence::SequenceUserData,
     unwrap::{
-        bad_argument_error, optional_string_from_value, string_from_value,
+        bad_argument_error, note_event_from_value, optional_string_from_value, string_from_value,
         validate_table_properties,
     },
 };
@@ -235,6 +235,20 @@ fn register_global_bindings(
         "note",
         lua.create_function(|_lua, args: LuaMultiValue| -> LuaResult<NoteUserData> {
             NoteUserData::from(args)
+        })?,
+    )?;
+
+    // function note_number(note)
+    globals.raw_set(
+        "note_number",
+        lua.create_function(|_lua, value: LuaValue| -> LuaResult<LuaValue> {
+            let note_event = note_event_from_value(&value, None)?;
+            match note_event {
+                Some(note_event) if note_event.note.is_note_on() => {
+                    Ok(LuaValue::Integer(u8::from(note_event.note) as LuaInteger))
+                }
+                _ => Ok(LuaValue::Integer(-1 as LuaInteger)),
+            }
         })?,
     )?;
 
