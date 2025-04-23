@@ -36,7 +36,7 @@ impl RhythmIterItem {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `RhythmIter` is an iterator which emits sample time tagged optional [`Event`](crate::Event)
+/// A `RhythmIter` is an iterator which emits sample time tagged optional [`Event`]
 /// items.
 ///
 /// It triggers events periodically, producing events at specific sample times with specific
@@ -87,6 +87,19 @@ impl Iterator for dyn RhythmIter {
 
 // -------------------------------------------------------------------------------------------------
 
+/// How rhythms should be triggered.
+#[derive(Default, Debug, Clone, Copy)]
+pub enum RhythmTriggerMode {
+    /// In poly mode, every new note event should start a new rhythm instance, which is the default.
+    #[default]
+    Poly,
+    /// In mono mode, only one rhythm instance should be triggered and should be fed with subsequent
+    /// triggered notes.
+    Mono,
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// A `Rhythm` is a resettable, dyn clonable `RhythmIter` with optional instrument and
 /// time base setters.
 ///
@@ -112,10 +125,14 @@ pub trait Rhythm: RhythmIter {
     /// instrument value set.
     fn set_instrument(&mut self, instrument: Option<InstrumentId>);
 
-    /// Set optional, application specific external context data for the pattern and emitter.
-    fn set_external_context(&mut self, data: &[(Cow<str>, f64)]);
+    /// Rhythms external trigger mode. See `RhythmTriggerMode` for details.
+    fn trigger_mode(&self) -> RhythmTriggerMode;
+    /// Set rhythms external trigger mode. See `RhythmTriggerMode` for details.
+    fn set_trigger_mode(&mut self, mode: RhythmTriggerMode);
 
     /// Set event which triggered, started the rhythm, if any.
+    /// For rhythms with mono trigger mode newly triggered or released notes should be passed
+    /// as new event to the running rhythms.
     fn set_trigger_event(&mut self, trigger: &Event);
 
     /// Create a new cloned instance of this rhythm. This actually is a clone(), wrapped into

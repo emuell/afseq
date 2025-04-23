@@ -3,7 +3,7 @@ use mlua::prelude::*;
 use super::super::{
     unwrap::{
         bad_argument_error, event_iter_from_value, gate_from_value, inputs_from_value,
-        pattern_from_value, pattern_repeat_count_from_value,
+        pattern_from_value, pattern_repeat_count_from_value, trigger_mode_from_mono_value,
     },
     LuaTimeoutHook,
 };
@@ -50,7 +50,7 @@ impl BeatTimeRhythm {
                 "1/16" => step = BeatTimeStep::Sixteenth(resolution),
                 "1/32" => step = BeatTimeStep::ThirtySecond(resolution),
                 "1/64" => step = BeatTimeStep::SixtyFourth(resolution),
-                _ => return Err(bad_argument_error("emit", "unit", 1, 
+                _ => return Err(bad_argument_error("rhythm", "unit", 1, 
                 "expected one of 'ms|seconds' or 'bars|beats' or '1/1|1/2|1/4|1/8|1/16|1/32|1/64"))
             }
         }
@@ -77,6 +77,12 @@ impl BeatTimeRhythm {
             let value = table.get::<LuaTable>("inputs")?;
             let inputs = inputs_from_value(lua, &value)?;
             rhythm = rhythm.with_input_parameters(inputs);
+        }
+        // mono
+        if table.contains_key("mono")? {
+            let value = table.get::<LuaValue>("mono")?;
+            let trigger_mode = trigger_mode_from_mono_value(&value)?;
+            rhythm = rhythm.with_trigger_mode(trigger_mode);
         }
         // pattern
         if table.contains_key("pattern")? {

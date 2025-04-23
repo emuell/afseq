@@ -119,8 +119,9 @@ impl IntoLua for ParameterChangeEvent {
 impl IntoLua for Event {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         match self {
-            Event::NoteEvents(note_events) => note_events.into_lua(lua),
+            Event::NoteEvents(note_events) => NoteUserData { notes: note_events }.into_lua(lua),
             Event::ParameterChangeEvent(parameter_change_event) => {
+                // TODO: ParameterChangeUserData
                 parameter_change_event.into_lua(lua)
             }
         }
@@ -740,6 +741,25 @@ pub(crate) fn chord_events_from_intervals(
             to: "note".to_string(),
             message: Some("invalid note in chord: note value is undefined".to_string()),
         })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub fn trigger_mode_from_mono_value(value: &LuaValue) -> LuaResult<RhythmTriggerMode> {
+    match value.as_boolean() {
+        Some(value) => {
+            if value {
+                Ok(RhythmTriggerMode::Mono)
+            } else {
+                Ok(RhythmTriggerMode::Poly)
+            }
+        }
+        None => Err(LuaError::FromLuaConversionError {
+            from: value.type_name(),
+            to: "trigger_mode".to_string(),
+            message: Some("expected a boolean value for `mono` property".to_string()),
+        }),
     }
 }
 

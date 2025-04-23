@@ -180,13 +180,13 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets the event which triggered the rhythm containing the context.
-    pub fn set_context_triggers(&mut self, event: &Event) -> LuaResult<()> {
-        let triggers_context = &mut self
+    /// Sets the event which triggered the rhythm for the callback context.
+    pub fn set_context_trigger_event(&mut self, event: &Event) -> LuaResult<()> {
+        let trigger_context = &mut self
             .context
             .borrow_mut::<CallbackContext>()?
-            .triggers_context;
-        triggers_context.triggers = Some(event.clone());
+            .trigger_context;
+        trigger_context.event = Some(event.clone());
         Ok(())
     }
 
@@ -358,7 +358,7 @@ impl LuaCallback {
 #[derive(Debug, Clone)]
 struct CallbackContext {
     values: HashMap<&'static [u8], ContextValue>,
-    triggers_context: CallbackTriggersContext,
+    trigger_context: CallbackTriggerContext,
     inputs_context: CallbackInputsContext,
 }
 
@@ -366,7 +366,7 @@ impl CallbackContext {
     fn new() -> Self {
         Self {
             values: HashMap::new(),
-            triggers_context: CallbackTriggersContext::new(),
+            trigger_context: CallbackTriggerContext::new(),
             inputs_context: CallbackInputsContext::new(),
         }
     }
@@ -386,8 +386,8 @@ impl LuaUserData for CallbackContext {
                         .into_lua(lua)
                 }
                 // trigger event values (also, medium overhead - creates copies)
-                else if key == b"triggers" {
-                    this.triggers_context.clone().into_lua(lua)
+                else if key == b"trigger" {
+                    this.trigger_context.clone().into_lua(lua)
                 } else {
                     Err(mlua::Error::RuntimeError(format!(
                         "undefined field '{}' in context",
@@ -453,19 +453,19 @@ impl LuaUserData for CallbackInputsContext {
 
 /// Memorizes an optional trigger event value within a CallbackContext
 #[derive(Debug, Clone)]
-struct CallbackTriggersContext {
-    triggers: Option<Event>,
+struct CallbackTriggerContext {
+    event: Option<Event>,
 }
 
-impl CallbackTriggersContext {
+impl CallbackTriggerContext {
     fn new() -> Self {
-        Self { triggers: None }
+        Self { event: None }
     }
 }
 
-impl IntoLua for CallbackTriggersContext {
+impl IntoLua for CallbackTriggerContext {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        if let Some(event) = self.triggers {
+        if let Some(event) = self.event {
             event.into_lua(lua)
         } else {
             Ok(LuaValue::Nil)
