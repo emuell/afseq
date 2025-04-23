@@ -7,7 +7,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----------------------------------------------------------------------------------------------------
 
 ---@class NoteTable
----@field key string|number Note Key
+---@field key string|number Note key & octave string (or MIDI note number as setter)
 ---@field instrument number? Instrument/Sample/Patch >= 0
 ---@field volume number? Volume in range [0.0 - 1.0]
 ---@field panning number? Panning factor in range [-1.0 - 1.0] where 0 is center
@@ -98,12 +98,12 @@ function Note:delay(delay) end
 ---
 ---### examples:
 --- ```lua
---- note(60) -- middle C
---- note("c4") -- middle C
---- note("c4 #2 v0.5 d0.3") -- middle C with additional properties
---- note({key="c4", volume=0.5}) -- middle C with volume 0.5
---- note("c4'maj v0.7") -- C4 major chord with volume 0.7
---- note("c4", "e4 v0.5", "off") -- custom chord with a c4, e4 and 'off' note
+--- note(48) --> middle C
+--- note("c4") --> middle C
+--- note("c4 #2 v0.5 d0.3") --> middle C with additional properties
+--- note({key="c4", volume=0.5}) --> middle C with volume 0.5
+--- note("c4'maj v0.7") --> C4 major chord with volume 0.7
+--- note("c4", "e4 v0.5", "off") --> custom chord with a c4, e4 and 'off' note
 --- ```
 ---@param ... NoteValue
 ---@return Note
@@ -111,3 +111,16 @@ function Note:delay(delay) end
 ---@overload fun(table: NoteValue[]): Note
 ---@overload fun(...: NoteValue): Note
 function note(...) end
+
+---Convert a note string or note table to a raw MIDI note number in range 0-127
+---or -1 for nil or off note values.
+---### Examples:
+---```lua
+---note_value("c4") --> 48
+---note_value(note("c4")) --> 48
+---note_value("off") --> -1
+---note_value("xyz") --> error
+---```
+---@param note NoteValue
+---@return integer
+function note_number(note) end

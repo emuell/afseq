@@ -246,6 +246,13 @@ mod test {
             .clone())
     }
 
+    fn evaluate_number(lua: &Lua, expression: &str) -> LuaResult<LuaInteger> {
+        lua.load(expression)
+            .eval::<LuaValue>()?
+            .as_integer()
+            .ok_or(LuaError::RuntimeError("No integer value".to_string()))
+    }
+
     #[test]
     fn note() -> LuaResult<()> {
         let (lua, _) = new_test_engine()?;
@@ -535,6 +542,26 @@ mod test {
                 new_note(("e4", None, 1.0, 0.0)),
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn note_numbers() -> LuaResult<()> {
+        let (lua, _) = new_test_engine()?;
+
+        // Note number
+        assert!(evaluate_number(
+            &lua,
+            r#"note_number("x1")#).is_err());
+        assert!(evaluate_number(&lua, r#"note_number({})"#
+        )
+        .is_err());
+        assert!(evaluate_number(&lua, r#"note_number(-1)"#).is_err());
+        assert_eq!(evaluate_number(&lua, r#"note_number("c4")"#)?, 48);
+        assert_eq!(evaluate_number(&lua, r#"note_number("off")"#)?, -1);
+        assert_eq!(evaluate_number(&lua, r#"note_number("---")"#)?, -1);
+        assert_eq!(evaluate_number(&lua, r#"note_number(nil)"#)?, -1);
 
         Ok(())
     }
