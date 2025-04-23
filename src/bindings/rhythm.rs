@@ -190,11 +190,12 @@ mod test {
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
-                        assert(#context.triggers == 1)
-                        assert(context.triggers[1].key == "A4")
-                        assert(context.triggers[1].volume == 0.5)
-                        assert(context.triggers[1].panning == 0.0)
-                        assert(context.triggers[1].delay == 0.25)
+                        local trigger_notes = context.trigger.notes
+                        assert(#trigger_notes == 1)
+                        assert(trigger_notes[1].key == "A4")
+                        assert(trigger_notes[1].volume == 0.5)
+                        assert(trigger_notes[1].panning == 0.0)
+                        assert(trigger_notes[1].delay == 0.25)
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                       end
@@ -214,7 +215,8 @@ mod test {
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
-                        assert(#context.triggers == 1 and context.triggers[1].key == "A4")
+                        assert(#context.trigger.notes == 1 and 
+                          context.trigger.notes[1].key == "A4")
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                       end
@@ -236,7 +238,8 @@ mod test {
                         assert(context.beats_per_min == 120)
                         assert(context.beats_per_bar == 4)
                         assert(context.samples_per_sec == 44100)
-                        assert(#context.triggers == 1 and context.triggers[1].key == "A4")
+                        assert(#context.trigger.notes == 1 and 
+                          context.trigger.notes[1].key == "A4")
                         assert(context.pulse_step == pulse_step)
                         assert(context.pulse_time_step == pulse_time_step)
                         assert(context.step == step)

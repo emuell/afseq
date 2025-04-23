@@ -269,7 +269,7 @@ impl EventIter for ScriptedCycleEventIter {
             timeout_hook.reset();
         }
         if let Some(callback) = &mut self.mapping_callback {
-            if let Err(err) = callback.set_context_triggers(event) {
+            if let Err(err) = callback.set_context_trigger_event(event) {
                 callback.handle_error(&err);
             }
         }

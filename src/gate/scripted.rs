@@ -79,7 +79,7 @@ impl Gate for ScriptedGate {
         // reset timeout
         self.timeout_hook.reset();
         // update function context from the new time base
-        if let Err(err) = self.callback.set_context_triggers(event) {
+        if let Err(err) = self.callback.set_context_trigger_event(event) {
             self.callback.handle_error(&err);
         }
     }

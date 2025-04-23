@@ -14,7 +14,7 @@ use crate::{
     pattern::{fixed::FixedPattern, Pattern},
     time::{BeatTimeBase, SampleTimeDisplay},
     Gate, InputParameter, InputParameterSet, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem,
-    SampleTime,
+    RhythmTriggerMode, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -43,6 +43,7 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     offset: Offset,
     instrument: Option<InstrumentId>,
     input_parameters: InputParameterSet,
+    trigger_mode: RhythmTriggerMode,
     pattern: Box<dyn Pattern>,
     pattern_repeat_count: Option<usize>,
     pattern_playback_finished: bool,
@@ -62,6 +63,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         let offset = Offset::default_offset();
         let instrument = None;
         let input_parameters = InputParameterSet::new();
+        let trigger_mode = RhythmTriggerMode::Poly;
         let pattern = Box::<FixedPattern>::default();
         let pattern_repeat_count = None;
         let pattern_playback_finished = false;
@@ -78,6 +80,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             offset,
             instrument,
             input_parameters,
+            trigger_mode,
             pattern,
             pattern_repeat_count,
             pattern_playback_finished,
@@ -144,6 +147,15 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         new.gate.set_input_parameters(parameters.clone());
         new.event_iter.set_input_parameters(parameters);
         new
+    }
+
+    /// Return a new rhythm instance with the given trigger mode
+    #[must_use]
+    pub fn with_trigger_mode(self, trigger_mode: RhythmTriggerMode) -> Self {
+        Self {
+            trigger_mode,
+            ..self
+        }
     }
 
     /// Return a new rhythm instance which trigger events with the given [`Pattern`].  
@@ -484,6 +496,14 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
 
     fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
         self.instrument = instrument;
+    }
+
+    fn trigger_mode(&self) -> RhythmTriggerMode {
+        self.trigger_mode
+    }
+
+    fn set_trigger_mode(&mut self, mode: RhythmTriggerMode) {
+        self.trigger_mode = mode;
     }
 
     fn set_trigger_event(&mut self, event: &Event) {

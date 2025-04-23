@@ -6,28 +6,20 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Optional trigger context passed to `pattern`, `gate` and 'emit' functions.
----Specifies which keyboard note triggered, if any, started the rhythm and
----info about other .
+---Trigger context passed to functions in `pattern`, `gate` and `emit`.
+---Contains information about what triggered the rhythm and current input values.
 ---@class TriggerContext
----
----The note which triggered the rhythm or notes which are currently held down for monophonic 
----rhythms:
----For monophonic rhythms with `poly` mode disabled, this will contain all notes which
----currently triggering the rhythm, in the order they got triggered. The last note stops
----the rhythm.
----For rhythms with `polyphonic` playback mode enabled, this will only contain a single note,
----the note that triggered the rhythm, as each note starts a new rhythm instance.
----@field triggers NoteTable[]?
----
----Current input parameter values, using parameter ids as keys
----and the actual parameter value as value.
----@see InputParameter
+---Notes that triggered the rhythm:
+---* Mono mode: All active trigger notes (last released note stops the rhythm)
+---* Poly mode: Single note that started the rhythm instance
+---@field trigger Note?
+--- Current input parameter values: parameter ids as keys, parameter values as values
 ---@field inputs table<string, number|integer|boolean|string>
+---@see InputParameter
 
 ----------------------------------------------------------------------------------------------------
 
----Transport & playback time context passed to `pattern`, `gate` and `emit` functions.
+---Transport & playback time context passed to functions in `pattern`, `gate` and `emit`.
 ---@class TimeContext : TriggerContext
 ---
 ---Project's tempo in beats per minutes.
@@ -39,7 +31,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to `pattern` and `gate` functions.
+---Pattern passed to functions in `pattern` and `gate`.
 ---@class PatternContext : TimeContext
 ---
 ---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
@@ -52,7 +44,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ----------------------------------------------------------------------------------------------------
 
----Context passed to `gate` functions.
+---Context passed to functions in `gate`.
 ---@class GateContext : PatternContext
 ---
 ---Current pulse's step time as fraction of a full step in the pattern. For simple pulses this
@@ -75,7 +67,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---- *running*: The emitter is played back regularly. Results are audible.
 ---@alias PlaybackState "seeking"|"running"
 
----Context passed to 'emit' functions.
+---Context passed to functions in 'emit'.
 ---@class EmitterContext : GateContext
 ---
 ---Specifies how the emitter currently is running.
@@ -95,6 +87,35 @@ error("Do not try to execute this file. It's just a type definition file.")
 
 ---Construction options for a new rhythm.
 ---@class RhythmOptions
+---
+---Set optional trigger mode. By default false, so rhythms are `polyphonic` by default.
+---
+---* `mono` mode will start the rhythm with the first note that got triggered, and will
+---pass all subsequent notes to the existing rhythm instance until all notes get released.
+---* `poly` mode will start a new rhythm instance for every new note and will stop the
+---rhythm instance when the note is released.
+---
+---Monophonic modes can be used to create arpeggio or chord mapping alike rhythms, which
+---need to consume multiple input notes.
+---
+------### examples:
+---```lua
+----- emit triggerd chords to a sequence of notes (an arpeggio)
+---return rhythm {
+---  mono = true,
+---  emit = function (init_context)
+---    -- index in arp as local state
+---    local note_index = 0
+---    return function (context)
+---      -- advance and wrap to next note in triggered notes
+---      local notes = context.triggers.notes
+---      note_index = math.imod(note_index + 1, #notes)
+---      return notes[note_index]
+---    end
+---  end
+---}
+---```
+---@field mono boolean?
 ---
 ---Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
 ---create other less common rhythm bases.
