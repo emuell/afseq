@@ -180,18 +180,13 @@
 ### step_length : [`number`](../API/builtins/number.md)<a name="step_length"></a>
 > step length fraction within the cycle, where 1 is the total duration of a single cycle run.
 
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
-> Note slice offset value that triggered, started the rhythm, if any.
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Notes that triggered the rhythm:
+> * Mono mode: All active trigger notes (last released note stops the rhythm)
+> * Poly mode: Single note that started the rhythm instance
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
+>  Current input parameter values: parameter ids as keys, parameter values as values
 
 ### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
 > Project's tempo in beats per minutes.

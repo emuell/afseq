@@ -10,6 +10,7 @@
 - [Advanced Topics](extras/README.md)
   - [Generators](extras/generators.md)
   - [Randomization](extras/randomization.md)
+  - [Triggering Rhythms](extras/triggering_rhythms.md)
 - [Examples](examples/README.md)
 - [API Reference](API/README.md)
   <!-- API TOC START -->
