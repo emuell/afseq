@@ -25,8 +25,8 @@
 >   unit = "bars",
 >   resolution = 4,
 >   offset = 1,
->   emit = { 
->     note("c4'm"), 
+>   emit = {
+>     note("c4'm"),
 >     note("g3'm7"):transpose({ 0, 12, 0, 0 })
 >   }
 > }
@@ -37,7 +37,7 @@
 > return rhythm {
 >   unit = "1/8",
 >   pattern = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
->   gate = function(init_context) 
+>   gate = function(init_context)
 >     local rand = math.randomstate(seed)
 >     return function(context)
 >       return context.pulse_value > rand()
@@ -88,22 +88,17 @@
 
 
 # EmitterContext<a name="EmitterContext"></a>  
-> Context passed to 'emit' functions.  
+> Context passed to functions in 'emit'.  
 
 ---  
 ## Properties
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
-> Note slice offset value that triggered, started the rhythm, if any.
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Notes that triggered the rhythm:
+> * Mono mode: All active trigger notes (last released note stops the rhythm)
+> * Poly mode: Single note that started the rhythm instance
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
+>  Current input parameter values: parameter ids as keys, parameter values as values
 
 ### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
 > Project's tempo in beats per minutes.
@@ -167,22 +162,17 @@
 
 
 # GateContext<a name="GateContext"></a>  
-> Context passed to `gate` functions.  
+> Context passed to functions in `gate`.  
 
 ---  
 ## Properties
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
-> Note slice offset value that triggered, started the rhythm, if any.
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Notes that triggered the rhythm:
+> * Mono mode: All active trigger notes (last released note stops the rhythm)
+> * Poly mode: Single note that started the rhythm instance
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
+>  Current input parameter values: parameter ids as keys, parameter values as values
 
 ### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
 > Project's tempo in beats per minutes.
@@ -221,22 +211,17 @@
 
 
 # PatternContext<a name="PatternContext"></a>  
-> Context passed to `pattern` and `gate` functions.  
+> Pattern passed to functions in `pattern` and `gate`.  
 
 ---  
 ## Properties
-### trigger_note : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_note"></a>
-> Note value that triggered, started the rhythm, if any.
-
-### trigger_volume : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="trigger_volume"></a>
-> Note volume that triggered, started the rhythm, if any.
-
-### trigger_offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md)<a name="trigger_offset"></a>
-> Note slice offset value that triggered, started the rhythm, if any.
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Notes that triggered the rhythm:
+> * Mono mode: All active trigger notes (last released note stops the rhythm)
+> * Poly mode: Single note that started the rhythm instance
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
-> Current input parameter values, using parameter ids as keys
-> and the actual parameter value as value.
+>  Current input parameter values: parameter ids as keys, parameter values as values
 
 ### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
 > Project's tempo in beats per minutes.
@@ -265,18 +250,47 @@
 
 ---  
 ## Properties
+### mono : [`boolean`](../API/builtins/boolean.md)[`?`](../API/builtins/nil.md)<a name="mono"></a>
+> Set optional trigger mode. By default false, so rhythms are `polyphonic` by default.
+> 
+> * `mono` mode will start the rhythm with the first note that got triggered, and will
+> pass all subsequent notes to the existing rhythm instance until all notes get released.
+> * `poly` mode will start a new rhythm instance for every new note and will stop the
+> rhythm instance when the note is released.
+> 
+> Monophonic modes can be used to create arpeggio or chord mapping alike rhythms, which
+> need to consume multiple input notes.
+> 
+> ---#### examples:
+> ```lua
+> -- emit triggerd chords to a sequence of notes (an arpeggio)
+> return rhythm {
+>   mono = true,
+>   emit = function (init_context)
+>     -- index in arp as local state
+>     local note_index = 0
+>     return function (context)
+>       -- advance and wrap to next note in triggered notes
+>       local notes = context.triggers.notes
+>       note_index = math.imod(note_index + 1, #notes)
+>       return notes[note_index]
+>     end
+>   end
+> }
+> ```
+
 ### unit : `"ms"` | `"seconds"` | `"bars"` | `"beats"` | `"1/1"` | `"1/2"` | `"1/4"` | `"1/8"` | `"1/16"` | `"1/32"` | `"1/64"`<a name="unit"></a>
 > Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
 > create other less common rhythm bases.
 > #### examples:
 > ```lua
 > -- slightly off beat pulse
-> unit = "beats", 
+> unit = "beats",
 > resolution = 1.01
 > ```
 > ```lua
 > -- triplet
-> unit = "1/16", 
+> unit = "1/16",
 > resolution = 4/3
 > ```
 
@@ -330,7 +344,7 @@
 > ```
 
 ### pattern : [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)[] | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md) | (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` (context : [`PatternContext`](../API/rhythm.md#PatternContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`Pulse`](#Pulse) | [`nil`](../API/builtins/nil.md)<a name="pattern"></a>
-> Specify the rhythmical pattern of the rhythm. With the default `gate` implementation, 
+> Specify the rhythmical pattern of the rhythm. With the default `gate` implementation,
 > each pulse with a value of `1` or `true` will cause an event from the `emitter` property
 > to be triggered in the emitters time unit. `0`, `false` or `nil` values do not trigger.
 > 
@@ -398,10 +412,10 @@
 ### gate : (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) | (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` (context : [`GateContext`](../API/rhythm.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md)<a name="gate"></a>
 > Optional pulse train filter function or generator function which filters events between
 > the pattern and emitter. By default a threshold gate, which passes all pulse values
-> greater than zero. 
+> greater than zero.
 > 
-> Custom function should returns true when a pattern pulse value should be passed, 
-> and false when the emitter should be skipped.  
+> Custom function should returns true when a pattern pulse value should be passed,
+> and false when the emitter should be skipped.
 > 
 > #### examples:
 > ```lua

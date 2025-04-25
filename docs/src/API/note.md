@@ -21,13 +21,25 @@
 > 
 > #### examples:
 >  ```lua
->  note(60) -- middle C
->  note("c4") -- middle C
->  note("c4 #2 v0.5 d0.3") -- middle C with additional properties
->  note({key="c4", volume=0.5}) -- middle C with volume 0.5
->  note("c4'maj v0.7") -- C4 major chord with volume 0.7
->  note("c4", "e4 v0.5", "off") -- custom chord with a c4, e4 and 'off' note
->  ```  
+>  note(48) --> middle C
+>  note("c4") --> middle C
+>  note("c4 #2 v0.5 d0.3") --> middle C with additional properties
+>  note({key="c4", volume=0.5}) --> middle C with volume 0.5
+>  note("c4'maj v0.7") --> C4 major chord with volume 0.7
+>  note("c4", "e4 v0.5", "off") --> custom chord with a c4, e4 and 'off' note
+>  ```
+### note_number(note : [`NoteValue`](#NoteValue))<a name="note_number"></a>
+`->`[`integer`](../API/builtins/integer.md)  
+
+> Convert a note string or note table to a raw MIDI note number in range 0-127
+> or -1 for nil or off note values.
+> ### Examples:
+> ```lua
+> note_value("c4") --> 48
+> note_value(note("c4")) --> 48
+> note_value("off") --> -1
+> note_value("xyz") --> error
+> ```  
 
 
 
@@ -105,7 +117,7 @@
 ---  
 ## Properties
 ### key : [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)<a name="key"></a>
-> Note Key
+> Note key & octave string (or MIDI note number as setter)
 
 ### instrument : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="instrument"></a>
 > Instrument/Sample/Patch >= 0
