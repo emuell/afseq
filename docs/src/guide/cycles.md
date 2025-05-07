@@ -1,18 +1,70 @@
 # Cycles
 
-In addition to static arrays of [notes](./notes&scales.md) or dynamic [generator functions](../extras/generators.md), emitters in afseq can also emit cycles using the tidal cycles [mini-notation](https://tidalcycles.org/docs/reference/mini_notation/).
+In addition to static arrays of [notes](./notes&scales.md) or dynamic [generator functions](../extras/generators.md), emitters in afseq can also emit cycles using the [tidal cycles mini-notation](https://tidalcycles.org/docs/reference/mini_notation/)
+
+## Introduction
+
+Cycles let you create repeating musical patterns using a simple text notation. Think of it like writing drum patterns or melodies in a compact, readable way.
 
 
-[Tidal Cycles](https://tidalcycles.org/) allows you to make patterns with code using a custom functional approach. It includes a language for describing flexible (e.g. polyphonic, polyrhythmic, generative) sequences of sounds, notes, parameters, and all kind of information.
+```lua
+-- Basic pattern with notes and rests
+return cycle("c4 d4 <e4 g4> _")
+```
 
-## Usage
+This plays:
+1. C4
+2. D4
+3. Alternate between E4 and G4
+4. play no event: `_` means rest
 
-To create cycles in afseq, use the [`cycle`](../API/cycle.md#cycle) function in the emitter and pass it a mini-notation as string.
+## Pattern Basics
 
-\> `emit = cycle("c4 d#4 <a5 g5> _")`
+Key symbols to know:
 
-> [!NOTE]
+| Symbol | Meaning                          | Example             |
+|--------|----------------------------------|---------------------|
+| ` `    | Separates steps                  | `c4 d4`             |
+| `,`    | Parallel patterns                | `[c4,e4], [g4,a4]`  |
+| `< >`  | Alternates between values        | `<c4 e4 g4>`        |
+| `\|`   | Random choice                    | `c4\|d4\|e4`        |
+| `*`    | Repeat                           | `c4*4`              |
+| `_`    | Elongate                         | `c4 _ d4`           |
+| `~`    | Rest                             | `c4 ~ d4`           |
+
+> [!TIP]
 > Please see [Tidal Cycles Mini-Notation Reference](https://tidalcycles.org/docs/reference/mini_notation/) for a complete overview of the cycle notation.
+
+## Basic Examples
+
+Basic scale:
+```lua
+return cycle("c4 d4 e4 f4 g4 a4 b4 c5")
+```
+
+Drum pattern:
+```lua
+return cycle("[c1 ~ e1 ~]*2")
+```
+
+Random melody:
+```lua
+return cycle("[c4|d4|e4|f4|g4|a4]*8")
+```
+
+## Combining with Patterns
+
+Control when patterns play using `rhythm`:
+
+```lua
+return rhythm {
+  unit = "bars",       -- Timing unit
+  pattern = {1, 0},    -- Play on odd bars only
+  emit = cycle("c4 d4 e4 f4")
+}
+```
+
+## Advanced Usage
 
 ### Limitations
 
@@ -29,10 +81,10 @@ There's no exact specification for how tidal cycles work, and it's constantly ev
 The base time of a pattern in tidal is specified as *cycles per second*. In afseq, the time of a cycle instead is given in *cycles per pattern pulse units*. 
 
 ```lua
--- emits an entire cycle every bar
+-- emits an entire cycle every beat
 return rhythm {
-  unit = "bars",
-  emit = cycle("c d e f")
+  unit = "beats",
+  emit = cycle("c4 d4 e4") -- tripplet
 }
 ```
 
@@ -41,10 +93,10 @@ return rhythm {
 An emitter in afseq gets triggered for each incoming non-gated pattern pulse. This is true for cycles are well and allows you to sequence entire cycles too. 
 
 ```lua
--- emit an entire cycle's every bar, then pause for a bar, then repeat
+-- emit an entire cycle's every bar, then pause for two bars, then repeat
 return rhythm {
   unit = "bars",
-  pattern = {1, 0},
+  pattern = { 1, 0, 0 },
   emit = cycle("c d e f")
 }
 ```
@@ -58,16 +110,6 @@ return rhythm {
   pattern = pattern.euclidean(5, 8),
   emit = cycle("<c d e f g|b>")
 }
-```
-
-### Shorthand Notation
-
-If all you want to define in a script is a cycle, you can also skip the rhythm definition and just return a cycle in scripts. This will wrap the cycle in a standard rhythm with a `bar` unit.
-
-```lua
--- shorthand notation, using a default rhythm definition. 
--- parenthesis for the cycle argument can also be skipped here...
-return cycle "c4 d4 g4|a4"
 ```
 
 ### Seeding
@@ -97,7 +139,6 @@ Supported note attributes are:
 
 Note that `X` must be written as *floating point number* for volume, panning and delay:</br> `c4:p-1.0` and `c4:p.8` is valid, while `c4:p-1` **is not valid**!
 
-
 ### Mapping
 
 Notes and chords in cycles are expressed as [note strings](./notes&scales.md#note-strings) in afseq. But you can also dynamically evaluate and map cycle identifiers using the cycle [`map`](../API/cycle.md#map) function.
@@ -107,32 +148,25 @@ This allows you, for example, to inject [input parameters](./parameters.md) into
 Using custom identifiers with a static map (a Lua table):
 
 ```lua
-return rhythm {
-  unit = "bars",
-  emit = cycle("[bd*4], [_ sn]*2"):map({ 
-    ["bd"] = note("c4 #0"), 
-    ["sn"] = note("g4 #1") 
-  })
+return cycle("[bd*4], [_ sn]*2"):map{ 
+  bd = note("c4 #0"), 
+  sn = note("g4 #1") 
 }
 ```
 
 Using custom identifiers with a dynamic map function (a Lua function):
 
 ```lua
-return rhythm {
-  unit = "bars",
-  emit = cycle("[bd*4], [_ sn]*2"):map(function(context, value)
-    if value == "bd" then
-      return note("c4 #0")
-    elseif value == "sn" then
-      return note("g4 #1")
-    end
-  end)
-}
+return cycle("[bd*4], [_ sn]*2"):map(function(context, value)
+  if value == "bd" then
+    return note("c4 #0")
+  elseif value == "sn" then
+    return note("g4 #1")
+  end
+end)
 ```
 
-## Examples
-
+## Advanced Examples
 
 Chord progression 
 
@@ -149,18 +183,19 @@ return cycle("[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63")
 Alternate panning with note attributes
 
 ```lua
-cycle("c4:<p-0.5 p.00 p0.5>")
+cycle("c4:<p-0.5 p0.0 p0.5>")
 ```
 
 Mapped multi channel beats
 
 ```lua
-return cycle([[
+-- use [=[ and ]=] as Lua multiline string
+return cycle([=[
   [<h1 h2 h2>*12],
   [kd ~]*2 ~ [~ kd] ~,
   [~ s1]*2,
   [~ s2]*8
-]]):map({
+]=]):map({
   kd = "c4 #0", -- Kick
   s1 = "c4 #1", -- Snare
   s2 = "c4 #1 v0.1", -- Ghost snare
