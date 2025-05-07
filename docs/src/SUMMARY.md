@@ -1,5 +1,6 @@
 - [Introduction](README.md)
-- [Rhythm](guide/README.md)
+- [Quickstart](quickstart.md)
+- [Guide](guide/README.md)
   - [Timebase](guide/timebase.md)
   - [Pattern](guide/pattern.md)
   - [Gate](guide/gate.md)

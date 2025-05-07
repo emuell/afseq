@@ -1,35 +1,48 @@
 # Welcome
 
-... to the afseq scripting guide!
+... to the afseq scripting guide! ***afseq***, also known as **nerdo-rhythm**, is an experimental imperative music sequence generator engine.
+
+It allows creating music sequences programmatically using either plain Rust as a library (*static, precompiled*) or Lua as a scripting engine (*dynamic, runtime interpreted*) for [live music coding](https://github.com/pjagielski/awesome-live-coding-music).
+
+This book only covers the Lua API for live music coding. For instructions and examples on creating rhythms in plain Rust, see the [afseq crate docs](https://github.com/emuell/afseq).
 
 
-## Introduction
+## Key Features
 
-***afseq***, also known as **nerdo-rhythm**, is an experimental imperative-style music sequence generator engine. 
-
-It allows you to programmatically create music sequences either in plain Rust as library (*static, compiled*) or in Lua as a scripting engine (*dynamic, interpreted*). So it's also suitable for [live coding music](https://github.com/pjagielski/awesome-live-coding-music). 
-
-In addition to its imperative event generator approach, it also supports the creation of musical events using [tidalcycle](https://tidalcycles.org/)'s mini-notation.
+`Programmatic`
+: Build musical patterns using Lua scripts or Rust code.<br>
+`Modular`
+: Combine and reuse rhythm components dynamically.<br>
+`Flexible`
+: Create anything from simple beats to complex nested rhythms.<br>
+`Generative`
+: Make evolving compositions that change over time.<br>
+`Dynamic`
+: Modify patterns live, during playback.<br>
+`External Control`
+: Connect with MIDI/OSC controllers for hands-on parameter tweaking.<br>
+`Template Rhythms`
+: Create user configurable rhythm patterns.<br>
+`Tidal Cycles`
+: Use familiar Tidal Cycles mini-notation for rapid pattern creation.<br>
 
 
 ## Installation
 
 afseq is a Rust *library* that deals with raw musical event generation only. It does not generate any audio. You must use an application with built-in support for afseq to use it. 
 
-You can also use `play-script.rs` from the [examples](https://github.com/emuell/afseq/tree/master/examples) in the git repository to test out afseq scripts using a basic sample player that plays a sample from the example assets folder using the script which has the same name as the audio file. 
+If you are familiar with Rust, you can also use `play-script.rs` from the [examples](https://github.com/emuell/afseq/tree/master/examples) in the git repository to test out afseq scripts using a basic sample player.
 
 
-## Scripting
+## Getting Started
 
-afseq uses [Lua](https://www.lua.org/) as a scripting language to dynamically generate content. 
+[Quickstart](./quickstart.md)
+: Start with a quick introduction through practical examples.<br>
+[Guide](./guide/)
+: Get into details with a more comprehensive documentation.<br>
+[Examples](./examples/)
+: More advanced examples, created and explained step by step.<br>
+[Reference](./API/)
+: Read raw technical specifications of the Lua API.
 
-If you're not familiar with Lua, don't worry. Lua is very easy to pick up if you have used another imperative programming language before, and fortunately there are great tutorials out there, such as [this one](https://www.lua.org/pil/1.html).
 
-
-## Creating Rhythms
-
-Ready to program some music? Then let's dive into the next chapter which will give you an overview of the overall architecture of a **rhythm**, the main building block in afseq.
-
----
-
-*Note: This guide covers the afseq Lua scripting API. For instructions on creating rhythms in plain Rust, see the [afseq crate docs](https://github.com/emuell/afseq).*

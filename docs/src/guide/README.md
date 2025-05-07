@@ -1,11 +1,8 @@
-# Rhythm 
+# Guide
 
-afseq consumes [Lua script](https://www.lua.org/) files that define rhythms, the main building block in afseq.
+A `Rhythm` is the main building block in afseq. It lets you define when and what to play.
 
-A rhythm programatically generates musical events. 
-
-The Lua API uses configuration tables to define the rhythm and their sub-components, so the main building blocks of a script are defined via Lua tables and functions as specified in the [API documentation](../API/).
-
+afseq consumes [Lua script](https://www.lua.org/) files that define rhythms as specified in the [API documentation](../API/).
 
 ## Components
 
@@ -13,43 +10,26 @@ The Lua API uses configuration tables to define the rhythm and their sub-compone
 - [Pattern](./pattern.md) -> [Gate](./gate.md) -> [Emitter](./emitter.md) do perform the basic event generation in 3 stages.
 - [Parameters](./parameters.md) change behaviour of components during runtime.
 
-```md
-     *Inputs*
- Optional user controlled parameters.
-       ↓ ↓ ↓
-┌────────────────────────────────────────────────────────┐ 
-│   *Time base*                                          │
-│ Basic unit of time and the increment of a pulse.       │
-│ ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┐                                        │
-│ │  *Pattern*  │ e.g. { 0, 1, 0, 1, 1 }                 │
-│ └┄┄┄┄┄┄┄┄┄┄┄┄┄┘                                        │
-│ Defines the basic rhythmic pattern as a pulse train.   │
-│        ↓                                               │
-│ ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┐                                        │
-│ │   *Gate*    │ e.g. { return pulse > 0.5 }            │
-│ └┄┄┄┄┄┄┄┄┄┄┄┄┄┘                                        │
-│ Passes or suppresses pattern pulses.                   │
-│        ↓                                               │
-│ ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┐                                        │
-│ │  *Emitter*  │ e.g. sequence{ "c4", "d#4", "g#4" }    │
-│ └┄┄┄┄┄┄┄┄┄┄┄┄┄┘                                        │
-│ Generates events for each incoming filtered pulse.     │
-└────────────────────────────────────────────────────────┘
-       ↓ ↓ ↓
-    [o] [x] [o] 
-   *Event Stream*
-```
-
 By separating the rhythmical pattern from the tonal part of a musical sequence, each part of a sequence can be freely modified, composed and (re)combined.
 
 All content in rhythms can be either static, a Lua table of events, or dynamic, a Lua function that [generates](../extras/generators.md) events on the fly. 
 
 Dynamic functions or generators can also be controlled, automated via [input parameters](./parameters.md) to change their behaviour at runtime in response to user input (e.g. MIDI controllers, DAW parameter automation). This also allows creating more flexible rhythm templates. 
 
-
 ## Examples
 
-A simple rhythm with a static pattern and emitter, using the default gate implementation.
+A rhythm which emits a note every beat.
+
+```lua
+-- trigger a c4 note every beat.
+return rhythm {
+  unit = "1/4",
+  pattern = { 1 },
+  emit = { "c4" }
+}
+```
+
+A rhythm with a pattern with sub divisions.
 
 ```lua
 -- sequence of 1/4th c4 and two 1/8 c5 notes.
@@ -60,7 +40,7 @@ return rhythm {
 }
 ```
 
-A rhythm with default pattern and gate, emitting a Tidal Cycle.
+A rhythm emitting a Tidal Cycle.
 
 ```lua
 -- emit a tidal cycle every bar
