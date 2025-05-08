@@ -32,6 +32,8 @@ Key symbols to know:
 | `_`    | Elongate                         | `c4 _ d4`           |
 | `~`    | Rest                             | `c4 ~ d4`           |
 
+<br>
+
 > [!TIP]
 > Please see [Tidal Cycles Mini-Notation Reference](https://tidalcycles.org/docs/reference/mini_notation/) for a complete overview of the cycle notation.
 

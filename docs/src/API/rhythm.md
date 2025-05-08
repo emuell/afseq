@@ -14,7 +14,7 @@
 > --trigger notes in an euclidean triplet pattern
 > return rhythm {
 >   unit = "1/16",
->   resolution = 4/3,
+>   resolution = 2/3,
 >   pattern = pattern.euclidean(12, 16),
 >   emit = { "c4", "g4", { "c5 v0.7", "g5 v0.4" }, "a#4" }
 > }
@@ -291,7 +291,7 @@
 > ```lua
 > -- triplet
 > unit = "1/16",
-> resolution = 4/3
+> resolution = 2/3
 > ```
 
 ### resolution : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="resolution"></a>
@@ -305,7 +305,7 @@
 > ```lua
 > -- triplet
 > unit = "1/16",
-> resolution = 4/3
+> resolution = 2/3
 > ```
 
 ### offset : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="offset"></a>

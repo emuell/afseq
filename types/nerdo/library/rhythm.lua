@@ -128,7 +128,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```lua
 ----- triplet
 ---unit = "1/16",
----resolution = 4/3
+---resolution = 2/3
 ---```
 ---@field unit "ms"|"seconds"|"bars"|"beats"|"1/1"|"1/2"|"1/4"|"1/8"|"1/16"|"1/32"|"1/64"
 ---Factor which is applied on `unit` to specify the final time resolution of the emitter.
@@ -141,7 +141,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---```lua
 ----- triplet
 ---unit = "1/16",
----resolution = 4/3
+---resolution = 2/3
 ---```
 ---@field resolution number?
 ---
@@ -333,7 +333,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 -----trigger notes in an euclidean triplet pattern
 ---return rhythm {
 ---  unit = "1/16",
----  resolution = 4/3,
+---  resolution = 2/3,
 ---  pattern = pattern.euclidean(12, 16),
 ---  emit = { "c4", "g4", { "c5 v0.7", "g5 v0.4" }, "a#4" }
 ---}

@@ -60,7 +60,7 @@ This is especially handy for chords, but also can be more verbose than using not
 
 » `emit = note({key = "c4"}):volume(0.2)` *c4 note with volume of 0.2*
 
-» `emit = note("c4'min"):transpose({-12, 0, 0})` *1st chord inversion*
+» `emit = note("c4'min"):transpose({12, 0, 0})` *1st chord inversion*
 
 See [note Lua API](../API/note.md) for details.
 

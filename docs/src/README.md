@@ -10,7 +10,7 @@ This book only covers the Lua API for live music coding. For instructions and ex
 ## Key Features
 
 `Programmatic`
-: Build musical patterns using Lua scripts or Rust code.<br>
+: Build musical phrases using Lua scripts or Rust code.<br>
 `Modular`
 : Combine and reuse rhythm components dynamically.<br>
 `Flexible`
@@ -22,8 +22,8 @@ This book only covers the Lua API for live music coding. For instructions and ex
 `External Control`
 : Connect with MIDI/OSC controllers for hands-on parameter tweaking.<br>
 `Template Rhythms`
-: Create user configurable rhythm patterns.<br>
-`Tidal Cycles`
+: Create user configurable rhythm templates.<br>
+`Cycles Mini-Notation`
 : Use familiar Tidal Cycles mini-notation for rapid pattern creation.<br>
 
 

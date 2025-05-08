@@ -44,7 +44,7 @@ Sixteenth tripplets
 ```lua
 return rhythm {
   unit = "1/16", 
-  resolution = 4/3,
+  resolution = 2/3,
   emit = "c4"
 }
 ```
