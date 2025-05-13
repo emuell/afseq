@@ -52,7 +52,7 @@ polymeter       = { "{" ~ sections? ~ "}" ~ polymeter_tail? }
 group           = _{ subdivision | alternating | polymeter }
 
 /// parameter for expressions with operators
-parameter        = _{ expression | single | group }
+parameter        = _{ single | group }
 single_parameter = _{ single }
 
 /// static operators
@@ -60,10 +60,10 @@ op_replicate = ${ "!" ~ number }
 op_weight    = ${ "@" ~ number? }
 op_degrade   = ${ "?" ~ number? }
 
-/// dynamic operators (NB: only o_target can be chained)
+/// dynamic operators
 op_fast      = { "*" ~ parameter }
 op_slow      = { "/" ~ parameter }
-op_target    = { ":" ~ parameter ~ (":" ~ parameter)* }
+op_target    = { ":" ~ parameter }
 // this should actually use `parameter` as well once bjorklund with patterns on the right is implemented
 op_bjorklund = { "(" ~ (single_parameter ~ ",")+ ~ single_parameter ~ ")" }
 
