@@ -304,6 +304,7 @@ enum Step {
     Stack(Stack),
     Choices(Choices),
     DynamicExpression(DynamicExpression),
+    TargetExpression(TargetExpression),
     StaticExpression(StaticExpression),
     Bjorklund(Bjorklund),
     Range(Range),
@@ -322,6 +323,7 @@ impl Step {
             Step::Choices(cs) => cs.choices.iter().collect(),
             Step::Stack(st) => st.stack.iter().collect(),
             Step::DynamicExpression(e) => vec![&e.left, &e.right],
+            Step::TargetExpression(e) => vec![&e.left, &e.right],
             Step::StaticExpression(e) => vec![&e.left],
             Step::Range(_) => vec![],
             Step::Bjorklund(b) => {
@@ -405,7 +407,6 @@ struct Stack {
 enum DynamicOp {
     Fast(),      // *
     Slow(),      // /
-    Target(),    // :
     Bjorklund(), // (p,s,r)
 }
 
@@ -437,7 +438,6 @@ impl Operator {
             Rule::op_degrade => Ok(Self::Static(StaticOp::Degrade())),
             Rule::op_replicate => Ok(Self::Static(StaticOp::Replicate())),
             Rule::op_weight => Ok(Self::Static(StaticOp::Weight())),
-            Rule::op_target => Ok(Self::Dynamic(DynamicOp::Target())),
             Rule::op_fast => Ok(Self::Dynamic(DynamicOp::Fast())),
             Rule::op_slow => Ok(Self::Dynamic(DynamicOp::Slow())),
             Rule::op_bjorklund => Ok(Self::Dynamic(DynamicOp::Bjorklund())),
@@ -458,6 +458,12 @@ struct StaticExpression {
     op: StaticOp,
     left: Box<Step>,
     right: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct TargetExpression {
+    left: Box<Step>,
+    right: Box<Step>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1157,6 +1163,7 @@ impl CycleParser {
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
             Rule::range => Self::range(pair),
+            Rule::targeted => Self::target_expression(pair),
             Rule::expression => Self::expression(pair),
             _ => Err(format!(
                 "unexpected rule, this is a bug in the parser\n{:?}",
@@ -1542,6 +1549,25 @@ impl CycleParser {
         }))
     }
 
+    fn target_expression(pair: Pair<Rule>) -> Result<Step, String> {
+        let mut inner = pair.clone().into_inner();
+        // Initialize 'left' with the first step (expression, single or group).
+        let mut left = Self::step(
+            inner
+                .next()
+                .ok_or_else(|| format!("empty expression\n{:?}", pair))?,
+        )?;
+        // Loop over chained targets
+        for target in inner {
+            let right = Self::step(target)?;
+            left = Step::TargetExpression(TargetExpression {
+                left: Box::new(left),
+                right: Box::new(right),
+            });
+        }
+        Ok(left)
+    }
+
     fn expression(pair: Pair<Rule>) -> Result<Step, String> {
         let mut inner = pair.clone().into_inner();
         // Initialize 'left' with the first step (single or group).
@@ -1552,30 +1578,12 @@ impl CycleParser {
         )?;
         // Loop over operators and parameters.
         for op_pair in inner {
-            match op_pair.as_rule() {
-                // Handle op_target chains
-                Rule::op_target => {
-                    if let Some(param_pair) = op_pair.clone().into_inner().next() {
-                        let right = Self::step(param_pair)?;
-                        left = Step::DynamicExpression(DynamicExpression {
-                            op: DynamicOp::Target(),
-                            left: Box::new(left),
-                            right: Box::new(right),
-                        });
-                    } else {
-                        return Err(format!("missing parameter after op_target\n{:?}", op_pair));
-                    }
-                }
-                // Handle other dynamic and static operators.
-                _ => {
-                    left = match Operator::parse(op_pair.clone())? {
-                        Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
-                        Operator::Dynamic(op) => match op {
-                            DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
-                            _ => Self::speed_expression(left, op, op_pair)?,
-                        },
-                    }
-                }
+            left = match Operator::parse(op_pair.clone())? {
+                Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
+                Operator::Dynamic(op) => match op {
+                    DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
+                    _ => Self::speed_expression(left, op, op_pair)?,
+                },
             }
         }
         Ok(left)
@@ -1926,16 +1934,12 @@ impl Cycle {
                     Events::empty()
                 }
             },
-            Step::DynamicExpression(e) => match e.op {
-                DynamicOp::Target() => Self::output_with_target(
-                    e.left.as_ref(),
-                    e.right.as_ref(),
-                    state,
-                    cycle,
-                    limit,
-                )?,
-                _ => Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?,
-            },
+            Step::TargetExpression(e) => {
+                Self::output_with_target(e.left.as_ref(), e.right.as_ref(), state, cycle, limit)?
+            }
+            Step::DynamicExpression(e) => {
+                Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?
+            }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
                 #[allow(clippy::single_match)]
@@ -2012,6 +2016,7 @@ impl Cycle {
             Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
             Step::DynamicExpression(e) => format!("Expression {:?}", e.op),
+            Step::TargetExpression(_e) => String::from("Targets"),
             Step::StaticExpression(e) => {
                 format!("SingleExpression {:?} : {:?}", e.op, e.right)
             }
@@ -2829,6 +2834,16 @@ mod test {
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
+        Ok(())
+    }
+
+    #[test]
+    fn expression_chains() -> Result<(), String> {
+        assert_cycle_equality("a*3/2", "a*1.5")?;
+        assert_cycle_equality(
+            "[a b c d e f]:[v.2 v.5]*3",
+            "[a b c d e f]:[v.2 v.5 v.2 v.5 v.2 v.5]",
+        )?;
         Ok(())
     }
 
