@@ -407,6 +407,7 @@ struct Stack {
 enum DynamicOp {
     Fast(),      // *
     Slow(),      // /
+    Target(),    // :
     Bjorklund(), // (p,s,r)
 }
 
@@ -440,6 +441,7 @@ impl Operator {
             Rule::op_weight => Ok(Self::Static(StaticOp::Weight())),
             Rule::op_fast => Ok(Self::Dynamic(DynamicOp::Fast())),
             Rule::op_slow => Ok(Self::Dynamic(DynamicOp::Slow())),
+            Rule::op_target => Ok(Self::Dynamic(DynamicOp::Target())),
             Rule::op_bjorklund => Ok(Self::Dynamic(DynamicOp::Bjorklund())),
             _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
         }
@@ -1163,7 +1165,6 @@ impl CycleParser {
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
             Rule::range => Self::range(pair),
-            Rule::targeted => Self::target_expression(pair),
             Rule::expression => Self::expression(pair),
             _ => Err(format!(
                 "unexpected rule, this is a bug in the parser\n{:?}",
@@ -1549,23 +1550,16 @@ impl CycleParser {
         }))
     }
 
-    fn target_expression(pair: Pair<Rule>) -> Result<Step, String> {
-        let mut inner = pair.clone().into_inner();
-        // Initialize 'left' with the first step (expression, single or group).
-        let mut left = Self::step(
-            inner
-                .next()
-                .ok_or_else(|| format!("empty expression\n{:?}", pair))?,
-        )?;
-        // Loop over chained targets
-        for target in inner {
-            let right = Self::step(target)?;
-            left = Step::TargetExpression(TargetExpression {
-                left: Box::new(left),
-                right: Box::new(right),
-            });
-        }
-        Ok(left)
+    fn target_expression(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let mut inner = op_pair.into_inner();
+        let right = inner
+            .next()
+            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
+            .and_then(Self::step)?;
+        Ok(Step::TargetExpression(TargetExpression {
+            left: Box::new(left),
+            right: Box::new(right),
+        }))
     }
 
     fn expression(pair: Pair<Rule>) -> Result<Step, String> {
@@ -1581,6 +1575,7 @@ impl CycleParser {
             left = match Operator::parse(op_pair.clone())? {
                 Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
                 Operator::Dynamic(op) => match op {
+                    DynamicOp::Target() => Self::target_expression(left, op_pair)?,
                     DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
                     _ => Self::speed_expression(left, op, op_pair)?,
                 },
@@ -2841,7 +2836,7 @@ mod test {
     fn expression_chains() -> Result<(), String> {
         assert_cycle_equality("a*3/2", "a*1.5")?;
         assert_cycle_equality(
-            "[a b c d e f]:[v.2 v.5]*3",
+            "[a b c d e f]:[[v.2 v.5]*3]",
             "[a b c d e f]:[v.2 v.5 v.2 v.5 v.2 v.5]",
         )?;
         Ok(())
