@@ -303,8 +303,9 @@ enum Step {
     Polymeter(Polymeter),
     Stack(Stack),
     Choices(Choices),
-    DynamicExpression(DynamicExpression),
+    SpeedExpression(SpeedExpression),
     TargetExpression(TargetExpression),
+    Degrade(Degrade),
     StaticExpression(StaticExpression),
     Bjorklund(Bjorklund),
     Range(Range),
@@ -322,7 +323,8 @@ impl Step {
             Step::Subdivision(sd) => sd.steps.iter().collect(),
             Step::Choices(cs) => cs.choices.iter().collect(),
             Step::Stack(st) => st.stack.iter().collect(),
-            Step::DynamicExpression(e) => vec![&e.left, &e.right],
+            Step::SpeedExpression(e) => vec![&e.left, &e.right],
+            Step::Degrade(e) => vec![&e.step],
             Step::TargetExpression(e) => vec![&e.left, &e.right],
             Step::StaticExpression(e) => vec![&e.left],
             Step::Range(_) => vec![],
@@ -404,53 +406,44 @@ struct Stack {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum DynamicOp {
-    Fast(),      // *
-    Slow(),      // /
-    Target(),    // :
-    Bjorklund(), // (p,s,r)
+enum SpeedOp {
+    Fast(), // *
+    Slow(), // /
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum StaticOp {
-    Degrade(),   // ?
     Replicate(), // !
     Weight(),    // @
-}
-
-impl StaticOp {
-    fn default_value(&self) -> Value {
-        match self {
-            StaticOp::Weight() | StaticOp::Replicate() => Value::Integer(2),
-            StaticOp::Degrade() => Value::Float(0.5),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Static(StaticOp),
-    Dynamic(DynamicOp),
+    Speed(SpeedOp),
+    Target(),    // :
+    Bjorklund(), // (p,s,r)
+    Degrade(),   // ?
 }
 
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Self, String> {
         match pair.as_rule() {
-            Rule::op_degrade => Ok(Self::Static(StaticOp::Degrade())),
+            Rule::op_degrade => Ok(Self::Degrade()),
             Rule::op_replicate => Ok(Self::Static(StaticOp::Replicate())),
             Rule::op_weight => Ok(Self::Static(StaticOp::Weight())),
-            Rule::op_fast => Ok(Self::Dynamic(DynamicOp::Fast())),
-            Rule::op_slow => Ok(Self::Dynamic(DynamicOp::Slow())),
-            Rule::op_target => Ok(Self::Dynamic(DynamicOp::Target())),
-            Rule::op_bjorklund => Ok(Self::Dynamic(DynamicOp::Bjorklund())),
+            Rule::op_fast => Ok(Self::Speed(SpeedOp::Fast())),
+            Rule::op_slow => Ok(Self::Speed(SpeedOp::Slow())),
+            Rule::op_target => Ok(Self::Target()),
+            Rule::op_bjorklund => Ok(Self::Bjorklund()),
             _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct DynamicExpression {
-    op: DynamicOp,
+struct SpeedExpression {
+    op: SpeedOp,
     left: Box<Step>,
     right: Box<Step>,
 }
@@ -460,6 +453,12 @@ struct StaticExpression {
     op: StaticOp,
     left: Box<Step>,
     right: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Degrade {
+    step: Box<Step>,
+    chance: Value,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1276,7 +1275,6 @@ impl CycleParser {
                         }
                     }
                 }
-                _ => steps.push(step),
             },
             Step::Range(r) => {
                 let range = if r.start <= r.end {
@@ -1518,29 +1516,19 @@ impl CycleParser {
         }))
     }
 
-    fn speed_expression(left: Step, op: DynamicOp, op_pair: Pair<Rule>) -> Result<Step, String> {
-        let mut inner = op_pair.into_inner();
-        let right = inner
-            .next()
-            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
-            .and_then(Self::step)?;
-        Ok(Step::DynamicExpression(DynamicExpression {
-            left: Box::new(left),
-            right: Box::new(right),
-            op,
-        }))
+    fn invalid_right_hand() -> String {
+        String::from("unreachable: missing right hand side from op_pair, error in grammar!")
     }
 
-    fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
-        let right = if let Some(right_pair) = pair.into_inner().next() {
+    fn static_expression(left: Step, op: StaticOp, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let right = if let Some(right_pair) = op_pair.into_inner().next() {
             right_pair
-                .clone()
                 .into_inner()
                 .next()
-                .ok_or_else(|| format!("invalid right hand {:?}", right_pair))
+                .ok_or_else(Self::invalid_right_hand)
                 .and_then(Self::value)?
         } else {
-            op.default_value()
+            Value::Integer(2)
         };
 
         Ok(Step::StaticExpression(StaticExpression {
@@ -1550,11 +1538,41 @@ impl CycleParser {
         }))
     }
 
-    fn target_expression(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
-        let mut inner = op_pair.into_inner();
-        let right = inner
+    fn degrade_expression(step: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let chance = if let Some(right_pair) = op_pair.into_inner().next() {
+            right_pair
+                .into_inner()
+                .next()
+                .ok_or_else(Self::invalid_right_hand)
+                .and_then(Self::value)?
+        } else {
+            Value::Float(0.5)
+        };
+
+        Ok(Step::Degrade(Degrade {
+            step: Box::new(step),
+            chance,
+        }))
+    }
+
+    fn speed_expression(left: Step, op: SpeedOp, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let right = op_pair
+            .into_inner()
             .next()
-            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
+            .ok_or_else(Self::invalid_right_hand)
+            .and_then(Self::step)?;
+        Ok(Step::SpeedExpression(SpeedExpression {
+            left: Box::new(left),
+            right: Box::new(right),
+            op,
+        }))
+    }
+
+    fn target_expression(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let right = op_pair
+            .into_inner()
+            .next()
+            .ok_or_else(Self::invalid_right_hand)
             .and_then(Self::step)?;
         Ok(Step::TargetExpression(TargetExpression {
             left: Box::new(left),
@@ -1570,15 +1588,14 @@ impl CycleParser {
                 .next()
                 .ok_or_else(|| format!("empty expression\n{:?}", pair))?,
         )?;
-        // Loop over operators and parameters.
+        // Loop over operators and parameters, creating a nested expression if multiple pairs are present
         for op_pair in inner {
             left = match Operator::parse(op_pair.clone())? {
                 Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
-                Operator::Dynamic(op) => match op {
-                    DynamicOp::Target() => Self::target_expression(left, op_pair)?,
-                    DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
-                    _ => Self::speed_expression(left, op, op_pair)?,
-                },
+                Operator::Speed(op) => Self::speed_expression(left, op, op_pair)?,
+                Operator::Target() => Self::target_expression(left, op_pair)?,
+                Operator::Degrade() => Self::degrade_expression(left, op_pair)?,
+                Operator::Bjorklund() => Self::bjorklund(left, op_pair)?,
             }
         }
         Ok(left)
@@ -1646,15 +1663,15 @@ impl Cycle {
                 Fraction::from_f64(count).unwrap_or(Fraction::ZERO)
                     / Fraction::from_f64(length).unwrap_or(Fraction::ONE)
             }
-            Step::DynamicExpression(e) => match e.op {
-                DynamicOp::Fast() => {
+            Step::SpeedExpression(e) => match e.op {
+                SpeedOp::Fast() => {
                     if let Some(right) = value.to_float() {
                         Fraction::from_f64(right).unwrap_or(Fraction::ZERO)
                     } else {
                         Fraction::ZERO
                     }
                 }
-                DynamicOp::Slow() => {
+                SpeedOp::Slow() => {
                     if let Some(right) = value.to_float() {
                         if right != 0.0 {
                             Fraction::from_f64(1.0 / right).unwrap_or(Fraction::ZERO)
@@ -1665,7 +1682,6 @@ impl Cycle {
                         Fraction::from(0)
                     }
                 }
-                _ => Fraction::from(1),
             },
             _ => Fraction::from(1),
         }
@@ -1783,7 +1799,7 @@ impl Cycle {
     ) -> Result<Events, String> {
         let left = match step {
             Step::Polymeter(pm) => pm.steps.as_ref(),
-            Step::DynamicExpression(exp) => exp.left.as_ref(),
+            Step::SpeedExpression(exp) => exp.left.as_ref(),
             _ => step,
         };
         match right {
@@ -1839,10 +1855,13 @@ impl Cycle {
         limit: usize,
     ) -> Result<Events, String> {
         let events = match step {
+            // unreachable, range and static expressions are applied in Self::push_applied");
+            Step::Range(_) => Events::empty(),
+            Step::StaticExpression(_) => Events::empty(),
+
             // repeats only make it here if they had no preceding value
             Step::Repeat => Events::empty(),
-            // ranges get applied at parse time
-            Step::Range(_) => Events::empty(),
+
             Step::Single(s) => {
                 state.events += 1;
                 if state.events > limit {
@@ -1912,27 +1931,21 @@ impl Cycle {
                     })
                 }
             }
-            Step::StaticExpression(e) => match e.op {
-                StaticOp::Degrade() => {
-                    let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
-                    out.mutate_events(&mut |event: &mut Event| {
-                        if let Some(chance) = e.right.to_chance() {
-                            if chance < state.rng.random_range(0.0..1.0) {
-                                event.value = Value::Rest
-                            }
+            Step::Degrade(d) => {
+                let mut out = Self::output(d.step.as_ref(), state, cycle, limit)?;
+                out.mutate_events(&mut |event: &mut Event| {
+                    if let Some(chance) = d.chance.to_chance() {
+                        if chance < state.rng.random_range(0.0..1.0) {
+                            event.value = Value::Rest
                         }
-                    });
-                    out
-                }
-                _ => {
-                    // unreachable, other expressions should have been applied in Self::push_applied");
-                    Events::empty()
-                }
-            },
+                    }
+                });
+                out
+            }
             Step::TargetExpression(e) => {
                 Self::output_with_target(e.left.as_ref(), e.right.as_ref(), state, cycle, limit)?
             }
-            Step::DynamicExpression(e) => {
+            Step::SpeedExpression(e) => {
                 Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?
             }
             Step::Bjorklund(b) => {
@@ -2010,11 +2023,12 @@ impl Cycle {
             Step::Polymeter(pm) => format!("Polymeter {{{}}}", pm.length()), //, pm.count),
             Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
-            Step::DynamicExpression(e) => format!("Expression {:?}", e.op),
-            Step::TargetExpression(_e) => String::from("Targets"),
+            Step::SpeedExpression(e) => format!("Speed Expression {:?}", e.op),
+            Step::TargetExpression(_e) => String::from("Target Expression"),
             Step::StaticExpression(e) => {
-                format!("SingleExpression {:?} : {:?}", e.op, e.right)
+                format!("Static Expression {:?} : {:?}", e.op, e.right)
             }
+            Step::Degrade(d) => format!("Degrade ? {:?}", d.chance),
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };
         println!("{} {}", Self::indent_lines(level), name);
