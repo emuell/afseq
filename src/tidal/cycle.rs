@@ -306,17 +306,14 @@ enum Step {
     SpeedExpression(SpeedExpression),
     TargetExpression(TargetExpression),
     Degrade(Degrade),
-    StaticExpression(StaticExpression),
     Bjorklund(Bjorklund),
-    Range(Range),
-    Repeat,
+    Static(Static),
 }
 
 impl Step {
     #[cfg(test)]
     fn inner_steps(&self) -> Vec<&Step> {
         match self {
-            Step::Repeat => vec![],
             Step::Single(_s) => vec![],
             Step::Alternating(a) => a.steps.iter().collect(),
             Step::Polymeter(pm) => pm.steps.as_ref().inner_steps(),
@@ -326,8 +323,6 @@ impl Step {
             Step::SpeedExpression(e) => vec![&e.left, &e.right],
             Step::Degrade(e) => vec![&e.step],
             Step::TargetExpression(e) => vec![&e.left, &e.right],
-            Step::StaticExpression(e) => vec![&e.left],
-            Step::Range(_) => vec![],
             Step::Bjorklund(b) => {
                 if let Some(rotation) = &b.rotation {
                     vec![&b.left, &b.steps, &b.pulses, &**rotation]
@@ -335,6 +330,11 @@ impl Step {
                     vec![&b.left, &b.steps, &b.pulses]
                 }
             }
+            Step::Static(s) => match s {
+                Static::Repeat => vec![],
+                Static::Expression(e) => vec![&e.left],
+                Static::Range(_) => vec![],
+            },
         }
     }
     fn rest() -> Self {
@@ -352,6 +352,13 @@ impl Step {
             count: Box::new(count),
         })
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Static {
+    Expression(StaticExpression),
+    Range(Range),
+    Repeat,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1159,7 +1166,7 @@ impl CycleParser {
     fn step(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.as_rule() {
             Rule::single => Self::single(pair),
-            Rule::repeat => Ok(Step::Repeat),
+            Rule::repeat => Ok(Step::Static(Static::Repeat)),
             Rule::subdivision | Rule::mini => Self::group(pair, Step::subdivision),
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
@@ -1247,48 +1254,50 @@ impl CycleParser {
     /// transform static steps into their final form and push them onto a list
     fn push_applied(steps: &mut Vec<Step>, step: Step) {
         match &step {
-            Step::Repeat => {
-                let repeat = steps.last().cloned().unwrap_or(Step::rest());
-                steps.push(repeat)
-            }
-            Step::StaticExpression(e) => match e.op {
-                StaticOp::Replicate() => {
-                    steps.push(e.left.as_ref().clone());
-                    if let Some(repeats) = e.right.to_integer() {
-                        if repeats > 0 {
-                            for _i in 1..repeats {
-                                steps.push(e.left.as_ref().clone())
+            Step::Static(s) => match s {
+                Static::Repeat => {
+                    let repeat = steps.last().cloned().unwrap_or(Step::rest());
+                    steps.push(repeat)
+                }
+                Static::Expression(e) => match e.op {
+                    StaticOp::Replicate() => {
+                        steps.push(e.left.as_ref().clone());
+                        if let Some(repeats) = e.right.to_integer() {
+                            if repeats > 0 {
+                                for _i in 1..repeats {
+                                    steps.push(e.left.as_ref().clone())
+                                }
                             }
                         }
                     }
-                }
-                StaticOp::Weight() => {
-                    steps.push(e.left.as_ref().clone());
-                    if let Some(repeats) = e.right.to_integer() {
-                        if repeats > 0 {
-                            for _i in 1..repeats {
-                                steps.push(Step::Single(Single {
-                                    value: Value::Hold,
-                                    string: Rc::from("_"),
-                                }))
+                    StaticOp::Weight() => {
+                        steps.push(e.left.as_ref().clone());
+                        if let Some(repeats) = e.right.to_integer() {
+                            if repeats > 0 {
+                                for _i in 1..repeats {
+                                    steps.push(Step::Single(Single {
+                                        value: Value::Hold,
+                                        string: Rc::from("_"),
+                                    }))
+                                }
                             }
                         }
+                    }
+                },
+                Static::Range(r) => {
+                    let range = if r.start <= r.end {
+                        Box::new(r.start..=r.end) as Box<dyn Iterator<Item = i32>>
+                    } else {
+                        Box::new((r.end..=r.start).rev()) as Box<dyn Iterator<Item = i32>>
+                    };
+                    for i in range {
+                        steps.push(Step::Single(Single {
+                            value: Value::Integer(i),
+                            string: Rc::from(i.to_string()),
+                        }))
                     }
                 }
             },
-            Step::Range(r) => {
-                let range = if r.start <= r.end {
-                    Box::new(r.start..=r.end) as Box<dyn Iterator<Item = i32>>
-                } else {
-                    Box::new((r.end..=r.start).rev()) as Box<dyn Iterator<Item = i32>>
-                };
-                for i in range {
-                    steps.push(Step::Single(Single {
-                        value: Value::Integer(i),
-                        string: Rc::from(i.to_string()),
-                    }))
-                }
-            }
             _ => steps.push(step),
         }
     }
@@ -1490,7 +1499,7 @@ impl CycleParser {
                 end_pair.as_str()
             )
         })?;
-        Ok(Step::Range(Range { start, end }))
+        Ok(Step::Static(Static::Range(Range { start, end })))
     }
 
     fn bjorklund(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
@@ -1531,11 +1540,11 @@ impl CycleParser {
             Value::Integer(2)
         };
 
-        Ok(Step::StaticExpression(StaticExpression {
+        Ok(Step::Static(Static::Expression(StaticExpression {
             left: Box::new(left),
             right,
             op,
-        }))
+        })))
     }
 
     fn degrade_expression(step: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
@@ -1855,13 +1864,6 @@ impl Cycle {
         limit: usize,
     ) -> Result<Events, String> {
         let events = match step {
-            // unreachable, range and static expressions are applied in Self::push_applied");
-            Step::Range(_) => Events::empty(),
-            Step::StaticExpression(_) => Events::empty(),
-
-            // repeats only make it here if they had no preceding value
-            Step::Repeat => Events::empty(),
-
             Step::Single(s) => {
                 state.events += 1;
                 if state.events > limit {
@@ -1996,6 +1998,12 @@ impl Cycle {
                     events,
                 })
             }
+
+            Step::Static(_) => {
+                // Repeat only makes it here if it had no preceding value
+                // Range and Expression should be applied in Self::push_applied
+                Events::empty()
+            }
         };
         Ok(events)
     }
@@ -2012,8 +2020,6 @@ impl Cycle {
     #[cfg(test)]
     fn print_steps(step: &Step, level: usize) {
         let name = match step {
-            Step::Repeat => "Repeat".to_string(),
-            Step::Range(r) => format!("Range {}..{}", r.start, r.end),
             Step::Single(s) => match &s.value {
                 Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
@@ -2025,9 +2031,13 @@ impl Cycle {
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
             Step::SpeedExpression(e) => format!("Speed Expression {:?}", e.op),
             Step::TargetExpression(_e) => String::from("Target Expression"),
-            Step::StaticExpression(e) => {
-                format!("Static Expression {:?} : {:?}", e.op, e.right)
-            }
+            Step::Static(s) => match s {
+                Static::Repeat => "Repeat".to_string(),
+                Static::Range(r) => format!("Range {}..{}", r.start, r.end),
+                Static::Expression(e) => {
+                    format!("Static Expression {:?} : {:?}", e.op, e.right)
+                }
+            },
             Step::Degrade(d) => format!("Degrade ? {:?}", d.chance),
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };
