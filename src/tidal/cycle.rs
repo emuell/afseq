@@ -1654,7 +1654,7 @@ impl Cycle {
         Ok(events)
     }
 
-    // helper to calculate the right multiplier for polymeter and dynamic expressions
+    // helper to calculate the right multiplier for polymeter and speed expressions
     fn step_multiplier(step: &Step, value: &Value) -> Fraction {
         match step {
             Step::Polymeter(pm) => {
@@ -1790,7 +1790,7 @@ impl Cycle {
     }
 
     // output a multiplied pattern expression with support for patterns on the right side
-    fn output_dynamic(
+    fn output_with_speed(
         right: &Step,
         step: &Step,
         state: &mut CycleState,
@@ -1914,7 +1914,7 @@ impl Cycle {
                 Self::output(&cs.choices[choice], state, cycle, limit)?
             }
             Step::Polymeter(pm) => {
-                Self::output_dynamic(pm.count.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(pm.count.as_ref(), step, state, cycle, limit)?
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1946,7 +1946,7 @@ impl Cycle {
                 Self::output_with_target(e.left.as_ref(), e.right.as_ref(), state, cycle, limit)?
             }
             Step::SpeedExpression(e) => {
-                Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(e.right.as_ref(), step, state, cycle, limit)?
             }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
