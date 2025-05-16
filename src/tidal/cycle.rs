@@ -110,7 +110,7 @@ impl Cycle {
         if let Some(seed) = self.seed {
             self.state.rng = Xoshiro256PlusPlus::seed_from_u64(seed.wrapping_add(cycle as u64));
         }
-        let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
+        let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit, false)?;
         self.state.iteration += 1;
         events.transform_spans(&Span::default());
         Ok(events.export())
@@ -941,14 +941,18 @@ impl Events {
         }
     }
 
-    fn crop(&mut self, span: &Span) {
+    fn crop(&mut self, span: &Span, overlap: bool) {
         self.filter_mut(&mut |e| {
-            if span.includes(&e.span) {
-                e.span.crop(span);
-                true
+            let keep = if overlap {
+                span.overlaps(&e.span)
             } else {
-                false
+                span.includes(&e.span)
+            };
+
+            if keep {
+                e.span.crop(span);
             }
+            keep
         });
     }
 
@@ -1641,6 +1645,7 @@ impl Cycle {
         state: &mut CycleState,
         span: &Span,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let range = span.whole_range();
         let mut cycles = Vec::with_capacity(range.clone().count());
@@ -1649,7 +1654,7 @@ impl Cycle {
                 Fraction::from_u32(cycle).ok_or(OVERFLOW_ERROR)?,
                 Fraction::from_u32(cycle + 1).ok_or(OVERFLOW_ERROR)?,
             );
-            let mut events = Self::output(step, state, cycle, limit)?;
+            let mut events = Self::output(step, state, cycle, limit, overlap)?;
             events.transform_spans(&span);
             cycles.push(events)
         }
@@ -1658,7 +1663,7 @@ impl Cycle {
             length: span.length(),
             events: cycles,
         });
-        events.crop(span);
+        events.crop(span, overlap);
         Ok(events)
     }
 
@@ -1668,12 +1673,13 @@ impl Cycle {
         cycle: u32,
         mult: Fraction,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let span = Span::new(
             Fraction::from_u32(cycle).ok_or(OVERFLOW_ERROR)? * mult,
             Fraction::from_u32(cycle + 1).ok_or(OVERFLOW_ERROR)? * mult,
         );
-        let mut events = Self::output_span(step, state, &span, limit)?;
+        let mut events = Self::output_span(step, state, &span, limit, overlap)?;
         events.normalize_spans(&span);
         Ok(events)
     }
@@ -1752,7 +1758,7 @@ impl Cycle {
         cycle: u32,
         limit: usize,
     ) -> Result<(Vec<Vec<Event>>, Span), String> {
-        let mut events = Self::output(step, state, cycle, limit)?;
+        let mut events = Self::output(step, state, cycle, limit, true)?;
         events.transform_spans(&events.get_span());
         let mut channels: Vec<Vec<Event>> = vec![];
         events.flatten(&mut channels, 0);
@@ -1767,11 +1773,12 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         match right {
             // multiply with single values to avoid generating events
             Step::Single(single) => {
-                let mut events = Self::output(left, state, cycle, limit)?;
+                let mut events = Self::output(left, state, cycle, limit, overlap)?;
                 if let Some(target) = Target::parse(&single.value, &single.string) {
                     events.mutate_events(&mut |event: &mut Event| {
                         if !{
@@ -1821,6 +1828,7 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let left = match step {
             Step::Polymeter(pm) => pm.steps.as_ref(),
@@ -1833,12 +1841,12 @@ impl Cycle {
                 // apply mutiplier
                 let multiplier = Self::step_multiplier(step, &single.value);
                 Ok(Self::output_multiplied(
-                    left, state, cycle, multiplier, limit,
+                    left, state, cycle, multiplier, limit, overlap,
                 )?)
             }
             _ => {
                 // generate and flatten the events for the right side of the expression
-                let events = Self::output(right, state, cycle, limit)?;
+                let events = Self::output(right, state, cycle, limit, overlap)?;
                 let mut channels: Vec<Vec<Event>> = vec![];
                 events.flatten(&mut channels, 0);
                 Events::merge(&mut channels);
@@ -1850,10 +1858,11 @@ impl Cycle {
                     for event in channel {
                         // apply multiplier
                         let multiplier = Self::step_multiplier(step, &event.value);
-                        let mut partial_events =
-                            Self::output_multiplied(left, state, cycle, multiplier, limit)?;
+                        let mut partial_events = Self::output_multiplied(
+                            left, state, cycle, multiplier, limit, overlap,
+                        )?;
                         // crop and push to multi events
-                        partial_events.crop(&event.span);
+                        partial_events.crop(&event.span, overlap);
                         multi_events.push(partial_events);
                     }
                     channel_events.push(Events::Multi(MultiEvents {
@@ -1879,6 +1888,7 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let events = match step {
             Step::Single(s) => {
@@ -1903,7 +1913,7 @@ impl Cycle {
                 } else {
                     let mut events = Vec::with_capacity(sd.steps.len());
                     for s in &sd.steps {
-                        let e = Self::output(s, state, cycle, limit)?;
+                        let e = Self::output(s, state, cycle, limit, overlap)?;
                         events.push(e)
                     }
 
@@ -1921,19 +1931,20 @@ impl Cycle {
                 } else {
                     let length = a.steps.len() as u32;
                     let current = cycle % length;
-                    if let Some(step) = a.steps.get(current as usize) {
-                        Self::output(step, state, cycle / length, limit)?
-                    } else {
-                        Events::empty() // unreachable
-                    }
+                    a.steps
+                        .get(current as usize)
+                        .map(|step| Self::output(step, state, cycle / length, limit, overlap))
+                        .unwrap_or(
+                            Ok(Events::empty()), // unreachable
+                        )?
                 }
             }
             Step::Choices(cs) => {
                 let choice = state.rng.random_range(0..cs.choices.len());
-                Self::output(&cs.choices[choice], state, cycle, limit)?
+                Self::output(&cs.choices[choice], state, cycle, limit, overlap)?
             }
             Step::Polymeter(pm) => {
-                Self::output_with_speed(pm.count.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(pm.count.as_ref(), step, state, cycle, limit, overlap)?
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1941,7 +1952,7 @@ impl Cycle {
                 } else {
                     let mut channels = Vec::with_capacity(st.stack.len());
                     for s in &st.stack {
-                        channels.push(Self::output(s, state, cycle, limit)?)
+                        channels.push(Self::output(s, state, cycle, limit, overlap)?)
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
@@ -1951,7 +1962,7 @@ impl Cycle {
                 }
             }
             Step::Degrade(d) => {
-                let mut out = Self::output(d.step.as_ref(), state, cycle, limit)?;
+                let mut out = Self::output(d.step.as_ref(), state, cycle, limit, overlap)?;
                 out.mutate_events(&mut |event: &mut Event| {
                     if let Some(chance) = d.chance.to_chance() {
                         if chance < state.rng.random_range(0.0..1.0) {
@@ -1961,11 +1972,16 @@ impl Cycle {
                 });
                 out
             }
-            Step::TargetExpression(e) => {
-                Self::output_with_target(e.left.as_ref(), e.right.as_ref(), state, cycle, limit)?
-            }
+            Step::TargetExpression(e) => Self::output_with_target(
+                e.left.as_ref(),
+                e.right.as_ref(),
+                state,
+                cycle,
+                limit,
+                overlap,
+            )?,
             Step::SpeedExpression(e) => {
-                Self::output_with_speed(e.right.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(e.right.as_ref(), step, state, cycle, limit, overlap)?
             }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
@@ -1987,8 +2003,13 @@ impl Cycle {
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
                                         events.reserve(pulses as usize);
-                                        let out =
-                                            Self::output(b.left.as_ref(), state, cycle, limit)?;
+                                        let out = Self::output(
+                                            b.left.as_ref(),
+                                            state,
+                                            cycle,
+                                            limit,
+                                            overlap,
+                                        )?;
                                         for pulse in euclidean(
                                             steps.max(0) as u32,
                                             pulses.max(0) as u32,
@@ -3016,7 +3037,7 @@ mod test {
         );
 
         assert_cycles(
-            "[1 2 3 4 5 6 7 8]/4:d=<.1 .2 .3 .4>:v=[[.3 .2 .1]/3]",
+            "[1 2 3 4 5 6 7 8]/4:d=<.1 .2 .3 .4>:v=[<.3 .2 .1>*2/3]",
             vec![
                 vec![vec![
                     Event::at(Fraction::from(0), Fraction::new(1, 2))
@@ -3037,7 +3058,7 @@ mod test {
                         .with_int(3)
                         .with_targets(vec![
                             Target::Named("d".into(), Some(0.2)),
-                            Target::Named("v".into(), Some(0.2)),
+                            Target::Named("v".into(), Some(0.3)),
                         ]),
                     Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_int(4)
@@ -3051,13 +3072,13 @@ mod test {
                         .with_int(5)
                         .with_targets(vec![
                             Target::Named("d".into(), Some(0.3)),
-                            Target::Named("v".into(), Some(0.1)),
+                            Target::Named("v".into(), Some(0.2)),
                         ]),
                     Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_int(6)
                         .with_targets(vec![
                             Target::Named("d".into(), Some(0.3)),
-                            Target::Named("v".into(), Some(0.1)),
+                            Target::Named("v".into(), Some(0.2)),
                         ]),
                 ]],
                 vec![vec![
@@ -3065,13 +3086,13 @@ mod test {
                         .with_int(7)
                         .with_targets(vec![
                             Target::Named("d".into(), Some(0.4)),
-                            Target::Named("v".into(), Some(0.3)),
+                            Target::Named("v".into(), Some(0.1)),
                         ]),
                     Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                         .with_int(8)
                         .with_targets(vec![
                             Target::Named("d".into(), Some(0.4)),
-                            Target::Named("v".into(), Some(0.3)),
+                            Target::Named("v".into(), Some(0.1)),
                         ]),
                 ]],
             ],
