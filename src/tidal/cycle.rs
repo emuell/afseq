@@ -303,27 +303,26 @@ enum Step {
     Polymeter(Polymeter),
     Stack(Stack),
     Choices(Choices),
-    DynamicExpression(DynamicExpression),
-    StaticExpression(StaticExpression),
+    SpeedExpression(SpeedExpression),
+    TargetExpression(TargetExpression),
+    Degrade(Degrade),
     Bjorklund(Bjorklund),
-    Range(Range),
-    Repeat,
+    Static(Static),
 }
 
 impl Step {
     #[cfg(test)]
     fn inner_steps(&self) -> Vec<&Step> {
         match self {
-            Step::Repeat => vec![],
             Step::Single(_s) => vec![],
             Step::Alternating(a) => a.steps.iter().collect(),
             Step::Polymeter(pm) => pm.steps.as_ref().inner_steps(),
             Step::Subdivision(sd) => sd.steps.iter().collect(),
             Step::Choices(cs) => cs.choices.iter().collect(),
             Step::Stack(st) => st.stack.iter().collect(),
-            Step::DynamicExpression(e) => vec![&e.left, &e.right],
-            Step::StaticExpression(e) => vec![&e.left],
-            Step::Range(_) => vec![],
+            Step::SpeedExpression(e) => vec![&e.left, &e.right],
+            Step::Degrade(e) => vec![&e.step],
+            Step::TargetExpression(e) => vec![&e.left, &e.right],
             Step::Bjorklund(b) => {
                 if let Some(rotation) = &b.rotation {
                     vec![&b.left, &b.steps, &b.pulses, &**rotation]
@@ -331,6 +330,11 @@ impl Step {
                     vec![&b.left, &b.steps, &b.pulses]
                 }
             }
+            Step::Static(s) => match s {
+                Static::Repeat => vec![],
+                Static::Expression(e) => vec![&e.left],
+                Static::Range(_) => vec![],
+            },
         }
     }
     fn rest() -> Self {
@@ -348,6 +352,13 @@ impl Step {
             count: Box::new(count),
         })
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Static {
+    Expression(StaticExpression),
+    Range(Range),
+    Repeat,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -402,53 +413,44 @@ struct Stack {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum DynamicOp {
-    Fast(),      // *
-    Slow(),      // /
-    Target(),    // :
-    Bjorklund(), // (p,s,r)
+enum SpeedOp {
+    Fast(), // *
+    Slow(), // /
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum StaticOp {
-    Degrade(),   // ?
     Replicate(), // !
     Weight(),    // @
-}
-
-impl StaticOp {
-    fn default_value(&self) -> Value {
-        match self {
-            StaticOp::Weight() | StaticOp::Replicate() => Value::Integer(2),
-            StaticOp::Degrade() => Value::Float(0.5),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Static(StaticOp),
-    Dynamic(DynamicOp),
+    Speed(SpeedOp),
+    Target(),    // :
+    Bjorklund(), // (p,s,r)
+    Degrade(),   // ?
 }
 
 impl Operator {
     fn parse(pair: Pair<Rule>) -> Result<Self, String> {
         match pair.as_rule() {
-            Rule::op_degrade => Ok(Self::Static(StaticOp::Degrade())),
+            Rule::op_degrade => Ok(Self::Degrade()),
             Rule::op_replicate => Ok(Self::Static(StaticOp::Replicate())),
             Rule::op_weight => Ok(Self::Static(StaticOp::Weight())),
-            Rule::op_target => Ok(Self::Dynamic(DynamicOp::Target())),
-            Rule::op_fast => Ok(Self::Dynamic(DynamicOp::Fast())),
-            Rule::op_slow => Ok(Self::Dynamic(DynamicOp::Slow())),
-            Rule::op_bjorklund => Ok(Self::Dynamic(DynamicOp::Bjorklund())),
+            Rule::op_fast => Ok(Self::Speed(SpeedOp::Fast())),
+            Rule::op_slow => Ok(Self::Speed(SpeedOp::Slow())),
+            Rule::op_target => Ok(Self::Target()),
+            Rule::op_bjorklund => Ok(Self::Bjorklund()),
             _ => Err(format!("unsupported operator: {:?}", pair.as_rule())),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct DynamicExpression {
-    op: DynamicOp,
+struct SpeedExpression {
+    op: SpeedOp,
     left: Box<Step>,
     right: Box<Step>,
 }
@@ -458,6 +460,18 @@ struct StaticExpression {
     op: StaticOp,
     left: Box<Step>,
     right: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Degrade {
+    step: Box<Step>,
+    chance: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct TargetExpression {
+    left: Box<Step>,
+    right: Box<Step>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1015,7 +1029,7 @@ impl Events {
             }
             Events::Poly(p) => {
                 for e in &mut p.channels {
-                    e.normalize_spans(span);
+                    e.normalize_spans(&p.span);
                 }
                 p.span.normalize(span);
                 p.length = p.span.length();
@@ -1152,7 +1166,7 @@ impl CycleParser {
     fn step(pair: Pair<Rule>) -> Result<Step, String> {
         match pair.as_rule() {
             Rule::single => Self::single(pair),
-            Rule::repeat => Ok(Step::Repeat),
+            Rule::repeat => Ok(Step::Static(Static::Repeat)),
             Rule::subdivision | Rule::mini => Self::group(pair, Step::subdivision),
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
@@ -1240,49 +1254,50 @@ impl CycleParser {
     /// transform static steps into their final form and push them onto a list
     fn push_applied(steps: &mut Vec<Step>, step: Step) {
         match &step {
-            Step::Repeat => {
-                let repeat = steps.last().cloned().unwrap_or(Step::rest());
-                steps.push(repeat)
-            }
-            Step::StaticExpression(e) => match e.op {
-                StaticOp::Replicate() => {
-                    steps.push(e.left.as_ref().clone());
-                    if let Some(repeats) = e.right.to_integer() {
-                        if repeats > 0 {
-                            for _i in 1..repeats {
-                                steps.push(e.left.as_ref().clone())
+            Step::Static(s) => match s {
+                Static::Repeat => {
+                    let repeat = steps.last().cloned().unwrap_or(Step::rest());
+                    steps.push(repeat)
+                }
+                Static::Expression(e) => match e.op {
+                    StaticOp::Replicate() => {
+                        steps.push(e.left.as_ref().clone());
+                        if let Some(repeats) = e.right.to_integer() {
+                            if repeats > 0 {
+                                for _i in 1..repeats {
+                                    steps.push(e.left.as_ref().clone())
+                                }
                             }
                         }
                     }
-                }
-                StaticOp::Weight() => {
-                    steps.push(e.left.as_ref().clone());
-                    if let Some(repeats) = e.right.to_integer() {
-                        if repeats > 0 {
-                            for _i in 1..repeats {
-                                steps.push(Step::Single(Single {
-                                    value: Value::Hold,
-                                    string: Rc::from("_"),
-                                }))
+                    StaticOp::Weight() => {
+                        steps.push(e.left.as_ref().clone());
+                        if let Some(repeats) = e.right.to_integer() {
+                            if repeats > 0 {
+                                for _i in 1..repeats {
+                                    steps.push(Step::Single(Single {
+                                        value: Value::Hold,
+                                        string: Rc::from("_"),
+                                    }))
+                                }
                             }
                         }
                     }
+                },
+                Static::Range(r) => {
+                    let range = if r.start <= r.end {
+                        Box::new(r.start..=r.end) as Box<dyn Iterator<Item = i32>>
+                    } else {
+                        Box::new((r.end..=r.start).rev()) as Box<dyn Iterator<Item = i32>>
+                    };
+                    for i in range {
+                        steps.push(Step::Single(Single {
+                            value: Value::Integer(i),
+                            string: Rc::from(i.to_string()),
+                        }))
+                    }
                 }
-                _ => steps.push(step),
             },
-            Step::Range(r) => {
-                let range = if r.start <= r.end {
-                    Box::new(r.start..=r.end) as Box<dyn Iterator<Item = i32>>
-                } else {
-                    Box::new((r.end..=r.start).rev()) as Box<dyn Iterator<Item = i32>>
-                };
-                for i in range {
-                    steps.push(Step::Single(Single {
-                        value: Value::Integer(i),
-                        string: Rc::from(i.to_string()),
-                    }))
-                }
-            }
             _ => steps.push(step),
         }
     }
@@ -1484,7 +1499,7 @@ impl CycleParser {
                 end_pair.as_str()
             )
         })?;
-        Ok(Step::Range(Range { start, end }))
+        Ok(Step::Static(Static::Range(Range { start, end })))
     }
 
     fn bjorklund(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
@@ -1510,35 +1525,67 @@ impl CycleParser {
         }))
     }
 
-    fn speed_expression(left: Step, op: DynamicOp, op_pair: Pair<Rule>) -> Result<Step, String> {
-        let mut inner = op_pair.into_inner();
-        let right = inner
+    fn invalid_right_hand() -> String {
+        String::from("unreachable: missing right hand side from op_pair, error in grammar!")
+    }
+
+    fn static_expression(left: Step, op: StaticOp, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let right = if let Some(right_pair) = op_pair.into_inner().next() {
+            right_pair
+                .into_inner()
+                .next()
+                .ok_or_else(Self::invalid_right_hand)
+                .and_then(Self::value)?
+        } else {
+            Value::Integer(2)
+        };
+
+        Ok(Step::Static(Static::Expression(StaticExpression {
+            left: Box::new(left),
+            right,
+            op,
+        })))
+    }
+
+    fn degrade_expression(step: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let chance = if let Some(right_pair) = op_pair.into_inner().next() {
+            right_pair
+                .into_inner()
+                .next()
+                .ok_or_else(Self::invalid_right_hand)
+                .and_then(Self::value)?
+        } else {
+            Value::Float(0.5)
+        };
+
+        Ok(Step::Degrade(Degrade {
+            step: Box::new(step),
+            chance,
+        }))
+    }
+
+    fn speed_expression(left: Step, op: SpeedOp, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let right = op_pair
+            .into_inner()
             .next()
-            .ok_or_else(|| format!("missing right hand side in expression\n{:?}", inner))
+            .ok_or_else(Self::invalid_right_hand)
             .and_then(Self::step)?;
-        Ok(Step::DynamicExpression(DynamicExpression {
+        Ok(Step::SpeedExpression(SpeedExpression {
             left: Box::new(left),
             right: Box::new(right),
             op,
         }))
     }
 
-    fn static_expression(left: Step, op: StaticOp, pair: Pair<Rule>) -> Result<Step, String> {
-        let right = if let Some(right_pair) = pair.into_inner().next() {
-            right_pair
-                .clone()
-                .into_inner()
-                .next()
-                .ok_or_else(|| format!("invalid right hand {:?}", right_pair))
-                .and_then(Self::value)?
-        } else {
-            op.default_value()
-        };
-
-        Ok(Step::StaticExpression(StaticExpression {
+    fn target_expression(left: Step, op_pair: Pair<Rule>) -> Result<Step, String> {
+        let right = op_pair
+            .into_inner()
+            .next()
+            .ok_or_else(Self::invalid_right_hand)
+            .and_then(Self::step)?;
+        Ok(Step::TargetExpression(TargetExpression {
             left: Box::new(left),
-            right,
-            op,
+            right: Box::new(right),
         }))
     }
 
@@ -1550,32 +1597,14 @@ impl CycleParser {
                 .next()
                 .ok_or_else(|| format!("empty expression\n{:?}", pair))?,
         )?;
-        // Loop over operators and parameters.
+        // Loop over operators and parameters, creating a nested expression if multiple pairs are present
         for op_pair in inner {
-            match op_pair.as_rule() {
-                // Handle op_target chains
-                Rule::op_target => {
-                    if let Some(param_pair) = op_pair.clone().into_inner().next() {
-                        let right = Self::step(param_pair)?;
-                        left = Step::DynamicExpression(DynamicExpression {
-                            op: DynamicOp::Target(),
-                            left: Box::new(left),
-                            right: Box::new(right),
-                        });
-                    } else {
-                        return Err(format!("missing parameter after op_target\n{:?}", op_pair));
-                    }
-                }
-                // Handle other dynamic and static operators.
-                _ => {
-                    left = match Operator::parse(op_pair.clone())? {
-                        Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
-                        Operator::Dynamic(op) => match op {
-                            DynamicOp::Bjorklund() => Self::bjorklund(left, op_pair)?,
-                            _ => Self::speed_expression(left, op, op_pair)?,
-                        },
-                    }
-                }
+            left = match Operator::parse(op_pair.clone())? {
+                Operator::Static(op) => Self::static_expression(left, op, op_pair)?,
+                Operator::Speed(op) => Self::speed_expression(left, op, op_pair)?,
+                Operator::Target() => Self::target_expression(left, op_pair)?,
+                Operator::Degrade() => Self::degrade_expression(left, op_pair)?,
+                Operator::Bjorklund() => Self::bjorklund(left, op_pair)?,
             }
         }
         Ok(left)
@@ -1634,7 +1663,7 @@ impl Cycle {
         Ok(events)
     }
 
-    // helper to calculate the right multiplier for polymeter and dynamic expressions
+    // helper to calculate the right multiplier for polymeter and speed expressions
     fn step_multiplier(step: &Step, value: &Value) -> Fraction {
         match step {
             Step::Polymeter(pm) => {
@@ -1643,15 +1672,15 @@ impl Cycle {
                 Fraction::from_f64(count).unwrap_or(Fraction::ZERO)
                     / Fraction::from_f64(length).unwrap_or(Fraction::ONE)
             }
-            Step::DynamicExpression(e) => match e.op {
-                DynamicOp::Fast() => {
+            Step::SpeedExpression(e) => match e.op {
+                SpeedOp::Fast() => {
                     if let Some(right) = value.to_float() {
                         Fraction::from_f64(right).unwrap_or(Fraction::ZERO)
                     } else {
                         Fraction::ZERO
                     }
                 }
-                DynamicOp::Slow() => {
+                SpeedOp::Slow() => {
                     if let Some(right) = value.to_float() {
                         if right != 0.0 {
                             Fraction::from_f64(1.0 / right).unwrap_or(Fraction::ZERO)
@@ -1662,7 +1691,6 @@ impl Cycle {
                         Fraction::from(0)
                     }
                 }
-                _ => Fraction::from(1),
             },
             _ => Fraction::from(1),
         }
@@ -1771,7 +1799,7 @@ impl Cycle {
     }
 
     // output a multiplied pattern expression with support for patterns on the right side
-    fn output_dynamic(
+    fn output_with_speed(
         right: &Step,
         step: &Step,
         state: &mut CycleState,
@@ -1780,7 +1808,7 @@ impl Cycle {
     ) -> Result<Events, String> {
         let left = match step {
             Step::Polymeter(pm) => pm.steps.as_ref(),
-            Step::DynamicExpression(exp) => exp.left.as_ref(),
+            Step::SpeedExpression(exp) => exp.left.as_ref(),
             _ => step,
         };
         match right {
@@ -1836,10 +1864,6 @@ impl Cycle {
         limit: usize,
     ) -> Result<Events, String> {
         let events = match step {
-            // repeats only make it here if they had no preceding value
-            Step::Repeat => Events::empty(),
-            // ranges get applied at parse time
-            Step::Range(_) => Events::empty(),
             Step::Single(s) => {
                 state.events += 1;
                 if state.events > limit {
@@ -1892,7 +1916,7 @@ impl Cycle {
                 Self::output(&cs.choices[choice], state, cycle, limit)?
             }
             Step::Polymeter(pm) => {
-                Self::output_dynamic(pm.count.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(pm.count.as_ref(), step, state, cycle, limit)?
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1909,33 +1933,23 @@ impl Cycle {
                     })
                 }
             }
-            Step::StaticExpression(e) => match e.op {
-                StaticOp::Degrade() => {
-                    let mut out = Self::output(e.left.as_ref(), state, cycle, limit)?;
-                    out.mutate_events(&mut |event: &mut Event| {
-                        if let Some(chance) = e.right.to_chance() {
-                            if chance < state.rng.random_range(0.0..1.0) {
-                                event.value = Value::Rest
-                            }
+            Step::Degrade(d) => {
+                let mut out = Self::output(d.step.as_ref(), state, cycle, limit)?;
+                out.mutate_events(&mut |event: &mut Event| {
+                    if let Some(chance) = d.chance.to_chance() {
+                        if chance < state.rng.random_range(0.0..1.0) {
+                            event.value = Value::Rest
                         }
-                    });
-                    out
-                }
-                _ => {
-                    // unreachable, other expressions should have been applied in Self::push_applied");
-                    Events::empty()
-                }
-            },
-            Step::DynamicExpression(e) => match e.op {
-                DynamicOp::Target() => Self::output_with_target(
-                    e.left.as_ref(),
-                    e.right.as_ref(),
-                    state,
-                    cycle,
-                    limit,
-                )?,
-                _ => Self::output_dynamic(e.right.as_ref(), step, state, cycle, limit)?,
-            },
+                    }
+                });
+                out
+            }
+            Step::TargetExpression(e) => {
+                Self::output_with_target(e.left.as_ref(), e.right.as_ref(), state, cycle, limit)?
+            }
+            Step::SpeedExpression(e) => {
+                Self::output_with_speed(e.right.as_ref(), step, state, cycle, limit)?
+            }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
                 #[allow(clippy::single_match)]
@@ -1984,6 +1998,12 @@ impl Cycle {
                     events,
                 })
             }
+
+            Step::Static(_) => {
+                // Repeat only makes it here if it had no preceding value
+                // Range and Expression should be applied in Self::push_applied
+                Events::empty()
+            }
         };
         Ok(events)
     }
@@ -2000,8 +2020,6 @@ impl Cycle {
     #[cfg(test)]
     fn print_steps(step: &Step, level: usize) {
         let name = match step {
-            Step::Repeat => "Repeat".to_string(),
-            Step::Range(r) => format!("Range {}..{}", r.start, r.end),
             Step::Single(s) => match &s.value {
                 Value::Pitch(_p) => format!("{:?} {}", s.value, s.string),
                 _ => format!("{:?} {:?}", s.value, s.string),
@@ -2011,10 +2029,16 @@ impl Cycle {
             Step::Polymeter(pm) => format!("Polymeter {{{}}}", pm.length()), //, pm.count),
             Step::Choices(cs) => format!("Choices |{}|", cs.choices.len()),
             Step::Stack(st) => format!("Stack ({})", st.stack.len()),
-            Step::DynamicExpression(e) => format!("Expression {:?}", e.op),
-            Step::StaticExpression(e) => {
-                format!("SingleExpression {:?} : {:?}", e.op, e.right)
-            }
+            Step::SpeedExpression(e) => format!("Speed Expression {:?}", e.op),
+            Step::TargetExpression(_e) => String::from("Target Expression"),
+            Step::Static(s) => match s {
+                Static::Repeat => "Repeat".to_string(),
+                Static::Range(r) => format!("Range {}..{}", r.start, r.end),
+                Static::Expression(e) => {
+                    format!("Static Expression {:?} : {:?}", e.op, e.right)
+                }
+            },
+            Step::Degrade(d) => format!("Degrade ? {:?}", d.chance),
             Step::Bjorklund(_b) => format!("Bjorklund {}", ""),
         };
         println!("{} {}", Self::indent_lines(level), name);
@@ -2829,6 +2853,71 @@ mod test {
 
         // TODO test random outputs // parse_with_debug("[a b c d]?0.5");
 
+        Ok(())
+    }
+
+    #[test]
+    fn expression_chains() -> Result<(), String> {
+        assert_cycle_equality("a*3/2", "a*1.5")?;
+        assert_cycle_equality("[a b c d]*2*4", "[a b c d]*8")?;
+        assert_cycle_equality("a/2/3/4/5", "a/120")?;
+        assert_cycle_equality(
+            "[a b c d e f]:[[v.2 v.5]*3]",
+            "[a b c d e f]:[v.2 v.5 v.2 v.5 v.2 v.5]",
+        )?;
+        assert_cycle_equality(
+            "[a:0 b:0 c:1 d:1 e:2 f:2 g:3 h:3]/2*4",
+            "[a b c d e f g h]:[0 1 2 3]/2*4",
+        )?;
+        assert_cycle_equality("[a:0 b:0 c:1 d:1]/2", "[a b c d]/2:<0 1>")?;
+
+        assert_eq!(
+            Cycle::from("[0 1]*2:[1 2 3 4]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(0)
+                    .with_target(Target::from_index(1)),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::from_index(2)),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
+                    .with_int(0)
+                    .with_target(Target::from_index(3)),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::from_index(4)),
+            ]]
+        );
+
+        assert_cycles(
+            "[a b c:v.2 d]:p.5:[v.1 v.3]:v.8/4",
+            vec![
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(9, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                    ])]],
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(11, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                    ])]],
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(0, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.2)),
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                    ])]],
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(2, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.3)),
+                    ])]],
+            ],
+        )?;
         Ok(())
     }
 
