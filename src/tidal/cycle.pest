@@ -17,6 +17,9 @@ pitch   = ${ note ~ mark? ~ octave? ~ !name}
 
 /// target properties such as volume "v0.1" (afseq extension)
 target = ${ ("#" ~ integer) | (ASCII_ALPHA ~ float) }
+/// patterns for assigning target keys with pattern on the right side
+target_name = ${ "#" | name }
+target_assign = { target_name ~ "=" ~ parameter }
 
 /// chord as pitch with mode string, separated via "'"
 mode    = ${ (ASCII_ALPHANUMERIC | "#" | "-" | "+" | "^")+ }
@@ -63,7 +66,7 @@ op_degrade   = ${ "?" ~ number? }
 /// dynamic operators
 op_fast      = { "*" ~ parameter }
 op_slow      = { "/" ~ parameter }
-op_target    = { ":" ~ parameter }
+op_target    = { ":" ~ (target_assign | parameter) }
 // this should actually use `parameter` as well once bjorklund with patterns on the right is implemented
 op_bjorklund = { "(" ~ (single_parameter ~ ",")+ ~ single_parameter ~ ")" }
 

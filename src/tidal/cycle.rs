@@ -291,6 +291,40 @@ impl Step {
             },
         }
     }
+
+    fn inner_steps_mut(&mut self) -> Vec<&mut Step> {
+        match self {
+            Step::Single(_s) => vec![],
+            Step::Alternating(a) => a.steps.iter_mut().collect(),
+            Step::Subdivision(sd) => sd.steps.iter_mut().collect(),
+            Step::SpeedExpression(e) => vec![&mut e.left],
+            Step::Choices(cs) => cs.choices.iter_mut().collect(),
+            Step::Polymeter(pm) => pm.steps.as_mut().inner_steps_mut(),
+            Step::Stack(st) => st.stack.iter_mut().collect(),
+            Step::Degrade(e) => vec![&mut e.step],
+            Step::TargetExpression(e) => vec![&mut e.left],
+            Step::Bjorklund(b) => vec![&mut b.left],
+            Step::Static(s) => match s {
+                Static::Repeat => vec![],
+                Static::Range(_) => vec![],
+                Static::Expression(_) => vec![],
+            },
+        }
+    }
+
+    fn mutate_singles<F>(&mut self, fun: &mut F)
+    where
+        F: FnMut(&mut Single),
+    {
+        match self {
+            Self::Single(s) => fun(s),
+            _ => self
+                .inner_steps_mut()
+                .iter_mut()
+                .for_each(|s| s.mutate_singles(fun)),
+        }
+    }
+
     fn rest() -> Self {
         Self::Single(Single::default())
     }
@@ -1053,7 +1087,7 @@ impl Events {
     }
 
     /// Removes Holds by extending preceding events and filters out Rests
-    fn merge(&self, channels: &mut [Vec<Event>]) {
+    fn merge(channels: &mut [Vec<Event>]) {
         for events in &mut *channels {
             Self::merge_holds(events);
         }
@@ -1065,7 +1099,7 @@ impl Events {
     fn export(&mut self) -> Vec<Vec<Event>> {
         let mut channels = vec![];
         self.flatten(&mut channels, 0);
-        self.merge(&mut channels);
+        Self::merge(&mut channels);
 
         #[cfg(test)]
         {
@@ -1123,6 +1157,7 @@ impl CycleParser {
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
             Rule::range => Self::range(pair),
+            Rule::target_assign => Self::target_assign(pair),
             Rule::expression => Self::expression(pair),
             _ => Err(format!(
                 "unexpected rule, this is a bug in the parser\n{:?}",
@@ -1562,6 +1597,33 @@ impl CycleParser {
         }
         Ok(left)
     }
+    fn target_assign(pair: Pair<Rule>) -> Result<Step, String> {
+        let mut inner = pair.into_inner();
+
+        let k = inner.next().ok_or("error in grammar, missing target key")?;
+        if k.as_rule() != Rule::target_name {
+            return Err("error in grammar, expected target_name".to_string());
+        }
+
+        let p = inner.next().ok_or("missing step pattern")?;
+        let mut pattern = Self::step(p)?;
+        let mut key = k.into_inner();
+        if let Some(name) = key.next() {
+            pattern.mutate_singles(&mut |single: &mut Single| {
+                if let Some(f) = single.value.to_float() {
+                    single.value = Value::Target(Target::Named(Rc::from(name.as_str()), Some(f)));
+                }
+            });
+        } else {
+            pattern.mutate_singles(&mut |single: &mut Single| {
+                if let Some(i) = single.value.to_integer() {
+                    single.value = Value::Target(Target::Index(i));
+                }
+            });
+        }
+
+        Ok(pattern)
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1694,6 +1756,7 @@ impl Cycle {
         events.transform_spans(&events.get_span());
         let mut channels: Vec<Vec<Event>> = vec![];
         events.flatten(&mut channels, 0);
+        Events::merge(&mut channels);
         Ok((channels, events.get_span()))
     }
 
@@ -1778,6 +1841,7 @@ impl Cycle {
                 let events = Self::output(right, state, cycle, limit)?;
                 let mut channels: Vec<Vec<Event>> = vec![];
                 events.flatten(&mut channels, 0);
+                Events::merge(&mut channels);
 
                 // extract a float to use as mult from each event and output the step with it
                 let mut channel_events: Vec<Events> = Vec::with_capacity(channels.len());
@@ -2891,6 +2955,127 @@ mod test {
         assert_cycle_advancing("a <b c>")?;
         assert_cycle_advancing("[a b? c d]|[c? d?]")?;
         assert_cycle_advancing("[{a b}/2 c d], <c d> e? {a b}*2")?;
+        Ok(())
+    }
+
+    #[test]
+    fn target_assign() -> Result<(), String> {
+        assert_cycle_equality(
+            "[a b c [d e f g]]:[v.5 v.3 v.2 v.1]:[p.5 p.25 p.1 p.9]",
+            "[a b c [d e f g]]:v=[.5 .3 .2 .1]:p=[.5 .25 .1 .9]",
+        )?;
+        assert_eq!(
+            Cycle::from("[1 2 3 4]:p=[.1 .2 .3 .4]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::Named("p".into(), Some(0.1))),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(2)
+                    .with_target(Target::Named("p".into(), Some(0.2))),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
+                    .with_int(3)
+                    .with_target(Target::Named("p".into(), Some(0.3))),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(4)
+                    .with_target(Target::Named("p".into(), Some(0.4))),
+            ]]
+        );
+        assert_eq!(
+            Cycle::from("[1 2 3 4]:#=[1 c4 3 0.2]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::Index(1)),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(2)
+                    .with_target(Target::Index(48)),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
+                    .with_int(3)
+                    .with_target(Target::Index(3)),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(4)
+                    .with_target(Target::Index(0)),
+            ]]
+        );
+
+        assert_eq!(
+            Cycle::from("[1 2 3 4]:long=[1 _ ~ 0.2]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::Named("long".into(), Some(1.0))),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(2)
+                    .with_target(Target::Named("long".into(), Some(1.0))),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(3),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(4)
+                    .with_target(Target::Named("long".into(), Some(0.2))),
+            ]]
+        );
+
+        assert_cycles(
+            "[1 2 3 4 5 6 7 8]/4:d=<.1 .2 .3 .4>:v=[[.3 .2 .1]/3]",
+            vec![
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(1)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.1)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(2)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.1)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(3)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.2)),
+                            Target::Named("v".into(), Some(0.2)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(4)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.2)),
+                            Target::Named("v".into(), Some(0.2)),
+                        ]),
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(5)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.3)),
+                            Target::Named("v".into(), Some(0.1)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(6)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.3)),
+                            Target::Named("v".into(), Some(0.1)),
+                        ]),
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(7)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.4)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(8)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.4)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                ]],
+            ],
+        )?;
         Ok(())
     }
 }
