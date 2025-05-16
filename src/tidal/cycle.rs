@@ -1029,7 +1029,7 @@ impl Events {
             }
             Events::Poly(p) => {
                 for e in &mut p.channels {
-                    e.normalize_spans(span);
+                    e.normalize_spans(&p.span);
                 }
                 p.span.normalize(span);
                 p.length = p.span.length();
@@ -2859,9 +2859,64 @@ mod test {
     #[test]
     fn expression_chains() -> Result<(), String> {
         assert_cycle_equality("a*3/2", "a*1.5")?;
+        assert_cycle_equality("[a b c d]*2*4", "[a b c d]*8")?;
+        assert_cycle_equality("a/2/3/4/5", "a/120")?;
         assert_cycle_equality(
             "[a b c d e f]:[[v.2 v.5]*3]",
             "[a b c d e f]:[v.2 v.5 v.2 v.5 v.2 v.5]",
+        )?;
+        assert_cycle_equality(
+            "[a:0 b:0 c:1 d:1 e:2 f:2 g:3 h:3]/2*4",
+            "[a b c d e f g h]:[0 1 2 3]/2*4",
+        )?;
+        assert_cycle_equality("[a:0 b:0 c:1 d:1]/2", "[a b c d]/2:<0 1>")?;
+
+        assert_eq!(
+            Cycle::from("[0 1]*2:[1 2 3 4]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(0)
+                    .with_target(Target::from_index(1)),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::from_index(2)),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
+                    .with_int(0)
+                    .with_target(Target::from_index(3)),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::from_index(4)),
+            ]]
+        );
+
+        assert_cycles(
+            "[a b c:v.2 d]:p.5:[v.1 v.3]:v.8/4",
+            vec![
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(9, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                    ])]],
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(11, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                    ])]],
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(0, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.2)),
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                    ])]],
+                vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
+                    .with_note(2, 4)
+                    .with_targets(vec![
+                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.3)),
+                    ])]],
+            ],
         )?;
         Ok(())
     }
