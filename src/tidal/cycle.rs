@@ -212,71 +212,25 @@ pub enum Value {
     Integer(i32),
     Pitch(Pitch),
     Chord(Pitch, Rc<str>),
-    Property(PropertyKey, PropertyValue),
+    Target(Target),
     Name(Rc<str>),
-}
-
-/// Property key of a target
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum PropertyKey {
-    Index(i32),
-    Name(Rc<str>),
-}
-
-/// Property value of a target
-#[derive(Clone, Debug, PartialEq)]
-pub enum PropertyValue {
-    None,
-    Float(f64),
-    Integer(i32),
-}
-
-impl PropertyValue {
-    pub fn to_integer(&self) -> Option<i32> {
-        match self {
-            Self::None => None,
-            Self::Float(f) => Some(*f as i32),
-            Self::Integer(i) => Some(*i),
-        }
-    }
-    pub fn to_float(&self) -> Option<f64> {
-        match self {
-            Self::None => None,
-            Self::Float(f) => Some(*f),
-            Self::Integer(i) => Some(*i as f64),
-        }
-    }
 }
 
 // Target property pair
 #[derive(Clone, Debug, PartialEq)]
-pub struct Target(PropertyKey, PropertyValue);
+pub enum Target {
+    Index(i32),
+    Named(Rc<str>, Option<f64>),
+}
 
 impl Target {
-    pub fn key(&self) -> &PropertyKey {
-        &self.0
-    }
-
-    pub fn value(&self) -> &PropertyValue {
-        &self.1
-    }
-
-    /// test if other target uses the same key representation, treating `#` names as index.
     pub fn equal_key(&self, other: &Self) -> bool {
-        match (self.key(), other.key()) {
+        match (self, other) {
             // both are indices: compare index values
-            (PropertyKey::Index(i), PropertyKey::Index(other_i)) => i == other_i,
-            // one is index, one is name - check if name is "#" and values match
-            (PropertyKey::Index(i), PropertyKey::Name(other_name)) => {
-                other_name.as_bytes() == b"#"
-                    && matches!(&other.value(), PropertyValue::Integer(other_i) if i == other_i)
-            }
-            (PropertyKey::Name(name), PropertyKey::Index(other_i)) => {
-                name.as_bytes() == b"#"
-                    && matches!(&self.value(), PropertyValue::Integer(i) if i == other_i)
-            }
+            (Self::Index(a), Self::Index(b)) => a == b,
             // both are names: compare names only
-            (PropertyKey::Name(name), PropertyKey::Name(other_name)) => name == other_name,
+            (Self::Named(a, _), Self::Named(b, _)) => a == b,
+            _ => false,
         }
     }
 }
@@ -496,7 +450,7 @@ impl Target {
             Value::Rest | Value::Hold => None,
             Value::Integer(i) => Some(Self::from_index(*i)),
             Value::Name(name) => Some(Self::from_name(Rc::clone(name))),
-            Value::Property(key, value) => Some(Self::from(key.clone(), value.clone())),
+            Value::Target(t) => Some(t.clone()),
             Value::Float(_) | Value::Pitch(_) | Value::Chord(_, _) => {
                 // pass unexpected values as raw string and let clients deal with conversions or errors
                 Some(Self::from_name(Rc::clone(value_string)))
@@ -504,16 +458,12 @@ impl Target {
         }
     }
 
-    fn from(key: PropertyKey, value: PropertyValue) -> Self {
-        Self(key, value)
-    }
-
     fn from_index(index: i32) -> Self {
-        Self(PropertyKey::Index(index), PropertyValue::None)
+        Self::Index(index)
     }
 
     fn from_name(str: Rc<str>) -> Self {
-        Self(PropertyKey::Name(str), PropertyValue::None)
+        Self::Named(str, None)
     }
 }
 
@@ -628,9 +578,9 @@ impl Value {
             Value::Float(f) => Some(*f as i32),
             Value::Pitch(n) => Some(n.midi_note() as i32),
             Value::Chord(p, _m) => Some(p.midi_note() as i32),
-            Value::Property(k, v) => match k {
-                PropertyKey::Index(i) => Some(*i),
-                PropertyKey::Name(_) => v.to_integer(),
+            Value::Target(t) => match t {
+                Target::Index(i) => Some(*i),
+                Target::Named(_, v) => v.map(|f| f as i32),
             },
             Value::Name(_n) => None,
         }
@@ -644,7 +594,10 @@ impl Value {
             Value::Float(f) => Some(*f),
             Value::Pitch(n) => Some(n.midi_note() as f64),
             Value::Chord(n, _m) => Some(n.midi_note() as f64),
-            Value::Property(_, v) => v.to_float(),
+            Value::Target(t) => match t {
+                Target::Index(i) => Some(*i as f64),
+                Target::Named(_, v) => *v,
+            },
             Value::Name(_n) => None,
         }
     }
@@ -657,10 +610,9 @@ impl Value {
             Value::Float(f) => Some(f.clamp(0.0, 1.0)),
             Value::Pitch(p) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
             Value::Chord(p, _m) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
-            Value::Property(_, v) => match v {
-                PropertyValue::Float(f) => Some(f.clamp(0.0, 1.0)),
-                PropertyValue::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
-                PropertyValue::None => None,
+            Value::Target(t) => match t {
+                Target::Index(i) => Some(*i as f64),
+                Target::Named(_, v) => v.map(|f| f.clamp(0.0, 1.0)),
             },
             Value::Name(_n) => None,
         }
@@ -1214,27 +1166,28 @@ impl CycleParser {
                 }
                 Ok(Value::Chord(pitch, Rc::from(mode)))
             }
-            Rule::property => {
-                let key = pair
-                    .as_str()
-                    .get(0..1)
-                    .map(|v| PropertyKey::Name(Rc::from(v)))
-                    .ok_or(format!("missing property key in pair\n{:?}", pair));
-                let value = if let Some(v) = pair.clone().into_inner().next() {
-                    match v.as_rule() {
-                        Rule::integer => {
-                            Value::parse_integer(v.as_str()).map(PropertyValue::Integer)
-                        }
-                        Rule::float => Value::parse_float(v.as_str()).map(PropertyValue::Float),
-                        _ => Err(format!("unrecognized property value in pair\n{:?}", pair)),
-                    }
-                } else {
-                    Err(format!("missing property value in pair\n{:?}", pair))
-                };
-                Ok(Value::Property(key?, value?))
+            Rule::target => {
+                let name = pair.as_str().get(0..1).ok_or(format!(
+                    "error in grammar, missing target key in pair\n{:?}",
+                    pair
+                ))?;
+                let value = pair.clone().into_inner().next().ok_or(format!(
+                    "error in grammar, missing target value in pair\n{:?}",
+                    pair
+                ))?;
+
+                match name.as_bytes() {
+                    b"#" => Ok(Value::Target(Target::Index(Value::parse_integer(
+                        value.as_str(),
+                    )?))),
+                    _ => Ok(Value::Target(Target::Named(
+                        Rc::from(name),
+                        Some(Value::parse_float(value.as_str())?),
+                    ))),
+                }
             }
             Rule::name => Ok(Value::Name(Rc::from(pair.as_str()))),
-            _ => Err(format!("unrecognized property value\n{:?}", pair)),
+            _ => Err(format!("unrecognized target value\n{:?}", pair)),
         }
     }
 
@@ -2741,9 +2694,9 @@ mod test {
                 Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::Named("v".into(), Some(0.1)),
                         // second v should not be applied
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(1.0))
+                        Target::Named("p".into(), Some(1.0)),
                     ])
             ]]
         );
@@ -2756,10 +2709,7 @@ mod test {
                     .with_target(Target::from_index(1)),
                 Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
-                    .with_target(Target::from(
-                        PropertyKey::Name("#".into()),
-                        PropertyValue::Integer(1)
-                    )),
+                    .with_target(Target::Index(1)),
             ]]
         );
 
@@ -2895,26 +2845,26 @@ mod test {
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(9, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::Named("p".into(), Some(0.5)),
+                        Target::Named("v".into(), Some(0.1)),
                     ])]],
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(11, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::Named("p".into(), Some(0.5)),
+                        Target::Named("v".into(), Some(0.1)),
                     ])]],
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(0, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.2)),
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::Named("v".into(), Some(0.2)),
+                        Target::Named("p".into(), Some(0.5)),
                     ])]],
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(2, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.3)),
+                        Target::Named("p".into(), Some(0.5)),
+                        Target::Named("v".into(), Some(0.3)),
                     ])]],
             ],
         )?;

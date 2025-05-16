@@ -56,9 +56,7 @@ pub use event::{
 
 pub mod tidal;
 pub use tidal::{
-    Cycle, Event as CycleEvent, PropertyKey as CyclePropertyKey,
-    PropertyValue as CyclePropertyValue, Span as CycleSpan, Target as CycleTarget,
-    Value as CycleValue,
+    Cycle, Event as CycleEvent, Span as CycleSpan, Target as CycleTarget, Value as CycleValue,
 };
 
 pub mod pulse;
