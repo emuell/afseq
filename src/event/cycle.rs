@@ -3,9 +3,8 @@ use std::{collections::HashMap, ops::RangeBounds};
 type Fraction = num_rational::Rational32;
 
 use crate::{
-    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CyclePropertyKey, CyclePropertyValue,
-    CycleTarget, CycleValue, Event, EventIter, EventIterItem, InputParameterSet, InstrumentId,
-    Note, NoteEvent, PulseIterItem,
+    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CycleTarget, CycleValue, Event,
+    EventIter, EventIterItem, InputParameterSet, InstrumentId, Note, NoteEvent, PulseIterItem,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -31,7 +30,7 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
                     .map(|i| new_note(chord.note().transposed(*i as i32)))
                     .collect())
             }
-            CycleValue::Property(_, _) => Ok(vec![None]),
+            CycleValue::Target(_) => Ok(vec![None]),
             CycleValue::Name(s) => {
                 if s.eq_ignore_ascii_case("off") {
                     Ok(vec![new_note(Note::OFF)])
@@ -47,37 +46,36 @@ impl TryFrom<&CycleValue> for Vec<Option<NoteEvent>> {
 
 // Conversion helpers for cycle targets
 fn float_value_in_range<Range>(
-    property: &CyclePropertyValue,
+    maybe_float: &Option<f64>,
     name: &'static str,
     range: Range,
 ) -> Result<f32, String>
 where
     Range: RangeBounds<f32> + std::fmt::Debug,
 {
-    let value = property
-        .to_float()
-        .ok_or(format!("{} property must be a number value", name))? as f32;
-    if range.contains(&value) {
-        Ok(value)
-    } else {
-        Err(format!(
-            "{} property must be in range [{:?}] but is '{}'",
-            name, range, value
-        ))
-    }
+    maybe_float
+        .map(|v| v as f32)
+        .ok_or_else(|| format!("{} property must be a number value", name))
+        .and_then(|v| {
+            if range.contains(&v) {
+                Ok(v)
+            } else {
+                Err(format!(
+                    "{} property must be in range [{:?}] but is '{}'",
+                    name, range, v
+                ))
+            }
+        })
 }
 
 fn integer_value_in_range<Range>(
-    property: &CyclePropertyValue,
+    value: i32,
     name: &'static str,
     range: Range,
 ) -> Result<i32, String>
 where
     Range: RangeBounds<i32> + std::fmt::Debug,
 {
-    let value = property
-        .to_integer()
-        .ok_or(format!("{} property must be an integer value", name))?;
     if range.contains(&value) {
         Ok(value)
     } else {
@@ -99,10 +97,10 @@ pub(crate) fn apply_cycle_note_properties(
     }
     // apply for all non empty note events
     for target in targets {
-        match target.key() {
-            CyclePropertyKey::Index(index) => {
+        match target {
+            CycleTarget::Index(index) => {
                 let index = integer_value_in_range(
-                    &CyclePropertyValue::Integer(*index),
+                    *index,
                     "instrument",
                     0..,
                 )?;
@@ -111,29 +109,22 @@ pub(crate) fn apply_cycle_note_properties(
                     note_event.instrument = Some(instrument);
                 }
             }
-            CyclePropertyKey::Name(name) => {
+            CycleTarget::Named(name, value) => {
                 match name.as_bytes() {
-                    b"#" => {
-                        let index = integer_value_in_range(target.value(), "instrument", 0..)?;
-                        let instrument = InstrumentId::from(index as usize);
-                        for note_event in note_events.iter_mut().flatten() {
-                            note_event.instrument = Some(instrument);
-                        }
-                    }
                     b"v" => {
-                        let volume = float_value_in_range(target.value(), "volume", 0.0..=1.0)?;
+                        let volume = float_value_in_range(value, "volume", 0.0..=1.0)?;
                         for note_event in note_events.iter_mut().flatten() {
                             note_event.volume = volume;
                         }
                     }
                     b"p" => {
-                        let panning = float_value_in_range(target.value(), "panning", -1.0..=1.0)?;
+                        let panning = float_value_in_range(value, "panning", -1.0..=1.0)?;
                         for note_event in note_events.iter_mut().flatten() {
                             note_event.panning = panning;
                         }
                     }
                     b"d" => {
-                        let delay = float_value_in_range(target.value(), "delay", 0.0..1.0)?;
+                        let delay = float_value_in_range(value, "delay", 0.0..1.0)?;
                         for note_event in note_events.iter_mut().flatten() {
                             note_event.delay = delay;
                         }
