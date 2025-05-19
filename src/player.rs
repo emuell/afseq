@@ -8,10 +8,10 @@ use std::{
 
 use crossbeam_channel::Sender;
 
-use afplay::{
-    source::file::preloaded::PreloadedFileSource, utils::speed_from_note, AudioFilePlaybackId,
-    AudioFilePlaybackStatusContext, AudioFilePlaybackStatusEvent, AudioFilePlayer, AudioOutput,
-    DefaultAudioOutput, Error, FilePlaybackOptions,
+use phonic::{
+    utils::speed_from_note, DefaultOutputDevice, Error, FilePlaybackOptions, OutputDevice,
+    PlaybackId, PlaybackStatusContext, PlaybackStatusEvent, Player as PhonicPlayer,
+    PreloadedFileSource,
 };
 
 use crate::{
@@ -110,7 +110,7 @@ pub struct SamplePlaybackContext {
 }
 
 impl SamplePlaybackContext {
-    pub fn from_event(context: Option<AudioFilePlaybackStatusContext>) -> Self {
+    pub fn from_event(context: Option<PlaybackStatusContext>) -> Self {
         if let Some(context) = context {
             if let Some(context) = context.downcast_ref::<SamplePlaybackContext>() {
                 return context.clone();
@@ -130,9 +130,9 @@ impl SamplePlaybackContext {
 ///
 /// Works on an existing sample pool, which can be used outside of the player as well.
 pub struct SamplePlayer {
-    player: AudioFilePlayer,
+    player: PhonicPlayer,
     sample_pool: Arc<RwLock<SamplePool>>,
-    playing_notes: Vec<HashMap<usize, (AudioFilePlaybackId, Note)>>,
+    playing_notes: Vec<HashMap<usize, (PlaybackId, Note)>>,
     new_note_action: NewNoteAction,
     playback_pos_emit_rate: Duration,
     show_events: bool,
@@ -149,11 +149,11 @@ impl SamplePlayer {
     /// returns an error if the player could not be created.
     pub fn new(
         sample_pool: Arc<RwLock<SamplePool>>,
-        playback_status_sender: Option<Sender<AudioFilePlaybackStatusEvent>>,
+        playback_status_sender: Option<Sender<PlaybackStatusEvent>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // create player
-        let audio_output = DefaultAudioOutput::open()?;
-        let player = AudioFilePlayer::new(audio_output.sink(), playback_status_sender);
+        let audio_output = DefaultOutputDevice::open()?;
+        let player = PhonicPlayer::new(audio_output.sink(), playback_status_sender);
         let playing_notes = Vec::new();
         let new_note_action = NewNoteAction::Continue;
         let playback_pos_emit_rate = Duration::from_secs(1);
@@ -175,10 +175,10 @@ impl SamplePlayer {
     }
 
     /// Access to our file player.
-    pub fn file_player(&self) -> &AudioFilePlayer {
+    pub fn file_player(&self) -> &PhonicPlayer {
         &self.player
     }
-    pub fn file_player_mut(&mut self) -> &mut AudioFilePlayer {
+    pub fn file_player_mut(&mut self) -> &mut PhonicPlayer {
         &mut self.player
     }
 
