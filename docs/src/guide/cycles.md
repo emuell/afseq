@@ -76,7 +76,7 @@ There's no exact specification for how tidal cycles work, and it's constantly ev
 
 * `:` sets the instrument or remappable target instead of selecting samples but also allows setting note attributes such as instrument/volume/pan/delay (e.g. `c4:v0.1:p0.5`)
 
-* In bjorklund expressions, operators *within* and on the *right side* are not supported (e.g. `bd(<3 2>, 8)` and `bd(3, 8)*2` are *not* supported)
+* In bjorklund expressions, operators *within* are not supported (e.g. `bd(<3 2>, 8)` is *not* supported)
 
 ### Timing 
 
@@ -86,7 +86,7 @@ The base time of a pattern in tidal is specified as *cycles per second*. In afse
 -- emits an entire cycle every beat
 return rhythm {
   unit = "beats",
-  emit = cycle("c4 d4 e4") -- tripplet
+  emit = cycle("c4 d4 e4") -- triplet
 }
 ```
 
@@ -140,6 +140,28 @@ Supported note attributes are:
 - Delay: `:dX` - with X \[0.0-1.0\)
 
 Note that `X` must be written as *floating point number* for volume, panning and delay:</br> `c4:p-1.0` and `c4:p.8` is valid, while `c4:p-1` **is not valid**!
+
+If you want to use expressions (like slowing down) for an attribute pattern on the right side, you'll have to wrap it in square brackets, otherwise the expression applies to the entire pattern, not just the attributes'.
+
+```lua
+-- This slows down the output
+cycle("[c4 d#4 e4]:<v.1 v.2>/2")
+
+-- This slows down the alternating for the volume
+cycle("[c4 d#4 e4]:[<v.1 v.2>/2]")
+  
+```
+
+A shorthand for assigning attributes exists in the form of `:v=X` where `X` can be a pattern. This way, you can supply float values without having to repeat the name of the target attribute.
+
+```lua
+-- Set volume to rise for each cycle
+cycle("[c4 d#4 e4]:v=<.1 .2 .3 .4>")
+
+-- This would be the same as
+cycle("[c4 d#4 e4]:<v.1 v.2 v.3 v.4>")
+```
+
 
 ### Mapping
 
