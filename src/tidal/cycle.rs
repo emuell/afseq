@@ -110,7 +110,7 @@ impl Cycle {
         if let Some(seed) = self.seed {
             self.state.rng = Xoshiro256PlusPlus::seed_from_u64(seed.wrapping_add(cycle as u64));
         }
-        let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit)?;
+        let mut events = Self::output(&self.root, &mut self.state, cycle, self.event_limit, false)?;
         self.state.iteration += 1;
         events.transform_spans(&Span::default());
         Ok(events.export())
@@ -212,71 +212,25 @@ pub enum Value {
     Integer(i32),
     Pitch(Pitch),
     Chord(Pitch, Rc<str>),
-    Property(PropertyKey, PropertyValue),
+    Target(Target),
     Name(Rc<str>),
-}
-
-/// Property key of a target
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum PropertyKey {
-    Index(i32),
-    Name(Rc<str>),
-}
-
-/// Property value of a target
-#[derive(Clone, Debug, PartialEq)]
-pub enum PropertyValue {
-    None,
-    Float(f64),
-    Integer(i32),
-}
-
-impl PropertyValue {
-    pub fn to_integer(&self) -> Option<i32> {
-        match self {
-            Self::None => None,
-            Self::Float(f) => Some(*f as i32),
-            Self::Integer(i) => Some(*i),
-        }
-    }
-    pub fn to_float(&self) -> Option<f64> {
-        match self {
-            Self::None => None,
-            Self::Float(f) => Some(*f),
-            Self::Integer(i) => Some(*i as f64),
-        }
-    }
 }
 
 // Target property pair
 #[derive(Clone, Debug, PartialEq)]
-pub struct Target(PropertyKey, PropertyValue);
+pub enum Target {
+    Index(i32),
+    Named(Rc<str>, Option<f64>),
+}
 
 impl Target {
-    pub fn key(&self) -> &PropertyKey {
-        &self.0
-    }
-
-    pub fn value(&self) -> &PropertyValue {
-        &self.1
-    }
-
-    /// test if other target uses the same key representation, treating `#` names as index.
     pub fn equal_key(&self, other: &Self) -> bool {
-        match (self.key(), other.key()) {
+        match (self, other) {
             // both are indices: compare index values
-            (PropertyKey::Index(i), PropertyKey::Index(other_i)) => i == other_i,
-            // one is index, one is name - check if name is "#" and values match
-            (PropertyKey::Index(i), PropertyKey::Name(other_name)) => {
-                other_name.as_bytes() == b"#"
-                    && matches!(&other.value(), PropertyValue::Integer(other_i) if i == other_i)
-            }
-            (PropertyKey::Name(name), PropertyKey::Index(other_i)) => {
-                name.as_bytes() == b"#"
-                    && matches!(&self.value(), PropertyValue::Integer(i) if i == other_i)
-            }
+            (Self::Index(a), Self::Index(b)) => a == b,
             // both are names: compare names only
-            (PropertyKey::Name(name), PropertyKey::Name(other_name)) => name == other_name,
+            (Self::Named(a, _), Self::Named(b, _)) => a == b,
+            _ => false,
         }
     }
 }
@@ -337,6 +291,40 @@ impl Step {
             },
         }
     }
+
+    fn inner_steps_mut(&mut self) -> Vec<&mut Step> {
+        match self {
+            Step::Single(_s) => vec![],
+            Step::Alternating(a) => a.steps.iter_mut().collect(),
+            Step::Subdivision(sd) => sd.steps.iter_mut().collect(),
+            Step::SpeedExpression(e) => vec![&mut e.left],
+            Step::Choices(cs) => cs.choices.iter_mut().collect(),
+            Step::Polymeter(pm) => pm.steps.as_mut().inner_steps_mut(),
+            Step::Stack(st) => st.stack.iter_mut().collect(),
+            Step::Degrade(e) => vec![&mut e.step],
+            Step::TargetExpression(e) => vec![&mut e.left],
+            Step::Bjorklund(b) => vec![&mut b.left],
+            Step::Static(s) => match s {
+                Static::Repeat => vec![],
+                Static::Range(_) => vec![],
+                Static::Expression(_) => vec![],
+            },
+        }
+    }
+
+    fn mutate_singles<F>(&mut self, fun: &mut F)
+    where
+        F: FnMut(&mut Single),
+    {
+        match self {
+            Self::Single(s) => fun(s),
+            _ => self
+                .inner_steps_mut()
+                .iter_mut()
+                .for_each(|s| s.mutate_singles(fun)),
+        }
+    }
+
     fn rest() -> Self {
         Self::Single(Single::default())
     }
@@ -496,7 +484,7 @@ impl Target {
             Value::Rest | Value::Hold => None,
             Value::Integer(i) => Some(Self::from_index(*i)),
             Value::Name(name) => Some(Self::from_name(Rc::clone(name))),
-            Value::Property(key, value) => Some(Self::from(key.clone(), value.clone())),
+            Value::Target(t) => Some(t.clone()),
             Value::Float(_) | Value::Pitch(_) | Value::Chord(_, _) => {
                 // pass unexpected values as raw string and let clients deal with conversions or errors
                 Some(Self::from_name(Rc::clone(value_string)))
@@ -504,16 +492,12 @@ impl Target {
         }
     }
 
-    fn from(key: PropertyKey, value: PropertyValue) -> Self {
-        Self(key, value)
-    }
-
     fn from_index(index: i32) -> Self {
-        Self(PropertyKey::Index(index), PropertyValue::None)
+        Self::Index(index)
     }
 
     fn from_name(str: Rc<str>) -> Self {
-        Self(PropertyKey::Name(str), PropertyValue::None)
+        Self::Named(str, None)
     }
 }
 
@@ -628,9 +612,9 @@ impl Value {
             Value::Float(f) => Some(*f as i32),
             Value::Pitch(n) => Some(n.midi_note() as i32),
             Value::Chord(p, _m) => Some(p.midi_note() as i32),
-            Value::Property(k, v) => match k {
-                PropertyKey::Index(i) => Some(*i),
-                PropertyKey::Name(_) => v.to_integer(),
+            Value::Target(t) => match t {
+                Target::Index(i) => Some(*i),
+                Target::Named(_, v) => v.map(|f| f as i32),
             },
             Value::Name(_n) => None,
         }
@@ -644,7 +628,10 @@ impl Value {
             Value::Float(f) => Some(*f),
             Value::Pitch(n) => Some(n.midi_note() as f64),
             Value::Chord(n, _m) => Some(n.midi_note() as f64),
-            Value::Property(_, v) => v.to_float(),
+            Value::Target(t) => match t {
+                Target::Index(i) => Some(*i as f64),
+                Target::Named(_, v) => *v,
+            },
             Value::Name(_n) => None,
         }
     }
@@ -657,10 +644,9 @@ impl Value {
             Value::Float(f) => Some(f.clamp(0.0, 1.0)),
             Value::Pitch(p) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
             Value::Chord(p, _m) => Some((p.midi_note() as f64).clamp(0.0, 128.0) / 128.0),
-            Value::Property(_, v) => match v {
-                PropertyValue::Float(f) => Some(f.clamp(0.0, 1.0)),
-                PropertyValue::Integer(i) => Some((*i as f64).clamp(0.0, 100.0) / 100.0),
-                PropertyValue::None => None,
+            Value::Target(t) => match t {
+                Target::Index(i) => Some(*i as f64),
+                Target::Named(_, v) => v.map(|f| f.clamp(0.0, 1.0)),
             },
             Value::Name(_n) => None,
         }
@@ -955,14 +941,18 @@ impl Events {
         }
     }
 
-    fn crop(&mut self, span: &Span) {
+    fn crop(&mut self, span: &Span, overlap: bool) {
         self.filter_mut(&mut |e| {
-            if span.includes(&e.span) {
-                e.span.crop(span);
-                true
+            let keep = if overlap {
+                span.overlaps(&e.span)
             } else {
-                false
+                span.includes(&e.span)
+            };
+
+            if keep {
+                e.span.crop(span);
             }
+            keep
         });
     }
 
@@ -1101,7 +1091,7 @@ impl Events {
     }
 
     /// Removes Holds by extending preceding events and filters out Rests
-    fn merge(&self, channels: &mut [Vec<Event>]) {
+    fn merge(channels: &mut [Vec<Event>]) {
         for events in &mut *channels {
             Self::merge_holds(events);
         }
@@ -1113,7 +1103,7 @@ impl Events {
     fn export(&mut self) -> Vec<Vec<Event>> {
         let mut channels = vec![];
         self.flatten(&mut channels, 0);
-        self.merge(&mut channels);
+        Self::merge(&mut channels);
 
         #[cfg(test)]
         {
@@ -1171,6 +1161,7 @@ impl CycleParser {
             Rule::alternating => Self::group(pair, Step::alternating),
             Rule::polymeter => Self::polymeter(pair),
             Rule::range => Self::range(pair),
+            Rule::target_assign => Self::target_assign(pair),
             Rule::expression => Self::expression(pair),
             _ => Err(format!(
                 "unexpected rule, this is a bug in the parser\n{:?}",
@@ -1214,27 +1205,28 @@ impl CycleParser {
                 }
                 Ok(Value::Chord(pitch, Rc::from(mode)))
             }
-            Rule::property => {
-                let key = pair
-                    .as_str()
-                    .get(0..1)
-                    .map(|v| PropertyKey::Name(Rc::from(v)))
-                    .ok_or(format!("missing property key in pair\n{:?}", pair));
-                let value = if let Some(v) = pair.clone().into_inner().next() {
-                    match v.as_rule() {
-                        Rule::integer => {
-                            Value::parse_integer(v.as_str()).map(PropertyValue::Integer)
-                        }
-                        Rule::float => Value::parse_float(v.as_str()).map(PropertyValue::Float),
-                        _ => Err(format!("unrecognized property value in pair\n{:?}", pair)),
-                    }
-                } else {
-                    Err(format!("missing property value in pair\n{:?}", pair))
-                };
-                Ok(Value::Property(key?, value?))
+            Rule::target => {
+                let name = pair.as_str().get(0..1).ok_or(format!(
+                    "error in grammar, missing target key in pair\n{:?}",
+                    pair
+                ))?;
+                let value = pair.clone().into_inner().next().ok_or(format!(
+                    "error in grammar, missing target value in pair\n{:?}",
+                    pair
+                ))?;
+
+                match name.as_bytes() {
+                    b"#" => Ok(Value::Target(Target::Index(Value::parse_integer(
+                        value.as_str(),
+                    )?))),
+                    _ => Ok(Value::Target(Target::Named(
+                        Rc::from(name),
+                        Some(Value::parse_float(value.as_str())?),
+                    ))),
+                }
             }
             Rule::name => Ok(Value::Name(Rc::from(pair.as_str()))),
-            _ => Err(format!("unrecognized property value\n{:?}", pair)),
+            _ => Err(format!("unrecognized target value\n{:?}", pair)),
         }
     }
 
@@ -1609,6 +1601,38 @@ impl CycleParser {
         }
         Ok(left)
     }
+    fn target_assign(pair: Pair<Rule>) -> Result<Step, String> {
+        let mut inner = pair.into_inner();
+
+        let k = inner.next().ok_or("error in grammar, missing target key")?;
+        if k.as_rule() != Rule::target_name {
+            return Err("error in grammar, expected target_name".to_string());
+        }
+
+        let p = inner.next().ok_or("missing step pattern")?;
+        let mut pattern = Self::step(p)?;
+        let mut key = k.into_inner();
+        if let Some(name) = key.next() {
+            pattern.mutate_singles(&mut |single: &mut Single| {
+                if let Some(f) = single.value.to_float() {
+                    if !matches!(single.value, Value::Target(_)) {
+                        single.value =
+                            Value::Target(Target::Named(Rc::from(name.as_str()), Some(f)));
+                    }
+                }
+            });
+        } else {
+            pattern.mutate_singles(&mut |single: &mut Single| {
+                if let Some(i) = single.value.to_integer() {
+                    if !matches!(single.value, Value::Target(_)) {
+                        single.value = Value::Target(Target::Index(i));
+                    }
+                }
+            });
+        }
+
+        Ok(pattern)
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1626,6 +1650,7 @@ impl Cycle {
         state: &mut CycleState,
         span: &Span,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let range = span.whole_range();
         let mut cycles = Vec::with_capacity(range.clone().count());
@@ -1634,7 +1659,7 @@ impl Cycle {
                 Fraction::from_u32(cycle).ok_or(OVERFLOW_ERROR)?,
                 Fraction::from_u32(cycle + 1).ok_or(OVERFLOW_ERROR)?,
             );
-            let mut events = Self::output(step, state, cycle, limit)?;
+            let mut events = Self::output(step, state, cycle, limit, overlap)?;
             events.transform_spans(&span);
             cycles.push(events)
         }
@@ -1643,7 +1668,7 @@ impl Cycle {
             length: span.length(),
             events: cycles,
         });
-        events.crop(span);
+        events.crop(span, overlap);
         Ok(events)
     }
 
@@ -1653,12 +1678,13 @@ impl Cycle {
         cycle: u32,
         mult: Fraction,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let span = Span::new(
             Fraction::from_u32(cycle).ok_or(OVERFLOW_ERROR)? * mult,
             Fraction::from_u32(cycle + 1).ok_or(OVERFLOW_ERROR)? * mult,
         );
-        let mut events = Self::output_span(step, state, &span, limit)?;
+        let mut events = Self::output_span(step, state, &span, limit, overlap)?;
         events.normalize_spans(&span);
         Ok(events)
     }
@@ -1737,10 +1763,11 @@ impl Cycle {
         cycle: u32,
         limit: usize,
     ) -> Result<(Vec<Vec<Event>>, Span), String> {
-        let mut events = Self::output(step, state, cycle, limit)?;
+        let mut events = Self::output(step, state, cycle, limit, true)?;
         events.transform_spans(&events.get_span());
         let mut channels: Vec<Vec<Event>> = vec![];
         events.flatten(&mut channels, 0);
+        Events::merge(&mut channels);
         Ok((channels, events.get_span()))
     }
 
@@ -1751,11 +1778,12 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         match right {
             // multiply with single values to avoid generating events
             Step::Single(single) => {
-                let mut events = Self::output(left, state, cycle, limit)?;
+                let mut events = Self::output(left, state, cycle, limit, overlap)?;
                 if let Some(target) = Target::parse(&single.value, &single.string) {
                     events.mutate_events(&mut |event: &mut Event| {
                         if !{
@@ -1805,6 +1833,7 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let left = match step {
             Step::Polymeter(pm) => pm.steps.as_ref(),
@@ -1817,14 +1846,15 @@ impl Cycle {
                 // apply mutiplier
                 let multiplier = Self::step_multiplier(step, &single.value);
                 Ok(Self::output_multiplied(
-                    left, state, cycle, multiplier, limit,
+                    left, state, cycle, multiplier, limit, overlap,
                 )?)
             }
             _ => {
                 // generate and flatten the events for the right side of the expression
-                let events = Self::output(right, state, cycle, limit)?;
+                let events = Self::output(right, state, cycle, limit, overlap)?;
                 let mut channels: Vec<Vec<Event>> = vec![];
                 events.flatten(&mut channels, 0);
+                Events::merge(&mut channels);
 
                 // extract a float to use as mult from each event and output the step with it
                 let mut channel_events: Vec<Events> = Vec::with_capacity(channels.len());
@@ -1833,10 +1863,11 @@ impl Cycle {
                     for event in channel {
                         // apply multiplier
                         let multiplier = Self::step_multiplier(step, &event.value);
-                        let mut partial_events =
-                            Self::output_multiplied(left, state, cycle, multiplier, limit)?;
+                        let mut partial_events = Self::output_multiplied(
+                            left, state, cycle, multiplier, limit, overlap,
+                        )?;
                         // crop and push to multi events
-                        partial_events.crop(&event.span);
+                        partial_events.crop(&event.span, overlap);
                         multi_events.push(partial_events);
                     }
                     channel_events.push(Events::Multi(MultiEvents {
@@ -1862,6 +1893,7 @@ impl Cycle {
         state: &mut CycleState,
         cycle: u32,
         limit: usize,
+        overlap: bool,
     ) -> Result<Events, String> {
         let events = match step {
             Step::Single(s) => {
@@ -1886,7 +1918,7 @@ impl Cycle {
                 } else {
                     let mut events = Vec::with_capacity(sd.steps.len());
                     for s in &sd.steps {
-                        let e = Self::output(s, state, cycle, limit)?;
+                        let e = Self::output(s, state, cycle, limit, overlap)?;
                         events.push(e)
                     }
 
@@ -1904,19 +1936,20 @@ impl Cycle {
                 } else {
                     let length = a.steps.len() as u32;
                     let current = cycle % length;
-                    if let Some(step) = a.steps.get(current as usize) {
-                        Self::output(step, state, cycle / length, limit)?
-                    } else {
-                        Events::empty() // unreachable
-                    }
+                    a.steps
+                        .get(current as usize)
+                        .map(|step| Self::output(step, state, cycle / length, limit, overlap))
+                        .unwrap_or(
+                            Ok(Events::empty()), // unreachable
+                        )?
                 }
             }
             Step::Choices(cs) => {
                 let choice = state.rng.random_range(0..cs.choices.len());
-                Self::output(&cs.choices[choice], state, cycle, limit)?
+                Self::output(&cs.choices[choice], state, cycle, limit, overlap)?
             }
             Step::Polymeter(pm) => {
-                Self::output_with_speed(pm.count.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(pm.count.as_ref(), step, state, cycle, limit, overlap)?
             }
             Step::Stack(st) => {
                 if st.stack.is_empty() {
@@ -1924,7 +1957,7 @@ impl Cycle {
                 } else {
                     let mut channels = Vec::with_capacity(st.stack.len());
                     for s in &st.stack {
-                        channels.push(Self::output(s, state, cycle, limit)?)
+                        channels.push(Self::output(s, state, cycle, limit, overlap)?)
                     }
                     Events::Poly(PolyEvents {
                         span: Span::default(),
@@ -1934,7 +1967,7 @@ impl Cycle {
                 }
             }
             Step::Degrade(d) => {
-                let mut out = Self::output(d.step.as_ref(), state, cycle, limit)?;
+                let mut out = Self::output(d.step.as_ref(), state, cycle, limit, overlap)?;
                 out.mutate_events(&mut |event: &mut Event| {
                     if let Some(chance) = d.chance.to_chance() {
                         if chance < state.rng.random_range(0.0..1.0) {
@@ -1944,11 +1977,16 @@ impl Cycle {
                 });
                 out
             }
-            Step::TargetExpression(e) => {
-                Self::output_with_target(e.left.as_ref(), e.right.as_ref(), state, cycle, limit)?
-            }
+            Step::TargetExpression(e) => Self::output_with_target(
+                e.left.as_ref(),
+                e.right.as_ref(),
+                state,
+                cycle,
+                limit,
+                overlap,
+            )?,
             Step::SpeedExpression(e) => {
-                Self::output_with_speed(e.right.as_ref(), step, state, cycle, limit)?
+                Self::output_with_speed(e.right.as_ref(), step, state, cycle, limit, overlap)?
             }
             Step::Bjorklund(b) => {
                 let mut events = vec![];
@@ -1970,8 +2008,13 @@ impl Cycle {
                                 if let Some(steps) = steps_single.value.to_integer() {
                                     if let Some(pulses) = pulses_single.value.to_integer() {
                                         events.reserve(pulses as usize);
-                                        let out =
-                                            Self::output(b.left.as_ref(), state, cycle, limit)?;
+                                        let out = Self::output(
+                                            b.left.as_ref(),
+                                            state,
+                                            cycle,
+                                            limit,
+                                            overlap,
+                                        )?;
                                         for pulse in euclidean(
                                             steps.max(0) as u32,
                                             pulses.max(0) as u32,
@@ -2741,9 +2784,9 @@ mod test {
                 Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::Named("v".into(), Some(0.1)),
                         // second v should not be applied
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(1.0))
+                        Target::Named("p".into(), Some(1.0)),
                     ])
             ]]
         );
@@ -2756,10 +2799,7 @@ mod test {
                     .with_target(Target::from_index(1)),
                 Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
                     .with_note(11, 4)
-                    .with_target(Target::from(
-                        PropertyKey::Name("#".into()),
-                        PropertyValue::Integer(1)
-                    )),
+                    .with_target(Target::Index(1)),
             ]]
         );
 
@@ -2895,26 +2935,26 @@ mod test {
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(9, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::Named("p".into(), Some(0.5)),
+                        Target::Named("v".into(), Some(0.1)),
                     ])]],
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(11, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.1)),
+                        Target::Named("p".into(), Some(0.5)),
+                        Target::Named("v".into(), Some(0.1)),
                     ])]],
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(0, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.2)),
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
+                        Target::Named("v".into(), Some(0.2)),
+                        Target::Named("p".into(), Some(0.5)),
                     ])]],
                 vec![vec![Event::at(Fraction::from(0), Fraction::from(1))
                     .with_note(2, 4)
                     .with_targets(vec![
-                        Target::from(PropertyKey::Name("p".into()), PropertyValue::Float(0.5)),
-                        Target::from(PropertyKey::Name("v".into()), PropertyValue::Float(0.3)),
+                        Target::Named("p".into(), Some(0.5)),
+                        Target::Named("v".into(), Some(0.3)),
                     ])]],
             ],
         )?;
@@ -2941,6 +2981,132 @@ mod test {
         assert_cycle_advancing("a <b c>")?;
         assert_cycle_advancing("[a b? c d]|[c? d?]")?;
         assert_cycle_advancing("[{a b}/2 c d], <c d> e? {a b}*2")?;
+        Ok(())
+    }
+
+    #[test]
+    fn target_assign() -> Result<(), String> {
+        assert_cycle_equality(
+            "[a b c [d e f g]]:[v.5 v.3 v.2 v.1]:[p.5 p.25 p.1 p.9]",
+            "[a b c [d e f g]]:v=[.5 .3 .2 .1]:p=[.5 .25 .1 .9]",
+        )?;
+        assert_eq!(
+            Cycle::from("[1 2 3 4]:p=[.1 .2 .3 .4]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::Named("p".into(), Some(0.1))),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(2)
+                    .with_target(Target::Named("p".into(), Some(0.2))),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
+                    .with_int(3)
+                    .with_target(Target::Named("p".into(), Some(0.3))),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(4)
+                    .with_target(Target::Named("p".into(), Some(0.4))),
+            ]]
+        );
+        assert_eq!(
+            Cycle::from("[1 2 3 4]:#=[1 c4 3 0.2]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::Index(1)),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(2)
+                    .with_target(Target::Index(48)),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4))
+                    .with_int(3)
+                    .with_target(Target::Index(3)),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(4)
+                    .with_target(Target::Index(0)),
+            ]]
+        );
+
+        assert_eq!(
+            Cycle::from("[1 2 3 4]:long=[1 _ ~ 0.2]")?.generate()?,
+            [[
+                Event::at(Fraction::from(0), Fraction::new(1, 4))
+                    .with_int(1)
+                    .with_target(Target::Named("long".into(), Some(1.0))),
+                Event::at(Fraction::new(1, 4), Fraction::new(1, 4))
+                    .with_int(2)
+                    .with_target(Target::Named("long".into(), Some(1.0))),
+                Event::at(Fraction::new(2, 4), Fraction::new(1, 4)).with_int(3),
+                Event::at(Fraction::new(3, 4), Fraction::new(1, 4))
+                    .with_int(4)
+                    .with_target(Target::Named("long".into(), Some(0.2))),
+            ]]
+        );
+
+        assert_cycles(
+            "[1 2 3 4 5 6 7 8]/4:d=<.1 .2 .3 .4>:v=[<.3 .2 .1>*2/3]",
+            vec![
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(1)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.1)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(2)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.1)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(3)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.2)),
+                            Target::Named("v".into(), Some(0.3)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(4)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.2)),
+                            Target::Named("v".into(), Some(0.2)),
+                        ]),
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(5)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.3)),
+                            Target::Named("v".into(), Some(0.2)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(6)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.3)),
+                            Target::Named("v".into(), Some(0.2)),
+                        ]),
+                ]],
+                vec![vec![
+                    Event::at(Fraction::from(0), Fraction::new(1, 2))
+                        .with_int(7)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.4)),
+                            Target::Named("v".into(), Some(0.1)),
+                        ]),
+                    Event::at(Fraction::new(1, 2), Fraction::new(1, 2))
+                        .with_int(8)
+                        .with_targets(vec![
+                            Target::Named("d".into(), Some(0.4)),
+                            Target::Named("v".into(), Some(0.1)),
+                        ]),
+                ]],
+            ],
+        )?;
+
+        assert_cycle_equality(
+            "[1 2 3 4]:v=[0.2 0.3 0.4 p.8]",
+            "[1 2 3 4]:[v0.2 v0.3 v0.4 p.8]",
+        )?;
         Ok(())
     }
 }
