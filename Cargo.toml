@@ -1,11 +1,14 @@
 [package]
-name = "afseq"
-version = "0.6.0"
-edition = "2021"
+categories = ["multimedia::audio"]
 description = "Experimental, dynamic, imperative and functional music sequence generator for Rust and Lua"
-authors = ["Eduard Müller <mail@emuell.net>", "unless <unlessgames@gmail.com>"]
-exclude = ["assets", "examples"]
-categories = ["audio", "midi", "sequencer"]
+edition = "2021"
+exclude = ["assets", "examples", "benches"]
+keywords = ["audio", "sequencer", "lua", "live_coding"]
+license = "GNU AFFERO"
+name = "afseq"
+readme = "README.md"
+repository = "https://github.com/emuell/afseq"
+version = "0.7.0"
 
 [dependencies]
 lazy_static = { version = "^1.4" }
