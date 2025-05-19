@@ -365,7 +365,7 @@ mod test {
         assert!(Note::try_from("cc2").is_err());
         assert!(Note::try_from("cbb2").is_err());
         assert!(Note::try_from("c##2").is_err());
-        
+
         assert_eq!(Note::try_from("C4")?, Note::C4);
         assert_eq!(Note::try_from("Cb4")?, Note::B3);
         assert_eq!(Note::try_from("C#3")?, Note::Cs3);

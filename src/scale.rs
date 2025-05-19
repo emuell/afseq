@@ -48,7 +48,10 @@ impl TryFrom<&Vec<i32>> for Mode {
             let mut degrees = [0; 12];
             for (degree_count, i) in intervals.iter().enumerate() {
                 if !(0..12).contains(i) {
-                    return Err(format!("intervals must be in range [0..12] but one is '{}'", i));
+                    return Err(format!(
+                        "intervals must be in range [0..12] but one is '{}'",
+                        i
+                    ));
                 }
                 degrees[*i as usize] = degree_count + 1;
             }

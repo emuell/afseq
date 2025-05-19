@@ -1,4 +1,5 @@
 use std::hint::black_box;
+
 use criterion::{criterion_group, Criterion};
 
 use afseq::prelude::*;
