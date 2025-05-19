@@ -39,7 +39,7 @@ mlua = { version = "^0.10", default-features = false, features = [
 pretty_assertions = "^1.4"
 notify = { version = "^8.0" }
 ctrlc = { version = "^3.4" }
-criterion = { version = "^0.5" }
+criterion = { version = "^0.6" }
 simplelog = { version = "^0.12" }
 
 [profile.dev]
