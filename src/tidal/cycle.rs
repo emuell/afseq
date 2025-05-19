@@ -1615,13 +1615,18 @@ impl CycleParser {
         if let Some(name) = key.next() {
             pattern.mutate_singles(&mut |single: &mut Single| {
                 if let Some(f) = single.value.to_float() {
-                    single.value = Value::Target(Target::Named(Rc::from(name.as_str()), Some(f)));
+                    if !matches!(single.value, Value::Target(_)) {
+                        single.value =
+                            Value::Target(Target::Named(Rc::from(name.as_str()), Some(f)));
+                    }
                 }
             });
         } else {
             pattern.mutate_singles(&mut |single: &mut Single| {
                 if let Some(i) = single.value.to_integer() {
-                    single.value = Value::Target(Target::Index(i));
+                    if !matches!(single.value, Value::Target(_)) {
+                        single.value = Value::Target(Target::Index(i));
+                    }
                 }
             });
         }
@@ -3096,6 +3101,11 @@ mod test {
                         ]),
                 ]],
             ],
+        )?;
+
+        assert_cycle_equality(
+            "[1 2 3 4]:v=[0.2 0.3 0.4 p.8]",
+            "[1 2 3 4]:[v0.2 v0.3 v0.4 p.8]",
         )?;
         Ok(())
     }
