@@ -1,0 +1,20 @@
+# Set default text eol to Unix LF
+* text=auto eol=lf
+
+# Force crlf for Windows bat and cmd text files.
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{bat,[bB][aA][tT]} text eol=crlf
+
+# Set image files as binary by default.
+*.bmp   binary
+*.gif   binary
+*.jpg   binary
+*.jpeg  binary
+*.png   binary
+
+# Set wasm files as binary by default.
+*.wasm  binary
+
+# Set library files as binary by default.
+*.a	    binary
+*.lib	binary
