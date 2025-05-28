@@ -1,6 +1,7 @@
 {
     "rust-analyzer.cargo.features": [
         "player",
+        "cpal-output",
         "scripting",
         "lua-jit"
     ],

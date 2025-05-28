@@ -26,31 +26,33 @@ pest_derive = { version = "^2.7" }
 # optional -> dhat-profiler
 dhat = { version = "^0.3", optional = true }
 
-# optional -> player
-crossbeam-channel = { version = "^0.5", optional = true }
-phonic = { version = "^0.6", default-features = false, features = [
-    "cpal-output"
-], optional = true }
-
 # optional -> scripting
 mlua = { version = "^0.10", default-features = false, features = [
     "vendored",
     "error-send"
 ], optional = true }
 
-[dev-dependencies]
+# optional -> player
+crossbeam-channel = { version = "^0.5", optional = true }
+phonic = { version = "^0.6", default-features = false, optional = true }
+
+# dev dependencies
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_assertions = "^1.4"
 notify = { version = "^8.0" }
 ctrlc = { version = "^3.4" }
 criterion = { version = "^0.6" }
 simplelog = { version = "^0.12" }
 
+[patch.crates-io]
+# tagged sokol versions are outdated: use latest version 
+sokol = { version="*", optional = true, git="https://github.com/emuell/sokol-rust" }
+
+# enable debug symbols in all builds
 [profile.dev]
 debug = "full"
-
 [profile.bench]
 debug = "full"
-
 [profile.release]
 debug = "full"
 
@@ -60,6 +62,9 @@ dhat-profiler = ["dhat"]
 
 # example player implementation
 player = ["crossbeam-channel", "phonic"]
+# example player's audio output driver 
+sokol-output = ["phonic/sokol-output"]
+cpal-output = ["phonic/cpal-output"]
 
 # lua scripting
 scripting = ["mlua"]
@@ -83,8 +88,8 @@ harness = false
 
 [[example]]
 name = "play"
-required-features = ["player"]
+required-features = ["player", "cpal-output"]
 
 [[example]]
 name = "play-script"
-required-features = ["scripting", "player"]
+required-features = ["scripting", "player", "cpal-output"]
