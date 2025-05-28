@@ -43,9 +43,22 @@ impl Sequence {
         &self.time_base
     }
 
-    /// Read-only borrowed access to our phrases.
-    pub fn phrases(&self) -> &Vec<Phrase> {
+    /// Update the sequence's internal time bases with a new time base.
+    pub fn set_time_base(&mut self, time_base: &BeatTimeBase) {
+        self.time_base = *time_base;
+        for phrase in &mut self.phrases {
+            phrase.set_time_base(time_base);
+        }
+    }
+
+    /// Read-only access to our phrases.
+    pub fn phrases(&self) -> &[Phrase] {
         &self.phrases
+    }
+
+    /// Mut access to our phrases.
+    pub fn phrases_mut(&mut self) -> &mut [Phrase] {
+        &mut self.phrases
     }
 
     /// returns maximum rhythm count in all phrases.
