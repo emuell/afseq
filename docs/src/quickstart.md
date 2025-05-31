@@ -9,13 +9,14 @@ This guide will take you from basic patterns to advanced rhythmic sequencing thr
 ## Table of Contents
 - [Basic Patterns](#basic-patterns)
 - [Rhythm Variations](#rhythm-variations)
-- [Tidal Cycles Mini-Notation](#tidal-cycles-mini-notation)
+- [Notes and Scales](#notes-and-scales)
+- [Cycles Mini-Notation](#cycles-mini-notation)
 - [Dynamic Patterns & Emitters](#dynamic-patterns--emitters)
 - [Advanced Techniques](#advanced-techniques)
 
 ## Basic Patterns
 
-### Simple Quarter Note Pulse
+### Quarter Note Pulse
 
 ```lua
 -- The most basic rhythm: steady quarter notes
@@ -25,7 +26,7 @@ return rhythm {
 }
 ```
 - TRY THIS: Change unit to `"1/8"` for eighth notes
-- TRY THIS: Replace `"c3"` with `"e3"` or `"g3"` for different notes
+- TRY THIS: Replace `"c4"` with `"e4"` or `"g4"` for different notes
 
 This creates a steady pulse playing C4 on every quarter note. The `unit` parameter sets the timing grid, while `emit` defines what note to play.
 
@@ -36,46 +37,29 @@ This creates a steady pulse playing C4 on every quarter note. The `unit` paramet
 return rhythm {
   unit = "1/8",           -- Eighth note timing grid
   pattern = {1, 0, 1, 1}, -- Play-rest-play-play pattern
-  emit = {"c3", "d3"}     -- Alternates between C3 and D3
+  emit = {"c4", "d4"}     -- Alternates between C4 and D4
 }
 ```
 - TRY THIS: Change pattern to `{1, 1, 0, 1}` for a different rhythm
-- TRY THIS: Add more notes to emit like `{"c3", "d3", "e3", "g3"}`
-
+- TRY THIS: Add more notes to emit like `{"c4", "d4", "e4", "g4"}`
 
 Here, `pattern` controls when notes play (1) or rest (0). The `emit` parameter cycles through the provided notes when a step triggers.
 
-### Simple Drum Pattern
-
-```lua
--- Basic drum pattern with kick and hi-hat
-return rhythm {
-  unit = "1/16",        -- Sixteenth note grid
-  pattern = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0}, -- Kick pattern
-  emit = {"c1", "f#3"}  -- C1 = kick, F#3 = hi-hat
-}
-```
-- TRY THIS: Add a snare on beats 2 and 4 by adding "d2" to emit
-- TRY THIS: Modify the pattern for different kick placements
-
-This example creates a basic drum pattern using General MIDI notes where C1 is typically kick drum and F#3 is hi-hat.
-
-## Rhythm Variations
-
-### Subdivided Rhythm
+### Subdivided Pulses
 
 ```lua
 -- Pattern with mixed note lengths
 return rhythm {
   unit = "1/4",
-  pattern = {1, {1, 1}},    -- One quarter note, then two eighth notes
-  emit = {"c3", "d3", "e3"} -- C3 (quarter), D3, E3 (eighth notes)
+  pattern = {1, {1, 1, 1, 1}},    -- One quarter note, then four sixteenth notes
+  emit = {"c4", "c5", "d4", "e4", "g4"} -- C4 (quarter), C5, d4, e4, g4 (sixteenth)
 }
 ```
-- TRY THIS: Try more complex subdivisions like `{1, {1, {1, 1}}}`
-- TRY THIS: Change the unit to `"1/8"` to make everything faster
+- TRY THIS: Try more complex subdivisions like {{1, 1}, {1, {1, 1}}}
+- TRY THIS: Change the unit to "1/8" to make everything faster
 
 Nested arrays in the pattern create subdivisions, allowing for more complex rhythms within the basic unit.
+
 
 ### Euclidean Rhythms
 
@@ -84,7 +68,7 @@ Nested arrays in the pattern create subdivisions, allowing for more complex rhyt
 return rhythm {
   unit = "1/16",
   pattern = pattern.euclidean(3, 8),  -- 3 hits spread over 8 steps
-  emit = "c1" -- Kick drum
+  emit = "c4" -- Basic note
 }
 ```
 - TRY THIS: Try different combinations like `(5, 8)` or `(7, 16)`
@@ -94,45 +78,76 @@ Euclidean patterns distribute a number of notes evenly across steps, creating na
 
 The [Pattern API](./API/pattern.md) contains various tools to programatically create patterns.
 
-### Triplet Feel with Resolution
+### Triplet Resolution
 
 ```lua
 -- Create swing or triplet feel
 return rhythm {
   unit = "1/8",
   resolution = 2/3, -- Triplet feel (3 notes in space of 2)
-  emit = {"c3 v0.3", "e3 v0.5", "g3 v0.8"} -- v specifies volume, d delay, p panning
+  emit = {"c4 v0.3", "e4 v0.5", "g4 v0.8"} -- v specifies volume, d delay, p panning
 }
 ```
 - TRY THIS: Change resolution to `"5/4"` for a different swing feel
-- TRY THIS: Add `d` values between 0 and 1 to delay specific notes
+- TRY THIS: Add values such as `d0.2` between 0 and 1 to delay specific notes
 
 The `resolution` parameter modifies the timing grid, enabling triplet feels, swing rhythms, and polyrhythms.
 
-### Note Stacks, Chords and Scales
+## Notes and Scales
+
+### Basic Note Stacks
 
 ```lua
--- Polyphonic notes and chord notations
+-- Simple chord by stacking notes
+return rhythm {
+  unit = "1/1",
+  emit = {{"c4", "e4", "g4"}, "c4"}  -- C major chord followed by a single C4
+}
+```
+- TRY THIS: Try different chord combinations like `{"d4", "f4", "a4"}` for D minor
+- TRY THIS: Add `v` values to create dynamics: `{"c4 v0.8", "e4 v0.6", "g4 v0.4"}`
+
+A table of notes allows emitting multiple notes at once, creating chords and harmonies.
+
+### Chord Notation
+
+```lua
+-- Using chord notation shortcuts
 return rhythm {
   unit = "1/1",
   emit = {
-    {"c4", "e4", "g4"},    -- c major by stacking notes
-    "c4'M",                -- c major using ' chord notation
-    note("c4'M"):transpose({12, 0, 0}), -- c major first inversion
-    chord("c4", "major"),   -- c major via the chord function
-    chord("c4", {0, 4, 7}), -- c major via custom intervals
-    scale("c", "major"):chord(1) -- c major from 1st degree of a c maj scale
+    "c4'M", -- C major using ' chord notation
+    "d4'm", -- D minor
+    "g4'7"  -- G dominant 7th
   }
 }
 ```
-- TRY THIS: Add `v` values to chord strings to create more dynamics.
-- TRY THIS: Use other chord modes than `M` such as `m`, `m5` or `+` or other degree values and scales.
+- TRY THIS: Use other chord modes like `'m5`, `'+`, or `'dim`
+- TRY THIS: Add inversions with `note("c4'M"):transpose({12, 0, 0})`
 
-A table of notes in a sequence `{}` allows emitting multiple notes at once. The `note()` function allows transforming existing note strings and chords can also be created from a `scale`. 
+Chord notation provides a quick way to specify common chord types without listing individual notes.
+
+### Working with Scales
+
+```lua
+-- Advanced chord and scale operations
+return rhythm {
+  unit = "1/1",
+  emit = {
+    chord("c4", "major"),         -- C major via the chord function
+    chord("c4", {0, 4, 7}),       -- C major via custom intervals
+    scale("c", "major"):chord(1), -- C major from 1st degree of C major scale
+    scale("c", "major"):chord(5)  -- G major from 5th degree of C major scale
+  }
+}
+```
+- TRY THIS: Use other scales like `"minor"`, `"dorian"`, or `"pentatonic"`
+- TRY THIS: Try different chord degrees: `scale("c", "major"):chord(2)` for D minor
+
+The `scale()` function allows creating chords from scale degrees, enabling more musical chord progressions.
 
 See available modes and scales at the [API docs](./API/scale.md).
 See [Notes and Scales](./guide/notes&scales.md) for more ways to create and manipulate notes and chords.
-
 
 ## Tidal Cycles Mini-Notation
 
@@ -186,7 +201,7 @@ See [Cycles Guide](./guide/cycles.md) for more example and info about Tidal Cycl
 
 ```lua
 -- Randomly select notes from a list
-local notes = {"c3", "d3", "e3", "g3"}
+local notes = {"c4", "d4", "e4", "g4"}
 return rhythm {
   unit = "1/8",
   emit = function(context)
@@ -225,11 +240,11 @@ This pattern uses a gate function to filter notes with a 30% probability, creati
 return rhythm {
   unit = "1/8",
   emit = function(init_context)
-    local notes = {"c3", "e3", "g3", "b3"}
+    local notes = {"c4", "e4", "g4", "b4"}
     local index = 1
     return function(context)
       local note = notes[index]
-      index = (index % #notes) + 1 -- Cycle through notes
+      index = math.imod(index + 1, #notes) -- Cycle through notes
       return note
     end
   end
@@ -255,7 +270,7 @@ return rhythm {
       -- else use pulse values as probablities
       context.pulse_value >= math.random() 
   end,
-  emit = "c3"
+  emit = "c4"
 }
 ```
 - TRY THIS: Create a threshold gate: `context.pulse_value > 0.5`
