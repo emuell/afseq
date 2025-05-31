@@ -13,8 +13,8 @@
 > * Stacks and random choices are valid without brackets (`a | b` is parsed as `[a | b]`)
 > * `:` sets the instrument or remappable target instead of selecting samples but also 
 >   allows setting note attributes such as instrument/volume/pan/delay (e.g. `c4:v0.1:p0.5`)
-> * In bjorklund expressions, operators *within* are not supported
->   (e.g. `bd(<3 2>, 8)` is *not* supported)
+> * In bjorklund expressions, operators *within* and on the *right side* are not supported
+>   (e.g. `bd(<3 2>, 8)` and `bd(3, 8)*2` are *not* supported)
 > 
 > [Tidal Cycles Reference](https://tidalcycles.org/docs/reference/mini_notation/)
 > 

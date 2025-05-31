@@ -24,6 +24,7 @@ const DOM7: [u8; 4] = [0, 4, 7, 10];
 const DOM9: [u8; 4] = [0, 4, 7, 14];
 const DOM11: [u8; 4] = [0, 4, 7, 17];
 const DOM13: [u8; 4] = [0, 4, 7, 21];
+const SEVEN: [u8; 4] = [0, 4, 7, 10];
 const SEVEN_FLAT5: [u8; 4] = [0, 4, 6, 10];
 const SEVEN_SHARP5: [u8; 4] = [0, 4, 8, 10];
 const SEVEN_FLAT9: [u8; 5] = [0, 4, 7, 10, 13];
@@ -96,6 +97,7 @@ lazy_static! {
             ("dom9", Vec::from(DOM9)),
             ("dom11", Vec::from(DOM11)),
             ("dom13", Vec::from(DOM13)),
+            ("7", Vec::from(SEVEN)),
             ("7b5", Vec::from(SEVEN_FLAT5)),
             ("7#5", Vec::from(SEVEN_SHARP5)),
             ("7b9", Vec::from(SEVEN_FLAT9)),

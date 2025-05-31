@@ -7,7 +7,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----------------------------------------------------------------------------------------------------
 
 ---Available chords.
----@alias ChordName "major"|"major7"|"major9"|"major11"|"major13"|"minor"|"minor#5"|"minor6"|"minor69"|"minor7b5"|"minor7"|"minor7#5"|"minor7b9"|"minor7#9"|"minor9"|"minor11"|"minor13"|"minorMajor7"|"add9"|"add11"|"add13"|"dom7"|"dom9"|"dom11"|"dom13"|"7b5"|"7#5"|"7b9"|"five"|"six"|"sixNine"|"nine"|"eleven"|"thirteen"|"augmented"|"diminished"|"diminished7"|"sus2"|"sus4"|"7sus2"|"7sus4"|"9sus2"|"9sus4"|string
+---@alias ChordName "major"|"major7"|"major9"|"major11"|"major13"|"minor"|"minor#5"|"minor6"|"minor69"|"minor7b5"|"minor7"|"minor7#5"|"minor7b9"|"minor7#9"|"minor9"|"minor11"|"minor13"|"minorMajor7"|"add9"|"add11"|"add13"|"dom7"|"dom9"|"dom11"|"dom13"|"7b5"|"7#5"|"7b9"|"five"|"six"|"sixNine"|"seven"|"nine"|"eleven"|"thirteen"|"augmented"|"diminished"|"diminished7"|"sus2"|"sus4"|"7sus2"|"7sus4"|"9sus2"|"9sus4"|string
 
 ---Create a new chord from the given key notes and a chord name or an array of custom intervals.
 ---
@@ -23,6 +23,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---- "5 -> "five"
 ---- "6 -> "six"
 ---- "69" -> "sixNine"
+---- "7 -> "seven"
 ---- "9 -> "nine"
 ---- "11" -> "eleven"
 ---
