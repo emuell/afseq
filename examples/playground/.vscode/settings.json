@@ -1,0 +1,16 @@
+{
+    "rust-analyzer.cargo.target": "wasm32-unknown-emscripten",
+    "Lua.runtime.builtin": {
+        "os": "disable",
+        "io": "disable",
+        "package": "disable",
+        "debug": "disable",
+        "bit": "disable",
+        "jit": "disable",
+        "ffi": "disable",
+    },
+    "Lua.workspace.library": [
+        "../../types/nerdo"
+    ],
+    "Lua.hint.arrayIndex": "Disable"
+}
