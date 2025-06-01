@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>RECOMP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&display=swap">
+    <link rel="stylesheet" href="./app.css">
+</head>
+
+<body>
+    <div id="loading">
+        <div id="spinner" class="spinner"></div>
+        <div id="spinner-status">Loading...</div>
+    </div>
+
+    <div id="content">
+        <div class="header">
+            <div>
+                <h1 class="title">AFSEQ playground</h1>
+            </div>
+            <div class="header-right">
+                <a href="https://emuell.github.io/afseq/" class="tutorial-link">Read the Tutorials</a>
+            </div>
+        </div>
+
+        <div class="transport">
+            <button id="playButton" title="Play"><i class="fas fa-play"></i></button>
+            <button id="stopButton" title="Stop"><i class="fas fa-stop"></i></button>
+
+            <div class="bpm-control">
+                <span>BPM:</span>
+                <input type="number" id="bpmInput" value="120" min="60" max="300">
+            </div>
+
+            <div class="sample-control">
+                <span>Samples:</span>
+                <select id="sampleSelect">
+                    <option value="none">Loading Samples...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="main-container">
+            <div class="editor-column">
+                <div class="editor-status">
+                    <div id="editor-status-content" class="editor-status-content hidden">
+                        <span>Hit <code>Control + Enter</code> to apply changes</span>
+                        <span id="editCount">no edits</span>
+                    </div>
+                </div>
+                <div id="editor" class="editor"></div>
+                <div id="editor-error" class="editor-error">
+                    <div id="editor-error-content" class="editor-error-content"></div>
+                </div>
+            </div>
+            <div id="examples-column" class="examples-column">
+                <ul id="examples-list"></ul>
+            </div>
+        </div>
+        <div id="status" class="status">Loading...</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.40.0/min/vs/loader.min.js"></script>
+    <script src="app.js" type="module"></script>
+
+</body>
+
+</html>
