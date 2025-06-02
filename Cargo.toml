@@ -28,7 +28,7 @@ dhat = { version = "^0.3", optional = true }
 
 # optional -> player
 crossbeam-channel = { version = "^0.5", optional = true }
-phonic = { version = "^0.3", default-features = false, features = [
+phonic = { version = "^0.6", default-features = false, features = [
     "cpal-output"
 ], optional = true }
 
