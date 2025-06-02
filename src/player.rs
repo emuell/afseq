@@ -352,7 +352,9 @@ impl SamplePlayer {
                     Some(note_event) => note_event,
                 };
                 // Handle note off or stop action
-                if note_event.note.is_note_off() || self.new_note_action != NewNoteAction::Continue
+                if note_event.note.is_note_off()
+                    || (note_event.note.is_note_on()
+                        && self.new_note_action != NewNoteAction::Continue)
                 {
                     if let Some((playback_id, _)) = playing_notes_in_rhythm.get(&voice_index) {
                         let _ = self.player.stop_source_at_sample_time(
