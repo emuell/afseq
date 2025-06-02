@@ -93,9 +93,7 @@
 ---  
 ## Properties
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Notes that triggered the rhythm:
-> * Mono mode: All active trigger notes (last released note stops the rhythm)
-> * Poly mode: Single note that started the rhythm instance
+> Note that triggered the rhythm, if any.
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
 >  Current input parameter values: parameter ids as keys, parameter values as values
@@ -167,9 +165,7 @@
 ---  
 ## Properties
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Notes that triggered the rhythm:
-> * Mono mode: All active trigger notes (last released note stops the rhythm)
-> * Poly mode: Single note that started the rhythm instance
+> Note that triggered the rhythm, if any.
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
 >  Current input parameter values: parameter ids as keys, parameter values as values
@@ -216,9 +212,7 @@
 ---  
 ## Properties
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Notes that triggered the rhythm:
-> * Mono mode: All active trigger notes (last released note stops the rhythm)
-> * Poly mode: Single note that started the rhythm instance
+> Note that triggered the rhythm, if any.
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
 >  Current input parameter values: parameter ids as keys, parameter values as values
@@ -250,35 +244,6 @@
 
 ---  
 ## Properties
-### mono : [`boolean`](../API/builtins/boolean.md)[`?`](../API/builtins/nil.md)<a name="mono"></a>
-> Set optional trigger mode. By default false, so rhythms are `polyphonic` by default.
-> 
-> * `mono` mode will start the rhythm with the first note that got triggered, and will
-> pass all subsequent notes to the existing rhythm instance until all notes get released.
-> * `poly` mode will start a new rhythm instance for every new note and will stop the
-> rhythm instance when the note is released.
-> 
-> Monophonic modes can be used to create arpeggio or chord mapping alike rhythms, which
-> need to consume multiple input notes.
-> 
-> ---#### examples:
-> ```lua
-> -- emit triggerd chords to a sequence of notes (an arpeggio)
-> return rhythm {
->   mono = true,
->   emit = function (init_context)
->     -- index in arp as local state
->     local note_index = 0
->     return function (context)
->       -- advance and wrap to next note in triggered notes
->       local notes = context.triggers.notes
->       note_index = math.imod(note_index + 1, #notes)
->       return notes[note_index]
->     end
->   end
-> }
-> ```
-
 ### unit : `"ms"` | `"seconds"` | `"bars"` | `"beats"` | `"1/1"` | `"1/2"` | `"1/4"` | `"1/8"` | `"1/16"` | `"1/32"` | `"1/64"`<a name="unit"></a>
 > Base time unit of the emitter. Use `resolution` to apply an additional factor, in order to
 > create other less common rhythm bases.

@@ -4,7 +4,7 @@ use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
     BeatTimeBase, BeatTimeStep, Event, InputParameter, InputParameterSet, InstrumentId, Rhythm,
-    RhythmIter, RhythmIterItem, RhythmTriggerMode, SampleTime, SampleTimeDisplay,
+    RhythmIter, RhythmIterItem, SampleTime, SampleTimeDisplay,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -312,23 +312,6 @@ impl Rhythm for Phrase {
         for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
                 rhythm.borrow_mut().set_instrument(instrument);
-            }
-        }
-    }
-
-    fn trigger_mode(&self) -> RhythmTriggerMode {
-        for rhythm_slot in &self.rhythm_slots {
-            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                return rhythm.borrow().trigger_mode();
-            }
-        }
-        RhythmTriggerMode::Poly
-    }
-
-    fn set_trigger_mode(&mut self, mode: RhythmTriggerMode) {
-        for rhythm_slot in &mut self.rhythm_slots {
-            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_trigger_mode(mode);
             }
         }
     }

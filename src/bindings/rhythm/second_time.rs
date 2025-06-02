@@ -3,7 +3,7 @@ use mlua::prelude::*;
 use super::super::{
     unwrap::{
         bad_argument_error, event_iter_from_value, gate_from_value, inputs_from_value,
-        pattern_from_value, pattern_repeat_count_from_value, trigger_mode_from_mono_value,
+        pattern_from_value, pattern_repeat_count_from_value,
     },
     LuaTimeoutHook,
 };
@@ -62,12 +62,6 @@ impl SecondTimeRhythm {
                     "offset must be a number >= 0",
                 ));
             }
-        }
-        // mono
-        if table.contains_key("mono")? {
-            let value = table.get::<LuaValue>("mono")?;
-            let trigger_mode = trigger_mode_from_mono_value(&value)?;
-            rhythm = rhythm.with_trigger_mode(trigger_mode);
         }
         // inputs
         if table.contains_key("inputs")? {

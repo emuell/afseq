@@ -47,7 +47,6 @@ pub use super::{
     RhythmIter,
     RhythmIterItem,
     RhythmSlot,
-    RhythmTriggerMode,
     SampleTime,
     Scale,
     SecondTimeBase,

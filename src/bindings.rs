@@ -300,8 +300,7 @@ fn register_global_bindings(
             let time_base = *time_base;
             move |lua, table: LuaTable| -> LuaResult<LuaValue> {
                 // error on unknown option keys
-                const RHYTHM_PROPERTIES: [&str; 9] = [
-                    "mono",
+                const RHYTHM_PROPERTIES: [&str; 8] = [
                     "unit",
                     "resolution",
                     "offset",
@@ -899,7 +898,7 @@ mod test {
         new_rhythm_from_string(
             time_base,
             None,
-            r#"return rhythm { mono = false, unit = "1/4", emit = "c4" }"#,
+            r#"return rhythm { unit = "1/4", emit = "c4" }"#,
             "[test beat rhythm]",
         )?;
 
@@ -907,7 +906,7 @@ mod test {
         new_rhythm_from_string(
             time_base,
             None,
-            r#"return rhythm { mono = true, unit = "ms", emit = "c4" }"#,
+            r#"return rhythm { unit = "ms", emit = "c4" }"#,
             "[test second time rhythm]",
         )?;
 

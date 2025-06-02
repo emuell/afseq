@@ -181,9 +181,7 @@
 > step length fraction within the cycle, where 1 is the total duration of a single cycle run.
 
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Notes that triggered the rhythm:
-> * Mono mode: All active trigger notes (last released note stops the rhythm)
-> * Poly mode: Single note that started the rhythm instance
+> Note that triggered the rhythm, if any.
 
 ### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
 >  Current input parameter values: parameter ids as keys, parameter values as values

@@ -70,8 +70,6 @@ function math.randomseed(x) end
 ---  end
 ---}
 ---```
----@see math.random function arguments
----@see math.randomseed seeding
 ---@param seed? integer
 ---@return fun(m: integer?, n: integer?): number
 function math.randomstate(seed) end
