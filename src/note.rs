@@ -187,9 +187,14 @@ impl TryFrom<&str> for Note {
 
     /// Try converting the given string to a Note value
     fn try_from(s: &str) -> Result<Self, String> {
+        fn is_empty_note(s: &str) -> bool {
+            s.is_empty() || s.trim_matches(|c| c == '-').is_empty()
+        }
+
         fn is_note_off(s: &str) -> bool {
             s.eq_ignore_ascii_case("off") || s == "~"
         }
+
         fn is_sharp_symbol(s: &str, index: usize) -> bool {
             if let Some(c) = s.chars().nth(index) {
                 if c == 'S' || c == 's' || c == '#' || c == '♮' {
@@ -256,6 +261,11 @@ impl TryFrom<&str> for Note {
             }
         }
 
+        // Empty Note
+        if is_empty_note(s) {
+            return Ok(Note::EMPTY);
+        }
+
         // Note-Off
         if is_note_off(s) {
             return Ok(Note::OFF);
@@ -286,7 +296,11 @@ impl TryFrom<&str> for Note {
 
 impl From<u8> for Note {
     fn from(n: u8) -> Note {
-        unsafe { mem::transmute(n & 0x7f) }
+        match n {
+            0xFF => Self::EMPTY,
+            0xFE => Self::OFF,
+            _ => unsafe { mem::transmute::<u8, Self>(n & 0x7f) },
+        }
     }
 }
 
@@ -324,13 +338,18 @@ impl Sub<u8> for Note {
 
 impl Display for Note {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        static NOTE_NAMES: [&str; 12] = [
+        const NOTE_NAMES: [&str; 12] = [
             "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
         ];
-
-        let octave = (*self as u8 / 12) as i32;
-        let note = (*self as u8 % 12) as usize;
-        write!(f, "{}{}", NOTE_NAMES[note], octave)
+        match self {
+            Self::EMPTY => write!(f, "---"),
+            Self::OFF => write!(f, "off"),
+            _ => {
+                let octave = (*self as u8 / 12) as i32;
+                let note = (*self as u8 % 12) as usize;
+                write!(f, "{}{}", NOTE_NAMES[note], octave)
+            }
+        }
     }
 }
 
@@ -345,8 +364,13 @@ mod test {
         assert_eq!(Note::from(0x0_u8), Note::C0);
         assert_eq!(Note::from(0x24_u8), Note::C3);
         assert_eq!(Note::from(0x80_u8), Note::C0); // wraps, probably should not be allowed
+        assert_eq!(Note::from(0xFF_u8), Note::EMPTY);
+        assert_eq!(Note::from(-1i32 as u8), Note::EMPTY);
+        assert_eq!(Note::from(0xFE_u8), Note::OFF);
         assert_eq!(i8::from(Note::C4), 48);
         assert_eq!(u8::from(Note::C3), 0x24);
+        assert_eq!(u8::from(Note::OFF), 0xFE);
+        assert_eq!(u8::from(Note::EMPTY), 0xFF);
     }
 
     #[test]
@@ -355,11 +379,11 @@ mod test {
         assert_eq!(Note::Cs0.to_string(), "C#0");
         assert_eq!(Note::G9.to_string(), "G9");
         assert_eq!(Note::Fs10.to_string(), "F#10");
+        assert_eq!(Note::OFF.to_string(), "off");
     }
 
     #[test]
     fn note_deserialization() -> Result<(), String> {
-        assert!(Note::try_from("").is_err());
         assert!(Note::try_from("x4").is_err());
         assert!(Note::try_from("c.2").is_err());
         assert!(Note::try_from("cc2").is_err());
@@ -380,6 +404,9 @@ mod test {
         assert_eq!(Note::try_from("off")?, Note::OFF);
         assert_eq!(Note::try_from("~")?, Note::OFF);
 
+        assert_eq!(Note::try_from("")?, Note::EMPTY);
+        assert_eq!(Note::try_from("-")?, Note::EMPTY);
+        assert_eq!(Note::try_from("---")?, Note::EMPTY);
         Ok(())
     }
 }

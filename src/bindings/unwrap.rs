@@ -486,13 +486,12 @@ pub(crate) fn note_degree_from_value(arg: &LuaValue, arg_index: usize) -> LuaRes
 }
 
 pub(crate) fn note_event_from_number(note_value: LuaInteger) -> LuaResult<Option<NoteEvent>> {
-    if (0..=0x7f).contains(&note_value) {
-        Ok(new_note(note_value.clamp(0, 0x7f) as u8))
-    } else {
-        Err(LuaError::RuntimeError(format!(
-            "note property must be in range [0..=0x7f] but is: '{}'",
+    match note_value {
+        0..=0x7f | 0xFE | 0xFF => Ok(new_note(note_value as u8)),
+        _ => Err(LuaError::RuntimeError(format!(
+            "note number must be 0xFF for empty notes or 0xFE for off notes or must be in range [0..=0x7f], but is: '{}'",
             note_value
-        )))
+        ))),
     }
 }
 

@@ -26,7 +26,7 @@ use crate::{
     event::InstrumentId,
     rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
     time::BeatTimeBase,
-    InputParameter, Scale,
+    InputParameter, Note, Scale,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -244,10 +244,8 @@ fn register_global_bindings(
         lua.create_function(|_lua, value: LuaValue| -> LuaResult<LuaValue> {
             let note_event = note_event_from_value(&value, None)?;
             match note_event {
-                Some(note_event) if note_event.note.is_note_on() => {
-                    Ok(LuaValue::Integer(u8::from(note_event.note) as LuaInteger))
-                }
-                _ => Ok(LuaValue::Integer(-1 as LuaInteger)),
+                Some(note_event) => Ok(LuaValue::Integer(u8::from(note_event.note) as LuaInteger)),
+                _ => Ok(LuaValue::Integer(Note::EMPTY as u8 as LuaInteger)),
             }
         })?,
     )?;

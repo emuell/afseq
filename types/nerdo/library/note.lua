@@ -113,12 +113,14 @@ function Note:delay(delay) end
 function note(...) end
 
 ---Convert a note string or note table to a raw MIDI note number in range 0-127
----or -1 for nil or off note values.
+---or 0xFF for nil or empty note strings
+---or 0xFE for note offs
 ---### Examples:
 ---```lua
 ---note_value("c4") --> 48
 ---note_value(note("c4")) --> 48
----note_value("off") --> -1
+---note_value("") --> 0xFF
+---note_value("off") --> 0xFE
 ---note_value("xyz") --> error
 ---```
 ---@param note NoteValue

@@ -25,10 +25,10 @@ local empty_pulse_values = {
 local function empty_pulse_value(table)
   if type(table) == "table" then
     for _, v in pairs(table) do
-      -- special case for numbers, which are more likely notes when > 1
+      -- special case for numbers, which are likely notes when > 1
       if type(v) == "number" then
         if v > 1 then
-          return {}
+          return 0xff -- empty note value
         end
       end
       local value = empty_pulse_values[type(v)]

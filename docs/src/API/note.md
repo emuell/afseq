@@ -37,7 +37,8 @@
 > ```lua
 > note_value("c4") --> 48
 > note_value(note("c4")) --> 48
-> note_value("off") --> -1
+> note_value("") --> -1
+> note_value("off") --> -2
 > note_value("xyz") --> error
 > ```  
 
