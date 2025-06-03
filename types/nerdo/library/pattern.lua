@@ -233,9 +233,9 @@ function pattern.euclidean(steps, length, offset, empty_value)
     end
     return result
   elseif #front >= length then
-    local result = pattern.new();
-    for _ = 1, length do
-      result:push_back(1)
+    local result = pattern.from(front);
+    while #result > length do
+      result:pop_back()
     end
     return result
   else
