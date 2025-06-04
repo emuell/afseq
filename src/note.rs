@@ -162,23 +162,29 @@ impl Note {
     }
     /// returns if this note value is a note-off.
     pub fn is_note_off(&self) -> bool {
-        *self == Note::OFF && *self != Note::EMPTY
+        *self == Note::OFF
     }
 
     /// Get root key of the note as number: 0 = C, 1 = C# ...
+    /// Panics when the note is not a note on value.
     pub fn key(&self) -> u8 {
+        assert!(self.is_note_on());
         *self as u8 % 12
     }
-
     /// Get note's octave value.
+    /// Panics when the note is not a note on value.
     pub fn octave(&self) -> u8 {
+        assert!(self.is_note_on());
         *self as u8 / 12
     }
 
     /// return a new transposed note with the given offset.
     #[must_use]
     pub fn transposed(&self, offset: i32) -> Self {
-        Note::from((*self as i32 + offset).clamp(0, 0x7f) as u8)
+        match self {
+            Self::OFF | Self::EMPTY => *self,
+            _ => Note::from((*self as i32 + offset).clamp(0, 0x7f) as u8),
+        }
     }
 }
 
