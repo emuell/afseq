@@ -44,6 +44,7 @@ pub use super::{
     PulseIter,
     PulseIterItem,
     Rhythm,
+    RhythmEventTransform,
     RhythmIter,
     RhythmIterItem,
     RhythmSlot,

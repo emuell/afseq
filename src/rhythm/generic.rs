@@ -12,9 +12,9 @@ use crate::{
     event::{fixed::FixedEventIter, Event, EventIter, EventIterItem, InstrumentId},
     gate::threshold::ThresholdGate,
     pattern::{fixed::FixedPattern, Pattern},
-    time::{BeatTimeBase, SampleTimeDisplay},
-    Gate, InputParameter, InputParameterSet, PulseIterItem, Rhythm, RhythmIter, RhythmIterItem,
-    SampleTime,
+    time::BeatTimeBase,
+    Gate, InputParameter, InputParameterSet, PulseIterItem, Rhythm, RhythmEventTransform,
+    RhythmIter, RhythmIterItem, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -36,7 +36,6 @@ pub trait GenericRhythmTimeStep: Debug + Clone + Copy + 'static {
 /// which then drives an [`EventIter`][`crate::EventIter`].
 ///
 /// Internal time units are generics, and will usually be beats or seconds.
-#[derive(Debug)]
 pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> {
     time_base: BeatTimeBase,
     step: Step,
@@ -52,7 +51,29 @@ pub struct GenericRhythm<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeS
     event_iter_next_sample_time: f64,
     event_iter_pulse_item: PulseIterItem,
     event_iter_items: VecDeque<EventIterItem>,
+    event_transform: Option<RhythmEventTransform>,
     sample_offset: SampleTime,
+}
+
+impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Debug
+    for GenericRhythm<Step, Offset>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GenericRhythm")
+            .field("time_base", &self.time_base)
+            .field("step", &self.step)
+            .field("offset", &self.offset)
+            .field("instrument", &self.instrument)
+            .field("input_parameters", &self.input_parameters)
+            .field("pattern", &self.pattern)
+            .field("pattern_repeat_count", &self.pattern_repeat_count)
+            .field("pattern_playback_finished", &self.pattern_playback_finished)
+            .field("gate", &self.gate)
+            .field("event_iter", &self.event_iter)
+            // Skip event_transform, which has no Debug impl and event_iter state to reduce noise
+            .field("sample_offset", &self.sample_offset)
+            .finish()
+    }
 }
 
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<Step, Offset> {
@@ -71,6 +92,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         let event_iter_next_sample_time = offset.to_samples(&time_base);
         let event_iter_pulse_item = PulseIterItem::default();
         let event_iter_items = VecDeque::new();
+        let event_transform = None;
         let sample_offset = 0;
         Self {
             time_base,
@@ -87,6 +109,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             event_iter_next_sample_time,
             event_iter_pulse_item,
             event_iter_items,
+            event_transform,
             sample_offset,
         }
     }
@@ -212,6 +235,15 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         new
     }
 
+    /// Return a new rhythm instance which uses the given event transform function
+    #[must_use]
+    pub fn with_event_transform(self, transform: RhythmEventTransform) -> Self {
+        Self {
+            event_transform: Some(transform),
+            ..self
+        }
+    }
+
     /// Return current pulse duration in samples
     #[inline]
     pub fn current_steps_sample_duration(&self) -> f64 {
@@ -235,16 +267,18 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
         (step_time * length) as SampleTime
     }
 
-    /// Set default instrument to event if none is set, else return the event as it is
-    fn event_with_default_instrument(&self, mut event_item: EventIterItem) -> EventIterItem {
+    /// Set a default instrument, if set, and apply event transform functions
+    fn apply_event_transform(&self, event_item: &mut EventIterItem) {
         if let Some(instrument) = self.instrument {
             if let Event::NoteEvents(note_events) = &mut event_item.event {
                 for note_event in note_events.iter_mut().flatten() {
                     note_event.instrument = note_event.instrument.or(Some(instrument));
                 }
             }
+            if let Some(transform) = &self.event_transform {
+                transform(&mut event_item.event);
+            }
         }
-        event_item
     }
 
     fn run_pattern(&mut self) -> Option<(PulseIterItem, bool)> {
@@ -296,11 +330,10 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> GenericRhythm<S
             }
         }
         // fetch a new event item from the event iter item deque
-        if let Some(event_item) = self
-            .event_iter_items
-            .pop_front()
-            .map(|event| self.event_with_default_instrument(event))
-        {
+        if let Some(event_item) = self.event_iter_items.pop_front().map(|mut event| {
+            self.apply_event_transform(&mut event);
+            event
+        }) {
             // return event as sample timed rhythm iter item
             let time = self.event_iter_item_start_time(&event_item.start);
             if time >= sample_time {
@@ -347,6 +380,7 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Clone
             pattern: self.pattern.duplicate(),
             event_iter: self.event_iter.duplicate(),
             event_iter_items: self.event_iter_items.clone(),
+            event_transform: self.event_transform.clone(),
             gate: self.gate.duplicate(),
             ..*self
         }
@@ -366,15 +400,18 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Iterator
 impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> RhythmIter
     for GenericRhythm<Step, Offset>
 {
-    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
-        Box::new(self.time_base)
-    }
-
     fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset;
+    }
+
+    fn event_transform(&self) -> &Option<RhythmEventTransform> {
+        &self.event_transform
+    }
+    fn set_event_transform(&mut self, transform: Option<RhythmEventTransform>) {
+        self.event_transform = transform;
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
@@ -480,10 +517,6 @@ impl<Step: GenericRhythmTimeStep, Offset: GenericRhythmTimeStep> Rhythm
         self.pattern.set_time_base(time_base);
         self.gate.set_time_base(time_base);
         self.event_iter.set_time_base(time_base);
-    }
-
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        self.instrument = instrument;
     }
 
     fn set_trigger_event(&mut self, event: &Event) {

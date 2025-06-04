@@ -8,7 +8,7 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 /// Pointer to a function which mutates an Event.
-type EventMapFn = dyn FnMut(Event) -> Event + 'static;
+type EventMapFn = dyn FnMut(&mut Event) + 'static;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -27,7 +27,7 @@ pub struct MutatedEventIter {
 impl MutatedEventIter {
     pub fn new<F>(events: Vec<Event>, map: F) -> Self
     where
-        F: FnMut(Event) -> Event + Clone + 'static,
+        F: FnMut(&mut Event) + Clone + 'static,
     {
         // capture initial map state
         let initial_map = map.clone();
@@ -35,21 +35,19 @@ impl MutatedEventIter {
         let mut map = Box::new(map);
         let mut initial_events = events;
         if !initial_events.is_empty() {
-            initial_events[0] = Self::mutate(initial_events[0].clone(), &mut map);
+            map(&mut initial_events[0]);
         }
+        let reset_map: Box<dyn Fn() -> Box<EventMapFn>> =
+            Box::new(move || Box::new(initial_map.clone()));
         let events = initial_events.clone();
         let event_index = 0;
         Self {
             events,
             event_index,
             initial_events,
-            reset_map: Box::new(move || Box::new(initial_map.clone())),
+            reset_map,
             map,
         }
-    }
-
-    fn mutate(event: Event, map: &mut dyn FnMut(Event) -> Event) -> Event {
-        (*map)(event)
     }
 }
 
@@ -80,8 +78,8 @@ impl EventIter for MutatedEventIter {
         if !emit_event || self.events.is_empty() {
             return None;
         }
-        let event = self.events[self.event_index].clone();
-        self.events[self.event_index] = Self::mutate(event.clone(), &mut self.map);
+        let mut event = self.events[self.event_index].clone();
+        (*self.map)(&mut event);
         self.event_index = (self.event_index + 1) % self.events.len();
         Some(vec![EventIterItem::new(event)])
     }
@@ -101,14 +99,14 @@ impl EventIter for MutatedEventIter {
 
 pub trait ToMutatedEventIter<F>
 where
-    F: FnMut(Event) -> Event + Clone + 'static,
+    F: FnMut(&mut Event) + Clone + 'static,
 {
     fn mutate(self, map: F) -> MutatedEventIter;
 }
 
 impl<F> ToMutatedEventIter<F> for FixedEventIter
 where
-    F: FnMut(Event) -> Event + Clone + 'static,
+    F: FnMut(&mut Event) + Clone + 'static,
 {
     /// Upgrade a [`FixedEventIter`] to a [`MutatedEventIter`].
     fn mutate(self, map: F) -> MutatedEventIter {

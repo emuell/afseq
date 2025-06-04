@@ -3,7 +3,7 @@
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
-use crate::{BeatTimeBase, Event, InputParameter, InstrumentId, SampleTime, SampleTimeDisplay};
+use crate::{BeatTimeBase, Event, InputParameter, SampleTime};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -36,6 +36,11 @@ impl RhythmIterItem {
 
 // -------------------------------------------------------------------------------------------------
 
+/// A refcounted function which may transform emitted [`Event`] contents of a [`RhythmIter`].
+pub type RhythmEventTransform = Rc<dyn Fn(&mut Event)>;
+
+// -------------------------------------------------------------------------------------------------
+
 /// A `RhythmIter` is an iterator which emits sample time tagged optional [`Event`]
 /// items.
 ///
@@ -47,14 +52,16 @@ impl RhythmIterItem {
 /// multiple notes, or a single parameter change event. The event iter impl is an iterator too,
 /// so the emitted event content may dynamically change over time as well.
 pub trait RhythmIter: Debug {
-    /// Create a sample time display printer, which serializes the given sample time to the rhythm's
-    /// time base as appropriated (in seconds or beats). May be useful for debugging purposes.
-    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay>;
-
     /// Custom sample offset value which is applied to all emitted events.
     fn sample_offset(&self) -> SampleTime;
     /// Set a new custom sample offset value.
     fn set_sample_offset(&mut self, sample_offset: SampleTime);
+
+    /// Get optional dynamic event transform function for the iterator
+    fn event_transform(&self) -> &Option<RhythmEventTransform>;
+    /// Set an optional dynamic event transform function for the iterator, which gets invoked for
+    /// every emitted event. Note that transforms can not change event times, but only event content.
+    fn set_event_transform(&mut self, transform: Option<RhythmEventTransform>);
 
     /// Sample time iter: Generate a single next due event but running the pattern to generate a new
     /// pulse, if the pulse's sample time is smaller than the given sample time. Then generates an
@@ -87,8 +94,7 @@ impl Iterator for dyn RhythmIter {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `Rhythm` is a resettable, dyn clonable `RhythmIter` with optional instrument and
-/// time base setters.
+/// A `Rhythm` is a resettable, dyn clonable `RhythmIter` with a beat time base.
 ///
 /// Rhythms can be reset and cloned (duplicated), so that they can be triggered multiple times
 /// using possibly different patterns and time bases.
@@ -102,17 +108,12 @@ pub trait Rhythm: RhythmIter {
     /// A rhythm pattern repeats after `self.pattern_step_length() * self.pattern_length()` samples.
     fn pattern_length(&self) -> usize;
 
-    /// Get the rhythm's current internal time base.
+    /// Get the rhythmiters internal beat time base.
     fn time_base(&self) -> &BeatTimeBase;
-    /// Update the rhythm's internal time bases with a new time base.
-    /// A rhythm usually will be created with a valid initial time base.
+    /// Update the rhythm iters beat time bases with a new time base (e.g. on tempo changes).
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// Set/unset a new default instrument value for all emitted note events which have no
-    /// instrument value set.
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>);
-
-    /// Set event which triggered, started the rhythm, if any.
+    /// Set event which triggered, started the rhythm.
     fn set_trigger_event(&mut self, trigger: &Event);
 
     /// Create a new cloned instance of this rhythm. This actually is a clone(), wrapped into

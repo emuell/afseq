@@ -3,17 +3,18 @@
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc};
 
 use crate::{
-    BeatTimeBase, BeatTimeStep, Event, InputParameter, InputParameterSet, InstrumentId, Rhythm,
-    RhythmIter, RhythmIterItem, SampleTime, SampleTimeDisplay,
+    BeatTimeBase, BeatTimeStep, Event, InputParameter, InputParameterSet, Rhythm,
+    RhythmEventTransform, RhythmIter, RhythmIterItem, SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
 
 /// A single slot in a [`Phrase`] vector.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum RhythmSlot {
     /// Stop previous playing rhythm and/or simply play nothing. This can be useful to
     /// create empty placeholder slots in e.g. a [Sequence][`crate::Sequence`].
+    #[default]
     Stop,
     /// Continue playing a previously played rhythm in a [Sequence][`crate::Sequence`].
     Continue,
@@ -57,14 +58,28 @@ pub type PhraseIterItem = (RhythmIndex, RhythmIterItem);
 ///
 /// The `run_until_time` function is also used by [Sequence][`crate::Sequence`] to play a phrase
 /// with a player engine.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Phrase {
     time_base: BeatTimeBase,
     length: BeatTimeStep,
     input_parameters: InputParameterSet,
     rhythm_slots: Vec<RhythmSlot>,
     next_events: Vec<Option<PhraseIterItem>>,
+    event_transform: Option<RhythmEventTransform>,
     sample_offset: SampleTime,
+}
+
+impl Debug for Phrase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GenericRhythm")
+            .field("time_base", &self.time_base)
+            .field("length", &self.length)
+            .field("input_parameters", &self.input_parameters)
+            .field("rhythm_slots", &self.rhythm_slots)
+            // Skip event_transform, which has no Debug impl and next_events to reduce noise
+            .field("sample_offset", &self.sample_offset)
+            .finish()
+    }
 }
 
 impl Phrase {
@@ -76,8 +91,6 @@ impl Phrase {
         rhythm_slots: Vec<R>,
         length: BeatTimeStep,
     ) -> Self {
-        let next_events = vec![None; rhythm_slots.len()];
-        let sample_offset = 0;
         let rhythm_slots = rhythm_slots
             .into_iter()
             .map(|r| r.into())
@@ -98,12 +111,16 @@ impl Phrase {
                 }
             }
         }
+        let next_events = vec![None; rhythm_slots.len()];
+        let event_transform = None;
+        let sample_offset = 0;
         Self {
             time_base,
             length,
             input_parameters,
             rhythm_slots,
             next_events,
+            event_transform,
             sample_offset,
         }
     }
@@ -115,20 +132,13 @@ impl Phrase {
     }
 
     /// Read-only access to our rhythm slots.
-    pub fn rhythm_slots(&self) -> &Vec<RhythmSlot> {
+    pub fn rhythm_slots(&self) -> &[RhythmSlot] {
         &self.rhythm_slots
     }
 
-    /// Run rhythms to produce a single next event, calling the given `consumer`
-    /// visitor function when an event got produced.
-    pub fn consume_event<F>(&mut self, consumer: &mut F)
-    where
-        F: FnMut(RhythmIndex, RhythmIterItem),
-    {
-        // emit and consume next event, if any
-        if let Some((rhythm_index, rhythm_item)) = self.next_event_until_time(SampleTime::MAX) {
-            consumer(rhythm_index, rhythm_item);
-        }
+    /// Mut access to our rhythm slots.
+    pub fn rhythm_slots_mut(&mut self) -> &mut [RhythmSlot] {
+        &mut self.rhythm_slots
     }
 
     /// Run rhythms until a given sample time is reached, calling the given `consumer`
@@ -138,8 +148,9 @@ impl Phrase {
         F: FnMut(RhythmIndex, RhythmIterItem),
     {
         // emit and consume next events until we've reached the desired sample_time
-        while let Some((rhythm_index, rhythm_item)) = self.next_event_until_time(sample_time) {
+        while let Some((rhythm_index, mut rhythm_item)) = self.next_event_until_time(sample_time) {
             debug_assert!(rhythm_item.time < sample_time);
+            self.apply_event_transform(&mut rhythm_item);
             consumer(rhythm_index, rhythm_item);
         }
     }
@@ -191,6 +202,15 @@ impl Phrase {
                     // take over rhythm
                     rhythm_slot.clone_from(&previous_phrase.rhythm_slots[rhythm_index]);
                 }
+            }
+        }
+    }
+
+    /// Apply custom event transform function, if any to all emitted events
+    fn apply_event_transform(&self, rhythm_item: &mut RhythmIterItem) {
+        if let Some(transform) = &self.event_transform {
+            if let Some(event) = &mut rhythm_item.event {
+                transform(event);
             }
         }
     }
@@ -259,15 +279,19 @@ impl Iterator for Phrase {
 }
 
 impl RhythmIter for Phrase {
-    fn sample_time_display(&self) -> Box<dyn SampleTimeDisplay> {
-        Box::new(self.time_base)
-    }
-
     fn sample_offset(&self) -> SampleTime {
         self.sample_offset
     }
     fn set_sample_offset(&mut self, sample_offset: SampleTime) {
         self.sample_offset = sample_offset;
+    }
+
+    fn event_transform(&self) -> &Option<RhythmEventTransform> {
+        &self.event_transform
+    }
+
+    fn set_event_transform(&mut self, transform: Option<RhythmEventTransform>) {
+        self.event_transform = transform;
     }
 
     fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem> {
@@ -308,14 +332,6 @@ impl Rhythm for Phrase {
         }
     }
 
-    fn set_instrument(&mut self, instrument: Option<InstrumentId>) {
-        for rhythm_slot in &mut self.rhythm_slots {
-            if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
-                rhythm.borrow_mut().set_instrument(instrument);
-            }
-        }
-    }
-
     fn set_trigger_event(&mut self, event: &Event) {
         for rhythm_slot in &mut self.rhythm_slots {
             if let RhythmSlot::Rhythm(rhythm) = rhythm_slot {
@@ -346,6 +362,8 @@ impl Rhythm for Phrase {
 
 #[cfg(test)]
 mod test {
+    use std::rc::Rc;
+
     use crate::prelude::*;
 
     fn create_phrase() -> Result<Phrase, String> {
@@ -366,6 +384,13 @@ mod test {
         let snare_pattern = beat_time
             .every_nth_beat(2.0)
             .with_offset(BeatTimeStep::Beats(1.0))
+            .with_event_transform(Rc::new(|event| {
+                if let Event::NoteEvents(notes) = event {
+                    for note in notes.iter_mut().flatten() {
+                        note.note = Note::D4;
+                    }
+                }
+            }))
             .trigger(new_note_event("C_5"));
 
         let hihat_pattern =
@@ -373,8 +398,8 @@ mod test {
                 .every_nth_sixteenth(2.0)
                 .trigger(new_note_event("C_5").mutate({
                     let mut step = 0;
-                    move |mut event| {
-                        if let Event::NoteEvents(notes) = &mut event {
+                    move |event| {
+                        if let Event::NoteEvents(notes) = event {
                             for note in notes.iter_mut().flatten() {
                                 note.volume = 1.0 / (step + 1) as f32;
                                 step += 1;
@@ -383,7 +408,6 @@ mod test {
                                 }
                             }
                         }
-                        event
                     }
                 }));
 
@@ -393,8 +417,8 @@ mod test {
             .trigger(new_note_event("C_5").mutate({
                 let mut vel_step = 0;
                 let mut note_step = 0;
-                move |mut event| {
-                    if let Event::NoteEvents(notes) = &mut event {
+                move |event| {
+                    if let Event::NoteEvents(notes) = event {
                         for note in notes.iter_mut().flatten() {
                             note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
                             vel_step += 1;
@@ -408,7 +432,6 @@ mod test {
                             }
                         }
                     }
-                    event
                 }
             }));
 

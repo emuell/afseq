@@ -69,7 +69,7 @@ pub mod gate;
 pub use gate::Gate;
 
 pub mod rhythm;
-pub use rhythm::{Rhythm, RhythmIter, RhythmIterItem};
+pub use rhythm::{Rhythm, RhythmEventTransform, RhythmIter, RhythmIterItem};
 
 pub mod phrase;
 pub use phrase::{Phrase, RhythmSlot};
