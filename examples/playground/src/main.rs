@@ -20,8 +20,8 @@ extern "C" {
 
 // -------------------------------------------------------------------------------------------------
 
-// a single thread in JS only and thus can avoid using Mutex or other RWLocks which would
-// require using atomics in the WASM.
+// We're called from single thread in JS only, thus we can avoid using Mutex or other RWLocks
+// which would require using atomics in the WASM.
 thread_local!( //
     static PLAYGROUND: RefCell<Option<Playground>> = const { RefCell::new(None) }
 );
@@ -60,7 +60,6 @@ where
 
 /// Single sample asset, passed as JSON to the frontend.
 #[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
 struct SampleEntry {
     name: String,
     id: usize,
@@ -68,7 +67,6 @@ struct SampleEntry {
 
 /// Single example script content section, passed as JSON to the frontend.
 #[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
 struct ScriptSection {
     name: String,
     entries: Vec<ScriptEntry>,
@@ -76,10 +74,17 @@ struct ScriptSection {
 
 /// Single example script asset, passed as JSON to the frontend.
 #[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
 struct ScriptEntry {
     name: String,
     content: String,
+}
+
+/// Single rhythm triggered by a MIDI note
+#[derive(Clone)]
+struct PlayingNote {
+    note: u8,
+    velocity: u8,
+    sample_offset: SampleTime,
 }
 
 /// The backend's global app state.
@@ -91,25 +96,29 @@ struct Playground {
     time_base: BeatTimeBase,
     time_base_changed: bool,
     instrument_id: Option<usize>,
-    instrument_id_changed: bool,
     script_content: String,
     script_changed: bool,
     script_runtime_error: String,
+    playing_notes: Vec<PlayingNote>,
     output_start_sample_time: u64,
     emitted_sample_time: u64,
     run_frame_id: ffi::c_long,
 }
 
 impl Playground {
-    /// Event scheduler read-ahead time (latency)
+    // Event scheduler read-ahead time (latency)
     const PLAYBACK_PRELOAD_SECONDS: f64 = if cfg!(debug_assertions) { 1.0 } else { 0.25 };
+    // Max expected MIDI notes
+    const NUM_MIDI_NOTES: usize = 127;
+    // Path to our assets folder. see build.rs.
+    const ASSETS_PATH: &str = "/assets";
 
     /// Creates a new Playground instance with initialized state.
     /// Returns an error if initialization fails at any step.
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // load samples
         println!("Loading sample files...");
-        let sample_paths = fs::read_dir("/assets/samples")?;
+        let sample_paths = fs::read_dir(format!("{}/samples", Self::ASSETS_PATH))?;
         let mut samples = Vec::new();
         let sample_pool = SamplePool::new();
         for sample_path in sample_paths.flatten() {
@@ -136,7 +145,7 @@ impl Playground {
         player.set_sample_root_note(Note::C4);
         player.set_new_note_action(NewNoteAction::Off(Some(Duration::from_millis(200))));
 
-        // createsequence
+        // create sequence
         let sequence = None;
 
         // time base
@@ -152,17 +161,19 @@ impl Playground {
         let script_changed = true;
         let script_runtime_error = String::new();
 
+        // MIDI note playback
+        let playing_notes = Vec::new();
+
         // default instrument
         let instrument_id = samples.first().map(|e| e.id);
-        let instrument_id_changed = false;
 
         // playback time
         let output_start_sample_time = player.file_player().output_sample_frame_position();
         let emitted_sample_time = 0;
 
-        // install emscripten loop
-        println!("Start running...");
+        // install emscripten frame timer
         let run_frame_id = unsafe {
+            println!("Start running...");
             emscripten_request_animation_frame_loop(Self::run_frame, std::ptr::null_mut())
         };
 
@@ -176,8 +187,8 @@ impl Playground {
             script_content,
             script_changed,
             script_runtime_error,
+            playing_notes,
             instrument_id,
-            instrument_id_changed,
             output_start_sample_time,
             emitted_sample_time,
             run_frame_id,
@@ -187,10 +198,9 @@ impl Playground {
     // read examples from the file system into a vector of ExampleScriptEntry
     fn example_scripts() -> Result<Vec<ScriptEntry>, Box<dyn std::error::Error>> {
         let mut example_entries = Vec::new();
-        let example_paths = fs::read_dir("./assets/examples")?;
+        let example_paths = fs::read_dir(format!("{}/examples", Self::ASSETS_PATH))?;
         for example in example_paths.flatten() {
             let path = example.path();
-            println!("Adding example: `{}`...", path.to_string_lossy());
             let mut name = path
                 .file_stem()
                 .unwrap_or_default()
@@ -208,7 +218,7 @@ impl Playground {
     // read quickstart examples from the file system into a vector of ExampleScriptSection
     fn quickstart_scripts() -> Result<Vec<ScriptSection>, Box<dyn std::error::Error>> {
         let mut quickstart_scripts = Vec::new();
-        let section_paths = fs::read_dir("./assets/quickstart")?;
+        let section_paths = fs::read_dir(format!("{}/quickstart", Self::ASSETS_PATH))?;
         for section_path in section_paths.flatten() {
             if section_path.metadata()?.is_dir() {
                 let mut section_name = section_path.file_name().to_string_lossy().to_string();
@@ -277,19 +287,75 @@ impl Playground {
         let _ = self.player.file_player_mut().stop_all_sources();
     }
 
+    /// Handle incoming MIDI note on event
+    fn handle_midi_note_on(&mut self, note: u8, velocity: u8) {
+        assert!(note as usize <= Self::NUM_MIDI_NOTES);
+        if self.playing_notes.is_empty() || self.rhythm_slot(note as usize).is_none() {
+            // reset play head
+            self.output_start_sample_time =
+                self.player.file_player().output_sample_frame_position();
+            self.emitted_sample_time = 0;
+            // memorize playing note
+            let new_note = PlayingNote {
+                note,
+                velocity,
+                sample_offset: 0,
+            };
+            self.playing_notes.push(new_note);
+            // start MIDI playback in `run`
+            self.script_changed = true;
+        } else {
+            // memorize playing note
+            let new_note = PlayingNote {
+                note,
+                velocity,
+                sample_offset: self.emitted_sample_time,
+            };
+            self.playing_notes.push(new_note.clone());
+            // add a new rhythm for the new note
+            let new_rhytm = self.new_rhythm(Some(new_note));
+            let rhythm_slot = self
+                .rhythm_slot(note as usize)
+                .expect("Missing MIDI rhythm slot");
+            *rhythm_slot = RhythmSlot::Rhythm(new_rhytm);
+        }
+    }
+
+    /// Handle incoming MIDI note off event
+    fn handle_midi_note_off(&mut self, note: u8) {
+        assert!(note as usize <= Self::NUM_MIDI_NOTES);
+        // ony handle off events when we got an on event
+        if let Some((playing_notes_index, _)) = self
+            .playing_notes
+            .iter()
+            .enumerate()
+            .find(|(_, n)| n.note == note)
+        {
+            // remove playing note
+            self.playing_notes.remove(playing_notes_index);
+            // remove the rhythm slot from sequence's phrase
+            if let Some(rhythm_slot) = self.rhythm_slot(note as usize) {
+                *rhythm_slot = RhythmSlot::Stop;
+                // stop pending from the note
+                self.player.stop_sources_in_rhythm_slot(note as usize);
+            }
+            // restore default playback in `run` with the last note removed
+            if self.playing_notes.is_empty() {
+                self.script_changed = true;
+            }
+        }
+    }
+
     /// Updates the tempo (beats per minute) of playback.
     fn set_bpm(&mut self, bpm: f32) {
-        self.time_base = BeatTimeBase {
-            beats_per_min: bpm,
-            ..self.time_base
-        };
+        self.time_base.beats_per_min = bpm;
         self.time_base_changed = true;
     }
 
     /// Sets the default instrument ID for playback.
     fn set_instrument(&mut self, id: i32) {
         self.instrument_id = Some(id as usize);
-        self.instrument_id_changed = true;
+        self.script_changed = true;
     }
 
     /// Updates the script content and marks it as changed to trigger recompilation.
@@ -315,21 +381,35 @@ impl Playground {
     fn run(&mut self) {
         // apply script content changes
         if self.script_changed || self.sequence.is_none() {
-            // create a new phrase from a single rhythm
-            let phrase = Phrase::new(
-                self.time_base,
-                vec![self.new_rhythm()],
-                BeatTimeStep::Bar(4.0),
-            );
+            // build note rhythm slots: one rhythm for each live played note
+            let rhythm_slots = if !self.playing_notes.is_empty() {
+                let mut slots = vec![RhythmSlot::Stop; Self::NUM_MIDI_NOTES];
+                for playing_note in &self.playing_notes.clone() {
+                    slots[playing_note.note as usize] =
+                        RhythmSlot::Rhythm(self.new_rhythm(Some(playing_note.clone())));
+                }
+                slots
+            } else {
+                // build a single regular rhythm slot
+                [RhythmSlot::Rhythm(self.new_rhythm(None))].to_vec()
+            };
+            // clear runtime errors
+            afseq::bindings::clear_lua_callback_errors();
             // replace sequence
-            let mut sequence = Sequence::new(self.time_base, vec![phrase]);
+            let mut sequence = Sequence::new(
+                self.time_base,
+                vec![Phrase::new(
+                    self.time_base,
+                    rhythm_slots,
+                    BeatTimeStep::Bar(4.0),
+                )],
+            );
             self.player
                 .prepare_run_until_time(&mut sequence, self.emitted_sample_time);
             self.sequence.replace(sequence);
             // reset all update flags: we're fully up to date now.
             self.script_changed = false;
             self.time_base_changed = false;
-            self.instrument_id_changed = false;
         }
 
         // apply time base changes
@@ -341,20 +421,11 @@ impl Playground {
                 .set_time_base(&self.time_base);
         }
 
-        // apply default instrument id changes
-        if self.instrument_id_changed {
-            self.instrument_id_changed = false;
-            let instrument_id = self.instrument_id.map(InstrumentId::from);
-            for phrase in self.sequence.as_mut().unwrap().phrases_mut() {
-                phrase.set_instrument(instrument_id);
-            }
-        }
-
         // check if audio output has been suspended by the browser
         let suspended = self.player.file_player().output_suspended();
 
         // run the player, when playing and audio output is not suspended
-        if self.playing && !suspended {
+        if (self.playing || !self.playing_notes.is_empty()) && !suspended {
             // calculate emitted and playback time differences
             let time_base = self.time_base;
             let output_sample_time = self.player.file_player().output_sample_frame_position();
@@ -373,8 +444,6 @@ impl Playground {
                     self.emitted_sample_time + samples_to_emit,
                 );
             } else if samples_to_emit > 0 {
-                // clear runtime errors before running
-                afseq::bindings::clear_lua_callback_errors();
                 // continue running player to generate events in real-time
                 self.player.run_until_time(
                     self.sequence.as_mut().unwrap(),
@@ -393,10 +462,23 @@ impl Playground {
         }
     }
 
+    /// Access an existing rhythm slot
+    fn rhythm_slot(&mut self, rhythm_index: usize) -> Option<&mut RhythmSlot> {
+        if let Some(sequence) = &mut self.sequence {
+            let phrase = sequence
+                .phrases_mut()
+                .first_mut()
+                .expect("Failed to access phrase");
+            phrase.rhythm_slots_mut().get_mut(rhythm_index)
+        } else {
+            None
+        }
+    }
+
     /// Create a new rhythm from the currently set script content
-    fn new_rhythm(&mut self) -> Rc<RefCell<dyn Rhythm>> {
-        self.script_runtime_error.clear();
-        new_rhythm_from_string(
+    fn new_rhythm(&mut self, midi_note: Option<PlayingNote>) -> Rc<RefCell<dyn Rhythm>> {
+        // create a new rhythm from our script
+        let rhythm = new_rhythm_from_string(
             self.time_base,
             self.instrument_id.map(InstrumentId::from),
             &self.script_content,
@@ -409,7 +491,59 @@ impl Playground {
                 self.time_base,
                 BeatTimeStep::Beats(1.0),
             )))
-        })
+        });
+        // and apply sample offset and event transform
+        rhythm
+            .borrow_mut()
+            .set_sample_offset(midi_note.as_ref().map(|n| n.sample_offset).unwrap_or(0));
+        rhythm
+            .borrow_mut()
+            .set_event_transform(self.new_rhythm_event_transform(midi_note));
+        rhythm
+    }
+
+    /// Create a note event transform function which applies instrument and
+    /// note_transpose transforms, when set.
+    fn new_rhythm_event_transform(
+        &self,
+        midi_note: Option<PlayingNote>,
+    ) -> Option<RhythmEventTransform> {
+        let transforms: Vec<_> = [
+            // Instrument transform
+            self.instrument_id.map(InstrumentId::from).map(|id| {
+                Box::new(move |note: &mut NoteEvent| {
+                    if note.instrument.is_none() {
+                        note.instrument = Some(id)
+                    }
+                }) as Box<dyn Fn(&mut NoteEvent)>
+            }),
+            // Note transform
+            midi_note.map(|note| {
+                let offset = note.note as i32 - 48;
+                let volume = note.velocity as f32 / 127.0;
+                Box::new(move |note_event: &mut NoteEvent| {
+                    note_event.note = note_event.note.transposed(offset);
+                    note_event.volume *= volume;
+                }) as Box<dyn Fn(&mut NoteEvent)>
+            }),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+
+        if !transforms.is_empty() {
+            Some(Rc::new(move |event: &mut Event| {
+                if let Event::NoteEvents(note_events) = event {
+                    note_events.iter_mut().flatten().for_each(|note_event| {
+                        transforms
+                            .iter()
+                            .for_each(|transform| transform(note_event))
+                    });
+                }
+            }))
+        } else {
+            None
+        }
     }
 }
 
@@ -450,7 +584,7 @@ pub unsafe extern "C" fn free_cstring(ptr: *mut ffi::c_char) {
 
 /// Creates global `Playground` state.
 #[no_mangle]
-pub extern "C" fn initialize() -> *const ffi::c_char {
+pub extern "C" fn initialize_playground() -> *const ffi::c_char {
     // create or recreate the player instance
     println!("Creating new player instance...");
     match Playground::new() {
@@ -469,7 +603,7 @@ pub extern "C" fn initialize() -> *const ffi::c_char {
 
 /// Destroys global `Playground` state.
 #[no_mangle]
-pub extern "C" fn shutdown() {
+pub extern "C" fn shutdown_playground() {
     // drop the player instance
     println!("Dropping player instance...");
     PLAYGROUND.replace(None);
@@ -491,6 +625,18 @@ pub extern "C" fn stop_playing() {
 #[no_mangle]
 pub extern "C" fn stop_playing_notes() {
     with_playground_mut(|playground| playground.stop_playing_notes());
+}
+
+/// Handle note on event from the frontend
+#[no_mangle]
+pub extern "C" fn midi_note_on(note: u8, velocity: u8) {
+    with_playground_mut(|playground| playground.handle_midi_note_on(note, velocity));
+}
+
+/// Handle note off event from the frontend
+#[no_mangle]
+pub extern "C" fn midi_note_off(note: u8) {
+    with_playground_mut(|playground| playground.handle_midi_note_off(note));
 }
 
 /// Update player's BPM.

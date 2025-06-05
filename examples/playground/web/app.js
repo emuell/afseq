@@ -48,10 +48,8 @@ var backend = {
     initialize: function (playground) {
         this._playground = playground;
 
-        let errPtr = playground._initialize();
-        if (errPtr != 0) {
-            let err = playground.UTF8ToString(errPtr);
-            playground._free_cstring(errPtr)
+        const err = this._playground.ccall('initialize_playground', 'string', [])
+        if (err) {
             return err
         }
 
@@ -106,6 +104,14 @@ var backend = {
 
     stopPlayingNotes: function () {
         this._playground.ccall("stop_playing_notes");
+    },
+
+    sendMidiNoteOn: function (note, velocity) {
+        this._playground.ccall("midi_note_on", 'undefined', ['number', 'number'], [note, velocity]);
+    },
+
+    sendMidiNoteOff: function (note) {
+        this._playground.ccall("midi_note_off", 'undefined', ['number'], [note]);
     },
 
     updateInstrument: function (instrument) {
@@ -174,7 +180,8 @@ var app = {
         // Set up control handlers
         const playButton = document.getElementById('playButton');
         const stopButton = document.getElementById('stopButton');
-        console.assert(playButton && stopButton);
+        const midiButton = document.getElementById('midiButton');
+        console.assert(playButton && stopButton && midiButton);
 
         playButton.addEventListener('click', () => {
             backend.startPlaying();
@@ -185,7 +192,7 @@ var app = {
         stopButton.addEventListener('click', () => {
             backend.stopPlaying();
             this.setStatus("Stopped");
-            playButton.style.color = 'var(--color-text)';
+            playButton.style.color = null;
         });
 
         const bpmInput = document.getElementById('bpmInput');
@@ -196,6 +203,90 @@ var app = {
             if (!isNaN(bpm)) {
                 backend.updateBpm(bpm);
                 this.setStatus(`Set new BPM: '${bpm}'`);
+            }
+        });
+
+        let midiAccess = null;
+        let midiEnabled = false;
+        let currentMidiNotes = new Set();
+
+        function enableMidi() {
+            if (!navigator.requestMIDIAccess) {
+                return Promise.reject(new Error("Web MIDI API not supported"));
+            }
+            return navigator.requestMIDIAccess()
+                .then(access => {
+                    midiAccess = access;
+                    midiEnabled = true;
+                    midiButton.style.color = 'var(--color-accent)';
+                    // Start listening to MIDI input
+                    for (let input of midiAccess.inputs.values()) {
+                        input.onmidimessage = handleMidiMessage;
+                    }
+                    // stop regular playback
+                    if (backend.isPlaying()) {
+                        backend.stopPlaying();
+                        playButton.style.color = null;
+                    }
+                    app.setStatus("MIDI input enabled. Press one or more notes on your keyboard to play the script...");
+                });
+        }
+
+        function disableMidi() {
+            midiEnabled = false;
+            midiButton.style.color = null;
+            // Stop listening to MIDI input
+            if (midiAccess) {
+                for (let input of midiAccess.inputs.values()) {
+                    input.onmidimessage = null;
+                }
+            }
+            // Release all notes
+            currentMidiNotes.forEach(note => {
+                backend.sendMidiNoteOff(note);
+            });
+            currentMidiNotes.clear();
+            app.setStatus("MIDI input disabled");
+            return Promise.resolve();
+        }
+
+        function handleMidiMessage(message) {
+            const data = message.data;
+            const status = data[0] & 0xF0;
+            const note = data[1];
+            const velocity = data[2];
+            if (status === 0x90 && velocity > 0) { // Note on
+                if (!currentMidiNotes.has(note)) {
+                    currentMidiNotes.add(note);
+                    backend.sendMidiNoteOn(note, velocity);
+                }
+            } else if (status === 0x80 || (status === 0x90 && velocity === 0)) { // Note off
+                if (currentMidiNotes.has(note)) {
+                    currentMidiNotes.delete(note);
+                    backend.sendMidiNoteOff(note);
+                }
+            }
+        }
+
+        midiButton.addEventListener('click', () => {
+            if (!midiEnabled) {
+                enableMidi().then(() => {
+                    // Disable play/stop buttons on success
+                    playButton.disabled = true;
+                    stopButton.disabled = true;
+                }).catch(err => {
+                    const isError = true;
+                    app.setStatus("Failed to access MIDI: " + err, isError);
+                });
+            } else {
+                disableMidi().then(() => {
+                    // Re-enable play/stop buttons
+                    playButton.disabled = false;
+                    stopButton.disabled = false;
+                }).catch(err => {
+                    const isError = true;
+                    app.setStatus("Failed to release MIDI: " + err, isError);
+                });
             }
         });
     },
@@ -346,15 +437,16 @@ var app = {
                     monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Space,
                 ],
                 run: () => {
-                    if (backend.isPlaying()) {
-                        backend.stopPlaying();
-                        const playButton = document.getElementById('playButton');
-                        playButton.style.color = 'var(--color-text)';
-                    }
-                    else {
-                        backend.startPlaying();
-                        const playButton = document.getElementById('playButton');
-                        playButton.style.color = 'var(--color-accent)';
+                    const playButton = document.getElementById('playButton');
+                    if (!playButton.disabled) {
+                        if (backend.isPlaying()) {
+                            backend.stopPlaying();
+                            playButton.style.color = null;
+                        }
+                        else {
+                            backend.startPlaying();
+                            playButton.style.color = 'var(--color-accent)';
+                        }
                     }
                 },
             }
@@ -379,13 +471,13 @@ var app = {
                         endLineNumber: position.lineNumber,
                         endColumn: position.column
                     });
-
+    
                     let insideRhythmTable = false;
                     let braceDepth = 0;
                     let inRhythm = false;
                     for (let i = 0; i < textUntilPosition.length; i++) {
                         const char = textUntilPosition[i];
-
+    
                         if (textUntilPosition.substr(i, 6) === 'rhythm') {
                             // Look ahead for opening brace
                             for (let j = i + 6; j < textUntilPosition.length; j++) {
@@ -438,7 +530,7 @@ var app = {
                             ]
                         };
                     }
-
+    
                     return { suggestions: [] };
                 }
             });
