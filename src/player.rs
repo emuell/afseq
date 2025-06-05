@@ -220,6 +220,22 @@ impl SamplePlayer {
         self.sample_root_note = root_note;
     }
 
+    /// Stop all currently playing back sources.
+    pub fn stop_all_sources(&mut self) {
+        let _ = self.player.stop_all_sources();
+        for notes in &mut self.playing_notes {
+            notes.clear();
+        }
+    }
+
+    /// Stop all currently playing back sources in the given rhythm slot index.
+    pub fn stop_sources_in_rhythm_slot(&mut self, rhythm_index: usize) {
+        for (playback_id, _) in self.playing_notes[rhythm_index].values() {
+            let _ = self.player.stop_source(*playback_id);
+        }
+        self.playing_notes[rhythm_index].clear();
+    }
+
     /// Run/play the given sequence until it stops.
     pub fn run(
         &mut self,
@@ -301,10 +317,7 @@ impl SamplePlayer {
 
     /// Manually seek the given sequence to the  given time offset and actual position.
     pub fn advance_until_time(&mut self, sequence: &mut Sequence, time: SampleTime) {
-        let _ = self.player.stop_all_sources();
-        for notes in &mut self.playing_notes {
-            notes.clear();
-        }
+        self.stop_all_sources();
         sequence.advance_until_time(time);
     }
 
@@ -394,21 +407,19 @@ impl SamplePlayer {
                     if let Ok(sample) =
                         sample_pool.get_sample(instrument, playback_options, playback_sample_rate)
                     {
-                        let context = Arc::new(SamplePlaybackContext {
-                            rhythm_index: Some(rhythm_index),
-                            voice_index: Some(voice_index),
-                        });
-
                         let sample_delay =
                             (note_event.delay * rhythm_item.duration as f32) as SampleTime;
+                        let start_time = Some(time_offset + rhythm_item.time + sample_delay);
+
+                        let context: Option<PlaybackStatusContext> =
+                            Some(Arc::new(SamplePlaybackContext {
+                                rhythm_index: Some(rhythm_index),
+                                voice_index: Some(voice_index),
+                            }));
 
                         let playback_id = self
                             .player
-                            .play_file_source_with_context(
-                                sample,
-                                Some(time_offset + rhythm_item.time + sample_delay),
-                                Some(context),
-                            )
+                            .play_file_source_with_context(sample, start_time, context)
                             .expect("Failed to play file source");
 
                         playing_notes_in_rhythm.insert(voice_index, (playback_id, note_event.note));
