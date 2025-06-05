@@ -54,6 +54,11 @@ button {
     color: var(--color-text);
 }
 
+button:disabled {
+    cursor: none;
+    color: var(--color-grid);
+}
+
 button:hover {
     color: var(--color-accent);
 }

@@ -1,6 +1,6 @@
 fn main() {
-    let target = std::env::var("TARGET").unwrap();
-    let profile = std::env::var("PROFILE").unwrap();
+    let target = std::env::var("TARGET").expect("No TARGET env variable set");
+    let profile = std::env::var("PROFILE").expect("No PROFILE env variable set");
     // inject emscripten build options
     if target.contains("emscripten") {
         // debug options
@@ -19,21 +19,20 @@ fn main() {
         // export options
         println!("cargo::rustc-link-arg=-sEXPORT_ES6=1");
         println!("cargo::rustc-link-arg=-sMODULARIZE");
-        // assets
-        println!(
-            "cargo::rustc-link-arg=--preload-file={}/assets@/assets",
-            std::env::var("CARGO_MANIFEST_DIR").unwrap()
-        );
+        println!("cargo::rustc-link-arg=-sINVOKE_RUN=0");
         // exports
+        println!("cargo::rustc-link-arg=--no-entry");
         let exports = [
             "UTF8ToString",
             "ccall",
             "_free_cstring",
-            "_initialize",
-            "_shutdown",
+            "_initialize_playground",
+            "_shutdown_playground",
             "_start_playing",
             "_stop_playing",
             "_stop_playing_notes",
+            "_midi_note_on",
+            "_midi_note_off",
             "_set_bpm",
             "_set_instrument",
             "_get_samples",
@@ -46,8 +45,11 @@ fn main() {
             "cargo::rustc-link-arg=-sEXPORTED_FUNCTIONS={}",
             exports.join(",")
         );
-        println!("cargo::rustc-link-arg=-sINVOKE_RUN=0");
-        println!("cargo::rustc-link-arg=--no-entry");
+        // assets
+        println!(
+            "cargo::rustc-link-arg=--preload-file={}/assets@/assets",
+            std::env::var("CARGO_MANIFEST_DIR").unwrap()
+        );
     } else {
         println!("cargo::warning=This example only works with target 'wasm32-unknown-emscripten'")
     }
