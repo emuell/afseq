@@ -31,8 +31,8 @@ fn create_phrase() -> Phrase {
         .every_nth_sixteenth(2.0)
         .trigger(new_note_event("C_5").mutate({
             let mut step = 0;
-            move |mut event| {
-                if let Event::NoteEvents(notes) = &mut event {
+            move |event| {
+                if let Event::NoteEvents(notes) = event {
                     for note in notes.iter_mut().flatten() {
                         note.volume = 1.0 / (step + 1) as f32;
                         step += 1;
@@ -41,7 +41,6 @@ fn create_phrase() -> Phrase {
                         }
                     }
                 }
-                event
             }
         }));
 
@@ -51,8 +50,8 @@ fn create_phrase() -> Phrase {
         .trigger(new_note_event("C_5").mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
-            move |mut event| {
-                if let Event::NoteEvents(notes) = &mut event {
+            move |event| {
+                if let Event::NoteEvents(notes) = event {
                     for note in notes.iter_mut().flatten() {
                         note.volume = 1.0 / (vel_step + 1) as f32 * 0.5;
                         vel_step += 1;
@@ -66,7 +65,6 @@ fn create_phrase() -> Phrase {
                         }
                     }
                 }
-                event
             }
         }));
 
