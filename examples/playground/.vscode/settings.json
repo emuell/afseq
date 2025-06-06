@@ -1,11 +1,5 @@
 {
-    "rust-analyzer.cargo.features": [
-        "player",
-        "cpal-output",
-        "scripting",
-        "lua-jit"
-    ],
-    "Lua.runtime.version": "LuaJIT",
+    "rust-analyzer.cargo.target": "wasm32-unknown-emscripten",
     "Lua.runtime.builtin": {
         "os": "disable",
         "io": "disable",
@@ -16,10 +10,7 @@
         "ffi": "disable",
     },
     "Lua.workspace.library": [
-        "types/nerdo"
-    ],
-    "Lua.workspace.ignoreDir": [
-        "docs"
+        "../../types/nerdo"
     ],
     "Lua.hint.arrayIndex": "Disable"
 }

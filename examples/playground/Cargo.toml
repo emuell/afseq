@@ -1,0 +1,23 @@
+[package]
+name = "playground"
+version = "0.1.0"
+edition = "2021"
+description = "afseq playground for the web"
+
+# see build.rs and build.sh for the emscripten config
+
+[dependencies]
+afseq = { path = "../..", default-features = false, features = [
+    "scripting",
+    "lua",
+    "player",
+    "sokol-output"
+]}
+serde = { version = "^1.0", features = ["derive"]}
+serde_json = { version = "^1.0" }
+
+[patch.crates-io]
+# we need a custom patched version with -pthread support
+lua-src = { git = 'https://github.com/emuell/lua-src-rs' } 
+# tagged sokol versions are outdated: use latest version 
+sokol = { version="*", optional = true, git="https://github.com/emuell/sokol-rust" }
