@@ -1,32 +1,29 @@
 --[[
-  Create a note pattern from scales, distributed via euclidean. 
+  Create a note pattern from scales, distributed via euclidean rhythms. 
 --]]
 
 -- Scale we're creating the note pattern from
 local s = scale("c3", "minor")
 
- -- Create a notes pattern from euclidean distributed chords 
+-- Create a notes pattern from euclidean distributed chords 
 local notes =
-  pattern.from(s:chord("I", 3)):euclidean(8) + 
-  pattern.from(s:chord("VI", 3)):euclidean(8, 1):reverse() +
-  pattern.from(s:chord("V", 3)):euclidean(8) +
-  pattern.from(s:chord("III", 5)):euclidean(8):reverse()
+  pattern.from(s:chord("i", 3)):euclidean(8) + 
+  pattern.from(s:chord("vi", 3)):euclidean(8, 1):reverse() +
+  pattern.from(s:chord("v", 3)):euclidean(8) +
+  pattern.from(s:chord("iii", 5)):euclidean(8):reverse()
 
+-- The rhythm emits the notes as a sequence
 return rhythm {
   unit = "1/16",
-  emit = function(context)
-    -- Cycle through notes with every new step
-    local step = math.imod(context.step, #notes)
-    return note(notes[step])
-  end
+  emit = sequence(notes):amplify(0.8)
 }--[[
-  Create a chord prgression from a scale
+  Create a chord progression from a scale
 --]]
 
 local cmin = scale("c4", "major")
+
 return rhythm {
-  unit = "1/4",
-  resolution = 2,
+  unit = "1/2",
   emit = sequence(
     cmin:chord("i"),
     cmin:chord("iv"),
@@ -169,44 +166,103 @@ return rhythm {
   end
 }
 --[[
-  Controlled randomness.
+  Controlled randomness: Combines two seeded randomly generated euclidean
+  rhythms with seeded randomly generated notes in a given scale.
 --]]
 
--- change seeds for other variations...
-local PATTERN_SEED = 0x12345
-local GATE_SEED    = 0x93752
-local EMIT_SEED    = 0x89736
+-- CHANGE ME: adjust timing
+local UNIT = "1/16"
+local PATTERN_LEN = 16
+local MELODY_LEN = PATTERN_LEN
 
+-- CHANGE ME: adjust variations
+local SCALE = "blues minor"
+local RHYTHM_SEED = 1
+local MELODY_SEED = 1
+
+---
+
+-- Create a random rhythm from two Euclidean rhythms
+local function generate_rhythm(seed)
+  -- Create a new local random number generator
+  local rand = math.randomstate(seed)
+
+  -- Generate the primary Euclidean rhythm pattern
+  local primary = pattern.euclidean(
+    rand(1, PATTERN_LEN / 2), PATTERN_LEN)
+  -- Generate a secondary Euclidean rhythm pattern
+  local secondary = pattern.euclidean(
+    rand(1, PATTERN_LEN / 2), PATTERN_LEN)
+
+  -- Volume randomization state
+  local volumes = { 0.25, 0.5 }
+  local last_volume = 1.0
+  local last_step = 1
+
+  -- Combine the two rhythms using the Schillinger principle
+  local combined = { 1 }
+  for step = 2, #primary do
+    if primary[step] == 1 or secondary[step] == 1 then
+      -- randomize note volume
+      local volume = (step % 4 == 1) and 1.0 or volumes[rand(#volumes)]
+      if last_volume < 1.0 or step - last_step > 1 then
+        volume = 1.0
+      end 
+      combined[step] = volume
+      last_step = step
+      last_volume = volume
+    else
+      combined[step] = 0
+    end
+  end
+  return combined
+end
+
+-- Create a function to map combined rhythm to the scale with randomness
+local function generate_melody(pattern_len, scale, seed)
+  -- Create a new local random number generator
+  local rand = math.randomstate(seed)
+  -- generate the melody, starting with the root note
+  local melody = { scale[1] }
+  local last_note_index = nil 
+  for step = 2, pattern_len do
+    -- pick a random note from the scale
+    local note_index = last_note_index
+    while note_index == last_note_index do 
+      note_index = rand(#scale + 1)
+    end
+    last_note_index = note_index
+    -- last note in scale is treated as an off
+    if note_index == #scale + 1 then
+      melody[#melody + 1] = "off"
+    else
+      melody[#melody + 1] = scale[note_index]
+    end
+  end
+  return melody
+end
+
+-- return rhythm
 return rhythm {
-  unit = "1/8",
-  pattern = function(init_context)
-    -- randomly emit crammed pulse patterns
-    local rand = math.randomstate(PATTERN_SEED)
+  unit = UNIT,
+  pattern = function(context)
+    -- Generate combined rhythm
+    local rhythm = generate_rhythm(RHYTHM_SEED)
+    -- Pick pulse from the rhythm for each new step
     return function(context)
-      -- every eight pulse
-      if math.imod(context.pulse_step, 8) == 1 then
-        return { 0.8, 0.2, 0.9, 0.2 }
-        -- else random, unlikely
-      elseif rand() > 0.9 then
-        return { 0.8, 0.9 }
-        -- default
-      else
-        return 1
-      end
+      return rhythm[math.imod(context.pulse_step, #rhythm)]
     end
   end,
-  gate = function(init_context)
-    -- probability gate
-    local rand = math.randomstate(GATE_SEED)
+  emit = function(context)
+    -- Define the notes that should be used for the melody
+    local scale = scale("c", SCALE).notes
+    -- Generate the melody based on the combined rhythm
+    local melody = generate_melody(MELODY_LEN, scale, MELODY_SEED)
+    -- Pick note from the melody and use the pulse value as volume
+    ---@param context EmitterContext
     return function(context)
-      return context.pulse_value > rand()
-    end
-  end,
-  emit = function(init_context)
-    -- randomly emit a lower or higher note
-    local rand = math.randomstate(EMIT_SEED)
-    return function(context)
-      return rand(1, 10) >= 8 and "c4" or "c5"
+      local step = math.imod(context.pulse_step, #melody)
+      return note(melody[step]):volume(context.pulse_value)
     end
   end
 }
@@ -284,8 +340,10 @@ return rhythm {
   end
 }
 --[[
-  Game of Melody: randomly creates melody populations from a c minor scale
-  and lets those melodies survive who fit best to a specified target melody
+  Game of Melody: randomly creates melody populations from the C minor scale.
+  Lets the melodies that best fit a specified target melody survive.
+
+  Stop the playback and start it again for a new random population.
 --]]
 
 -- Define the unit for timing
@@ -309,10 +367,10 @@ local TARGET_MELODY = pattern.from(
 )
 -- Define a chord progression using the minor scale as background chords
 local CHORD_PROGRESSION = {
-  MINOR_SCALE:chord("I"),  -- C minor chord
-  MINOR_SCALE:chord("I"),  -- C minor chord
-  MINOR_SCALE:chord("IV"), -- F minor chord
-  MINOR_SCALE:chord("V"),  -- G minor chord
+  MINOR_SCALE:chord("i"),  -- C minor chord
+  MINOR_SCALE:chord("i"),  -- C minor chord
+  MINOR_SCALE:chord("iv"), -- F minor chord
+  MINOR_SCALE:chord("v"),  -- G minor chord
 }
 
 -- Define the fitness function
@@ -419,7 +477,7 @@ return rhythm {
         end
         -- Calculate the chord index based on the current step
         local chord_index = math.imod((context.step - 1) / 16 + 1, #CHORD_PROGRESSION)
-        world.chord = note(CHORD_PROGRESSION[chord_index]):transpose(-12):volume(0.5)
+        world.chord = note(CHORD_PROGRESSION[chord_index]):volume(0.5)
       else
         world.chord = note({ "---", "---", "---" })
       end

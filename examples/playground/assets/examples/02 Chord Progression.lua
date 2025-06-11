@@ -1,11 +1,11 @@
 --[[
-  Create a chord prgression from a scale
+  Create a chord progression from a scale
 --]]
 
 local cmin = scale("c4", "major")
+
 return rhythm {
-  unit = "1/4",
-  resolution = 2,
+  unit = "1/2",
   emit = sequence(
     cmin:chord("i"),
     cmin:chord("iv"),
