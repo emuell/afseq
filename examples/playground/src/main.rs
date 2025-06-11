@@ -381,6 +381,9 @@ impl Playground {
     fn run(&mut self) {
         // apply script content changes
         if self.script_changed || self.sequence.is_none() {
+            // clear errors
+            afseq::bindings::clear_lua_callback_errors();
+            self.script_runtime_error = String::new();
             // build note rhythm slots: one rhythm for each live played note
             let rhythm_slots = if !self.playing_notes.is_empty() {
                 let mut slots = vec![RhythmSlot::Stop; Self::NUM_MIDI_NOTES];
@@ -393,8 +396,6 @@ impl Playground {
                 // build a single regular rhythm slot
                 [RhythmSlot::Rhythm(self.new_rhythm(None))].to_vec()
             };
-            // clear runtime errors
-            afseq::bindings::clear_lua_callback_errors();
             // replace sequence
             let mut sequence = Sequence::new(
                 self.time_base,
