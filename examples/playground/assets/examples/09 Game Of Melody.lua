@@ -1,6 +1,8 @@
 --[[
-  Game of Melody: randomly creates melody populations from a c minor scale
-  and lets those melodies survive who fit best to a specified target melody
+  Game of Melody: randomly creates melody populations from the C minor scale.
+  Lets the melodies that best fit a specified target melody survive.
+
+  Stop the playback and start it again for a new random population.
 --]]
 
 -- Define the unit for timing
@@ -24,10 +26,10 @@ local TARGET_MELODY = pattern.from(
 )
 -- Define a chord progression using the minor scale as background chords
 local CHORD_PROGRESSION = {
-  MINOR_SCALE:chord("I"),  -- C minor chord
-  MINOR_SCALE:chord("I"),  -- C minor chord
-  MINOR_SCALE:chord("IV"), -- F minor chord
-  MINOR_SCALE:chord("V"),  -- G minor chord
+  MINOR_SCALE:chord("i"),  -- C minor chord
+  MINOR_SCALE:chord("i"),  -- C minor chord
+  MINOR_SCALE:chord("iv"), -- F minor chord
+  MINOR_SCALE:chord("v"),  -- G minor chord
 }
 
 -- Define the fitness function
@@ -134,7 +136,7 @@ return rhythm {
         end
         -- Calculate the chord index based on the current step
         local chord_index = math.imod((context.step - 1) / 16 + 1, #CHORD_PROGRESSION)
-        world.chord = note(CHORD_PROGRESSION[chord_index]):transpose(-12):volume(0.5)
+        world.chord = note(CHORD_PROGRESSION[chord_index]):volume(0.5)
       else
         world.chord = note({ "---", "---", "---" })
       end

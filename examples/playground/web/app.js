@@ -5,10 +5,10 @@ import { default as createModule } from "./playground.js";
 const defaultBpm = 120;
 const defaultInstrument = 0;
 const defaultScriptContent = `--
--- Welcome to the AFSEQ Playground!
+-- Welcome to the pttrns playground!
 --
--- Create and experiment with rhythm scripts here to learn how AFSEQ works.
--- Check out the interactive Quickstart scripts on the right, or load some examples
+-- Create and experiment with pattern scripts here to learn how the work.
+-- Check out the interactive 'Quickstart' scripts on the right, or load some examples
 -- to get started.
 --
 -- This playground uses a simple sample player as the player backend. The currently 
@@ -344,6 +344,7 @@ var app = {
             } else {
                 backend.updateScriptContent(example.content);
             }
+            this._editor.setScrollPosition({scrollTop: 0});
             this._updateEditCount(0);
             this.setStatus(`Loaded script: '${example.name}'.`);
         };
