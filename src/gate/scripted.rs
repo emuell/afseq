@@ -2,12 +2,12 @@ use mlua::prelude::LuaResult;
 
 use crate::{
     bindings::{gate_trigger_from_value, LuaCallback, LuaTimeoutHook},
-    BeatTimeBase, Event, Gate, InputParameterSet, PulseIterItem,
+    BeatTimeBase, Event, Gate, ParameterSet, RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Gate impl, which calls an existing lua script function to filter pulses.
+/// Evaluates a lua script function to generate new events.
 #[derive(Debug)]
 pub struct ScriptedGate {
     timeout_hook: LuaTimeoutHook,
@@ -27,7 +27,7 @@ impl ScriptedGate {
         timeout_hook.reset();
         // initialize function context
         let mut callback = callback;
-        let pulse = PulseIterItem {
+        let pulse = RhythmEvent {
             value: 1.0,
             step_time: 1.0,
         };
@@ -42,7 +42,7 @@ impl ScriptedGate {
         })
     }
 
-    fn next_gate_trigger_value(&mut self, pulse: &PulseIterItem) -> LuaResult<bool> {
+    fn next_gate_trigger_value(&mut self, pulse: &RhythmEvent) -> LuaResult<bool> {
         // reset timeout
         self.timeout_hook.reset();
         // update context
@@ -84,16 +84,16 @@ impl Gate for ScriptedGate {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
+    fn set_parameters(&mut self, parameters: ParameterSet) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new parameters
-        if let Err(err) = self.callback.set_context_input_parameters(parameters) {
+        if let Err(err) = self.callback.set_context_parameters(parameters) {
             self.callback.handle_error(&err);
         }
     }
 
-    fn run(&mut self, pulse: &PulseIterItem) -> bool {
+    fn run(&mut self, pulse: &RhythmEvent) -> bool {
         // call function with context and evaluate the result
         let result = match self.next_gate_trigger_value(pulse) {
             Err(err) => {

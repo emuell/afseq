@@ -1,12 +1,12 @@
 local cmin = scale("c4", "minor")
 
-return rhythm {
+return pattern {
   unit = "bars",
   resolution = 4,
   offset = 4,
-  pattern = {1, 1, 1, 1},
+  pulse = {1, 1, 1, 1},
   repeats = 3,
-  emit = sequence(
+  event = sequence(
     note(cmin:chord("i", 3)),
     note(cmin:chord("i", 3)):transpose({0, 0, -2}),
     note(cmin:chord("i", 3)),

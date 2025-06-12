@@ -27,7 +27,7 @@
 > 
 > #### examples:
 > ```lua
-> scale("c4", "minor").notes -> {"c4", "d4", "d#4", "f4", "g4", "g#4", "a#4"}
+> scale("c4", "minor").notes -> {48, 50, 51, 53, 55, 56, 58}
 > ```
 > 
 > ```lua
@@ -82,7 +82,7 @@
 ---  
 ## Aliases  
 ### DegreeValue<a name="DegreeValue"></a>
-[`integer`](../API/builtins/integer.md) | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
+[`integer`](../API/builtins/integer.md) | `"I"` | `"II"` | `"III"` | `"IV"` | `"V"` | `"VI"` | `"VII"` | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
 > ```lua
 > -- Roman number or plain number as degree in range [1 - 7]
 > DegreeValue:
@@ -93,6 +93,13 @@
 >     | "v"
 >     | "vi"
 >     | "vii"
+>     | "I"
+>     | "II"
+>     | "III"
+>     | "IV"
+>     | "V"
+>     | "VI"
+>     | "VII"
 > ```  
   
 ### NoteValue<a name="NoteValue"></a>
@@ -182,12 +189,19 @@
 >     | "v"
 >     | "vi"
 >     | "vii"
+>     | "I"
+>     | "II"
+>     | "III"
+>     | "IV"
+>     | "V"
+>     | "VI"
+>     | "VII"
 > ```
 ### degree([*self*](../API/builtins/self.md), ...[`DegreeValue`](#DegreeValue))<a name="degree"></a>
 `->`... : [`integer`](../API/builtins/integer.md)  
 
 > Get a single or multiple notes by its degree from the scale, using the given roman
-> number string or a plain number as interval index.
+> number string or a plain number as index value.
 > Allows picking intervals from the scale to e.g. create chords with roman number
 > notation.
 > 
@@ -209,6 +223,13 @@
 >     | "v"
 >     | "vi"
 >     | "vii"
+>     | "I"
+>     | "II"
+>     | "III"
+>     | "IV"
+>     | "V"
+>     | "VI"
+>     | "VII"
 > ```
 ### notes_iter([*self*](../API/builtins/self.md), count : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md))<a name="notes_iter"></a>
 `->`() `->` [`integer`](../API/builtins/integer.md) | [`nil`](../API/builtins/nil.md)  
@@ -228,8 +249,8 @@
 > for note in cmin:notes_iter(16) do
 >  table.insert(notes, note)
 > end
-> -- same using the `pattern` library
-> local notes = pattern.new(16):init(cmaj.notes_iter())
+> -- same using the `pulse` library
+> local notes = pulse.new(16):init(cmaj.notes_iter())
 > ```
 ### fit([*self*](../API/builtins/self.md), ...[`NoteValue`](#NoteValue))<a name="fit"></a>
 `->`[`integer`](../API/builtins/integer.md)[]  
@@ -247,7 +268,7 @@
 ---  
 ## Aliases  
 ### DegreeValue<a name="DegreeValue"></a>
-[`integer`](../API/builtins/integer.md) | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
+[`integer`](../API/builtins/integer.md) | `"I"` | `"II"` | `"III"` | `"IV"` | `"V"` | `"VI"` | `"VII"` | `"i"` | `"ii"` | `"iii"` | `"iv"` | `"v"` | `"vi"` | `"vii"`  
 > ```lua
 > -- Roman number or plain number as degree in range [1 - 7]
 > DegreeValue:
@@ -258,6 +279,13 @@
 >     | "v"
 >     | "vi"
 >     | "vii"
+>     | "I"
+>     | "II"
+>     | "III"
+>     | "IV"
+>     | "V"
+>     | "VI"
+>     | "VII"
 > ```  
   
 ### NoteValue<a name="NoteValue"></a>

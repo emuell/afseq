@@ -3,8 +3,8 @@ use std::{collections::HashMap, ops::RangeBounds};
 type Fraction = num_rational::Rational32;
 
 use crate::{
-    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CycleTarget, CycleValue, Event,
-    EventIter, EventIterItem, InputParameterSet, InstrumentId, Note, NoteEvent, PulseIterItem,
+    event::new_note, BeatTimeBase, Chord, Cycle, CycleEvent, CycleTarget, CycleValue, Emitter,
+    EmitterEvent, Event, InstrumentId, Note, NoteEvent, ParameterSet, RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -142,7 +142,7 @@ pub(crate) fn apply_cycle_note_properties(
 
 // -------------------------------------------------------------------------------------------------
 
-/// Helper struct to convert time tagged events from Cycle into a `Vec<EventIterItem>`
+/// Helper struct to convert time tagged events from Cycle into a `Vec<EmitterEvent>`
 pub(crate) struct CycleNoteEvents {
     // collected events for a given time span per channels
     events: Vec<(Fraction, Fraction, Vec<Option<Event>>)>,
@@ -198,12 +198,12 @@ impl CycleNoteEvents {
         }
     }
 
-    /// Convert to a list of EventIterItems.
-    pub fn into_event_iter_items(self) -> Vec<EventIterItem> {
+    /// Convert to a list of EmitterEvents.
+    pub fn into_event_iter_items(self) -> Vec<EmitterEvent> {
         // max number of note events in a single merged down Event
         let max_event_count = self.event_counts.iter().sum::<usize>();
-        // apply padding per channel, merge down and convert to EventIterItem
-        let mut event_iter_items: Vec<EventIterItem> = Vec::with_capacity(self.events.len());
+        // apply padding per channel, merge down and convert to EmitterEvent
+        let mut event_iter_items: Vec<EmitterEvent> = Vec::with_capacity(self.events.len());
         for (start_time, length, mut events) in self.events.into_iter() {
             // ensure that each event in the channel, contains the same number of note events
             for (channel, mut event) in events.iter_mut().enumerate() {
@@ -224,7 +224,7 @@ impl CycleNoteEvents {
             }
             // convert padded, merged note events to a timed 'Event'
             let event = Event::NoteEvents(merged_note_events);
-            event_iter_items.push(EventIterItem::new_with_fraction(event, start_time, length));
+            event_iter_items.push(EmitterEvent::new_with_fraction(event, start_time, length));
         }
         event_iter_items
     }
@@ -232,33 +232,33 @@ impl CycleNoteEvents {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits a vector of [`EventIterItem`] from a Tidal [`Cycle`].
+/// Emits events from a [`Cycle`].
 ///
 /// Channels from cycle are merged down into note events on different voices.
 /// Values in cycles can be mapped to notes with an optional mapping table.
 ///
-/// See also [`ScriptedCycleEventIter`](`super::scripted_cycle::ScriptedCycleEventIter`)
+/// See also [`ScriptedCycleEmitter`](`super::scripted_cycle::ScriptedCycleEmitter`)
 #[derive(Clone, Debug)]
-pub struct CycleEventIter {
+pub struct CycleEmitter {
     cycle: Cycle,
     mappings: HashMap<String, Vec<Option<NoteEvent>>>,
 }
 
-impl CycleEventIter {
-    /// Create a new cycle event iter from the given precompiled cycle.
+impl CycleEmitter {
+    /// Create a new cycle emitter from the given precompiled cycle.
     pub(crate) fn new(cycle: Cycle) -> Self {
         let mappings = HashMap::new();
         Self { cycle, mappings }
     }
 
-    /// Try creating a new cycle event iter from the given mini notation string.
+    /// Try creating a new cycle emitter from the given mini notation string.
     ///
     /// Returns error when the cycle string failed to parse.
     pub fn from_mini(input: &str) -> Result<Self, String> {
         Ok(Self::new(Cycle::from(input)?))
     }
 
-    /// Try creating a new cycle event iter from the given mini notation string
+    /// Try creating a new cycle emitter from the given mini notation string
     /// and the given seed for the cycle's random number generator.
     ///
     /// Returns error when the cycle string failed to parse.
@@ -296,7 +296,7 @@ impl CycleEventIter {
 
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
-    fn generate(&mut self) -> Vec<EventIterItem> {
+    fn generate(&mut self) -> Vec<EmitterEvent> {
         // run the cycle event generator
         let events = {
             match self.cycle.generate() {
@@ -326,12 +326,12 @@ impl CycleEventIter {
                 }
             }
         }
-        // convert timed note events into EventIterItems
+        // convert timed note events into EmitterEvents
         timed_note_events.into_event_iter_items()
     }
 }
 
-impl EventIter for CycleEventIter {
+impl Emitter for CycleEmitter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
@@ -340,11 +340,11 @@ impl EventIter for CycleEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
-    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: RhythmEvent, emit_event: bool) -> Option<Vec<EmitterEvent>> {
         if emit_event {
             Some(self.generate())
         } else {
@@ -352,13 +352,13 @@ impl EventIter for CycleEventIter {
         }
     }
 
-    fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, _pulse: RhythmEvent, emit_event: bool) {
         if emit_event {
             self.cycle.advance();
         }
     }
 
-    fn duplicate(&self) -> Box<dyn EventIter> {
+    fn duplicate(&self) -> Box<dyn Emitter> {
         Box::new(self.clone())
     }
 
@@ -369,10 +369,10 @@ impl EventIter for CycleEventIter {
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn new_cycle_event(input: &str) -> Result<CycleEventIter, String> {
-    CycleEventIter::from_mini(input)
+pub fn new_cycle_emitter(input: &str) -> Result<CycleEmitter, String> {
+    CycleEmitter::from_mini(input)
 }
 
-pub fn new_cycle_event_with_seed(input: &str, seed: u64) -> Result<CycleEventIter, String> {
-    CycleEventIter::from_mini_with_seed(input, seed)
+pub fn new_cycle_emitter_with_seed(input: &str, seed: u64) -> Result<CycleEmitter, String> {
+    CycleEmitter::from_mini_with_seed(input, seed)
 }

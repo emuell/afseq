@@ -1,6 +1,6 @@
-return rhythm {
+return pattern {
   unit = "1/8",
-  pattern = function(context)
+  pulse = function(context)
     local rand = math.randomstate(0x12345)
     return function(context)
       if math.imod(context.pulse_step, 8) == 1 then
@@ -17,9 +17,9 @@ return rhythm {
   gate = function(context)
     return context.pulse_value > math.random()
   end,
-  emit = function(init_context)
+  event = function(init_context)
     local rand = math.randomstate(0x8879)
-    ---@param context EmitterContext
+    ---@param context EventContext
     return function(context)
       local note = rand(1, 10) >= 8 and "c6" or "c7"
       local _, fraction = math.modf(context.pulse_time_step)
@@ -28,5 +28,6 @@ return rhythm {
       end
       return note
     end
-  end
+  end,
+  
 }

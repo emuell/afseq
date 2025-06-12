@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use lazy_static::lazy_static;
 use std::sync::RwLock;
 
-use crate::{BeatTimeBase, Event, InputParameter, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, Parameter, ParameterSet, RhythmEvent};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -167,8 +167,8 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets input parameter context for the callback.
-    pub fn set_context_input_parameters(&mut self, parameters: InputParameterSet) -> LuaResult<()> {
+    /// Sets parameter context for the callback.
+    pub fn set_context_parameters(&mut self, parameters: ParameterSet) -> LuaResult<()> {
         let inputs_context = &mut self.context.borrow_mut::<CallbackContext>()?.inputs_context;
         let mut parameters_map = HashMap::new();
         for parameter in &parameters {
@@ -180,7 +180,7 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets the event which triggered the rhythm for the callback context.
+    /// Sets the event which triggered the pattern for the callback context.
     pub fn set_context_trigger_event(&mut self, event: &Event) -> LuaResult<()> {
         let trigger_context = &mut self
             .context
@@ -191,7 +191,7 @@ impl LuaCallback {
     }
 
     /// Sets the pulse value emitter context for the callback.
-    pub fn set_context_pulse_value(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
+    pub fn set_context_pulse_value(&mut self, pulse: RhythmEvent) -> LuaResult<()> {
         let values = &mut self.context.borrow_mut::<CallbackContext>()?.values;
         values.insert(b"pulse_value", pulse.value.into());
         values.insert(b"pulse_time", pulse.step_time.into());
@@ -231,8 +231,8 @@ impl LuaCallback {
         Ok(())
     }
 
-    /// Sets the emitter context for the callback.
-    pub fn set_pattern_context(
+    /// Sets the rhythm context for the callback.
+    pub fn set_rhythm_context(
         &mut self,
         time_base: &BeatTimeBase,
         pulse_step: usize,
@@ -247,11 +247,11 @@ impl LuaCallback {
     pub fn set_gate_context(
         &mut self,
         time_base: &BeatTimeBase,
-        pulse: PulseIterItem,
+        pulse: RhythmEvent,
         pulse_step: usize,
         pulse_time_step: f64,
     ) -> LuaResult<()> {
-        self.set_pattern_context(time_base, pulse_step, pulse_time_step)?;
+        self.set_rhythm_context(time_base, pulse_step, pulse_time_step)?;
         self.set_context_pulse_value(pulse)?;
         Ok(())
     }
@@ -261,7 +261,7 @@ impl LuaCallback {
         &mut self,
         playback_state: ContextPlaybackState,
         time_base: &BeatTimeBase,
-        pulse: PulseIterItem,
+        pulse: RhythmEvent,
         pulse_step: usize,
         pulse_time_step: f64,
         step: usize,
@@ -380,8 +380,8 @@ impl LuaUserData for CallbackContext {
                 if let Some(value) = this.values.get(key.as_bytes().as_ref()) {
                     value.into_lua(lua)
                 }
-                // inputs value table (also likely, small overhead)
-                else if key == b"inputs" {
+                // parameter value table (also likely, small overhead)
+                else if key == b"parameter" {
                     lua.create_userdata(this.inputs_context.clone())?
                         .into_lua(lua)
                 }
@@ -412,7 +412,7 @@ impl LuaUserData for CallbackContext {
 /// a parameter map, so it's cheap to clone...
 #[derive(Debug, Clone)]
 struct CallbackInputsContext {
-    parameters_map: Rc<HashMap<Vec<u8>, Rc<RefCell<InputParameter>>>>,
+    parameters_map: Rc<HashMap<Vec<u8>, Rc<RefCell<Parameter>>>>,
 }
 
 impl CallbackInputsContext {
@@ -522,7 +522,7 @@ mod test {
     use std::borrow::BorrowMut;
 
     use super::*;
-    use crate::{bindings::*, Event, Note, RhythmIterItem};
+    use crate::{bindings::*, Event, Note, PatternEvent};
 
     fn new_test_engine(
         beats_per_min: f32,
@@ -547,15 +547,15 @@ mod test {
     fn callbacks() -> LuaResult<()> {
         let (lua, _) = new_test_engine(120.0, 4, 44100)?;
 
-        let rhythm = lua
+        let pattern = lua
             .load(
                 r#"
-                return rhythm {
+                return pattern {
                     unit = "seconds",
-                    pattern = function(context)
+                    pulse = function(context)
                       return (context.pulse_step == 2) and 0 or 1
                     end,
-                    emit = function(context)
+                    event = function(context)
                       local notes = {"c4", "d#4", "g4"}
                       local step = 1
                       return function(context)
@@ -569,33 +569,33 @@ mod test {
             )
             .eval::<LuaValue>()?;
 
-        let mut rhythm = rhythm
+        let mut pattern = pattern
             .as_userdata()
             .unwrap()
-            .borrow_mut::<SecondTimeRhythm>()?;
-        let rhythm = rhythm.borrow_mut();
+            .borrow_mut::<SecondTimePattern>()?;
+        let pattern = pattern.borrow_mut();
         for _ in 0..2 {
-            let events = rhythm.clone().take(4).collect::<Vec<_>>();
-            rhythm.reset();
+            let events = pattern.clone().take(4).collect::<Vec<_>>();
+            pattern.reset();
             assert_eq!(
                 events,
                 vec![
-                    RhythmIterItem {
+                    PatternEvent {
                         event: Some(Event::NoteEvents(vec![Some((Note::C4).into())])),
                         time: 0,
                         duration: 44100
                     },
-                    RhythmIterItem {
+                    PatternEvent {
                         time: 44100,
                         event: None,
                         duration: 44100
                     },
-                    RhythmIterItem {
+                    PatternEvent {
                         time: 88200,
                         event: Some(Event::NoteEvents(vec![Some((Note::Ds4).into())])),
                         duration: 44100
                     },
-                    RhythmIterItem {
+                    PatternEvent {
                         time: 132300,
                         event: Some(Event::NoteEvents(vec![Some((Note::G4).into())])),
                         duration: 44100

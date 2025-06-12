@@ -12,7 +12,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 type Fraction = num_rational::Rational32;
 use num_traits::{FromPrimitive, ToPrimitive};
 
-use crate::pattern::euclidean::euclidean;
+use crate::rhythm::euclidean::euclidean;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -20,6 +20,7 @@ const OVERFLOW_ERROR: &str = "Internal error: interger overflow in cycle";
 
 // -------------------------------------------------------------------------------------------------
 
+/// Tidal cycle mini notation parser and event generator.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cycle {
     root: Step,
@@ -28,6 +29,7 @@ pub struct Cycle {
     seed: Option<u64>,
     state: CycleState,
 }
+
 impl Cycle {
     /// Default value for the cycle's event limit option.
     const EVENT_LIMIT_DEFAULT: usize = 0x1000;
@@ -128,6 +130,7 @@ impl Cycle {
     }
 }
 
+/// Musical event with timing and value information within a [`Cycle`].
 #[derive(Debug, Clone)]
 pub struct Event {
     length: Fraction,
@@ -176,6 +179,7 @@ impl Event {
     }
 }
 
+/// Time span for musical events within Cycles.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Span {
     start: Fraction,
@@ -203,6 +207,7 @@ impl Span {
     }
 }
 
+/// Possible types of values that are emitted by a [`Cycle`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Value {
     #[default]
@@ -216,7 +221,7 @@ pub enum Value {
     Name(Rc<str>),
 }
 
-// Target property pair
+/// Sample/instrument target information for cycle events.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Target {
     Index(i32),
@@ -235,6 +240,7 @@ impl Target {
     }
 }
 
+/// Pitch with note and octave information for cycle events.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pitch {
     note: u8,

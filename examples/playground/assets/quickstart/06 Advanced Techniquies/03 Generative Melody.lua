@@ -1,7 +1,7 @@
 -- Create melodies that follow musical rules
-return rhythm {
+return pattern {
   unit = "1/8",
-  emit = function(init_context)
+  event = function(init_context)
     local pentatonic = scale("c4", "pentatonic minor").notes
     local last_note = 1
     return function(context)

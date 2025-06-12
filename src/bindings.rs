@@ -11,9 +11,9 @@ use mlua::prelude::*;
 
 use self::{
     cycle::CycleUserData,
-    input::InputParameterUserData,
     note::NoteUserData,
-    rhythm::rhythm_from_userdata,
+    parameter::ParameterUserData,
+    rhythm::pattern_from_userdata,
     sequence::SequenceUserData,
     unwrap::{
         bad_argument_error, note_event_from_value, optional_string_from_value, string_from_value,
@@ -22,11 +22,11 @@ use self::{
 };
 
 use crate::{
-    chord::unique_chord_names,
     event::InstrumentId,
-    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm, Rhythm},
+    note::chord::Chord,
+    pattern::{beat_time::BeatTimePattern, second_time::SecondTimePattern, Pattern},
     time::BeatTimeBase,
-    InputParameter, Note, Scale,
+    Note, Parameter, Scale,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -34,8 +34,8 @@ use crate::{
 // private binding impls
 mod callback;
 mod cycle;
-mod input;
 mod note;
+mod parameter;
 mod rhythm;
 mod scale;
 mod sequence;
@@ -50,21 +50,19 @@ pub use callback::{
 // internal re-exports
 pub(crate) use callback::{ContextPlaybackState, LuaCallback};
 pub(crate) use timeout::LuaTimeoutHook;
-pub(crate) use unwrap::{
-    gate_trigger_from_value, note_events_from_value, pattern_pulse_from_value,
-};
+pub(crate) use unwrap::{gate_trigger_from_value, note_events_from_value, pulse_from_value};
 
 // ---------------------------------------------------------------------------------------------
 
-/// Global sharedLua data, unique to each new Lua instance.
+/// Global shared Lua data, unique in every new Lua instance.
 #[derive(Debug, Clone)]
 pub(crate) struct LuaAppData {
     /// Global random seed, set by math.randomseed() for each Lua instance and passed to
-    /// newly created rhythm impls.
+    /// newly created pattern impls.
     pub(crate) rand_seed: Option<u64>,
     /// Global random number generator, used for our math.random() impl.
     pub(crate) rand_rgn: Xoshiro256PlusPlus,
-    /// Declared global variables for the strict checks
+    /// Declared global variables for the strict checks.
     pub(crate) declared_globals: HashSet<Vec<u8>>,
 }
 
@@ -85,7 +83,7 @@ impl LuaAppData {
 
 /// Create a new raw lua engine with preloaded packages, but no bindings. Also returns a timeout
 /// hook instance to limit duration of script calls.
-/// Use [`register_bindings`] to register the bindings for a newly created engine.
+/// Use [`register_bindings`] to register the bindings for the newly created engine.
 pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
     // create a new lua instance with the allowed std libraries
     let lua = Lua::new_with(
@@ -104,16 +102,16 @@ pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Evaluate a lua script file which creates and returns a rhythm.
+/// Evaluate a lua script file which creates and returns a pattern.
 ///
 /// ### Errors
 /// Will return `Err` if `file_name` does not exist, failed to load or the lua file at the given
-/// path fails to evaulate to a valid rhythm.
-pub fn new_rhythm_from_file(
+/// path fails to evaulate to a valid pattern.
+pub fn new_pattern_from_file(
     time_base: BeatTimeBase,
     instrument: Option<InstrumentId>,
     file_name: &str,
-) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
+) -> Result<Rc<RefCell<dyn Pattern>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
     let (mut lua, mut timeout_hook) =
         new_engine().map_err(Into::<Box<dyn std::error::Error>>::into)?;
@@ -124,19 +122,19 @@ pub fn new_rhythm_from_file(
     let chunk = lua.load(std::path::PathBuf::from(file_name));
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)
+    pattern_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)
 }
 
-/// Evaluate a Lua string expression which creates and returns a rhythm.
+/// Evaluate a Lua string expression which creates and returns a pattern.
 ///
 /// ### Errors
-/// Will return `Err` if the lua string contents fail to evaluate to a valid rhythm.
-pub fn new_rhythm_from_string(
+/// Will return `Err` if the lua string contents fail to evaluate to a valid pattern.
+pub fn new_pattern_from_string(
     time_base: BeatTimeBase,
     instrument: Option<InstrumentId>,
     script: &str,
     script_name: &str,
-) -> Result<Rc<RefCell<dyn Rhythm>>, Box<dyn std::error::Error>> {
+) -> Result<Rc<RefCell<dyn Pattern>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
     let (mut lua, mut timeout_hook) =
         new_engine().map_err(Into::<Box<dyn std::error::Error>>::into)?;
@@ -147,12 +145,12 @@ pub fn new_rhythm_from_string(
     let chunk = lua.load(script).set_name(script_name);
     let result = chunk.eval::<LuaValue>()?;
     // convert result
-    rhythm_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)
+    pattern_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// Register afseq bindings with the given lua engine.
+/// Register afseq bindings to the given Lua engine.
 /// Engine instance is expected to be one created via [`new_engine`].
 pub(crate) fn register_bindings(
     lua: &mut Lua,
@@ -163,7 +161,7 @@ pub(crate) fn register_bindings(
     register_parameter_bindings(lua)?;
     register_math_bindings(lua)?;
     register_table_bindings(lua)?;
-    register_pattern_bindings(lua)?;
+    register_pulse_bindings(lua)?;
     Ok(())
 }
 
@@ -264,7 +262,7 @@ fn register_global_bindings(
     globals.raw_set(
         "chord_names",
         lua.create_function(|lua, _args: LuaMultiValue| -> LuaResult<LuaTable> {
-            lua.create_sequence_from(unique_chord_names())
+            lua.create_sequence_from(Chord::unique_names())
         })?,
     )?;
 
@@ -290,9 +288,9 @@ fn register_global_bindings(
         })?,
     )?;
 
-    // function rhythm { args... }
+    // function pattern { args... }
     globals.raw_set(
-        "rhythm",
+        "pattern",
         lua.create_function({
             let timeout_hook = timeout_hook.clone();
             let time_base = *time_base;
@@ -303,10 +301,10 @@ fn register_global_bindings(
                     "resolution",
                     "offset",
                     "repeats",
-                    "inputs",
-                    "pattern",
+                    "parameter",
+                    "pulse",
                     "gate",
-                    "emit",
+                    "event",
                 ];
                 validate_table_properties(&table, &RHYTHM_PROPERTIES)?;
                 // check which time unit is specified
@@ -315,10 +313,10 @@ fn register_global_bindings(
                     Err(_) => false,
                 };
                 if second_time_unit {
-                    SecondTimeRhythm::from_table(lua, &timeout_hook, &time_base, &table)?
+                    SecondTimePattern::from_table(lua, &timeout_hook, &time_base, &table)?
                         .into_lua(lua)
                 } else {
-                    BeatTimeRhythm::from_table(lua, &timeout_hook, &time_base, &table)?
+                    BeatTimePattern::from_table(lua, &timeout_hook, &time_base, &table)?
                         .into_lua(lua)
                 }
             }
@@ -332,7 +330,7 @@ fn register_global_bindings(
         lua.create_function(
             |lua, (table, key): (LuaTable, LuaValue)| -> LuaResult<LuaValue> {
                 if let Some(key) = key.as_str() {
-                    if key.as_bytes() != b"pattern" {
+                    if key.as_bytes() != b"pulse" {
                         let declared_globals = &lua
                             .app_data_ref::<LuaAppData>()
                             .expect("Failed to access Lua app data")
@@ -353,7 +351,7 @@ fn register_global_bindings(
         "__newindex",
         lua.create_function(|lua, (table, key, value): (LuaTable, LuaValue, LuaValue)| {
             if let Some(key) = key.as_str() {
-                if key.as_bytes() != b"pattern" {
+                if key.as_bytes() != b"pulse" {
                     let declared_globals = &mut lua
                         .app_data_mut::<LuaAppData>()
                         .expect("Failed to access Lua app data")
@@ -382,7 +380,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
         lua.create_function(
             |_lua,
              (id, default, name, description): (LuaValue, LuaValue, LuaValue, LuaValue)|
-             -> LuaResult<InputParameterUserData> {
+             -> LuaResult<ParameterUserData> {
                 let id = string_from_value(&id, "boolean", "id", 1)?;
                 if id.is_empty() {
                     return Err(bad_argument_error(
@@ -398,8 +396,8 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let name = optional_string_from_value(&name, "boolean", "name", 3)?;
                 let description =
                     optional_string_from_value(&description, "boolean", "description", 4)?;
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_boolean(&id, &name, &description, default),
+                Ok(ParameterUserData {
+                    parameter: Parameter::new_boolean(&id, &name, &description, default),
                 })
             },
         )?,
@@ -418,7 +416,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 LuaValue,
                 LuaValue,
             )|
-             -> LuaResult<InputParameterUserData> {
+             -> LuaResult<ParameterUserData> {
                 let id = string_from_value(&id, "integer", "id", 1)?;
                 if id.is_empty() {
                     return Err(bad_argument_error(
@@ -455,14 +453,8 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let name = optional_string_from_value(&name, "integer", "name", 3)?;
                 let description =
                     optional_string_from_value(&description, "integer", "description", 4)?;
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_integer(
-                        &id,
-                        &name,
-                        &description,
-                        range,
-                        default,
-                    ),
+                Ok(ParameterUserData {
+                    parameter: Parameter::new_integer(&id, &name, &description, range, default),
                 })
             },
         )?,
@@ -481,7 +473,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 LuaValue,
                 LuaValue,
             )|
-             -> LuaResult<InputParameterUserData> {
+             -> LuaResult<ParameterUserData> {
                 let id = string_from_value(&id, "number", "id", 1)?;
                 if id.is_empty() {
                     return Err(bad_argument_error(
@@ -521,8 +513,8 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let name = optional_string_from_value(&name, "number", "name", 3)?;
                 let description =
                     optional_string_from_value(&description, "number", "description", 4)?;
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_float(&id, &name, &description, range, default),
+                Ok(ParameterUserData {
+                    parameter: Parameter::new_float(&id, &name, &description, range, default),
                 })
             },
         )?,
@@ -540,7 +532,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 LuaValue,
                 LuaValue,
             )|
-             -> LuaResult<InputParameterUserData> {
+             -> LuaResult<ParameterUserData> {
                 let id = string_from_value(&id, "enum", "id", 1)?;
                 if id.is_empty() {
                     return Err(bad_argument_error("enum", "id", 1, "ids can not be empty"));
@@ -573,8 +565,8 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let name = optional_string_from_value(&name, "enum", "name", 3)?;
                 let description =
                     optional_string_from_value(&description, "enum", "description", 4)?;
-                Ok(InputParameterUserData {
-                    parameter: InputParameter::new_enum(&id, &name, &description, values, default),
+                Ok(ParameterUserData {
+                    parameter: Parameter::new_enum(&id, &name, &description, values, default),
                 })
             },
         )?,
@@ -685,19 +677,19 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     }
 }
 
-fn register_pattern_bindings(lua: &mut Lua) -> LuaResult<()> {
+fn register_pulse_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up requires
     lazy_static! {
-        static ref PATTERN_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
-            include_str!("../types/nerdo/library/pattern.lua"),
-            "[inbuilt:pattern.lua]"
+        static ref PULSE_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
+            include_str!("../types/nerdo/library/pulse.lua"),
+            "[inbuilt:pulse.lua]"
         );
     }
     // implemented in lua: load and evaluate cached chunk
-    match PATTERN_BYTECODE.as_ref() {
+    match PULSE_BYTECODE.as_ref() {
         Ok(bytecode) => lua
             .load(bytecode)
-            .set_name("[inbuilt:pattern.lua]")
+            .set_name("[inbuilt:pulse.lua]")
             .set_mode(mlua::ChunkMode::Binary)
             .exec(),
         Err(err) => Err(err.clone()),
@@ -843,11 +835,8 @@ mod test {
         // table.lua is present
         assert!(lua.load(r#"return table.new()"#).eval::<LuaTable>().is_ok());
 
-        // pattern.lua is present
-        assert!(lua
-            .load(r#"return pattern.new()"#)
-            .eval::<LuaTable>()
-            .is_ok());
+        // pulse.lua is present
+        assert!(lua.load(r#"return pulse.new()"#).eval::<LuaTable>().is_ok());
 
         // math.randomstate is present
         assert!(lua
@@ -884,7 +873,7 @@ mod test {
     }
 
     #[test]
-    fn create_rhythm() -> Result<(), Box<dyn std::error::Error>> {
+    fn create_pattern() -> Result<(), Box<dyn std::error::Error>> {
         // create a new engine and register bindings
         let time_base = BeatTimeBase {
             beats_per_min: 160.0,
@@ -892,24 +881,24 @@ mod test {
             samples_per_sec: 44100,
         };
 
-        // beat time rhythm
-        new_rhythm_from_string(
+        // beat time pattern
+        new_pattern_from_string(
             time_base,
             None,
-            r#"return rhythm { unit = "1/4", emit = "c4" }"#,
-            "[test beat rhythm]",
+            r#"return pattern { unit = "1/4", event = "c4" }"#,
+            "[test beat pattern]",
         )?;
 
-        // second time rhythm
-        new_rhythm_from_string(
+        // second time pattern
+        new_pattern_from_string(
             time_base,
             None,
-            r#"return rhythm { unit = "ms", emit = "c4" }"#,
-            "[test second time rhythm]",
+            r#"return pattern { unit = "ms", event = "c4" }"#,
+            "[test second time pattern]",
         )?;
 
-        // cycle as beat time rhythm
-        new_rhythm_from_string(
+        // cycle as beat time pattern
+        new_pattern_from_string(
             time_base,
             None,
             r#"return cycle("c4 d4 e4 f4 g4")"#,

@@ -7,7 +7,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ----------------------------------------------------------------------------------------------------
 
 ---Roman number or plain number as degree in range [1 - 7]
----@alias DegreeValue integer|"i"|"ii"|"iii"|"iv"|"v"|"vi"|"vii"
+---@alias DegreeValue integer|"i"|"ii"|"iii"|"iv"|"v"|"vi"|"vii"|"I"|"II"|"III"|"IV"|"V"|"VI"|"VII"
 
 ---@class Scale
 ---Scale note values as integers, in ascending order of the mode, starting from the scale's key note.
@@ -31,7 +31,7 @@ local Scale = {}
 function Scale:chord(degree, note_count) end
 
 ---Get a single or multiple notes by its degree from the scale, using the given roman
----number string or a plain number as interval index.
+---number string or a plain number as index value.
 ---Allows picking intervals from the scale to e.g. create chords with roman number
 ---notation.
 ---
@@ -62,8 +62,8 @@ function Scale:degree(...) end
 ---for note in cmin:notes_iter(16) do
 --- table.insert(notes, note)
 ---end
------ same using the `pattern` library
----local notes = pattern.new(16):init(cmaj.notes_iter())
+----- same using the `pulse` library
+---local notes = pulse.new(16):init(cmaj.notes_iter())
 ---```
 ---@param count integer?
 ---@return fun():integer|nil
@@ -106,7 +106,7 @@ function Scale:fit(...) end
 ---
 ---### examples:
 ---```lua
----scale("c4", "minor").notes -> {"c4", "d4", "d#4", "f4", "g4", "g#4", "a#4"}
+---scale("c4", "minor").notes -> {48, 50, 51, 53, 55, 56, 58}
 ---```
 ---@param key string|number e.g. "c4" or 48
 ---@param mode ScaleMode
@@ -118,7 +118,7 @@ function scale(key, mode) end
 ---
 ---### examples:
 ---```lua
----scale("c4", {0,3,5,7}).notes -> {"c4", "d#4", "f4", "g4", "a4"}
+---scale("c4", {0,3,5,7}).notes -> {48, 51, 53, 55}
 ---```
 ---@param key string|number e.g. "c4" or 48
 ---@param intervals integer[] list of transpose steps relative to the key note

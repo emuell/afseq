@@ -13,51 +13,51 @@ fn create_phrase() -> Phrase {
         beats_per_bar: 4,
     };
 
-    let kick_rhythm = new_rhythm_from_string(
+    let kick_pattern = new_pattern_from_string(
         beat_time,
         None,
         r#"
-          return rhythm {
+          return pattern {
             unit = "1/1", 
-            pattern = function(context) 
+            pulse = function(context) 
               return 1 
             end,
-            emit = cycle("bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd? [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]"):map({
+            event = cycle("bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd? [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]"):map({
                 ["bd"] = "c4",
                 ["bd2"] = "c4 v0.5",
             })
           }
         "#,
-        "kick rhythm.lua",
+        "kick pattern.lua",
     )
     .unwrap();
 
-    let snare_rhythm = new_rhythm_from_string(
+    let snare_pattern = new_pattern_from_string(
         beat_time,
         None,
         r#"
-          return rhythm {
+          return pattern {
             unit = "beats", 
-            pattern = { 0, 1 },
-            emit = "c5"
+            pulse = { 0, 1 },
+            event = "c5"
           }
         "#,
-        "snare rhythm.lua",
+        "snare pattern.lua",
     )
     .unwrap();
 
-    let bass_rhythm = new_rhythm_from_string(
+    let bass_pattern = new_pattern_from_string(
         beat_time,
         None,
         r#"
           local scale = scale("c5", "natural minor")
-          return rhythm {
+          return pattern {
           unit = "1/8",
-          pattern = pattern.from({ 1, 0.5, 1, 0 }, { 0, 1, 0, 0 }, { 1, 0, 1, 0 }, { 0, 1, 0, 1 }),
+          pulse = pulse.from({ 1, 0.5, 1, 0 }, { 0, 1, 0, 0 }, { 1, 0, 1, 0 }, { 0, 1, 0, 1 }),
           gate = function (context)
               return context.pulse_value == 1.0
           end,
-          emit = pattern.from(1, 3, 4, 1, 3, 4, -7):map(function(index, value)
+          event = pulse.from(1, 3, 4, 1, 3, 4, -7):map(function(index, value)
             if value < 0 then
               return { key = scale.notes[-value] - 12, volume = 0.7 }
             else
@@ -67,30 +67,30 @@ fn create_phrase() -> Phrase {
           )
         }
         "#,
-        "bass rhythm.lua",
+        "bass pattern.lua",
     )
     .unwrap();
 
-    let fx_rhythm = new_rhythm_from_string(
+    let fx_pattern = new_pattern_from_string(
         beat_time,
         None,
         r#"
-          return rhythm {
+          return pattern {
             unit = "seconds",
             resolution = 8,
             offset = 8,
-            emit = {
+            event = {
               note("c_4", "---", "---"):volume(0.2),
               note("---", "c_5", "---"):volume(0.25),
               note("---", "---", "f_5"):volume(0.2)
             }
           }
         "#,
-        "fx rhythm.lua",
+        "fx pattern.lua",
     )
     .unwrap();
 
-    let chord_rhythm = new_rhythm_from_string(
+    let chord_pattern = new_pattern_from_string(
         beat_time,
         None,
         r#"
@@ -101,26 +101,26 @@ fn create_phrase() -> Phrase {
             note(CMIN:chord("i", 3)),
             note(CMIN:chord("i", 4)):transpose({0, 0, 3, -12})
           }
-          return rhythm {
+          return pattern {
             unit = "bars", 
             resolution = 4,
-            emit = function(context)
+            event = function(context)
               return CHORDS[math.imod(context.step, #CHORDS)] 
             end
           }
         "#,
-        "chord rhythm.lua",
+        "chord pattern.lua",
     )
     .unwrap();
 
     Phrase::new(
         beat_time,
         vec![
-            RhythmSlot::from(kick_rhythm),
-            RhythmSlot::from(snare_rhythm),
-            RhythmSlot::from(bass_rhythm),
-            RhythmSlot::from(fx_rhythm),
-            RhythmSlot::from(chord_rhythm),
+            PatternSlot::from(kick_pattern),
+            PatternSlot::from(snare_pattern),
+            PatternSlot::from(bass_pattern),
+            PatternSlot::from(fx_pattern),
+            PatternSlot::from(chord_pattern),
         ],
         BeatTimeStep::Bar(8.0),
     )

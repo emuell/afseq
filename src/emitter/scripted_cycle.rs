@@ -9,22 +9,22 @@ use crate::{
         add_lua_callback_error, note_events_from_value, ContextPlaybackState, LuaCallback,
         LuaTimeoutHook,
     },
-    event::cycle::{apply_cycle_note_properties, CycleNoteEvents},
-    BeatTimeBase, Cycle, CycleEvent, CycleValue, Event, EventIter, EventIterItem,
-    InputParameterSet, NoteEvent, PulseIterItem,
+    emitter::cycle::{apply_cycle_note_properties, CycleNoteEvents},
+    BeatTimeBase, Cycle, CycleEvent, CycleValue, Emitter, EmitterEvent, Event, NoteEvent,
+    ParameterSet, RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Emits a vector of [`EventIterItem`] from a Tidal [`Cycle`].
+/// Emits a vector of [`EmitterEvent`]s from a [`Cycle`].
 ///
 /// Channels from cycle are merged down into note events on different voices.
 /// Values in cycles can be mapped to notes with an optional mapping table or
 /// callbacks from from scripts.
 ///
-/// See also [`CycleEventIter`](`super::cycle::CycleEventIter`)
+/// See also [`CycleEmitter`](`super::cycle::CycleEmitter`)
 #[derive(Clone, Debug)]
-pub struct ScriptedCycleEventIter {
+pub struct ScriptedCycleEmitter {
     cycle: Cycle,
     mappings: HashMap<String, Vec<Option<NoteEvent>>>,
     mapping_callback: Option<LuaCallback>,
@@ -32,7 +32,7 @@ pub struct ScriptedCycleEventIter {
     channel_steps: Vec<usize>,
 }
 
-impl ScriptedCycleEventIter {
+impl ScriptedCycleEmitter {
     /// Return a new cycle with the given value mappings applied.
     pub fn with_mappings(cycle: Cycle, mappings: Vec<(String, Vec<Option<NoteEvent>>)>) -> Self {
         let mappings = mappings.into_iter().collect();
@@ -82,7 +82,7 @@ impl ScriptedCycleEventIter {
         })
     }
 
-    /// Generate a note event stack from a single cycle event, applying mappings if necessary
+    /// Generate a note event stack from a single cycle event, applying mappings if necessary.
     fn cycle_to_note_event(
         &mut self,
         channel_index: usize,
@@ -128,7 +128,7 @@ impl ScriptedCycleEventIter {
 
     /// Generate next batch of events from the next cycle run.
     /// Converts cycle events to note events and flattens channels into note columns.
-    fn generate(&mut self) -> Vec<EventIterItem> {
+    fn generate(&mut self) -> Vec<EmitterEvent> {
         // run the cycle event generator
         let events = {
             match self.cycle.generate() {
@@ -181,7 +181,7 @@ impl ScriptedCycleEventIter {
                 }
             }
         }
-        // convert timed note events into EventIterItems
+        // convert timed note events into EmitterEvents
         timed_note_events.into_event_iter_items()
     }
 
@@ -252,7 +252,7 @@ impl ScriptedCycleEventIter {
     }
 }
 
-impl EventIter for ScriptedCycleEventIter {
+impl Emitter for ScriptedCycleEmitter {
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         if let Some(timeout_hook) = &mut self.timeout_hook {
             timeout_hook.reset();
@@ -275,18 +275,18 @@ impl EventIter for ScriptedCycleEventIter {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
+    fn set_parameters(&mut self, parameters: ParameterSet) {
         if let Some(timeout_hook) = &mut self.timeout_hook {
             timeout_hook.reset();
         }
         if let Some(callback) = &mut self.mapping_callback {
-            if let Err(err) = callback.set_context_input_parameters(parameters) {
+            if let Err(err) = callback.set_context_parameters(parameters) {
                 callback.handle_error(&err);
             }
         }
     }
 
-    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: RhythmEvent, emit_event: bool) -> Option<Vec<EmitterEvent>> {
         if emit_event {
             Some(self.generate())
         } else {
@@ -294,13 +294,13 @@ impl EventIter for ScriptedCycleEventIter {
         }
     }
 
-    fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, _pulse: RhythmEvent, emit_event: bool) {
         if emit_event {
             self.advance();
         }
     }
 
-    fn duplicate(&self) -> Box<dyn EventIter> {
+    fn duplicate(&self) -> Box<dyn Emitter> {
         Box::new(self.clone())
     }
 

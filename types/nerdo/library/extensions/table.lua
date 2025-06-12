@@ -75,7 +75,7 @@ function table.find(t, value, start_index)
   return nil
 end
 
----Serialze a table to a string for display/debugging purposes.
+---Serialize a table to a string for display/debugging purposes.
 ---@param t table
 ---@return string
 ---@nodiscard

@@ -1,12 +1,12 @@
-use crate::{BeatTimeBase, Event, EventIter, EventIterItem, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Emitter, EmitterEvent, Event, ParameterSet, RhythmEvent};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Continuously emits empty [`EventIterItem`]S.
+/// Emitter which continously emits nothing (`None` events).
 #[derive(Clone, Debug)]
-pub struct EmptyEventIter {}
+pub struct EmptyEmitter {}
 
-impl EventIter for EmptyEventIter {
+impl Emitter for EmptyEmitter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
@@ -15,15 +15,15 @@ impl EventIter for EmptyEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
-    fn run(&mut self, _pulse: PulseIterItem, _emit_event: bool) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: RhythmEvent, _emit_event: bool) -> Option<Vec<EmitterEvent>> {
         None
     }
 
-    fn duplicate(&self) -> Box<dyn EventIter> {
+    fn duplicate(&self) -> Box<dyn Emitter> {
         Box::new(self.clone())
     }
 

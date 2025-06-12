@@ -1,17 +1,17 @@
 use crate::{
-    time::{SampleTimeDisplay, TimeBase},
+    time::{SampleTimeBase, SampleTimeDisplay},
     SampleTime,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Second time timing base for beat based [Rhythm](`crate::Rhythm`) impls.
+/// Second time base for wallclock time based [Pattern](`crate::Pattern`) impls.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct SecondTimeBase {
     pub samples_per_sec: u32,
 }
 
-impl TimeBase for SecondTimeBase {
+impl SampleTimeBase for SecondTimeBase {
     #[inline]
     fn samples_per_second(&self) -> u32 {
         self.samples_per_sec
@@ -19,7 +19,7 @@ impl TimeBase for SecondTimeBase {
 }
 
 impl SampleTimeDisplay for SecondTimeBase {
-    /// generate a second string representation of the the given sample time
+    /// Generate a second string representation of the the given sample time.
     fn display(&self, sample_time: SampleTime) -> String {
         format!("{}s", sample_time as f32 / self.samples_per_second() as f32)
     }

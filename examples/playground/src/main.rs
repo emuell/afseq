@@ -79,7 +79,7 @@ struct ScriptEntry {
     content: String,
 }
 
-/// Single rhythm triggered by a MIDI note
+/// Single pattern triggered by a MIDI note
 #[derive(Clone)]
 struct PlayingNote {
     note: u8,
@@ -157,7 +157,7 @@ impl Playground {
         let time_base_changed = false;
 
         // script content
-        let script_content = "return rhythm { }".to_string();
+        let script_content = "return pattern { }".to_string();
         let script_changed = true;
         let script_runtime_error = String::new();
 
@@ -290,7 +290,7 @@ impl Playground {
     /// Handle incoming MIDI note on event
     fn handle_midi_note_on(&mut self, note: u8, velocity: u8) {
         assert!(note as usize <= Self::NUM_MIDI_NOTES);
-        if self.playing_notes.is_empty() || self.rhythm_slot(note as usize).is_none() {
+        if self.playing_notes.is_empty() || self.pattern_slot(note as usize).is_none() {
             // reset play head
             self.output_start_sample_time =
                 self.player.file_player().output_sample_frame_position();
@@ -312,12 +312,12 @@ impl Playground {
                 sample_offset: self.emitted_sample_time,
             };
             self.playing_notes.push(new_note.clone());
-            // add a new rhythm for the new note
-            let new_rhytm = self.new_rhythm(Some(new_note));
-            let rhythm_slot = self
-                .rhythm_slot(note as usize)
-                .expect("Missing MIDI rhythm slot");
-            *rhythm_slot = RhythmSlot::Rhythm(new_rhytm);
+            // add a new pattern for the new note
+            let new_pattern = self.new_pattern(Some(new_note));
+            let pattern_slot = self
+                .pattern_slot(note as usize)
+                .expect("Missing MIDI pattern slot");
+            *pattern_slot = PatternSlot::Pattern(new_pattern);
         }
     }
 
@@ -333,11 +333,11 @@ impl Playground {
         {
             // remove playing note
             self.playing_notes.remove(playing_notes_index);
-            // remove the rhythm slot from sequence's phrase
-            if let Some(rhythm_slot) = self.rhythm_slot(note as usize) {
-                *rhythm_slot = RhythmSlot::Stop;
+            // remove the pattern slot from sequence's phrase
+            if let Some(pattern_slot) = self.pattern_slot(note as usize) {
+                *pattern_slot = PatternSlot::Stop;
                 // stop pending from the note
-                self.player.stop_sources_in_rhythm_slot(note as usize);
+                self.player.stop_sources_in_pattern_slot(note as usize);
             }
             // restore default playback in `run` with the last note removed
             if self.playing_notes.is_empty() {
@@ -384,24 +384,24 @@ impl Playground {
             // clear errors
             afseq::bindings::clear_lua_callback_errors();
             self.script_runtime_error = String::new();
-            // build note rhythm slots: one rhythm for each live played note
-            let rhythm_slots = if !self.playing_notes.is_empty() {
-                let mut slots = vec![RhythmSlot::Stop; Self::NUM_MIDI_NOTES];
+            // build note pattern slots: one pattern for each live played note
+            let pattern_slots = if !self.playing_notes.is_empty() {
+                let mut slots = vec![PatternSlot::Stop; Self::NUM_MIDI_NOTES];
                 for playing_note in &self.playing_notes.clone() {
                     slots[playing_note.note as usize] =
-                        RhythmSlot::Rhythm(self.new_rhythm(Some(playing_note.clone())));
+                        PatternSlot::Pattern(self.new_pattern(Some(playing_note.clone())));
                 }
                 slots
             } else {
-                // build a single regular rhythm slot
-                [RhythmSlot::Rhythm(self.new_rhythm(None))].to_vec()
+                // build a single regular pattern slot
+                [PatternSlot::Pattern(self.new_pattern(None))].to_vec()
             };
             // replace sequence
             let mut sequence = Sequence::new(
                 self.time_base,
                 vec![Phrase::new(
                     self.time_base,
-                    rhythm_slots,
+                    pattern_slots,
                     BeatTimeStep::Bar(4.0),
                 )],
             );
@@ -463,23 +463,23 @@ impl Playground {
         }
     }
 
-    /// Access an existing rhythm slot
-    fn rhythm_slot(&mut self, rhythm_index: usize) -> Option<&mut RhythmSlot> {
+    /// Access an existing pattern slot
+    fn pattern_slot(&mut self, pattern_index: usize) -> Option<&mut PatternSlot> {
         if let Some(sequence) = &mut self.sequence {
             let phrase = sequence
                 .phrases_mut()
                 .first_mut()
                 .expect("Failed to access phrase");
-            phrase.rhythm_slots_mut().get_mut(rhythm_index)
+            phrase.pattern_slots_mut().get_mut(pattern_index)
         } else {
             None
         }
     }
 
-    /// Create a new rhythm from the currently set script content
-    fn new_rhythm(&mut self, midi_note: Option<PlayingNote>) -> Rc<RefCell<dyn Rhythm>> {
-        // create a new rhythm from our script
-        let rhythm = new_rhythm_from_string(
+    /// Create a new pattern from the currently set script content
+    fn new_pattern(&mut self, midi_note: Option<PlayingNote>) -> Rc<RefCell<dyn Pattern>> {
+        // create a new pattern from our script
+        let pattern = new_pattern_from_string(
             self.time_base,
             self.instrument_id.map(InstrumentId::from),
             &self.script_content,
@@ -487,28 +487,28 @@ impl Playground {
         )
         .unwrap_or_else(|err| {
             self.script_runtime_error = err.to_string();
-            // create an empty fallback rhythm on errors
-            Rc::new(RefCell::new(BeatTimeRhythm::new(
+            // create an empty fallback pattern on errors
+            Rc::new(RefCell::new(BeatTimePattern::new(
                 self.time_base,
                 BeatTimeStep::Beats(1.0),
             )))
         });
         // and apply sample offset and event transform
-        rhythm
+        pattern
             .borrow_mut()
             .set_sample_offset(midi_note.as_ref().map(|n| n.sample_offset).unwrap_or(0));
-        rhythm
+        pattern
             .borrow_mut()
-            .set_event_transform(self.new_rhythm_event_transform(midi_note));
-        rhythm
+            .set_event_transform(self.new_pattern_event_transform(midi_note));
+        pattern
     }
 
     /// Create a note event transform function which applies instrument and
     /// note_transpose transforms, when set.
-    fn new_rhythm_event_transform(
+    fn new_pattern_event_transform(
         &self,
         midi_note: Option<PlayingNote>,
-    ) -> Option<RhythmEventTransform> {
+    ) -> Option<EventTransform> {
         let transforms: Vec<_> = [
             // Instrument transform
             self.instrument_id.map(InstrumentId::from).map(|id| {

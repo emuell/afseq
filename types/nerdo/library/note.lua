@@ -20,7 +20,7 @@ local NoteTable = {}
 ---@field notes NoteTable[]
 local Note = {}
 
----Transpose the notes key with the specified step or steps.
+---Transpose the note with the specified step or steps.
 ---
 ---Values outside of the valid key range (0 - 127) will be clamped.
 ---
@@ -91,9 +91,9 @@ function Note:delay(delay) end
 --- attributes:
 ---```md
 --- -'#' -> instrument (integer > 0)
---- -'v' -> volume (float in range [0-1])
---- -'p' -> panning (float in range [-1-1])
---- -'d' -> delay (float in range [0-1])
+--- -'v' -> volume (number in range [0-1])
+--- -'p' -> panning (number in range [-1-1])
+--- -'d' -> delay (number in range [0-1])
 ---```
 ---
 ---### examples:
@@ -117,11 +117,10 @@ function note(...) end
 ---or 0xFE for note offs
 ---### Examples:
 ---```lua
----note_value("c4") --> 48
----note_value(note("c4")) --> 48
----note_value("") --> 0xFF
----note_value("off") --> 0xFE
----note_value("xyz") --> error
+---note_number("c4") --> 48
+---note_number(note("c4")) --> 48
+---note_number("-") --> 0xFF
+---note_number("xyz") --> error
 ---```
 ---@param note NoteValue
 ---@return integer

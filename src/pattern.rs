@@ -1,62 +1,112 @@
-//! Rhythmical pattern as sequence of pulses in a `Rhythm`.
+//! Emit `Event`s via an `Emitter` with a given time base on a rhythmical pattern
+//! defined as `Rhythm`.
 
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
-use crate::{BeatTimeBase, Event, InputParameterSet, PulseIterItem};
-
-pub mod empty;
-pub mod euclidean;
-pub mod fixed;
-#[cfg(feature = "scripting")]
-pub mod scripted;
+use crate::{BeatTimeBase, Event, EventTransform, ExactSampleTime, Parameter, SampleTime};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Interface for a pulse pattern iterator as used by [Rhythm](`crate::Rhythm`).
-pub trait Pattern: Debug {
-    /// Returns if there is a valid pattern that can be run.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
+pub(crate) mod generic;
+
+pub mod beat_time;
+pub mod second_time;
+
+// -------------------------------------------------------------------------------------------------
+
+/// Iterator item as produced by [`Pattern`]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PatternEvent {
+    pub time: SampleTime,
+    pub event: Option<Event>,
+    pub duration: SampleTime,
+}
+
+impl PatternEvent {
+    /// Create a new `PatternEvent` with the given sample offset
+    /// added to the iter items sample time.
+    #[must_use]
+    pub fn with_offset(self, offset: SampleTime) -> Self {
+        Self {
+            time: self.time + offset,
+            ..self
+        }
     }
-    /// Return number of pulses this pattern has. The pattern repeats after this. When the size
-    /// is unknown, e.g. in external callbacks that generated pulses, 0 is returned, but
-    /// `self.is_empty` will still be true.
-    fn len(&self) -> usize;
-
-    /// Run and move the pattern by a single step and return the to emitted pulse.
-    /// When None, the pattern finished playback.
-    fn run(&mut self) -> Option<PulseIterItem>;
-
-    /// Set or update the pattern's internal beat or second time base with the new time base.
-    fn set_time_base(&mut self, time_base: &BeatTimeBase);
-
-    /// Set optional event which triggered, started the iter, if any, before running.
-    fn set_trigger_event(&mut self, event: &Event);
-
-    /// Set or update optional, input parameter map for callbacks.
-    fn set_input_parameters(&mut self, parameters: InputParameterSet);
-
-    /// Set how many times the pattern should be repeated. If 0, the pattern will be run once.
-    /// When None, which is the default, the pattern will be repeated indefinitely.
-    fn set_repeat_count(&mut self, count: Option<usize>);
-
-    /// Create a new cloned instance of this event iter. This actualy is a clone(), wrapped into
-    /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
-    /// Clone impls.
-    fn duplicate(&self) -> Box<dyn Pattern>;
-
-    /// Reset the pattern genertor, so it emits the same values as if it was freshly initialized.
-    /// This does to reset the pattern itself, but onlt the pattern playback position.
-    fn reset(&mut self);
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// Standard Iterator impl for Pattern.
+/// Emits sample time tagged optional [`Event`] items as [`PatternEvent`]s.
+///
+/// Iteratively produces events until given sample times with specific pulse durations.
+/// An audio player can use the sample time to schedule the events within the audio stream.
+///
+/// `Pattern` impls typically will use a [`Emitter`](crate::Emitter) to produce one or
+/// multiple notes, or a single parameter change event. The emitter is an iterator too,
+/// so the emitted event content may dynamically change over time as well.
+///
+/// Patterns can be reset and cloned (duplicated), so they can be triggered multiple times using
+/// possibly different rhythms and time bases.
+pub trait Pattern: Debug {
+    /// Get the pattern's internal beat time base.
+    fn time_base(&self) -> &BeatTimeBase;
+    /// Update the pattern beat time bases with a new time base (e.g. on tempo changes).
+    fn set_time_base(&mut self, time_base: &BeatTimeBase);
+
+    /// Length in *samples* of a *single time step* in the pattern's rhythm.
+    fn step_length(&self) -> ExactSampleTime;
+    /// Number of *steps* in the rhythm's pattern (cycle step count).
+    /// A pattern's rhythm repeats after `self.step_count() * self.step_length()` samples.
+    fn step_count(&self) -> usize;
+
+    /// Shared access to the pattern's parameter set, if any. Parameter sets do not change
+    /// after construction, but their values may.
+    fn parameters(&self) -> &[Rc<RefCell<Parameter>>];
+
+    /// Set the event which triggered, started the pattern, *before* running the pattern.
+    /// Rhythm, Gate or Emitter impls may use this to dynamically change their behavior.
+    fn set_trigger_event(&mut self, trigger: &Event);
+
+    /// Set an optional dynamic event transform function for the pattern, which gets invoked
+    /// for every event, right before it gets emitted. Note that transforms can not change event
+    /// times but only event values.
+    fn set_event_transform(&mut self, transform: Option<EventTransform>);
+
+    /// Custom sample offset value which is applied to all emitted events.
+    fn sample_offset(&self) -> SampleTime;
+    /// Set a new custom sample offset value. This may be used by a Sequencer to chain or offset
+    /// multiple pattern's in time.
+    fn set_sample_offset(&mut self, sample_offset: SampleTime);
+
+    /// Sample time event iterator: Generates a single event by first running the pattern's rhythm
+    /// to generate a new pulse. If the pulse's sample time is smaller than the given sample time
+    /// a new event is generated by the pattern's emitter and returned.
+    /// Returns `None` when no event is due or when pattern playback finished.
+    fn run_until_time(&mut self, sample_time: SampleTime) -> Option<PatternEvent>;
+
+    /// Skip all events until the given target time is reached.
+    ///
+    /// This calls `run_until_time` by default, until the target time is reached and
+    /// discards all generated events, but may be overridden for optimization purposes.
+    fn advance_until_time(&mut self, sample_time: SampleTime) {
+        while self.run_until_time(sample_time).is_some() {
+            // continue
+        }
+    }
+
+    /// Create a new cloned instance of this pattern. This actually is a clone(), wrapped into
+    /// a `Box<dyn Pattern>`, called 'duplicate' to avoid conflicts with possible Clone impls.
+    fn duplicate(&self) -> Rc<RefCell<dyn Pattern>>;
+
+    /// Resets/rewinds the pattern to its initial state.
+    fn reset(&mut self);
+}
+
+/// Standard iterator impl for [`Pattern`].
 impl Iterator for dyn Pattern {
-    type Item = PulseIterItem;
+    type Item = PatternEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.run()
+        self.run_until_time(SampleTime::MAX)
     }
 }

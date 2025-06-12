@@ -1,6 +1,4 @@
-//! The afseq prelude.
-//!
-//! The purpose of this module is to alleviate imports of common afseq traits:
+//! Alleviates imports of common traits, when using afseq as library.
 //!
 //! ```
 //! # #![allow(unused_imports)]
@@ -8,19 +6,19 @@
 //! ```
 
 pub use super::{
-    // all public types to create event iters, gates and patterns
-    event::{
-        cycle::{new_cycle_event, new_cycle_event_with_seed, CycleEventIter},
-        fixed::ToFixedEventIter,
-        fixed::ToFixedEventIterSequence,
-        mutated::ToMutatedEventIter,
-        new_empty_note, new_empty_note_event, new_note, new_note_event, new_note_event_sequence,
-        new_parameter_change_event, new_polyphonic_note_event, new_polyphonic_note_sequence_event,
-        unique_instrument_id, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId,
+    // all public types to create emitters, gates and patterns
+    emitter::{
+        cycle::{new_cycle_emitter, new_cycle_emitter_with_seed, CycleEmitter},
+        fixed::{ToFixedEmitter, ToFixedEmitterSequence},
+        mutated::ToMutatedEmitter,
+        new_empty_note_emitter, new_note_emitter, new_note_sequence_emitter,
+        new_parameter_change_emitter, new_polyphonic_note_emitter,
+        new_polyphonic_note_sequence_emitter,
     },
+    event::{new_empty_note, new_note, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId},
     gate::{probability::ProbabilityGate, threshold::ThresholdGate},
-    pattern::{euclidean, fixed::ToFixedPattern},
-    rhythm::{beat_time::BeatTimeRhythm, second_time::SecondTimeRhythm},
+    pattern::{beat_time::BeatTimePattern, second_time::SecondTimePattern},
+    rhythm::{euclidean, fixed::ToFixedRhythm},
     time::{BeatTimeStep, SecondTimeStep},
     // all public basic types
     BeatTimeBase,
@@ -30,29 +28,26 @@ pub use super::{
     CycleSpan,
     CycleTarget,
     CycleValue,
+    Emitter,
+    EmitterEvent,
     Event,
-    EventIter,
-    EventIterItem,
+    EventTransform,
     Gate,
-    InputParameter,
-    InputParameterSet,
-    InputParameterType,
     Note,
+    Parameter,
+    ParameterSet,
+    ParameterType,
     Pattern,
+    PatternEvent,
+    PatternSlot,
     Phrase,
     Pulse,
-    PulseIter,
-    PulseIterItem,
     Rhythm,
-    RhythmEventTransform,
-    RhythmIter,
-    RhythmIterItem,
-    RhythmSlot,
     SampleTime,
+    SampleTimeBase,
     Scale,
     SecondTimeBase,
     Sequence,
-    TimeBase,
 };
 
 #[cfg(feature = "scripting")]
@@ -60,11 +55,11 @@ pub use super::{
 pub use super::{
     bindings::{
         clear_lua_callback_errors, has_lua_callback_errors, lua_callback_errors,
-        new_rhythm_from_file, new_rhythm_from_string,
+        new_pattern_from_file, new_pattern_from_string,
     },
-    event::{scripted::ScriptedEventIter, scripted_cycle::ScriptedCycleEventIter},
+    emitter::{scripted::ScriptedEmitter, scripted_cycle::ScriptedCycleEmitter},
     gate::scripted::ScriptedGate,
-    pattern::scripted::ScriptedPattern,
+    rhythm::scripted::ScriptedRhythm,
 };
 
 #[cfg(feature = "player")]

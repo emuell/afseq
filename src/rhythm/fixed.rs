@@ -1,27 +1,29 @@
-use super::euclidean::euclidean;
-use crate::{BeatTimeBase, Event, InputParameterSet, Pattern, Pulse, PulseIter, PulseIterItem};
+use crate::{
+    rhythm::euclidean::euclidean, rhythm::RhythmEventIterator, BeatTimeBase, Event, ParameterSet,
+    Pulse, Rhythm, RhythmEvent,
+};
 
 // -------------------------------------------------------------------------------------------------
 
-/// A pattern which endlessly emits pulses by stepping through a fixed pulse array.
+/// A rhythm which endlessly emits pulses by stepping through a static pulse rhythm.
 #[derive(Clone, Debug)]
-pub struct FixedPattern {
+pub struct FixedRhythm {
     pulses: Vec<Pulse>,
     pulse_index: usize,
-    pulse_iter: Option<PulseIter>,
+    pulse_iter: Option<RhythmEventIterator>,
     repeat_count_option: Option<usize>,
     repeat_count: usize,
 }
 
-impl Default for FixedPattern {
+impl Default for FixedRhythm {
     fn default() -> Self {
         Self::from_pulses(vec![Pulse::Pulse(1.0)])
     }
 }
 
-impl FixedPattern {
-    /// Create a pattern from a vector of pattern pulses or a vector of values which can be
-    /// converted to pattern pulses (boolean, u32, f32).
+impl FixedRhythm {
+    /// Create from a vector of pulses or a vector of values which can be
+    /// converted to pulses (boolean, u32, f32).
     pub fn from_pulses<T>(pulses: Vec<T>) -> Self
     where
         Pulse: std::convert::From<T> + Sized,
@@ -34,7 +36,7 @@ impl FixedPattern {
         let pulse_iter = pulses.first().map(|pulse| pulse.clone().into_iter());
         let repeat_count_option = None;
         let repeat_count = 0;
-        FixedPattern {
+        FixedRhythm {
             pulses,
             pulse_index,
             pulse_iter,
@@ -43,18 +45,18 @@ impl FixedPattern {
         }
     }
 
-    /// Create a pattern from an euclidan rhythm.
+    /// Create from an euclidan rhythm.
     pub fn from_euclidean(steps: u32, pulses: u32, offset: i32) -> Self {
         Self::from_pulses(euclidean(steps, pulses, offset))
     }
 }
 
-impl Pattern for FixedPattern {
+impl Rhythm for FixedRhythm {
     fn len(&self) -> usize {
         self.pulses.iter().fold(0, |sum, pulse| sum + pulse.len())
     }
 
-    fn run(&mut self) -> Option<PulseIterItem> {
+    fn run(&mut self) -> Option<RhythmEvent> {
         // when we have no pulses there's nothing to run
         if self.is_empty() {
             return None;
@@ -99,7 +101,7 @@ impl Pattern for FixedPattern {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
@@ -107,7 +109,7 @@ impl Pattern for FixedPattern {
         self.repeat_count_option = count;
     }
 
-    fn duplicate(&self) -> Box<dyn Pattern> {
+    fn duplicate(&self) -> Box<dyn Rhythm> {
         Box::new(self.clone())
     }
 
@@ -124,28 +126,28 @@ impl Pattern for FixedPattern {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Create `FixedPattern` from convertible types.
-pub trait ToFixedPattern {
-    fn to_pattern(self) -> FixedPattern;
+/// Create [`FixedRhythm`]s from convertible types.
+pub trait ToFixedRhythm {
+    fn to_rhythm(self) -> FixedRhythm;
 }
 
-impl<T> ToFixedPattern for Vec<T>
+impl<T> ToFixedRhythm for Vec<T>
 where
     Pulse: std::convert::From<T>,
 {
-    /// Create a vector of pulses, numbers or booleans to a new [`FixedPattern`].
-    fn to_pattern(self) -> FixedPattern {
-        FixedPattern::from_pulses(self)
+    /// Create a vector of pulses, numbers or booleans to a new [`FixedRhythm`].
+    fn to_rhythm(self) -> FixedRhythm {
+        FixedRhythm::from_pulses(self)
     }
 }
 
-impl<const N: usize, T> ToFixedPattern for [T; N]
+impl<const N: usize, T> ToFixedRhythm for [T; N]
 where
     Pulse: std::convert::From<T>,
 {
-    /// Create a static array of pulses, numbers or booleans to a new [`FixedPattern`].
-    fn to_pattern(self) -> FixedPattern {
-        FixedPattern::from_pulses(self.into_iter().collect::<Vec<_>>())
+    /// Create a static array of pulses, numbers or booleans to a new [`FixedRhythm`].
+    fn to_rhythm(self) -> FixedRhythm {
+        FixedRhythm::from_pulses(self.into_iter().collect::<Vec<_>>())
     }
 }
 
@@ -157,67 +159,67 @@ mod test {
 
     #[test]
     fn run() {
-        let mut pattern = [1.0, 0.0, 1.0, 0.0].to_pattern();
+        let mut rhythm = [1.0, 0.0, 1.0, 0.0].to_rhythm();
         assert_eq!(
-            vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
+            vec![rhythm.run(), rhythm.run(), rhythm.run(), rhythm.run()],
             vec![
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 1.0,
                 })
             ]
         );
 
-        pattern = [
+        rhythm = [
             Pulse::from(1.0),
             Pulse::from(0.0),
             Pulse::from(vec![Pulse::from(vec![0.0, 1.0]), Pulse::from(1.0)]),
             Pulse::from(0.0),
         ]
-        .to_pattern();
+        .to_rhythm();
         assert_eq!(
             vec![
-                pattern.run(),
-                pattern.run(),
-                pattern.run(),
-                pattern.run(),
-                pattern.run(),
-                pattern.run()
+                rhythm.run(),
+                rhythm.run(),
+                rhythm.run(),
+                rhythm.run(),
+                rhythm.run(),
+                rhythm.run()
             ],
             vec![
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 0.25,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 0.25,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 0.5,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 1.0,
                 })
@@ -227,29 +229,29 @@ mod test {
 
     #[test]
     fn repeat() {
-        let mut pattern = [1.0, 0.0].to_pattern();
-        pattern.set_repeat_count(Some(1));
+        let mut rhythm = [1.0, 0.0].to_rhythm();
+        rhythm.set_repeat_count(Some(1));
         assert_eq!(
-            vec![pattern.run(), pattern.run(), pattern.run(), pattern.run()],
+            vec![rhythm.run(), rhythm.run(), rhythm.run(), rhythm.run()],
             vec![
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 1.0,
                     step_time: 1.0,
                 }),
-                Some(PulseIterItem {
+                Some(RhythmEvent {
                     value: 0.0,
                     step_time: 1.0,
                 })
             ]
         );
-        assert_eq!(pattern.run(), None);
+        assert_eq!(rhythm.run(), None);
     }
 }

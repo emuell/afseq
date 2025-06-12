@@ -1,18 +1,18 @@
-use crate::{BeatTimeBase, Event, InputParameterSet, Pattern, PulseIterItem};
+use crate::{BeatTimeBase, Event, ParameterSet, Rhythm, RhythmEvent};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Defines an empty pattern which never triggers a pulse.
+/// An empty rhythm which continuisly emits None pulse values.
 #[derive(Clone, Debug, Default)]
-pub struct EmptyPattern {}
+pub struct EmptyRhythm {}
 
-impl EmptyPattern {
+impl EmptyRhythm {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Pattern for EmptyPattern {
+impl Rhythm for EmptyRhythm {
     fn is_empty(&self) -> bool {
         true
     }
@@ -29,7 +29,7 @@ impl Pattern for EmptyPattern {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
@@ -37,11 +37,11 @@ impl Pattern for EmptyPattern {
         // nothing to do
     }
 
-    fn run(&mut self) -> Option<PulseIterItem> {
+    fn run(&mut self) -> Option<RhythmEvent> {
         None
     }
 
-    fn duplicate(&self) -> Box<dyn Pattern> {
+    fn duplicate(&self) -> Box<dyn Rhythm> {
         Box::new(self.clone())
     }
 

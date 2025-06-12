@@ -1,6 +1,6 @@
 # Cycles
 
-In addition to static arrays of [notes](./notes&scales.md) or dynamic [generator functions](../extras/generators.md), emitters in afseq can also emit cycles using the [tidal cycles mini-notation](https://tidalcycles.org/docs/reference/mini_notation/)
+In addition to static arrays of [notes](./notes&scales.md) or dynamic [generator functions](../extras/generators.md), `event` in afseq can also use cycles using the [tidal cycles mini-notation](https://tidalcycles.org/docs/reference/mini_notation/)
 
 ## Introduction
 
@@ -54,15 +54,15 @@ Random melody:
 return cycle("[c4|d4|e4|f4|g4|a4]*8")
 ```
 
-## Combining with Patterns
+## Combining with Pulses
 
-Control when patterns play using `rhythm`:
+Control when cycles play using `pulse`:
 
 ```lua
-return rhythm {
-  unit = "bars",       -- Timing unit
-  pattern = {1, 0},    -- Play on odd bars only
-  emit = cycle("c4 d4 e4 f4")
+return pattern {
+  unit = "bars",     -- Timing unit
+  pulse = {1, 0},    -- Play on odd bars only
+  event = cycle("c4 d4 e4 f4")
 }
 ```
 
@@ -84,33 +84,33 @@ The base time of a pattern in tidal is specified as *cycles per second*. In afse
 
 ```lua
 -- emits an entire cycle every beat
-return rhythm {
+return pattern {
   unit = "beats",
-  emit = cycle("c4 d4 e4") -- triplet
+  event = cycle("c4 d4 e4") -- triplet
 }
 ```
 
 ### Sequencing
 
-An emitter in afseq gets triggered for each incoming non-gated pattern pulse. This is true for cycles are well and allows you to sequence entire cycles too. 
+An event in afseq gets triggered for each incoming non-gated pattern pulse. This is true for cycles are well and allows you to sequence cycles too. 
 
 ```lua
 -- emit an entire cycle's every bar, then pause for two bars, then repeat
-return rhythm {
+return pattern {
   unit = "bars",
-  pattern = { 1, 0, 0 },
-  emit = cycle("c d e f")
+  pulse = { 1, 0, 0 },
+  event = cycle("c d e f")
 }
 ```
 
-You can also use the mini notation to emit single notes only, making use of tidal's note alternating and randomization features only: 
+You can also use the mini notation to emit single notes only, e.g. making use of the cycle's note alternating and randomization features only: 
 
 ```lua
 -- emit a single note from a cycle in an euclidean pattern
-return rhythm {
+return pattern {
   unit = "beats",
-  pattern = pattern.euclidean(5, 8),
-  emit = cycle("<c d e f g|b>")
+  pulse = pulse.euclidean(5, 8),
+  event = cycle("<c d e f g|b>")
 }
 ```
 
@@ -152,7 +152,7 @@ cycle("[c4 d#4 e4]:[<v.1 v.2>/2]")
   
 ```
 
-A shorthand for assigning attributes exists in the form of `:v=X` where `X` can be a pattern. This way, you can supply float values without having to repeat the name of the target attribute.
+A shorthand for assigning attributes exists in the form of `:v=X` where `X` can be a pulse. This way, you can supply float values without having to repeat the name of the target attribute.
 
 ```lua
 -- Set volume to rise for each cycle
@@ -167,7 +167,7 @@ cycle("[c4 d#4 e4]:<v.1 v.2 v.3 v.4>")
 
 Notes and chords in cycles are expressed as [note strings](./notes&scales.md#note-strings) in afseq. But you can also dynamically evaluate and map cycle identifiers using the cycle [`map`](../API/cycle.md#map) function.
 
-This allows you, for example, to inject [input parameters](./parameters.md) into cycles or to use custom identifiers.
+This allows you, for example, to inject [parameters](./parameters.md) into cycles or to use custom identifiers.
 
 Using custom identifiers with a static map (a Lua table):
 
@@ -231,15 +231,15 @@ return cycle([=[
 Dynamically mapped roman chord numbers with user defined scale
 
 ```lua
-return rhythm {
+return pattern {
   unit = "1/1",
   resolution = 4,
-  inputs = {
+  parameter = {
     parameter.enum("mode", "major", { "major", "minor" })
   },
-  emit = cycle("I V III VI"):map(
+  event = cycle("I V III VI"):map(
     function(init_context, value)
-      local s = scale("c4", init_context.inputs.mode)
+      local s = scale("c4", init_context.parameter.mode)
       return function(context, value)
         return value ~= "_" and s:chord(value) or value
       end

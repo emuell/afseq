@@ -15,10 +15,10 @@ local MAX_GENERATIONS = math.huge
 -- Define the minor scale in MIDI note values
 local MINOR_SCALE = scale("c", "minor")
 -- Define notes to choose from: 16 notes
-local SOURCE_NOTES = pattern.new(16, MINOR_SCALE:notes_iter())
+local SOURCE_NOTES = pulse.new(16, MINOR_SCALE:notes_iter())
 -- Define the optimal melody (best fitness): 16 notes
 -- with ascending, then descending notes from the scale
-local TARGET_MELODY = pattern.from(
+local TARGET_MELODY = pulse.from(
     1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 2, 1):map(
   function (_, value)
     return SOURCE_NOTES[value]
@@ -100,11 +100,11 @@ local function mutate(melody, notes)
   melody[mutation_point] = notes[new_note_index]
 end
 
--- Create Nerdo Rhythm script
-return rhythm {
+-- Create nerdo pattern
+return pattern {
   unit = UNIT,
-  emit = function(context)
-    -- a newly triggered rhythm starts a new world
+  event = function(context)
+    -- a newly triggered pattern starts a new world
     local world = {
       population = generate_population(),
       generation = 1,

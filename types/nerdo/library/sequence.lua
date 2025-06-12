@@ -10,7 +10,7 @@ error("Do not try to execute this file. It's just a type definition file.")
 ---@field notes NoteTable[][]
 local Sequence = {}
 
----Transpose all notes key values with the specified step value or values.
+---Transpose all note's key values with the specified step value or values.
 ---
 ---Values outside of the valid key range (0 - 127) will be clamped.
 ---
@@ -24,7 +24,7 @@ local Sequence = {}
 ---@nodiscard
 function Sequence:transpose(step) end
 
----Multiply all notes volume values with the specified factor or factors.
+---Multiply all note's volume values with the specified factor or factors.
 ---
 ---Values outside of the valid volume range (0 - 1) will be clamped.
 ---
@@ -74,7 +74,7 @@ function Sequence:delay(delay) end
 ---Create a sequence from an array of note values or note value varargs.
 ---
 ---Using `sequence` instead of a raw `{}` table can be useful to ease transforming the note
----content and to explicitly pass a sequence of e.g. single notes to the emitter.
+---content and to explicitly pass a sequence of e.g. single notes to the event emitter.
 ---
 ---### examples:
 ---```lua

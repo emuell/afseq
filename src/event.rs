@@ -1,26 +1,11 @@
-//! Events and event iterators which get emitted by a `Rhythm`.
+//! Events and event iterators which get emitted by a `Pattern`.
 
 use std::{
-    fmt::Debug,
-    fmt::Display,
-    sync::atomic::{AtomicUsize, Ordering},
+    fmt::{Debug, Display},
+    rc::Rc,
 };
 
-use crate::{BeatTimeBase, InputParameterSet, Note, PulseIterItem};
-use fixed::{FixedEventIter, ToFixedEventIter, ToFixedEventIterSequence};
-
-type Fraction = num_rational::Rational32;
-
-// -------------------------------------------------------------------------------------------------
-
-pub mod cycle;
-pub mod empty;
-pub mod fixed;
-pub mod mutated;
-#[cfg(feature = "scripting")]
-pub mod scripted;
-#[cfg(feature = "scripting")]
-pub mod scripted_cycle;
+use crate::Note;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -51,14 +36,6 @@ pub struct InstrumentId(usize);
     Hash,
 )]
 pub struct ParameterId(usize);
-
-// -------------------------------------------------------------------------------------------------
-
-/// Generate a new unique instrument id.
-pub fn unique_instrument_id() -> InstrumentId {
-    static ID: AtomicUsize = AtomicUsize::new(0);
-    InstrumentId(ID.fetch_add(1, Ordering::Relaxed))
-}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -208,7 +185,7 @@ pub fn new_note<E: Into<NoteEvent>>(note_event: E) -> Option<NoteEvent> {
     Some(note_event.into())
 }
 
-/// Shortcut for creating a vector of [`NoteEvent`]:
+/// Shortcut for creating a vector of [`NoteEvent`]s:
 /// e.g. a sequence of single notes
 pub fn new_note_vector<E: Into<NoteEvent>>(sequence: Vec<Option<E>>) -> Vec<Option<NoteEvent>> {
     let mut event_sequence = Vec::with_capacity(sequence.len());
@@ -240,37 +217,6 @@ pub fn new_polyphonic_note_sequence<E: Into<NoteEvent>>(
         polyphonic_event_sequence.push(event_sequence);
     }
     polyphonic_event_sequence
-}
-
-/// Shortcut for creating a new empty [`NoteEvent`] [`EventIter`].
-pub fn new_empty_note_event() -> FixedEventIter {
-    new_empty_note().to_event()
-}
-
-/// Shortcut for creating a new [`NoteEvent`] [`EventIter`].
-pub fn new_note_event<E: Into<NoteEvent>>(event: E) -> FixedEventIter {
-    new_note(event).to_event()
-}
-
-/// Shortcut for creating a new sequence of [`NoteEvent`] [`EventIter`].
-pub fn new_note_event_sequence<E: Into<NoteEvent>>(sequence: Vec<Option<E>>) -> FixedEventIter {
-    new_note_vector(sequence).to_event_sequence()
-}
-
-/// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
-/// e.g. a chord.
-pub fn new_polyphonic_note_event<E: Into<NoteEvent>>(
-    polyphonic_events: Vec<Option<E>>,
-) -> FixedEventIter {
-    new_note_vector(polyphonic_events).to_event()
-}
-
-/// Shortcut for creating a single [`EventIter`] from multiple [`NoteEvent`]:
-/// e.g. a sequence of chords.
-pub fn new_polyphonic_note_sequence_event<E: Into<NoteEvent>>(
-    polyphonic_sequence: Vec<Vec<Option<E>>>,
-) -> FixedEventIter {
-    new_polyphonic_note_sequence(polyphonic_sequence).to_event_sequence()
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -316,17 +262,9 @@ pub fn new_parameter_change<Parameter: Into<Option<ParameterId>>>(
     ParameterChangeEvent { parameter, value }
 }
 
-/// Shortcut for creating a new [`ParameterChangeEvent`] [`EventIter`].
-pub fn new_parameter_change_event<Parameter: Into<Option<ParameterId>>>(
-    parameter: Parameter,
-    value: f32,
-) -> FixedEventIter {
-    new_parameter_change(parameter, value).to_event()
-}
-
 // -------------------------------------------------------------------------------------------------
 
-/// Event which gets emitted by an [`EventIter`].
+/// Event value, produced by [`Emitter`](crate::Emitter) as [`EmitterEvent`](crate::EmitterEvent).
 #[derive(Clone, PartialEq, Debug)]
 pub enum Event {
     NoteEvents(Vec<Option<NoteEvent>>),
@@ -366,85 +304,5 @@ impl Display for Event {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Event with an optional start and length fraction which gets emitted by an [`EventIter`].
-#[derive(Clone, PartialEq, Debug)]
-pub struct EventIterItem {
-    pub event: Event,     // The emitted event
-    pub start: Fraction,  // Relative event start time in range 0..1
-    pub length: Fraction, // Relative event length in range 0..1
-}
-
-impl EventIterItem {
-    /// Create a new event iter item with default start and length
-    pub fn new(event: Event) -> Self {
-        Self {
-            event,
-            start: Fraction::ZERO,
-            length: Fraction::ONE,
-        }
-    }
-
-    /// Create a new event iter item with custom start and length
-    pub fn new_with_fraction(event: Event, start: Fraction, length: Fraction) -> Self {
-        Self {
-            start,
-            length,
-            event,
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// A resettable [`Event`] iterator, triggered via [`Pulse`](`crate::Pulse`)S.
-/// Used by [Rhythm](`crate::Rhythm`) to emit events from pulse patterns.
-pub trait EventIter: Debug {
-    /// Update the iterator's internal beat or second time base with the new time base.
-    fn set_time_base(&mut self, time_base: &BeatTimeBase);
-
-    /// Set optional event which triggered, started the iter, if any.
-    fn set_trigger_event(&mut self, event: &Event);
-
-    /// Set or update optional, input parameter map for callbacks.
-    fn set_input_parameters(&mut self, parameters: InputParameterSet);
-
-    /// Move iterator with the given pulse value forward.
-    /// `pulse` contains the current value and timing information for the current step in the pattern.
-    /// `emit_event` indicates whether the iterator should trigger the next event in the sequence as
-    /// evaluated by the rhythm's gate.
-    ///
-    /// Returns an optional stack of event iter items, which should be emitted for the given pulse.
-    fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>>;
-
-    /// Move iterator with the given pulse value forward without generating an event.
-    ///
-    /// This can be used to optimize iterator skipping in some EventIter implementations, but by
-    /// default calls `run` and simply discards the generated event return value.
-    fn advance(&mut self, pulse: PulseIterItem, emit_event: bool) {
-        let _ = self.run(pulse, emit_event);
-    }
-
-    /// Create a new cloned instance of this event iter. This actually is a clone(), wrapped into
-    /// a `Box<dyn EventIter>`, but called 'duplicate' to avoid conflicts with possible
-    /// Clone impls.
-    fn duplicate(&self) -> Box<dyn EventIter>;
-
-    /// Reset/rewind the iterator to its initial state.
-    fn reset(&mut self);
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Standard Iterator impl for [`EventIter`]. Runs the iter with a 1 valued [`PulseIterItem`].
-impl Iterator for dyn EventIter {
-    type Item = Vec<EventIterItem>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let pulse = PulseIterItem {
-            value: 1.0,
-            step_time: 1.0,
-        };
-        let emit_event = true;
-        self.run(pulse, emit_event)
-    }
-}
+/// A refcounted function which transforms emitted [`Event`] contents.
+pub type EventTransform = Rc<dyn Fn(&mut Event)>;

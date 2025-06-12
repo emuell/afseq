@@ -39,9 +39,9 @@
 > #### examples:
 > 
 > ```lua
-> return rhythm {
->   emit = function(init_context)
->     -- use a unique random sequence every time the rhythm gets (re)triggered
+> return pattern {
+>   event = function(init_context)
+>     -- use a unique random sequence every time the pattern gets (re)triggered
 >     local rand = math.randomstate(12345)
 >     return function(context)
 >       if rand(1, 10) > 5 then

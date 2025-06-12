@@ -21,10 +21,10 @@ local function generate_rhythm(seed)
   local rand = math.randomstate(seed)
 
   -- Generate the primary Euclidean rhythm pattern
-  local primary = pattern.euclidean(
+  local primary = pulse.euclidean(
     rand(1, PATTERN_LEN / 2), PATTERN_LEN)
   -- Generate a secondary Euclidean rhythm pattern
-  local secondary = pattern.euclidean(
+  local secondary = pulse.euclidean(
     rand(1, PATTERN_LEN / 2), PATTERN_LEN)
 
   -- Volume randomization state
@@ -75,10 +75,10 @@ local function generate_melody(pattern_len, scale, seed)
   return melody
 end
 
--- return rhythm
-return rhythm {
+-- return pattern
+return pattern {
   unit = UNIT,
-  pattern = function(context)
+  pulse = function(init_context)
     -- Generate combined rhythm
     local rhythm = generate_rhythm(RHYTHM_SEED)
     -- Pick pulse from the rhythm for each new step
@@ -86,13 +86,13 @@ return rhythm {
       return rhythm[math.imod(context.pulse_step, #rhythm)]
     end
   end,
-  emit = function(context)
+  event = function(init_context)
     -- Define the notes that should be used for the melody
     local scale = scale("c", SCALE).notes
     -- Generate the melody based on the combined rhythm
     local melody = generate_melody(MELODY_LEN, scale, MELODY_SEED)
     -- Pick note from the melody and use the pulse value as volume
-    ---@param context EmitterContext
+    ---@param context EventContext
     return function(context)
       local step = math.imod(context.pulse_step, #melody)
       return note(melody[step]):volume(context.pulse_value)

@@ -1,16 +1,16 @@
 use mlua::prelude::*;
 
-use crate::InputParameter;
+use crate::Parameter;
 
 // ---------------------------------------------------------------------------------------------
 
-/// Opaque Lua Userdata impl for an InputParameter.
-pub(crate) struct InputParameterUserData {
-    pub(crate) parameter: InputParameter,
+/// Opaque Lua Userdata impl for a Parameter.
+pub(crate) struct ParameterUserData {
+    pub(crate) parameter: Parameter,
 }
 
 // Use default IntoLua impl for LuaUserData
-impl LuaUserData for InputParameterUserData {}
+impl LuaUserData for ParameterUserData {}
 
 // ---------------------------------------------------------------------------------------------
 

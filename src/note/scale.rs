@@ -14,7 +14,7 @@ struct Mode {
 impl TryFrom<&str> for Mode {
     type Error = String;
 
-    /// Try converting the given string to a known scale
+    /// Try converting the given string to a known scale.
     fn try_from(mode: &str) -> Result<Self, String> {
         let norm_scale = Mode::resolve_synonyms(mode)
             .to_ascii_lowercase()
@@ -36,7 +36,7 @@ impl TryFrom<&str> for Mode {
 impl TryFrom<&Vec<i32>> for Mode {
     type Error = String;
 
-    /// Try converting the given interval list to a custom scale
+    /// Try converting the given interval list to a custom scale.
     fn try_from(intervals: &Vec<i32>) -> Result<Self, String> {
         if intervals.is_empty() {
             Err("interval list can not be empty".to_string())
@@ -289,6 +289,7 @@ const SCALE_MODES: [Mode; 36] = [
 
 #[repr(u8)]
 #[derive(PartialEq, Copy, Clone)]
+#[allow(clippy::enum_variant_names)]
 pub enum TransposeStrictness {
     ForceSecondaryInScaleNotesWhenRootInScale = 0,
     ForceSecondaryInScaleNotes = 1,
@@ -298,16 +299,16 @@ pub enum TransposeStrictness {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Note iterator for notes in a `Scale`.
+/// Note iterator for notes in a [`Scale`].
 #[derive(Debug, Clone)]
-pub struct ScaleNoteIter {
+pub struct NoteScaleIterator {
     root: u8,
     octave: u8,
     steps: Vec<usize>,
     step_index: usize,
 }
 
-impl ScaleNoteIter {
+impl NoteScaleIterator {
     fn new(root: u8, octave: u8, steps: Vec<usize>) -> Self {
         let step_index = 0;
         Self {
@@ -319,7 +320,7 @@ impl ScaleNoteIter {
     }
 }
 
-impl Iterator for ScaleNoteIter {
+impl Iterator for NoteScaleIterator {
     type Item = Note;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -372,31 +373,16 @@ impl TryFrom<(Note, &Vec<i32>)> for Scale {
 }
 
 impl Scale {
-    #[allow(dead_code)] // used in tests only
-    fn new(note: Note, mode: Mode) -> Self {
-        let key = note.key();
-        let octave = note.octave();
-        Self { key, octave, mode }
-    }
-
     /// Known mode/scaling names.
     pub fn mode_names() -> Vec<&'static str> {
         SCALE_MODES.iter().map(|mode| mode.name).collect()
     }
 
-    /// Key note as number [0..12].
-    pub fn key(&self) -> u8 {
-        self.key
-    }
-
-    /// List of raw degrees where 0 indicates no step.
-    pub fn degrees(&self) -> Vec<usize> {
-        self.mode.degrees.to_vec()
-    }
-
-    /// List of steps / intervals.
-    pub fn steps(&self) -> Vec<usize> {
-        self.mode.steps()
+    #[allow(dead_code)] // used in tests only
+    fn new(note: Note, mode: Mode) -> Self {
+        let key = note.key();
+        let octave = note.octave();
+        Self { key, octave, mode }
     }
 
     /// Generate a chord from a given degree with the given number of notes.
@@ -427,9 +413,24 @@ impl Scale {
             .collect()
     }
 
+    /// Key note as number [0..12].
+    pub fn key(&self) -> u8 {
+        self.key
+    }
+
+    /// List of raw degrees where 0 indicates no step.
+    pub fn degrees(&self) -> Vec<usize> {
+        self.mode.degrees.to_vec()
+    }
+
+    /// List of steps / intervals.
+    pub fn steps(&self) -> Vec<usize> {
+        self.mode.steps()
+    }
+
     /// Iterator with ascending list of notes in the scale
-    pub fn notes_iter(&self) -> ScaleNoteIter {
-        ScaleNoteIter::new(self.key, self.octave, self.steps())
+    pub fn notes_iter(&self) -> NoteScaleIterator {
+        NoteScaleIterator::new(self.key, self.octave, self.steps())
     }
 
     /// Generate an ascending list of notes in the scale, using the Note passed in the

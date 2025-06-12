@@ -1,4 +1,4 @@
-//! Tidal mini parser and event generator, used as `EventIter`.
+//! Tidal mini parser and event generator, used as `Emitter`.
 
 mod cycle;
-pub use cycle::{Cycle, Event, Pitch, Span, Target, Value};
+pub use cycle::{Cycle, Event, Span, Target, Value};

@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use crate::{
-    event::fixed::FixedEventIter, BeatTimeBase, Event, EventIter, EventIterItem, InputParameterSet,
-    PulseIterItem,
+    emitter::fixed::FixedEmitter, BeatTimeBase, Emitter, EmitterEvent, Event, ParameterSet,
+    RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -12,11 +12,11 @@ type EventMapFn = dyn FnMut(&mut Event) + 'static;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Continuously emits [`EventIterItem`] which's value can be mutated in each iter step
-/// with a custom closure.
+/// Continuously emits a single, static emitter event value, whose value can be mutated in each
+/// iter step with a custom closure.
 ///
-/// NB: This event iter can not be cloned. `clone_dyn` thus will cause a panic!
-pub struct MutatedEventIter {
+/// NB: This emitter can not be cloned. `duplicate` will panic!
+pub struct MutatedEmitter {
     events: Vec<Event>,
     event_index: usize,
     initial_events: Vec<Event>,
@@ -24,7 +24,7 @@ pub struct MutatedEventIter {
     reset_map: Box<dyn Fn() -> Box<EventMapFn>>,
 }
 
-impl MutatedEventIter {
+impl MutatedEmitter {
     pub fn new<F>(events: Vec<Event>, map: F) -> Self
     where
         F: FnMut(&mut Event) + Clone + 'static,
@@ -51,9 +51,9 @@ impl MutatedEventIter {
     }
 }
 
-impl Debug for MutatedEventIter {
+impl Debug for MutatedEmitter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("MutatedEventIter")
+        f.debug_struct("MutatedEmitter")
             .field("events", &self.events)
             .field("event_index", &self.event_index)
             .field("initial_events", &self.initial_events)
@@ -61,7 +61,7 @@ impl Debug for MutatedEventIter {
     }
 }
 
-impl EventIter for MutatedEventIter {
+impl Emitter for MutatedEmitter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
@@ -70,22 +70,22 @@ impl EventIter for MutatedEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
-    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: RhythmEvent, emit_event: bool) -> Option<Vec<EmitterEvent>> {
         if !emit_event || self.events.is_empty() {
             return None;
         }
         let mut event = self.events[self.event_index].clone();
         (*self.map)(&mut event);
         self.event_index = (self.event_index + 1) % self.events.len();
-        Some(vec![EventIterItem::new(event)])
+        Some(vec![EmitterEvent::new(event)])
     }
 
-    fn duplicate(&self) -> Box<dyn EventIter> {
-        panic!("Mutated event iters can't be cloned")
+    fn duplicate(&self) -> Box<dyn Emitter> {
+        panic!("Mutated event emitters can't be cloned")
     }
 
     fn reset(&mut self) {
@@ -97,19 +97,19 @@ impl EventIter for MutatedEventIter {
 
 // -------------------------------------------------------------------------------------------------
 
-pub trait ToMutatedEventIter<F>
+pub trait ToMutatedEmitter<F>
 where
     F: FnMut(&mut Event) + Clone + 'static,
 {
-    fn mutate(self, map: F) -> MutatedEventIter;
+    fn mutate(self, map: F) -> MutatedEmitter;
 }
 
-impl<F> ToMutatedEventIter<F> for FixedEventIter
+impl<F> ToMutatedEmitter<F> for FixedEmitter
 where
     F: FnMut(&mut Event) + Clone + 'static,
 {
-    /// Upgrade a [`FixedEventIter`] to a [`MutatedEventIter`].
-    fn mutate(self, map: F) -> MutatedEventIter {
-        MutatedEventIter::new(self.events().clone(), map)
+    /// Upgrade a [`FixedEmitter`] to a [`MutatedEmitter`].
+    fn mutate(self, map: F) -> MutatedEmitter {
+        MutatedEmitter::new(self.events().to_vec(), map)
     }
 }

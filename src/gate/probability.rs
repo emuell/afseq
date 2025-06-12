@@ -1,7 +1,7 @@
 use rand::{rng, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use crate::{BeatTimeBase, Event, Gate, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, Gate, ParameterSet, RhythmEvent};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -30,11 +30,11 @@ impl Gate for ProbabilityGate {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
-    fn run(&mut self, pulse: &PulseIterItem) -> bool {
+    fn run(&mut self, pulse: &RhythmEvent) -> bool {
         pulse.value >= 1.0
             || (pulse.value > 0.0 && pulse.value > self.rand_gen.random_range(0.0..1.0))
     }

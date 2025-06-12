@@ -1,5 +1,4 @@
-//! An experimental functional musical sequence generator.
-//! Part of the [afplay](https://github.com/emuell/afplay) crates.
+//! Experimental imperative-style music sequence generator engine with optional Lua bindings.
 
 // -------------------------------------------------------------------------------------------------
 
@@ -33,60 +32,72 @@ compile_error!(
 
 // -------------------------------------------------------------------------------------------------
 
-// Exports
+// Internal mods
+mod emitter;
+mod event;
+mod gate;
+mod note;
+mod parameter;
+mod pattern;
+mod phrase;
+mod pulse;
+mod rhythm;
+mod sequence;
+mod tidal;
+mod time;
 
-pub mod time;
-pub use time::{
-    BeatTimeBase, BeatTimeStep, SampleTime, SampleTimeDisplay, SecondTimeBase, TimeBase,
+// Re-Exported basic Traits and Types
+pub use crate::{
+    emitter::{Emitter, EmitterEvent},
+    event::{Event, EventTransform, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId},
+    gate::Gate,
+    note::{chord::Chord, scale::Scale, Note},
+    parameter::{Parameter, ParameterSet, ParameterType},
+    pattern::{Pattern, PatternEvent},
+    phrase::{PatternSlot, Phrase},
+    pulse::Pulse,
+    rhythm::{Rhythm, RhythmEvent},
+    sequence::Sequence,
+    tidal::{
+        Cycle, Event as CycleEvent, Span as CycleSpan, Target as CycleTarget, Value as CycleValue,
+    },
+    time::{
+        BeatTimeBase, BeatTimeStep, ExactSampleTime, SampleTime, SampleTimeBase, SampleTimeDisplay,
+        SecondTimeBase,
+    },
 };
 
-pub mod note;
-pub use note::Note;
+/// Default [`Rhythm`] impls.
+pub mod rhythms {
+    pub use super::rhythm::{empty::EmptyRhythm, fixed::FixedRhythm};
 
-pub mod chord;
-pub use chord::Chord;
+    #[cfg(feature = "scripting")]
+    pub use crate::rhythm::scripted::ScriptedRhythm;
+}
 
-pub mod scale;
-pub use scale::Scale;
+/// Default [`Gate`] impls.
+pub mod gates {
+    pub use super::gate::{probability::ProbabilityGate, threshold::ThresholdGate};
 
-pub mod event;
-pub use event::{
-    Event, EventIter, EventIterItem, InstrumentId, NoteEvent, ParameterChangeEvent, ParameterId,
-};
+    #[cfg(feature = "scripting")]
+    pub use super::gate::scripted::ScriptedGate;
+}
 
-pub mod tidal;
-pub use tidal::{
-    Cycle, Event as CycleEvent, Span as CycleSpan, Target as CycleTarget, Value as CycleValue,
-};
+/// Default [`Emitter`] impls.
+pub mod emitters {
+    pub use super::emitter::{
+        cycle::CycleEmitter, empty::EmptyEmitter, fixed::FixedEmitter, mutated::MutatedEmitter,
+    };
 
-pub mod pulse;
-pub use pulse::{Pulse, PulseIter, PulseIterItem};
+    #[cfg(feature = "scripting")]
+    pub use super::emitter::{scripted::ScriptedEmitter, scripted_cycle::ScriptedCycleEmitter};
+}
 
-pub mod pattern;
-pub use pattern::Pattern;
-
-pub mod gate;
-pub use gate::Gate;
-
-pub mod rhythm;
-pub use rhythm::{Rhythm, RhythmEventTransform, RhythmIter, RhythmIterItem};
-
-pub mod phrase;
-pub use phrase::{Phrase, RhythmSlot};
-
-pub mod sequence;
-pub use sequence::Sequence;
-
-pub mod input;
-pub use input::{
-    Parameter as InputParameter, ParameterSet as InputParameterSet,
-    ParameterType as InputParameterType,
-};
-
+// Public modules
 #[cfg(feature = "scripting")]
 pub mod bindings;
-
 #[cfg(feature = "player")]
 pub mod player;
 
+// Prelude
 pub mod prelude;

@@ -1,4 +1,4 @@
-//! Defines musical or wall clock time bases that `Rhythms` can run on.
+//! Defines musical or wall clock time bases that `Patterns` can run on.
 
 use std::fmt::Debug;
 
@@ -10,12 +10,16 @@ pub use seconds::{SecondTimeBase, SecondTimeStep};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Sample time value type as emitted by [`RhythmIter`](crate::RhythmIter).
+/// Sample time value type as emitted by
+/// [`Pattern`](crate::Pattern) and [`Rhythm`](crate::Rhythm).
 pub type SampleTime = u64;
+
+/// Sample time as real number value, used to keep track of other units as sample time.
+pub type ExactSampleTime = f64;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Displays sample times as strings in various time bases.
+/// Convert sample times to strings in [`SampleTimeBase`] impls.
 pub trait SampleTimeDisplay: Debug {
     /// generate a string representation of the the given sample time
     fn display(&self, sample_time: SampleTime) -> String;
@@ -23,8 +27,8 @@ pub trait SampleTimeDisplay: Debug {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Basic time trait, providing sample <-> second rate conversion only.
-pub trait TimeBase: Debug {
+/// Root time trait, providing sample <-> second rate conversion only.
+pub trait SampleTimeBase: Debug {
     /// Sample rate for the time base.  
     fn samples_per_second(&self) -> u32;
 

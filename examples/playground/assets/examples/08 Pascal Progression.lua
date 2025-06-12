@@ -15,7 +15,7 @@ local pascals_triangle = {
 }
 
 -- Define the scale we pick notes from (16 notes from a C pentatonic scale)
-local relaxing_scale = pattern.new(16, scale("c5", "pentatonic major"):notes_iter())
+local relaxing_scale = pulse.new(16, scale("c5", "pentatonic major"):notes_iter())
 
 -- Function to generate chord progressions from Pascal's Triangle values
 local function generate_chord_progressions(triangle)
@@ -37,9 +37,9 @@ math.randomseed(2323)
 -- Generate chord progressions
 local chord_progressions = generate_chord_progressions(pascals_triangle)
 
-return rhythm {
+return pattern {
   unit = "1/2",
-  emit = function(context)
+  event = function(context)
     local result = {}
     -- randomly add maybe notes
     if math.random() < 0.5 then

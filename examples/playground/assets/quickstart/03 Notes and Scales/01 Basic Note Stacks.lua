@@ -1,7 +1,7 @@
 -- Create a chord by stacking notes
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = { {"c4", "e4", "g4"}, "c4" } -- C major chord followed by a single C4
+  event = { {"c4", "e4", "g4"}, "c4" } -- C major chord followed by a single C4
 }
 
 -- TRY THIS: Try different chord combinations like `{"d4", "f4", "a4"}` for D minor

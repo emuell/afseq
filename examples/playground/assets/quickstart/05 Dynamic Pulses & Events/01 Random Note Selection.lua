@@ -1,8 +1,8 @@
 -- Randomly select notes from a list
 local notes = {"c4", "d4", "e4", "g4"}
-return rhythm {
+return pattern {
   unit = "1/8",
-  emit = function(context)
+  event = function(context)
     return notes[math.random(#notes)] -- Pick random note from array
   end
 }

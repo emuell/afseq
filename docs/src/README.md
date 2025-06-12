@@ -1,40 +1,41 @@
 # Welcome
 
-... to the afseq scripting guide! ***afseq***, also known as **nerdo-rhythm**, is an experimental imperative music sequence generator engine.
+... to the afseq scripting guide! **afseq** a.k.a **nerdo-patterns**, is an experimental imperative music sequence generator engine that lets you create musical patterns programmatically using Lua scripts for algorithmic or [live music coding](https://github.com/pjagielski/awesome-live-coding-music).
 
-It allows creating music sequences programmatically using either plain Rust as a library (*static, precompiled*) or Lua as a scripting engine (*dynamic, runtime interpreted*) for [live music coding](https://github.com/pjagielski/awesome-live-coding-music).
-
-This book only covers the Lua API for live music coding. For instructions and examples on creating rhythms in plain Rust, see the [afseq crate docs](https://github.com/emuell/afseq).
+This guide focuses on the Lua scripting API. For Rust development, see the [afseq crate docs](https://github.com/emuell/afseq).
 
 
 ## Key Features
 
 `Programmatic`
-: Build musical phrases using Lua scripts or Rust code.<br>
+: Build musical patterns using dynamic scripts or precompiled code.<br>
 `Modular`
-: Combine and reuse rhythm components dynamically.<br>
+: Combine and reuse patterns components dynamically.<br>
 `Flexible`
-: Create anything from simple beats to complex nested rhythms.<br>
+: Create anything from simple beats to complex musical phrases.<br>
 `Generative`
 : Make evolving compositions that change over time.<br>
 `Dynamic`
 : Modify patterns live, during playback.<br>
 `External Control`
 : Connect with MIDI/OSC controllers for hands-on parameter tweaking.<br>
-`Template Rhythms`
-: Create user configurable rhythm templates.<br>
+`Templates`
+: Create user configurable pattern templates.<br>
 `Cycles Mini-Notation`
 : Use familiar Tidal Cycles mini-notation for rapid pattern creation.<br>
 
 
-## Installation
+## Applications
 
-afseq is a Rust *library* that deals with raw musical event generation only. It does not generate any audio. You must use an application with built-in support for afseq to use it. 
+[Renoise](https://www.renoise.com)
+: has built-in afseq support in its [phrase editor](https://tutorials.renoise.com/wiki/Phrase_Editor).<br>
+[Online Playground](https://pttrns.renoise.com)
+: Experiment with afseq scripts directly in your browser<br>
+[Rust Examples](https://github.com/emuell/afseq/tree/master/examples)
+: Write or test scripts in Rust or Lua with a basic sample player.<br>
 
-If you are familiar with Rust, you can also use `play-script.rs` from the [examples](https://github.com/emuell/afseq/tree/master/examples) in the git repository to test out afseq scripts using a basic sample player.
 
-
-## Getting Started
+## Documentation
 
 [Quickstart](./quickstart.md)
 : Start with a quick introduction through practical examples.<br>
@@ -44,5 +45,3 @@ If you are familiar with Rust, you can also use `play-script.rs` from the [examp
 : More advanced examples, created and explained step by step.<br>
 [Reference](./API/)
 : Read raw technical specifications of the Lua API.
-
-

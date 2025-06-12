@@ -5,26 +5,26 @@
 -- Scale we're creating the note pattern from
 local s = scale("c3", "minor")
 
--- Create a notes pattern from euclidean distributed chords 
+-- Create a note pattern from euclidean distributed chords 
 local notes =
-  pattern.from(s:chord("i", 3)):euclidean(8) + 
-  pattern.from(s:chord("vi", 3)):euclidean(8, 1):reverse() +
-  pattern.from(s:chord("v", 3)):euclidean(8) +
-  pattern.from(s:chord("iii", 5)):euclidean(8):reverse()
+  pulse.from(s:chord("i", 3)):euclidean(8) + 
+  pulse.from(s:chord("vi", 3)):euclidean(8, 1):reverse() +
+  pulse.from(s:chord("v", 3)):euclidean(8) +
+  pulse.from(s:chord("iii", 5)):euclidean(8):reverse()
 
 -- The rhythm emits the notes as a sequence
-return rhythm {
+return pattern {
   unit = "1/16",
-  emit = sequence(notes):amplify(0.8)
+  event = sequence(notes):amplify(0.8)
 }--[[
   Create a chord progression from a scale
 --]]
 
 local cmin = scale("c4", "major")
 
-return rhythm {
+return pattern {
   unit = "1/2",
-  emit = sequence(
+  event = sequence(
     cmin:chord("i"),
     cmin:chord("iv"),
     cmin:chord("vi"),
@@ -49,9 +49,9 @@ local patterns = {
 }
 
 -- Create Nerdo Rhythm script
-return rhythm {
+return pattern {
   unit = "1/16",
-  emit = function(context)
+  event = function(context)
     -- State variables to track current pattern index and position in pattern
     local pattern_index = 1
     -- Counter to change pattern every 16 steps
@@ -135,12 +135,12 @@ return cycle("[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63")
 local BOUNCE_DISTANCE = 32
 local BOUNCE_SPEED = 1.05
 
-return rhythm {
+return pattern {
   unit = '1/4',
   resolution = 1/32,
-  pattern = function(context)
+  pulse = function(context)
     local step, step_size = 0, BOUNCE_DISTANCE
-    ---@param context PatternContext
+    ---@param context PulseContext
     return function(context)
       if step_size <= 1 then
         -- restart
@@ -158,7 +158,7 @@ return rhythm {
       return trigger_new_pulse
     end
   end,
-  emit = function(context)
+  event = function(context)
     return {
       key = "c4",
       delay = math.random() * 0.25
@@ -188,10 +188,10 @@ local function generate_rhythm(seed)
   local rand = math.randomstate(seed)
 
   -- Generate the primary Euclidean rhythm pattern
-  local primary = pattern.euclidean(
+  local primary = pulse.euclidean(
     rand(1, PATTERN_LEN / 2), PATTERN_LEN)
   -- Generate a secondary Euclidean rhythm pattern
-  local secondary = pattern.euclidean(
+  local secondary = pulse.euclidean(
     rand(1, PATTERN_LEN / 2), PATTERN_LEN)
 
   -- Volume randomization state
@@ -242,10 +242,10 @@ local function generate_melody(pattern_len, scale, seed)
   return melody
 end
 
--- return rhythm
-return rhythm {
+-- return pattern
+return pattern {
   unit = UNIT,
-  pattern = function(context)
+  pulse = function(init_context)
     -- Generate combined rhythm
     local rhythm = generate_rhythm(RHYTHM_SEED)
     -- Pick pulse from the rhythm for each new step
@@ -253,13 +253,13 @@ return rhythm {
       return rhythm[math.imod(context.pulse_step, #rhythm)]
     end
   end,
-  emit = function(context)
+  event = function(init_context)
     -- Define the notes that should be used for the melody
     local scale = scale("c", SCALE).notes
     -- Generate the melody based on the combined rhythm
     local melody = generate_melody(MELODY_LEN, scale, MELODY_SEED)
     -- Pick note from the melody and use the pulse value as volume
-    ---@param context EmitterContext
+    ---@param context EventContext
     return function(context)
       local step = math.imod(context.pulse_step, #melody)
       return note(melody[step]):volume(context.pulse_value)
@@ -283,7 +283,7 @@ local pascals_triangle = {
 }
 
 -- Define the scale we pick notes from (16 notes from a C pentatonic scale)
-local relaxing_scale = pattern.new(16, scale("c5", "pentatonic major"):notes_iter())
+local relaxing_scale = pulse.new(16, scale("c5", "pentatonic major"):notes_iter())
 
 -- Function to generate chord progressions from Pascal's Triangle values
 local function generate_chord_progressions(triangle)
@@ -305,9 +305,9 @@ math.randomseed(2323)
 -- Generate chord progressions
 local chord_progressions = generate_chord_progressions(pascals_triangle)
 
-return rhythm {
+return pattern {
   unit = "1/2",
-  emit = function(context)
+  event = function(context)
     local result = {}
     -- randomly add maybe notes
     if math.random() < 0.5 then
@@ -356,10 +356,10 @@ local MAX_GENERATIONS = math.huge
 -- Define the minor scale in MIDI note values
 local MINOR_SCALE = scale("c", "minor")
 -- Define notes to choose from: 16 notes
-local SOURCE_NOTES = pattern.new(16, MINOR_SCALE:notes_iter())
+local SOURCE_NOTES = pulse.new(16, MINOR_SCALE:notes_iter())
 -- Define the optimal melody (best fitness): 16 notes
 -- with ascending, then descending notes from the scale
-local TARGET_MELODY = pattern.from(
+local TARGET_MELODY = pulse.from(
     1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 2, 1):map(
   function (_, value)
     return SOURCE_NOTES[value]
@@ -441,11 +441,11 @@ local function mutate(melody, notes)
   melody[mutation_point] = notes[new_note_index]
 end
 
--- Create Nerdo Rhythm script
-return rhythm {
+-- Create nerdo pattern
+return pattern {
   unit = UNIT,
-  emit = function(context)
-    -- a newly triggered rhythm starts a new world
+  event = function(context)
+    -- a newly triggered pattern starts a new world
     local world = {
       population = generate_population(),
       generation = 1,
@@ -491,62 +491,66 @@ return rhythm {
       }
     end
   end
-}-- The most basic rhythm: steady quarter notes
-return rhythm {
+}-- The most basic pattern: steady quarter notes
+return pattern {
   unit = "1/4", -- Quarter note timing grid
-  emit = "c4"   -- Play middle C on each pulse
+  event = "c4"  -- Play middle C on each pulse
 }
 
 -- TRY THIS: Change unit to "1/8" for eighth notes
 -- TRY THIS: Replace "c4" with "e4" or "g4" for different notes
 -- Create a pattern that alternates between notes
-return rhythm {
-  unit = "1/8",           -- Eighth note timing grid
-  pattern = {1, 0, 1, 1}, -- Play-rest-play-play pattern
-  emit = {"c4", "d4"}     -- Alternates between c4 and d4
+return pattern {
+  unit = "1/8",         -- Eighth note timing grid
+  pulse = {1, 0, 1, 1}, -- Play-rest-play-play pattern
+  event = {"c4", "d4"}  -- Alternates between c4 and d4
 }
 
 -- TRY THIS: Change pattern to {1, 1, 0, 1} for a different rhythm
 -- TRY THIS: Add more notes to emit like {"c4", "d4", "e4", "g4"}
 -- Note properties
-return rhythm {
+return pattern {
   unit = "1/8",
-  -- `v` = volume [0 - 1] `p` = panning [-1 - 1] `d` = delay [0 - 1] `#` = instrument
-  emit = { "c4 v0.2", "off d0.5", "g4 v0.8" }
+  event = { "c4 v0.2", "off d0.5", "g4 v0.8" }
 }
+
+-- v: volume [0 - 1] 
+-- p: panning [-1 - 1] 
+-- d: delay [0 - 1]
+-- #: instrument
 
 -- TRY THIS: Play specific instruments with # such as `c4 #8`
 -- TRY THIS: Add delays to some of the notes
 -- Pattern with mixed note lengths
-return rhythm {
+return pattern {
   unit = "1/4",
-  pattern = {1, {1, 1, 1, 1}}, -- One quarter note, then four sixteenth notes
-  emit = {"c4", "c5", "e4", "g4", "d4"} -- C4 (quarter), c5, e4, g4, d4 (sixteenth notes)
+  pulse = {1, {1, 1, 1, 1}}, -- One quarter note, then four sixteenth notes
+  event = {"c4", "c5", "e4", "g4", "d4"} -- C4 (quarter), c5, e4, g4, d4 (sixteenth notes)
 }
 
 -- TRY THIS: Try more complex subdivisions like {{1, 1}, {1, {1, 1}}}
 -- TRY THIS: Change the unit to "1/8" to make everything faster
 -- Create swing or triplet feel
-return rhythm {
+return pattern {
   unit = "1/8",
   resolution = 2/3, -- Triplet feel (3 notes in space of 2)
-  emit = {"c4", "e4", "g4"}
+  event = {"c4", "e4", "g4"}
 }
 
 -- TRY THIS: Change resolution to "5/4" for a different swing feel
 -- Distributes notes evenly across steps (common in many music traditions)
-return rhythm {
+return pattern {
   unit = "1/16",
-  pattern = pattern.euclidean(3, 8, 0),  -- 3 hits spread over 8 steps without offset
-  emit = "c4"
+  pulse = pulse.euclidean(3, 8, 0),  -- 3 hits spread over 8 steps without offset
+  event = "c4"
 }
 
 -- TRY THIS: Try different combinations like (5, 8, -2) or (7, 16)
--- TRY THIS: Use pattern = pattern.euclidean(3, 8) + pattern.euclidean(5, 8) to chain different patterns
+-- TRY THIS: Use pulse = pulse.euclidean(3, 8) + pulse.euclidean(5, 8) to chain different patterns
 -- Create a chord by stacking notes
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = { {"c4", "e4", "g4"}, "c4" } -- C major chord followed by a single C4
+  event = { {"c4", "e4", "g4"}, "c4" } -- C major chord followed by a single C4
 }
 
 -- TRY THIS: Try different chord combinations like `{"d4", "f4", "a4"}` for D minor
@@ -557,9 +561,9 @@ return rhythm {
 --      note{"c4"}:volume(0.8)
 --   }
 -- Using chord notation shortcuts
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = {
+  event = {
     "c4'M",   -- C major using ' chord notation
     "d4'm",   -- D minor
     "g4'dom7" -- G dominant 7th
@@ -569,9 +573,9 @@ return rhythm {
 -- TRY THIS: Use other chord modes like `'m5`, `'+`, or `'dim`
 -- TRY THIS: Add inversions with `note("c4'M"):transpose({12, 0, 0})`
 -- Advanced chord and scale operations
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = {
+  event = {
     chord("c4", "major"),          -- C major via the chord function
     chord("c4", {0, 4, 7}),        -- C major via custom intervals
     scale("c", "major"):chord(1),  -- C major from 1st degree of C major scale
@@ -582,9 +586,9 @@ return rhythm {
 -- TRY THIS: Use other scales like `"minor"`, `"dorian"`, or `"pentatonic"`
 -- TRY THIS: Try different chord degrees: `scale("c", "major"):chord(2)` for D minor
 -- Using tidal cycles notation for concise patterns
-return rhythm {
+return pattern {
   unit = "1/4", -- Emit a cycle every beat
-  emit = cycle("c4 e4 g4") -- C major arpeggio
+  event = cycle("c4 e4 g4") -- C major arpeggio
 }
 
 -- TRY THIS: The simplified notation emits a cycle per bar
@@ -593,9 +597,9 @@ return rhythm {
 
 -- See https://tidalcycles.org/docs/reference/mini_notation/ 
 -- for more info about the Tidal Cycles mini-notation-- Switching between different patterns
-return rhythm {
+return pattern {
   unit = "1/4",
-  emit = cycle("[c4 e4 g4]|[d4 f4 a4]") -- Randomly select one of two chords
+  event = cycle("[c4 e4 g4]|[d4 f4 a4]") -- Randomly select one of two chords
 }
 
 -- TRY THIS: Combine with alternation: c4(3,8)|e4(5,8)
@@ -603,9 +607,9 @@ return rhythm {
 
 -- See https://tidalcycles.org/docs/reference/mini_notation/ 
 -- for more info about the Tidal Cycles mini-notatio-- Euclidean patterns in tidal cycles notation
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = cycle("c4(3,8) e4(5,8) g4(7,8)")  -- Different Euclidean rhythms
+  event = cycle("c4(3,8) e4(5,8) g4(7,8)")  -- Different Euclidean rhythms
 }
 
 -- TRY THIS: Combine with alternation: c4(3,8)|e4(5,8)
@@ -614,9 +618,9 @@ return rhythm {
 -- See https://tidalcycles.org/docs/reference/mini_notation/ 
 -- for more info about the Tidal Cycles mini-notatio-- Randomly select notes from a list
 local notes = {"c4", "d4", "e4", "g4"}
-return rhythm {
+return pattern {
   unit = "1/8",
-  emit = function(context)
+  event = function(context)
     return notes[math.random(#notes)] -- Pick random note from array
   end
 }
@@ -624,10 +628,10 @@ return rhythm {
 -- TRY THIS: Use notes from a specific scale with local notes = scale("c4", "major").notes
 -- TRY THIS: Add amplitude variation with note(some_note):amplify(0.5 + math.random() * 0.5)
 -- Emit notes with certain probability
-return rhythm {
+return pattern {
   unit = "1/8",
-  pattern = {1, 1, 1, 1},  -- Regular pattern
-  emit = function(context)
+  pulse = {1, 1, 1, 1},  -- Regular pattern
+  event = function(context)
     if math.random() < 0.3 then  -- 30% chance to emit
       return "c4"
     end
@@ -640,9 +644,9 @@ return rhythm {
 -- TRY THIS: Higher probability on downbeats: 
 --   if math.random() < ((context.pulse_step - 1) % 2 == 0 and 0.8 or 0.2) then
 -- Create patterns that remember previous states
-return rhythm {
+return pattern {
   unit = "1/8",
-  emit = function(init_context)
+  event = function(init_context)
     local notes = {"c4", "e4", "g4", "b4"}
     local index = 1 -- local state
     return function(context)
@@ -657,16 +661,16 @@ return rhythm {
 -- TRY THIS: Generate notes from a scale: 
 --   local notes = scale("C4", "major").notes
 -- Filter which notes actually play using gates
-return rhythm {
+return pattern {
   unit = "1/8",
-  pattern = {1, 0.1, 1, 0.5, 1, 0.2, 1, 0.1}, -- probability values
+  pulse = {1, 0.1, 1, 0.5, 1, 0.2, 1, 0.1}, -- probability values
   gate = function(context)
     -- always play on even-numbered step values
     return (context.pulse_step - 1) % 2 == 0 or
       -- else use pulse values as probabilities
       context.pulse_value >= math.random() 
   end,
-  emit = "c4"
+  event = "c4"
 }
 
 -- TRY THIS: Create a threshold gate: context.pulse_value > 0.5
@@ -683,9 +687,9 @@ end)
 -- TRY THIS: Change scale to "major", "dorian", or "pentatonic minor"
 -- TRY THIS: Add parameters: parameter.enum("scale", "minor", {"major", "minor", "pentatonic"})
 -- Create melodies that follow musical rules
-return rhythm {
+return pattern {
   unit = "1/8",
-  emit = function(init_context)
+  event = function(init_context)
     local pentatonic = scale("c4", "pentatonic minor").notes
     local last_note = 1
     return function(context)

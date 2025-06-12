@@ -1,15 +1,16 @@
 use mlua::prelude::LuaResult;
 
 use crate::{
-    bindings::{pattern_pulse_from_value, LuaCallback, LuaTimeoutHook},
-    BeatTimeBase, InputParameterSet, Pattern, Pulse, PulseIter, PulseIterItem,
+    bindings::{pulse_from_value, LuaCallback, LuaTimeoutHook},
+    rhythm::RhythmEventIterator,
+    BeatTimeBase, ParameterSet, Pulse, Rhythm, RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Pattern impl, which calls an existing lua script function to generate pulses.
+/// Evaluates a lua script function to dynamically generate events.
 #[derive(Debug)]
-pub struct ScriptedPattern {
+pub struct ScriptedRhythm {
     timeout_hook: LuaTimeoutHook,
     callback: LuaCallback,
     repeat_count_option: Option<usize>,
@@ -17,10 +18,10 @@ pub struct ScriptedPattern {
     pulse_step: usize,
     pulse_time_step: f64,
     pulse: Option<Pulse>,
-    pulse_iter: Option<PulseIter>,
+    pulse_iter: Option<RhythmEventIterator>,
 }
 
-impl ScriptedPattern {
+impl ScriptedRhythm {
     pub(crate) fn new(
         timeout_hook: &LuaTimeoutHook,
         callback: LuaCallback,
@@ -35,7 +36,7 @@ impl ScriptedPattern {
         let pulse_time_step = 0.0;
         let repeat_count_option = None;
         let repeat_count = 0;
-        callback.set_pattern_context(time_base, pulse_step, pulse_time_step)?;
+        callback.set_rhythm_context(time_base, pulse_step, pulse_time_step)?;
         let pulse = None;
         let pulse_iter = None;
         Ok(Self {
@@ -57,11 +58,11 @@ impl ScriptedPattern {
         self.callback
             .set_context_pulse_step(self.pulse_step, self.pulse_time_step)?;
         // invoke callback and evaluate the result
-        Ok(Some(pattern_pulse_from_value(&self.callback.call()?)?))
+        Ok(Some(pulse_from_value(&self.callback.call()?)?))
     }
 }
 
-impl Clone for ScriptedPattern {
+impl Clone for ScriptedRhythm {
     fn clone(&self) -> Self {
         Self {
             timeout_hook: self.timeout_hook.clone(),
@@ -76,7 +77,7 @@ impl Clone for ScriptedPattern {
     }
 }
 
-impl Pattern for ScriptedPattern {
+impl Rhythm for ScriptedRhythm {
     fn is_empty(&self) -> bool {
         false
     }
@@ -89,7 +90,7 @@ impl Pattern for ScriptedPattern {
         }
     }
 
-    fn run(&mut self) -> Option<PulseIterItem> {
+    fn run(&mut self) -> Option<RhythmEvent> {
         // if we have a pulse iterator, consume it
         if let Some(pulse_iter) = &mut self.pulse_iter {
             if let Some(pulse) = pulse_iter.next() {
@@ -101,7 +102,7 @@ impl Pattern for ScriptedPattern {
         }
         // pulse iter is exhausted now
         self.pulse_iter = None;
-        // apply pattern repeat count, unless this is the first run
+        // apply repeat count, unless this is the first run
         if self.pulse_step > 0 {
             self.repeat_count += 1;
             if self
@@ -121,7 +122,7 @@ impl Pattern for ScriptedPattern {
         };
         if let Some(pulse) = pulse {
             let mut pulse_iter = pulse.clone().into_iter();
-            let pulse_item = pulse_iter.next().unwrap_or(PulseIterItem::default());
+            let pulse_item = pulse_iter.next().unwrap_or(RhythmEvent::default());
             self.pulse_iter = Some(pulse_iter);
             self.pulse = Some(pulse);
             // move step for the next iter call
@@ -154,11 +155,11 @@ impl Pattern for ScriptedPattern {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
+    fn set_parameters(&mut self, parameters: ParameterSet) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new parameters
-        if let Err(err) = self.callback.set_context_input_parameters(parameters) {
+        if let Err(err) = self.callback.set_context_parameters(parameters) {
             self.callback.handle_error(&err);
         }
     }
@@ -167,7 +168,7 @@ impl Pattern for ScriptedPattern {
         self.repeat_count_option = count;
     }
 
-    fn duplicate(&self) -> Box<dyn Pattern> {
+    fn duplicate(&self) -> Box<dyn Rhythm> {
         Box::new(self.clone())
     }
 
