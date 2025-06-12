@@ -1,8 +1,8 @@
 -- Emit notes with certain probability
-return rhythm {
+return pattern {
   unit = "1/8",
-  pattern = {1, 1, 1, 1},  -- Regular pattern
-  emit = function(context)
+  pulse = {1, 1, 1, 1},  -- Regular pattern
+  event = function(context)
     if math.random() < 0.3 then  -- 30% chance to emit
       return "c4"
     end

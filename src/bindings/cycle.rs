@@ -80,8 +80,9 @@ mod test {
 
     use crate::{
         bindings::*,
-        event::{cycle::CycleEventIter, new_note, scripted_cycle::ScriptedCycleEventIter},
-        Event, EventIter, Note, PulseIterItem,
+        emitter::{cycle::CycleEmitter, scripted_cycle::ScriptedCycleEmitter},
+        event::new_note,
+        Emitter, Event, Note, RhythmEvent,
     };
 
     fn new_test_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
@@ -141,10 +142,10 @@ mod test {
 
         // check if mappings are applied correctly
         let mut event_iter =
-            CycleEventIter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
+            CycleEmitter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
         assert_eq!(
             event_iter
-                .run(PulseIterItem::default(), true)
+                .run(RhythmEvent::default(), true)
                 .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
             Some(vec![
                 Event::NoteEvents(vec![new_note(Note::C0)]),
@@ -156,10 +157,10 @@ mod test {
         // check note properties
         let mapped_cycle = evaluate_cycle_userdata(&lua, r#"cycle("a:1:v0.1:p-1.0:d0.3")"#)?;
         let mut event_iter =
-            CycleEventIter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
+            CycleEmitter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
         assert_eq!(
             event_iter
-                .run(PulseIterItem::default(), true)
+                .run(RhythmEvent::default(), true)
                 .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
             Some(vec![Event::NoteEvents(vec![new_note((
                 Note::A4,
@@ -176,10 +177,10 @@ mod test {
             r#"cycle("a:1 a:2 a"):map({ a = { key = 48, instrument = 66 } })"#,
         )?;
         let mut event_iter =
-            CycleEventIter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
+            CycleEmitter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
         assert_eq!(
             event_iter
-                .run(PulseIterItem::default(), true)
+                .run(RhythmEvent::default(), true)
                 .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
             Some(vec![
                 Event::NoteEvents(vec![new_note((Note::C4, InstrumentId::from(1)))]),
@@ -194,10 +195,10 @@ mod test {
             r#"cycle("a:1:v.1 a"):map({ a = { key = 48, instrument = 66, volume = 1.0 } })"#,
         )?;
         let mut event_iter =
-            CycleEventIter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
+            CycleEmitter::new(mapped_cycle.cycle).with_mappings(&mapped_cycle.mappings);
         assert_eq!(
             event_iter
-                .run(PulseIterItem::default(), true)
+                .run(RhythmEvent::default(), true)
                 .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
             Some(vec![
                 Event::NoteEvents(vec![new_note((Note::C4, InstrumentId::from(1), 0.1))]),
@@ -234,7 +235,7 @@ mod test {
         )?;
         let mapping_callback =
             LuaCallback::new(&lua, mapped_cycle.mapping_function.unwrap().clone())?;
-        let mut event_iter = ScriptedCycleEventIter::with_mapping_callback(
+        let mut event_iter = ScriptedCycleEmitter::with_mapping_callback(
             mapped_cycle.cycle,
             &timeout_hook,
             mapping_callback,
@@ -242,7 +243,7 @@ mod test {
         )?;
         assert_eq!(
             event_iter
-                .run(PulseIterItem::default(), true)
+                .run(RhythmEvent::default(), true)
                 .map(|events| events.into_iter().map(|e| e.event).collect::<Vec<_>>()),
             Some(vec![
                 Event::NoteEvents(vec![new_note(Note::Cs4)]),

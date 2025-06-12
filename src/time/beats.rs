@@ -1,11 +1,11 @@
 use crate::{
-    time::{SampleTimeDisplay, TimeBase},
-    SampleTime, SecondTimeBase,
+    time::{SampleTimeBase, SampleTimeDisplay},
+    ExactSampleTime, SampleTime, SecondTimeBase,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Beat & bar timing base for beat based [Rhythm](`crate::Rhythm`) impls.
+/// Beat & bar time base for beat based [`Pattern`](crate::Pattern) impls.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct BeatTimeBase {
     pub beats_per_min: f32,
@@ -16,13 +16,14 @@ pub struct BeatTimeBase {
 impl BeatTimeBase {
     /// Time base's samples per beat, in order to convert beat to sample time and vice versa.
     #[inline]
-    pub fn samples_per_beat(&self) -> f64 {
-        self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64
+    pub fn samples_per_beat(&self) -> ExactSampleTime {
+        self.samples_per_sec as ExactSampleTime * 60.0 / self.beats_per_min as ExactSampleTime
     }
     /// Time base's samples per bar, in order to convert bar to sample time and vice versa.
     #[inline]
-    pub fn samples_per_bar(&self) -> f64 {
-        self.samples_per_sec as f64 * 60.0 / self.beats_per_min as f64 * self.beats_per_bar as f64
+    pub fn samples_per_bar(&self) -> ExactSampleTime {
+        self.samples_per_sec as ExactSampleTime * 60.0 / self.beats_per_min as ExactSampleTime
+            * self.beats_per_bar as ExactSampleTime
     }
 }
 
@@ -34,7 +35,7 @@ impl From<BeatTimeBase> for SecondTimeBase {
     }
 }
 
-impl TimeBase for BeatTimeBase {
+impl SampleTimeBase for BeatTimeBase {
     #[inline]
     fn samples_per_second(&self) -> u32 {
         self.samples_per_sec
@@ -42,7 +43,7 @@ impl TimeBase for BeatTimeBase {
 }
 
 impl SampleTimeDisplay for BeatTimeBase {
-    /// generate a bar.beat.ppq string representation of the the given sample time
+    /// generate a bar.beat.ppq string representation of the the given sample time.
     fn display(&self, sample_time: SampleTime) -> String {
         let total_beats = sample_time / self.samples_per_beat() as u64;
         let total_beats_f = sample_time as f64 / self.samples_per_beat();

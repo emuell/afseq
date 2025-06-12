@@ -79,6 +79,10 @@ luau-jit = ["mlua/luau-jit"]
 # default features enable scripting with a luaJIT interpreter
 default = ["scripting", "lua-jit"]
 
+[package.metadata.docs.rs]
+no-default-features = true
+features = ["scripting", "lua-jit", "player", "cpal-output"]
+
 [lib]
 bench = false
 

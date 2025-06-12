@@ -179,48 +179,7 @@ lazy_static! {
 
 // --------------------------------------------------------------------------------------------------
 
-/// return list of all known chords with aliases.
-pub fn chords() -> HashMap<&'static str, Vec<u8>> {
-    CHORD_TABLE.clone()
-}
-
-/// return list of all known chord names.
-pub fn chord_names() -> Vec<String> {
-    let mut chords = CHORD_TABLE
-        .keys()
-        .map(|name| String::from(*name))
-        .collect::<Vec<_>>();
-    chords.sort();
-    chords
-}
-
-/// return list of all known chord names with unique intervals.
-pub fn unique_chord_names() -> Vec<String> {
-    let mut unique_chords = CHORD_TABLE.iter().collect::<Vec<_>>();
-    // prefere longer names, then dedup
-    unique_chords.sort_by(|(an, _), (bn, _)| bn.len().cmp(&an.len()));
-    unique_chords.sort_by(|(_, ai), (_, bi)| ai.cmp(bi));
-    // dedup, but keep add/dom duplicates
-    unique_chords.dedup_by(|(an, ai), (_, bi)| {
-        ai == bi && !(an.starts_with("dom") || an.starts_with("add"))
-    });
-    // get names and sort
-    let mut chords = unique_chords
-        .into_iter()
-        .map(|(name, _)| String::from(*name))
-        .collect::<Vec<_>>();
-    chords.sort();
-    chords
-}
-
-/// return chord intervals for the given chord string or []
-pub fn chord_intervals(p: &str) -> Vec<u8> {
-    CHORD_TABLE.get(p).cloned().unwrap_or(vec![])
-}
-
-// --------------------------------------------------------------------------------------------------
-
-/// Note vector, created from a root note and intervals.
+/// Note vector, created from a root [`Note`] and intervals.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chord {
     note: Note,
@@ -228,12 +187,54 @@ pub struct Chord {
 }
 
 impl Chord {
-    /// Create a new chord from the given base note and interval
+    /// return list of all known chord names.
+    pub fn names() -> Vec<String> {
+        let mut chords = CHORD_TABLE
+            .keys()
+            .map(|name| String::from(*name))
+            .collect::<Vec<_>>();
+        chords.sort();
+        chords
+    }
+
+    /// return list of all known chord names with unique intervals.
+    pub fn unique_names() -> Vec<String> {
+        let mut unique_chords = CHORD_TABLE.iter().collect::<Vec<_>>();
+        // prefere longer names, then dedup
+        unique_chords.sort_by(|(an, _), (bn, _)| bn.len().cmp(&an.len()));
+        unique_chords.sort_by(|(_, ai), (_, bi)| ai.cmp(bi));
+        // dedup, but keep add/dom duplicates
+        unique_chords.dedup_by(|(an, ai), (_, bi)| {
+            ai == bi && !(an.starts_with("dom") || an.starts_with("add"))
+        });
+        // get names and sort
+        let mut chords = unique_chords
+            .into_iter()
+            .map(|(name, _)| String::from(*name))
+            .collect::<Vec<_>>();
+        chords.sort();
+        chords
+    }
+
+    /// Create a new chord from the given base note and interval.
     pub fn new<N: Into<Note>>(note: N, intervals: Vec<u8>) -> Self {
         Self {
             note: note.into(),
             intervals,
         }
+    }
+
+    /// Try converting the given string to a chord string in the form:
+    /// `$note'$chord` where `$note` is a root key or note string and
+    /// `$mode` is one of `Chord::names()`
+    pub fn from_string(str: &str) -> Result<Self, String> {
+        Self::try_from(str)
+    }
+
+    /// Try converting the given string to a note and mode string tuple.
+    /// mode must be one of `Chord::names()`
+    pub fn from_mode_string<N: Into<Note>>((note, mode): (N, &str)) -> Result<Self, String> {
+        Self::try_from((note, mode))
     }
 
     /// Root note.
@@ -242,7 +243,7 @@ impl Chord {
     }
 
     /// Note intervals / steps.
-    pub fn intervals(&self) -> &Vec<u8> {
+    pub fn intervals(&self) -> &[u8] {
         &self.intervals
     }
 }
@@ -250,8 +251,6 @@ impl Chord {
 impl TryFrom<&str> for Chord {
     type Error = String;
 
-    /// Try converting the given string to a chord string in the form:
-    /// $note'$chord where $note is a root key or note string and $chord is a key of `CHORD_TABLE`
     fn try_from(s: &str) -> Result<Self, String> {
         let mut splits = s.split('\'');
         if let Some(note_part) = splits.next() {
@@ -264,7 +263,7 @@ impl TryFrom<&str> for Chord {
                 let note = Note::try_from(note_part)?;
                 let intervals = CHORD_TABLE.get(chord_part).ok_or(format!(
                     "invalid chord mode, valid modes are: {}",
-                    chord_names().join(",")
+                    Chord::names().join(",")
                 ))?;
                 return Ok(Self::new(note, intervals.clone()));
             }
@@ -281,11 +280,10 @@ where
 {
     type Error = String;
 
-    /// Try converting the given string to a note and mode tuple.
     fn try_from((note, mode): (N, &str)) -> Result<Self, String> {
         let intervals = CHORD_TABLE.get(mode).ok_or(format!(
             "Invalid chord mode, valid chords are: {}",
-            chord_names().join(",")
+            Chord::names().join(",")
         ))?;
         Ok(Self::new(note, intervals.clone()))
     }
@@ -297,7 +295,6 @@ where
 {
     type Error = String;
 
-    /// Try converting the given string to a note and interval slice tuple.
     fn try_from((note, intervals): (N, &[i32])) -> Result<Self, String> {
         if intervals.is_empty() {
             return Err("interval list can not be empty".to_string());

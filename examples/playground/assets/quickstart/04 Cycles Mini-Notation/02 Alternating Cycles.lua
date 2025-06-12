@@ -1,7 +1,7 @@
 -- Switching between different patterns
-return rhythm {
+return pattern {
   unit = "1/4",
-  emit = cycle("[c4 e4 g4]|[d4 f4 a4]") -- Randomly select one of two chords
+  event = cycle("[c4 e4 g4]|[d4 f4 a4]") -- Randomly select one of two chords
 }
 
 -- TRY THIS: Combine with alternation: c4(3,8)|e4(5,8)

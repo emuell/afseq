@@ -1,124 +1,160 @@
-//! Periodically emit `Events` via an `EventIter` with a given time base on a
-//! rhythmical pattern defined via a `Pattern`.
+//! Rhythmical pattern as sequence of pulses in a `Pattern`.
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::fmt::Debug;
 
-use crate::{BeatTimeBase, Event, InputParameter, SampleTime};
+use crate::{BeatTimeBase, Event, ParameterSet, Pulse};
 
-// -------------------------------------------------------------------------------------------------
-
-pub(crate) mod generic;
-
-pub mod beat_time;
-pub mod second_time;
+pub mod empty;
+pub mod euclidean;
+pub mod fixed;
+#[cfg(feature = "scripting")]
+pub mod scripted;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Iter item as produced by [`RhythmIter`]
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct RhythmIterItem {
-    pub time: SampleTime,
-    pub event: Option<Event>,
-    pub duration: SampleTime,
+/// Iterator item as produced by [`Rhythm`]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RhythmEvent {
+    /// Pulse value in a rhythm in range \[0 - 1\] where 0 means don't trigger anything, and 1
+    /// means definitely do trigger something. Values within 0 - 1 maybe trigger, depending on the
+    /// pattern/rhythm/gate impl.
+    pub value: f32,
+    /// Pulse step time fraction in range \[0 - 1\]. 1 means advance by a full step, 0.5 means
+    /// advance by a half step, etc.
+    pub step_time: f64,
 }
 
-impl RhythmIterItem {
-    /// Create a new `RhythmIterItem` with the given sample offset
-    /// added to the iter items sample time.
-    #[must_use]
-    pub fn with_offset(self, offset: SampleTime) -> Self {
+impl Default for RhythmEvent {
+    fn default() -> Self {
         Self {
-            time: self.time + offset,
-            ..self
+            value: 0.0,
+            step_time: 1.0,
         }
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// A refcounted function which may transform emitted [`Event`] contents of a [`RhythmIter`].
-pub type RhythmEventTransform = Rc<dyn Fn(&mut Event)>;
+/// Iterator for [`Pulse`], recursively flattening all subdivisions.
+#[derive(Clone, Debug)]
+pub struct RhythmEventIterator {
+    values: Vec<RhythmEvent>,
+    step: usize,
+}
 
-// -------------------------------------------------------------------------------------------------
+impl RhythmEventIterator {
+    pub fn new(pulse: &Pulse) -> Self {
+        let values = pulse.to_rhythm_events();
+        let step = 0;
+        Self { values, step }
+    }
 
-/// A `RhythmIter` is an iterator which emits sample time tagged optional [`Event`]
-/// items.
-///
-/// It triggers events periodically, producing events at specific sample times with specific
-/// pulse durations. An audio player can use the sample time to schedule those events within the
-/// audio stream.
-///
-/// `RhythmIter` impls typically will use a [`EventIter`](crate::EventIter) to produce one or
-/// multiple notes, or a single parameter change event. The event iter impl is an iterator too,
-/// so the emitted event content may dynamically change over time as well.
-pub trait RhythmIter: Debug {
-    /// Custom sample offset value which is applied to all emitted events.
-    fn sample_offset(&self) -> SampleTime;
-    /// Set a new custom sample offset value.
-    fn set_sample_offset(&mut self, sample_offset: SampleTime);
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
-    /// Get optional dynamic event transform function for the iterator
-    fn event_transform(&self) -> &Option<RhythmEventTransform>;
-    /// Set an optional dynamic event transform function for the iterator, which gets invoked for
-    /// every emitted event. Note that transforms can not change event times, but only event content.
-    fn set_event_transform(&mut self, transform: Option<RhythmEventTransform>);
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
 
-    /// Sample time iter: Generate a single next due event but running the pattern to generate a new
-    /// pulse, if the pulse's sample time is smaller than the given sample time. Then generates an
-    /// event from the event iter and returns it.
-    ///
-    /// Returns `None` when no event is due of when the pattern finished playing, else Some event.
-    fn run_until_time(&mut self, sample_time: SampleTime) -> Option<RhythmIterItem>;
-
-    /// Skip *all events* until the given target time is reached.
-    ///
-    /// This calls `run_until_time` by default, until the target time is reached and
-    /// discards all generated events, but may be overridden to optimize run time.
-    fn advance_until_time(&mut self, sample_time: SampleTime) {
-        while self.run_until_time(sample_time).is_some() {
-            // continue
-        }
+    pub fn step(&self) -> usize {
+        self.step
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-
-/// Standard iterator impl for [`RhythmIter`].
-impl Iterator for dyn RhythmIter {
-    type Item = RhythmIterItem;
+impl Iterator for RhythmEventIterator {
+    type Item = RhythmEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.run_until_time(SampleTime::MAX)
+        if self.step >= self.values.len() {
+            None
+        } else {
+            let event = self.values[self.step];
+            self.step += 1;
+            Some(event)
+        }
+    }
+}
+
+impl Pulse {
+    /// Returns a flattened copy of all contained pulse values as events.
+    pub fn to_rhythm_events(&self) -> Vec<RhythmEvent> {
+        let mut values = vec![];
+        self.expand_into(&mut values, 1.0);
+        values
+    }
+
+    fn expand_into(&self, result: &mut Vec<RhythmEvent>, step_time: f64) {
+        match self {
+            Pulse::Pulse(value) => {
+                let value = *value;
+                result.push(RhythmEvent { value, step_time });
+            }
+            Pulse::SubDivision(ref sub_pulses) => {
+                for sub_pulse in sub_pulses {
+                    let sub_step_time = step_time / sub_pulses.len() as f64;
+                    sub_pulse.expand_into(result, sub_step_time);
+                }
+            }
+        }
+    }
+}
+
+impl IntoIterator for Pulse {
+    type Item = RhythmEvent;
+    type IntoIter = RhythmEventIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        RhythmEventIterator::new(&self)
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// A `Rhythm` is a resettable, dyn clonable `RhythmIter` with a beat time base.
-///
-/// Rhythms can be reset and cloned (duplicated), so that they can be triggered multiple times
-/// using possibly different patterns and time bases.
-pub trait Rhythm: RhythmIter {
-    /// Shared access to the rhythms input parameters, if any.
-    fn input_parameters(&self) -> &[Rc<RefCell<InputParameter>>];
+/// Defines the rhythmic structure of a [`Pattern`](crate::Pattern).
+pub trait Rhythm: Debug {
+    /// Returns true if there is no rhythm to run.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    /// Return number of pulses this rhythm has. The rhythm's pattern repeats after this count.
+    /// When the size is unknown, e.g. in external callbacks that generated pulses, 0 is returned,
+    /// but `self.is_empty` will still be false.
+    fn len(&self) -> usize;
 
-    /// Length in samples of a single step in the rhythm's internal pattern.
-    fn pattern_step_length(&self) -> f64;
-    /// Get length in steps of the rhythm's internal pattern (cycle length in steps).
-    /// A rhythm pattern repeats after `self.pattern_step_length() * self.pattern_length()` samples.
-    fn pattern_length(&self) -> usize;
+    /// Run and move the rhythm by a single step and return the emitted pulse event.
+    /// When None, playback finished.
+    fn run(&mut self) -> Option<RhythmEvent>;
 
-    /// Get the rhythmiters internal beat time base.
-    fn time_base(&self) -> &BeatTimeBase;
-    /// Update the rhythm iters beat time bases with a new time base (e.g. on tempo changes).
+    /// Set or update the rhythm's internal beat time base with the given new time base.
     fn set_time_base(&mut self, time_base: &BeatTimeBase);
 
-    /// Set event which triggered, started the rhythm.
-    fn set_trigger_event(&mut self, trigger: &Event);
+    /// Set optional event which triggered, started the iter, if any, before running.
+    fn set_trigger_event(&mut self, event: &Event);
 
-    /// Create a new cloned instance of this rhythm. This actually is a clone(), wrapped into
+    /// Set or update and optional parameter map for callbacks.
+    fn set_parameters(&mut self, parameters: ParameterSet);
+
+    /// Set how many times the rhythm pattern should be repeated. If 0, the rhythm will be run
+    /// once. When None, which is the default, the rhythm will be repeated indefinitely.
+    fn set_repeat_count(&mut self, count: Option<usize>);
+
+    /// Create a new cloned instance of this rhythm. This actualy is a clone(), wrapped into
     /// a `Box<dyn Rhythm>`, but called 'duplicate' to avoid conflicts with possible Clone impls.
-    fn duplicate(&self) -> Rc<RefCell<dyn Rhythm>>;
-    /// Resets/rewinds the rhythm to its initial state.
+    fn duplicate(&self) -> Box<dyn Rhythm>;
+
+    /// Reset the rhythm, so it emits the same values as if it was freshly initialized.
+    /// This usually will only reset rhythm playback positions.
     fn reset(&mut self);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Standard Iterator impl for Pattern.
+impl Iterator for dyn Rhythm {
+    type Item = RhythmEvent;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.run()
+    }
 }

@@ -4,9 +4,9 @@
 
 local cmin = scale("c4", "major")
 
-return rhythm {
+return pattern {
   unit = "1/2",
-  emit = sequence(
+  event = sequence(
     cmin:chord("i"),
     cmin:chord("iv"),
     cmin:chord("vi"),

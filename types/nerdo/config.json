@@ -1,7 +1,7 @@
 {
     "name": "nerdo",
     "words": [
-        "%s*rhythm%s*%(?%s*%{"
+        "%s*pattern%s*%(?%s*%{"
     ],
     "settings": {
         "Lua.runtime.version": "Lua 5.1",

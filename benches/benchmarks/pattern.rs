@@ -13,23 +13,24 @@ fn create_phrase() -> Phrase {
         beats_per_bar: 4,
     };
 
-    let kick_cycle =
-        new_cycle_event("bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd?] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")
-            .unwrap()
-            .with_mappings(&[
-                ("bd", vec![new_note("c4")]),
-                ("bd2", vec![new_note(("c4", None, 0.5))]),
-            ]);
-    let kick_pattern = beat_time.every_nth_beat(16.0).trigger(kick_cycle);
+    let kick_cycle = new_cycle_emitter(
+        "bd? [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd?] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]",
+    )
+    .unwrap()
+    .with_mappings(&[
+        ("bd", vec![new_note("c4")]),
+        ("bd2", vec![new_note(("c4", None, 0.5))]),
+    ]);
+    let kick_pattern = beat_time.every_nth_beat(16.0).emit(kick_cycle);
 
     let snare_pattern = beat_time
         .every_nth_beat(2.0)
         .with_offset(BeatTimeStep::Beats(1.0))
-        .trigger(new_note_event("C_5"));
+        .emit(new_note_emitter("C_5"));
 
     let hihat_pattern = beat_time
         .every_nth_sixteenth(2.0)
-        .trigger(new_note_event("C_5").mutate({
+        .emit(new_note_emitter("C_5").mutate({
             let mut step = 0;
             move |event| {
                 if let Event::NoteEvents(notes) = event {
@@ -47,7 +48,7 @@ fn create_phrase() -> Phrase {
     let hihat_pattern2 = beat_time
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
-        .trigger(new_note_event("C_5").mutate({
+        .emit(new_note_emitter("C_5").mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |event| {
@@ -68,7 +69,7 @@ fn create_phrase() -> Phrase {
             }
         }));
 
-    let hihat_rhythm = Phrase::new(
+    let hihat_pattern = Phrase::new(
         beat_time,
         vec![hihat_pattern, hihat_pattern2],
         BeatTimeStep::Bar(4.0),
@@ -77,8 +78,8 @@ fn create_phrase() -> Phrase {
     let bass_notes = Scale::try_from((Note::C5, "aeolian")).unwrap().notes();
     let bass_pattern = beat_time
         .every_nth_eighth(1.0)
-        .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_pattern())
-        .trigger(new_note_event_sequence(vec![
+        .with_rhythm([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_rhythm())
+        .emit(new_note_sequence_emitter(vec![
             new_note((bass_notes[0], None, 0.5)),
             new_note((bass_notes[2], None, 0.5)),
             new_note((bass_notes[3], None, 0.5)),
@@ -90,7 +91,7 @@ fn create_phrase() -> Phrase {
 
     let synth_pattern = beat_time
         .every_nth_bar(4.0)
-        .trigger(new_polyphonic_note_sequence_event(vec![
+        .emit(new_polyphonic_note_sequence_emitter(vec![
             vec![
                 new_note(("C 4", None, 0.3)),
                 new_note(("D#4", None, 0.3)),
@@ -115,7 +116,7 @@ fn create_phrase() -> Phrase {
 
     let fx_pattern = beat_time
         .every_nth_seconds(8.0)
-        .trigger(new_polyphonic_note_sequence_event(vec![
+        .emit(new_polyphonic_note_sequence_emitter(vec![
             vec![new_note(("C 4", None, 0.2)), None, None],
             vec![None, new_note(("C 4", None, 0.2)), None],
             vec![None, None, new_note(("F 4", None, 0.2))],
@@ -124,12 +125,12 @@ fn create_phrase() -> Phrase {
     Phrase::new(
         beat_time,
         vec![
-            RhythmSlot::from(kick_pattern),
-            RhythmSlot::from(snare_pattern),
-            RhythmSlot::from(hihat_rhythm),
-            RhythmSlot::from(bass_pattern),
-            RhythmSlot::from(fx_pattern),
-            RhythmSlot::from(synth_pattern),
+            PatternSlot::from(kick_pattern),
+            PatternSlot::from(snare_pattern),
+            PatternSlot::from(hihat_pattern),
+            PatternSlot::from(bass_pattern),
+            PatternSlot::from(fx_pattern),
+            PatternSlot::from(synth_pattern),
         ],
         BeatTimeStep::Bar(8.0),
     )
@@ -217,7 +218,7 @@ pub fn seek(c: &mut Criterion) {
 // ---------------------------------------------------------------------------------------------
 
 criterion_group! {
-    name = rhythm;
+    name = pattern;
     config = Criterion::default();
     targets = create, clone, run, seek
 }

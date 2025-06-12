@@ -1,18 +1,22 @@
 use crate::{
-    event::new_note, BeatTimeBase, Event, EventIter, EventIterItem, InputParameterSet, Note,
-    NoteEvent, ParameterChangeEvent, PulseIterItem,
+    event::{
+        new_empty_note, new_note, new_note_vector, new_parameter_change,
+        new_polyphonic_note_sequence,
+    },
+    BeatTimeBase, Emitter, EmitterEvent, Event, Note, NoteEvent, ParameterChangeEvent, ParameterId,
+    ParameterSet, RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// Continuously emits a single, fixed [`EventIterItem`].
+/// Continuously emits a single or vector of static event values.
 #[derive(Clone, Debug)]
-pub struct FixedEventIter {
+pub struct FixedEmitter {
     events: Vec<Event>,
     event_index: usize,
 }
 
-impl FixedEventIter {
+impl FixedEmitter {
     pub fn new(events: Vec<Event>) -> Self {
         let mut events = events;
         Self::normalize_events(&mut events);
@@ -23,12 +27,12 @@ impl FixedEventIter {
         }
     }
 
-    /// Access to the event that we're triggering
-    pub fn events(&self) -> &Vec<Event> {
+    /// Access to the event that we're triggering.
+    pub fn events(&self) -> &[Event] {
         &self.events
     }
 
-    /// Add note-offs for all notes in the given event list
+    /// Add note-offs for all notes in the given event list.
     pub(crate) fn normalize_events(events: &mut Vec<Event>) {
         let mut note_event_state = Vec::<Option<NoteEvent>>::new();
         for event in &mut *events {
@@ -82,12 +86,12 @@ impl FixedEventIter {
     }
 }
 
-impl Default for FixedEventIter {
+impl Default for FixedEmitter {
     fn default() -> Self {
         Self::new(vec![Event::NoteEvents(vec![Some((Note::C4).into())])])
     }
 }
-impl EventIter for FixedEventIter {
+impl Emitter for FixedEmitter {
     fn set_time_base(&mut self, _time_base: &BeatTimeBase) {
         // nothing to do
     }
@@ -96,27 +100,27 @@ impl EventIter for FixedEventIter {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
-    fn run(&mut self, _pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, _pulse: RhythmEvent, emit_event: bool) -> Option<Vec<EmitterEvent>> {
         if !emit_event || self.events.is_empty() {
             return None;
         }
         let event = self.events[self.event_index].clone();
         self.event_index = (self.event_index + 1) % self.events.len();
-        Some(vec![EventIterItem::new(event)])
+        Some(vec![EmitterEvent::new(event)])
     }
 
-    fn advance(&mut self, _pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, _pulse: RhythmEvent, emit_event: bool) {
         if !emit_event || self.events.is_empty() {
             return;
         }
         self.event_index = (self.event_index + 1) % self.events.len();
     }
 
-    fn duplicate(&self) -> Box<dyn EventIter> {
+    fn duplicate(&self) -> Box<dyn Emitter> {
         Box::new(self.clone())
     }
 
@@ -128,86 +132,127 @@ impl EventIter for FixedEventIter {
 
 // -------------------------------------------------------------------------------------------------
 
-pub trait ToFixedEventIter {
-    fn to_event(self) -> FixedEventIter;
+/// Convert [`Event`]s into [`FixedEmitter`]s.
+pub trait ToFixedEmitter {
+    fn to_emitter(self) -> FixedEmitter;
 }
 
-impl ToFixedEventIter for NoteEvent {
-    /// Wrap a [`NoteEvent`] to a new [`FixedEventIter`]
+impl ToFixedEmitter for NoteEvent {
+    /// Wrap a [`NoteEvent`] to a new [`FixedEmitter`]
     /// resulting into a single monophonic event.
-    fn to_event(self) -> FixedEventIter {
-        FixedEventIter::new(vec![Event::NoteEvents(vec![Some(self)])])
+    fn to_emitter(self) -> FixedEmitter {
+        FixedEmitter::new(vec![Event::NoteEvents(vec![Some(self)])])
     }
 }
-impl ToFixedEventIter for Option<NoteEvent> {
-    /// Wrap a [`NoteEvent`] to a new [`FixedEventIter`]
+impl ToFixedEmitter for Option<NoteEvent> {
+    /// Wrap a [`NoteEvent`] to a new [`FixedEmitter`]
     /// resulting into a single monophonic event.
-    fn to_event(self) -> FixedEventIter {
-        FixedEventIter::new(vec![Event::NoteEvents(vec![self])])
+    fn to_emitter(self) -> FixedEmitter {
+        FixedEmitter::new(vec![Event::NoteEvents(vec![self])])
     }
 }
 
-impl ToFixedEventIter for Vec<NoteEvent> {
-    /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`].
+impl ToFixedEmitter for Vec<NoteEvent> {
+    /// Wrap a vector of [`NoteEvent`]s to a new [`FixedEmitter`].
     /// resulting into a single polyphonic event.
-    fn to_event(self) -> FixedEventIter {
-        FixedEventIter::new(vec![Event::NoteEvents(
+    fn to_emitter(self) -> FixedEmitter {
+        FixedEmitter::new(vec![Event::NoteEvents(
             self.iter().map(|v| Some(v.clone())).collect::<Vec<_>>(),
         )])
     }
 }
-impl ToFixedEventIter for Vec<Option<NoteEvent>> {
-    /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`].
+impl ToFixedEmitter for Vec<Option<NoteEvent>> {
+    /// Wrap a vector of [`NoteEvent`]s to a new [`FixedEmitter`].
     /// resulting into a single polyphonic event.
-    fn to_event(self) -> FixedEventIter {
-        FixedEventIter::new(vec![Event::NoteEvents(self)])
+    fn to_emitter(self) -> FixedEmitter {
+        FixedEmitter::new(vec![Event::NoteEvents(self)])
     }
 }
 
-impl ToFixedEventIter for ParameterChangeEvent {
-    /// Wrap a [`ParameterChangeEvent`] into a new [`FixedEventIter`].
-    fn to_event(self) -> FixedEventIter {
-        FixedEventIter::new(vec![Event::ParameterChangeEvent(self)])
+impl ToFixedEmitter for ParameterChangeEvent {
+    /// Wrap a [`ParameterChangeEvent`] into a new [`FixedEmitter`].
+    fn to_emitter(self) -> FixedEmitter {
+        FixedEmitter::new(vec![Event::ParameterChangeEvent(self)])
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-pub trait ToFixedEventIterSequence {
-    fn to_event_sequence(self) -> FixedEventIter;
+/// Convert a sequence of [`Event`]s into a [`FixedEmitter`].
+pub trait ToFixedEmitterSequence {
+    fn to_sequence_emitter(self) -> FixedEmitter;
 }
 
-impl ToFixedEventIterSequence for Vec<Option<NoteEvent>> {
-    /// Wrap a vector of [`NoteEvent`] to a new [`FixedEventIter`]
+impl ToFixedEmitterSequence for Vec<Option<NoteEvent>> {
+    /// Wrap a vector of [`NoteEvent`]s to a new [`FixedEmitter`]
     /// resulting into a sequence of single note events.
-    fn to_event_sequence(self) -> FixedEventIter {
+    fn to_sequence_emitter(self) -> FixedEmitter {
         let mut sequence = Vec::with_capacity(self.len());
         for note in self {
             sequence.push(Event::NoteEvents(vec![note]));
         }
-        FixedEventIter::new(sequence)
+        FixedEmitter::new(sequence)
     }
 }
 
-impl ToFixedEventIterSequence for Vec<Vec<Option<NoteEvent>>> {
-    /// Wrap a vector of vectors of [`NoteEvent`] to a new [`FixedEventIter`]
+impl ToFixedEmitterSequence for Vec<Vec<Option<NoteEvent>>> {
+    /// Wrap a vector of vectors of [`NoteEvent`]s to a new [`FixedEmitter`]
     /// resulting into a sequence of polyphonic note events.
-    fn to_event_sequence(self) -> FixedEventIter {
+    fn to_sequence_emitter(self) -> FixedEmitter {
         let mut sequence = Vec::with_capacity(self.len());
         for notes in self {
             sequence.push(Event::NoteEvents(notes));
         }
-        FixedEventIter::new(sequence)
+        FixedEmitter::new(sequence)
     }
 }
 
-impl ToFixedEventIterSequence for Vec<ParameterChangeEvent> {
-    /// Wrap a [`ParameterChangeEvent`] into a new [`FixedEventIter`]
-    fn to_event_sequence(self) -> FixedEventIter {
+impl ToFixedEmitterSequence for Vec<ParameterChangeEvent> {
+    /// Wrap a [`ParameterChangeEvent`] into a new [`FixedEmitter`]
+    fn to_sequence_emitter(self) -> FixedEmitter {
         let mut sequence = Vec::with_capacity(self.len());
         for p in self {
             sequence.push(Event::ParameterChangeEvent(p));
         }
-        FixedEventIter::new(sequence)
+        FixedEmitter::new(sequence)
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Shortcut for creating an [`Emitter`] which produces an empty note.
+pub fn new_empty_note_emitter() -> FixedEmitter {
+    new_empty_note().to_emitter()
+}
+
+/// Shortcut for creating an [`Emitter`] which produces a single note.
+pub fn new_note_emitter<E: Into<NoteEvent>>(event: E) -> FixedEmitter {
+    new_note(event).to_emitter()
+}
+
+/// Shortcut for creating an [`Emitter`] which produces a sequence of single note.
+pub fn new_note_sequence_emitter<E: Into<NoteEvent>>(sequence: Vec<Option<E>>) -> FixedEmitter {
+    new_note_vector(sequence).to_sequence_emitter()
+}
+
+/// Shortcut for creating an [`Emitter`] which produces a single note stack (a chord).
+pub fn new_polyphonic_note_emitter<E: Into<NoteEvent>>(
+    polyphonic_events: Vec<Option<E>>,
+) -> FixedEmitter {
+    new_note_vector(polyphonic_events).to_emitter()
+}
+
+/// Shortcut for creating an [`Emitter`] which produces a sequence of single notes or note stacks.
+pub fn new_polyphonic_note_sequence_emitter<E: Into<NoteEvent>>(
+    polyphonic_sequence: Vec<Vec<Option<E>>>,
+) -> FixedEmitter {
+    new_polyphonic_note_sequence(polyphonic_sequence).to_sequence_emitter()
+}
+
+/// Shortcut for creating an [`Emitter`] which produces paranmeter changes.
+pub fn new_parameter_change_emitter<Parameter: Into<Option<ParameterId>>>(
+    parameter: Parameter,
+    value: f32,
+) -> FixedEmitter {
+    new_parameter_change(parameter, value).to_emitter()
 }

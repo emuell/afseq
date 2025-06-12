@@ -59,9 +59,9 @@
 ### PlaybackState<a name="PlaybackState"></a>
 `"running"` | `"seeking"`  
 > ```lua
-> -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
+> -- - *seeking*: The pattern is auto-seeked to a target time. All events are discarded. Avoid
 > --   unnecessary computations while seeking, and only maintain your generator's internal state.
-> -- - *running*: The emitter is played back regularly. Results are audible.
+> -- - *running*: The pattern is played back regularly. Events are emitted and audible.
 > PlaybackState:
 >     | "seeking"
 >     | "running"
@@ -150,9 +150,9 @@
 ### PlaybackState<a name="PlaybackState"></a>
 `"running"` | `"seeking"`  
 > ```lua
-> -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
+> -- - *seeking*: The pattern is auto-seeked to a target time. All events are discarded. Avoid
 > --   unnecessary computations while seeking, and only maintain your generator's internal state.
-> -- - *running*: The emitter is played back regularly. Results are audible.
+> -- - *running*: The pattern is played back regularly. Events are emitted and audible.
 > PlaybackState:
 >     | "seeking"
 >     | "running"
@@ -181,19 +181,21 @@
 > step length fraction within the cycle, where 1 is the total duration of a single cycle run.
 
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Note that triggered the rhythm, if any.
+> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
+> `context.note.notes[1].key`
 
-### inputs : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="inputs"></a>
->  Current input parameter values: parameter ids as keys, parameter values as values
+### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
+> Current parameter values: parameter ids are keys, parameter values are values.
+> To access a parameter with id `enabled` use: `context.parameter.enabled`
 
 ### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
 > Project's tempo in beats per minutes.
 
 ### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
-> Project's beats per bar setting.
+> Project's beats per bar setting - usually will be 4.
 
 ### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
-> Project's sample rate in samples per second.
+> Project's audio playback sample rate in samples per second.
 
   
 
@@ -204,9 +206,9 @@
 ### PlaybackState<a name="PlaybackState"></a>
 `"running"` | `"seeking"`  
 > ```lua
-> -- - *seeking*: The emitter is auto-seeked to a target time. All results are discarded. Avoid
+> -- - *seeking*: The pattern is auto-seeked to a target time. All events are discarded. Avoid
 > --   unnecessary computations while seeking, and only maintain your generator's internal state.
-> -- - *running*: The emitter is played back regularly. Results are audible.
+> -- - *running*: The pattern is played back regularly. Events are emitted and audible.
 > PlaybackState:
 >     | "seeking"
 >     | "running"

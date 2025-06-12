@@ -71,28 +71,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // generate a few phrases
-    let cycle =
-        new_cycle_event("bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]")?
-            .with_mappings(&[
-                ("bd", vec![new_note("c4")]),
-                ("bd2", vec![new_note(("c4", None, 0.5))]),
-            ]);
+    let cycle = new_cycle_emitter(
+        "bd [~ bd] ~ ~ bd [~ bd] _ ~ bd [~ bd] ~ ~ bd [~ bd] [_ bd2] [~ bd _ ~]",
+    )?
+    .with_mappings(&[
+        ("bd", vec![new_note("c4")]),
+        ("bd2", vec![new_note(("c4", None, 0.5))]),
+    ]);
 
     let kick_pattern = beat_time
         .every_nth_beat(16.0)
         .with_instrument(KICK)
-        .trigger(cycle);
+        .emit(cycle);
 
     let snare_pattern = beat_time
         .every_nth_beat(2.0)
         .with_offset(BeatTimeStep::Beats(1.0))
         .with_instrument(SNARE)
-        .trigger(new_note_event("C_5"));
+        .emit(new_note_emitter("C_5"));
 
     let hihat_pattern = beat_time
         .every_nth_sixteenth(2.0)
         .with_instrument(HIHAT)
-        .trigger(new_note_event("C_5").mutate({
+        .emit(new_note_emitter("C_5").mutate({
             let mut step = 0;
             move |event| {
                 if let Event::NoteEvents(notes) = event {
@@ -110,9 +111,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .every_nth_sixteenth(2.0)
         .with_offset(BeatTimeStep::Sixteenth(1.0))
         .with_instrument(HIHAT)
-        .with_pattern([1.0, 0.5].to_pattern())
+        .with_rhythm([1.0, 0.5].to_rhythm())
         .with_gate(ProbabilityGate::new(None))
-        .trigger(new_note_event("C_5").mutate({
+        .emit(new_note_emitter("C_5").mutate({
             let mut vel_step = 0;
             let mut note_step = 0;
             move |event| {
@@ -134,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }));
 
     // combine two hi hat rhythms into a phrase
-    let hihat_rhythm = Phrase::new(
+    let hihat_pattern = Phrase::new(
         beat_time,
         vec![hihat_pattern, hihat_pattern2],
         BeatTimeStep::Bar(4.0),
@@ -144,8 +145,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bass_pattern = beat_time
         .every_nth_eighth(1.0)
         .with_instrument(BASS)
-        .with_pattern([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_pattern())
-        .trigger(new_note_event_sequence(vec![
+        .with_rhythm([1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1].to_rhythm())
+        .emit(new_note_sequence_emitter(vec![
             new_note((bass_notes[0], None, 0.5)),
             new_note((bass_notes[2], None, 0.5)),
             new_note((bass_notes[3], None, 0.5)),
@@ -155,8 +156,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             new_note((bass_notes[6].transposed(-12), None, 0.5)),
         ]));
 
-    let synth_pattern = beat_time.every_nth_bar(4.0).with_instrument(SYNTH).trigger(
-        new_polyphonic_note_sequence_event(vec![
+    let synth_pattern = beat_time.every_nth_bar(4.0).with_instrument(SYNTH).emit(
+        new_polyphonic_note_sequence_emitter(vec![
             vec![
                 new_note(("C 4", None, 0.3)),
                 new_note(("D#4", None, 0.3)),
@@ -180,14 +181,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ]),
     );
 
-    let fx_pattern = beat_time
-        .every_nth_seconds(8.0)
-        .with_instrument(FX)
-        .trigger(new_polyphonic_note_sequence_event(vec![
+    let fx_pattern = beat_time.every_nth_seconds(8.0).with_instrument(FX).emit(
+        new_polyphonic_note_sequence_emitter(vec![
             vec![new_note(("C 4", None, 0.2)), None, None],
             vec![None, new_note(("C 4", None, 0.2)), None],
             vec![None, None, new_note(("F 4", None, 0.2))],
-        ]));
+        ]),
+    );
 
     // arrange rhytms into phrases and sequence up these phrases to create a litte arrangement
     let mut sequence = Sequence::new(
@@ -196,48 +196,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Phrase::new(
                 beat_time,
                 vec![
-                    RhythmSlot::from(kick_pattern),
-                    RhythmSlot::from(snare_pattern),
-                    RhythmSlot::Stop, // hihat
-                    RhythmSlot::Stop, // bass
-                    RhythmSlot::Stop, // synth
-                    RhythmSlot::Stop, // fx
+                    PatternSlot::from(kick_pattern),
+                    PatternSlot::from(snare_pattern),
+                    PatternSlot::Stop, // hihat
+                    PatternSlot::Stop, // bass
+                    PatternSlot::Stop, // synth
+                    PatternSlot::Stop, // fx
                 ],
                 BeatTimeStep::Bar(8.0),
             ),
             Phrase::new(
                 beat_time,
                 vec![
-                    RhythmSlot::Continue, // kick
-                    RhythmSlot::Continue, // snare
-                    RhythmSlot::from(hihat_rhythm),
-                    RhythmSlot::from(bass_pattern),
-                    RhythmSlot::Stop, // synth
-                    RhythmSlot::Stop, // fx
+                    PatternSlot::Continue, // kick
+                    PatternSlot::Continue, // snare
+                    PatternSlot::from(hihat_pattern),
+                    PatternSlot::from(bass_pattern),
+                    PatternSlot::Stop, // synth
+                    PatternSlot::Stop, // fx
                 ],
                 BeatTimeStep::Bar(8.0),
             ),
             Phrase::new(
                 beat_time,
                 vec![
-                    RhythmSlot::Continue, // kick
-                    RhythmSlot::Continue, // snare
-                    RhythmSlot::Continue, // hihat
-                    RhythmSlot::Continue, // bass
-                    RhythmSlot::from(synth_pattern),
-                    RhythmSlot::Stop, // fx
+                    PatternSlot::Continue, // kick
+                    PatternSlot::Continue, // snare
+                    PatternSlot::Continue, // hihat
+                    PatternSlot::Continue, // bass
+                    PatternSlot::from(synth_pattern),
+                    PatternSlot::Stop, // fx
                 ],
                 BeatTimeStep::Bar(16.0),
             ),
             Phrase::new(
                 beat_time,
                 vec![
-                    RhythmSlot::Continue, // kick
-                    RhythmSlot::Continue, // snare
-                    RhythmSlot::Continue, // hihat
-                    RhythmSlot::Continue, // bass
-                    RhythmSlot::Continue, // synth
-                    RhythmSlot::from(fx_pattern),
+                    PatternSlot::Continue, // kick
+                    PatternSlot::Continue, // snare
+                    PatternSlot::Continue, // hihat
+                    PatternSlot::Continue, // bass
+                    PatternSlot::Continue, // synth
+                    PatternSlot::from(fx_pattern),
                 ],
                 BeatTimeStep::Bar(16.0),
             ),

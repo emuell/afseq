@@ -15,12 +15,12 @@ Here's a simple example which creates a random melody line based on a scale.
 local cmin = scale("c", "minor")
 
 -- pick 10 random notes from the scale
-local random_notes = pattern.new(10, function()
+local random_notes = pulse.new(10, function()
   return cmin.notes[math.random(#cmin.notes)] 
 end)
 
-return rhythm {
-  emit = random_notes
+return pattern {
+  event = random_notes
 }
 ```
 
@@ -34,18 +34,18 @@ local cmin = scale("c", "minor")
 
 -- pick the same random 10 notes from the scale every time
 math.randomseed(1234)
-local random_notes = pattern.new(10, function() 
+local random_notes = pulse.new(10, function() 
   return cmin.notes[math.random(#cmin.notes)] 
 end)
 
-return rhythm {
-  emit = random_notes
+return pattern {
+  event = random_notes
 }
 ```
 
 ### Local Random Number Generators
 
-When seeding the RNG, each time a rhythm is (re)started, an existing rhythm instance will continue to run. The global state of a rhythm script is not recreated each time the rhythm is played again. 
+When seeding the RNG, each time a pattern is (re)started, an existing pattern instance will continue to run. The global state of a pattern script is not recreated each time the pattern is played again. 
 
 See [generators](./generators.md) for details of how afseq handles global and local states in general.
 
@@ -53,8 +53,8 @@ To create multiple separate local random states, use the non standard [`math.ran
 
 ```lua
 local cmin = scale("c", "minor")
-return rhythm {
-  emit = function(init_context) 
+return pattern {
+  event = function(init_context) 
     local rand = math.randomstate(1234) -- a local random number generator
     return function(context) 
       return note(cmin.notes[rand(#cmin.notes)])

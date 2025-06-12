@@ -10,7 +10,7 @@
 > Create a sequence from an array of note values or note value varargs.
 > 
 > Using `sequence` instead of a raw `{}` table can be useful to ease transforming the note
-> content and to explicitly pass a sequence of e.g. single notes to the emitter.
+> content and to explicitly pass a sequence of e.g. single notes to the note emitter.
 > 
 > #### examples:
 > ```lua
@@ -43,7 +43,7 @@
 ### transpose([*self*](../API/builtins/self.md), step : [`integer`](../API/builtins/integer.md) | [`integer`](../API/builtins/integer.md)[])<a name="transpose"></a>
 `->`[`Sequence`](../API/sequence.md#Sequence)  
 
-> Transpose all notes key values with the specified step value or values.
+> Transpose all note's key values with the specified step value or values.
 > 
 > Values outside of the valid key range (0 - 127) will be clamped.
 > 
@@ -55,7 +55,7 @@
 ### amplify([*self*](../API/builtins/self.md), factor : [`number`](../API/builtins/number.md) | [`number`](../API/builtins/number.md)[])<a name="amplify"></a>
 `->`[`Sequence`](../API/sequence.md#Sequence)  
 
-> Multiply all notes volume values with the specified factor or factors.
+> Multiply all note's volume values with the specified factor or factors.
 > 
 > Values outside of the valid volume range (0 - 1) will be clamped.
 > 

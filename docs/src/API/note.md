@@ -14,9 +14,9 @@
 >  attributes:
 > ```md
 >  -'#' -> instrument (integer > 0)
->  -'v' -> volume (float in range [0-1])
->  -'p' -> panning (float in range [-1-1])
->  -'d' -> delay (float in range [0-1])
+>  -'v' -> volume (number in range [0-1])
+>  -'p' -> panning (number in range [-1-1])
+>  -'d' -> delay (number in range [0-1])
 > ```
 > 
 > #### examples:
@@ -32,14 +32,14 @@
 `->`[`integer`](../API/builtins/integer.md)  
 
 > Convert a note string or note table to a raw MIDI note number in range 0-127
-> or -1 for nil or off note values.
+> or 0xFF for nil or empty note strings
+> or 0xFE for note offs
 > ### Examples:
 > ```lua
-> note_value("c4") --> 48
-> note_value(note("c4")) --> 48
-> note_value("") --> -1
-> note_value("off") --> -2
-> note_value("xyz") --> error
+> note_number("c4") --> 48
+> note_number(note("c4")) --> 48
+> note_number("-") --> 0xFF
+> note_number("xyz") --> error
 > ```  
 
 
@@ -65,7 +65,7 @@
 ### transpose([*self*](../API/builtins/self.md), step : [`integer`](../API/builtins/integer.md) | [`integer`](../API/builtins/integer.md)[])<a name="transpose"></a>
 `->`[`Note`](../API/note.md#Note)  
 
-> Transpose the notes key with the specified step or steps.
+> Transpose the note with the specified step or steps.
 > 
 > Values outside of the valid key range (0 - 127) will be clamped.
 > 

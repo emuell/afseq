@@ -1,8 +1,12 @@
-//! Example player implementation, which plays back a `Sequence` via the `afplay` crate.
+//! Example player implementation, which plays back a [`Sequence`]
+//! via the [`phonic`](https://crates.io/crates/phonic) crate.
 
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, RwLock,
+    },
     time::Duration,
 };
 
@@ -15,15 +19,14 @@ use phonic::{
 };
 
 use crate::{
-    event::{unique_instrument_id, InstrumentId},
-    time::{SampleTimeDisplay, TimeBase},
-    BeatTimeBase, Event, Note, RhythmIterItem, SampleTime, Sequence,
+    time::{SampleTimeBase, SampleTimeDisplay},
+    BeatTimeBase, Event, InstrumentId, Note, PatternEvent, SampleTime, Sequence,
 };
 
 // -------------------------------------------------------------------------------------------------
 
 /// Preload time of the player's `run_until` function. Should be big enough to ensure that events
-/// are scheduled ahead of playback time, but small enough to avoid latency.
+/// are scheduled ahead of playback time, but small enough to avoid too much latency.
 /// NB: real audio/event latency is twice the amount of the preload!
 #[cfg(debug_assertions)]
 const PLAYBACK_PRELOAD_SECONDS: f64 = 1.0;
@@ -32,11 +35,11 @@ const PLAYBACK_PRELOAD_SECONDS: f64 = 0.5;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Preloads a set of sample files and stores them as
-/// [`PreloadedFileSource`] for later use.
+/// Preloads a set of sample files and stores them as [`PreloadedFileSource`] for later use.
 ///
-/// When files are accessed, the stored file sources are cloned, which avoids loading and decoding
-/// the files again. Cloned [`PreloadedFileSource`] are using a shared Buffer, so cloning is very cheap.
+/// When files are accessed, the already cached file sources are cloned, which avoids loading
+/// and decoding the files again while playback. Cloned [`PreloadedFileSource`] are using a
+/// shared Buffer, so cloning is very cheap.
 #[derive(Default)]
 pub struct SamplePool {
     pool: RwLock<HashMap<InstrumentId, PreloadedFileSource>>,
@@ -71,7 +74,7 @@ impl SamplePool {
         }
     }
 
-    /// Load a sample file into a [`PreloadedFileSource`] and return its id.
+    /// Loads a sample file as [`PreloadedFileSource`] and return its unique id.
     /// A copy of this sample can then later on be fetched with `get_sample` with the returned id.
     ///
     /// ### Errors
@@ -82,10 +85,16 @@ impl SamplePool {
     pub fn load_sample(&self, file_path: &str) -> Result<InstrumentId, Error> {
         let sample =
             PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
-        let id = unique_instrument_id();
+        let id = Self::unique_id();
         let mut pool = self.pool.write().expect("Failed to access sample pool");
         pool.insert(id, sample);
         Ok(id)
+    }
+
+    /// Generate a new unique instrument id.
+    fn unique_id() -> InstrumentId {
+        static ID: AtomicUsize = AtomicUsize::new(0);
+        InstrumentId::from(ID.fetch_add(1, Ordering::Relaxed))
     }
 }
 
@@ -108,7 +117,7 @@ pub enum NewNoteAction {
 /// Context, passed along serialized when triggering new notes from the sample player.   
 #[derive(Clone)]
 pub struct SamplePlaybackContext {
-    pub rhythm_index: Option<usize>,
+    pub pattern_index: Option<usize>,
     pub voice_index: Option<usize>,
 }
 
@@ -120,7 +129,7 @@ impl SamplePlaybackContext {
             }
         }
         SamplePlaybackContext {
-            rhythm_index: None,
+            pattern_index: None,
             voice_index: None,
         }
     }
@@ -128,7 +137,7 @@ impl SamplePlaybackContext {
 
 // -------------------------------------------------------------------------------------------------
 
-/// An simple example player implementation, which plays back a `Sequence` via the `afplay` crate
+/// An simple example player implementation, which plays back a `Sequence` via the `phonic` crate
 /// using the default audio output device using plain samples loaded from a file as instruments.
 ///
 /// Works on an existing sample pool, which can be used outside of the player as well.
@@ -228,19 +237,19 @@ impl SamplePlayer {
         }
     }
 
-    /// Stop all currently playing back sources in the given rhythm slot index.
-    pub fn stop_sources_in_rhythm_slot(&mut self, rhythm_index: usize) {
-        for (playback_id, _) in self.playing_notes[rhythm_index].values() {
+    /// Stop all currently playing back sources in the given pattern slot index.
+    pub fn stop_sources_in_pattern_slot(&mut self, pattern_index: usize) {
+        for (playback_id, _) in self.playing_notes[pattern_index].values() {
             let _ = self.player.stop_source(*playback_id);
         }
-        self.playing_notes[rhythm_index].clear();
+        self.playing_notes[pattern_index].clear();
     }
 
     /// Run/play the given sequence until it stops.
     pub fn run(
         &mut self,
         sequence: &mut Sequence,
-        time_base: &dyn TimeBase,
+        time_base: &dyn SampleTimeBase,
         reset_playback_pos: bool,
     ) {
         let dont_stop = || false;
@@ -251,7 +260,7 @@ impl SamplePlayer {
     pub fn run_until<StopFn: Fn() -> bool>(
         &mut self,
         sequence: &mut Sequence,
-        time_base: &dyn TimeBase,
+        time_base: &dyn SampleTimeBase,
         reset_playback_pos: bool,
         stop_fn: StopFn,
     ) {
@@ -308,9 +317,9 @@ impl SamplePlayer {
     /// Initialize the given sequence for playback with `run_until_time`.
     /// This seeks the sequence to the given position and keeps track of internal playback state.
     pub fn prepare_run_until_time(&mut self, sequence: &mut Sequence, sample_time: u64) {
-        // match playing notes state to the passed rhythm
+        // match playing notes state to the passed patterns
         self.playing_notes
-            .resize(sequence.phrase_rhythm_slot_count(), HashMap::new());
+            .resize(sequence.phrase_pattern_slot_count(), HashMap::new());
         // move new phase to our previously played time
         sequence.advance_until_time(sample_time);
     }
@@ -330,16 +339,16 @@ impl SamplePlayer {
         time: SampleTime,
     ) {
         let time_base = *sequence.time_base();
-        sequence.consume_events_until_time(time, &mut |rhythm_index, rhythm_item| {
-            self.handle_rhythm_event(rhythm_index, rhythm_item, time_base, time_offset);
+        sequence.consume_events_until_time(time, &mut |pattern_index, pattern_event| {
+            self.handle_pattern_event(pattern_index, pattern_event, time_base, time_offset);
         });
     }
 
-    /// Handle a single rhythm event from the sequence
-    fn handle_rhythm_event(
+    /// Handle a single pattern event from the sequence
+    fn handle_pattern_event(
         &mut self,
-        rhythm_index: usize,
-        rhythm_item: RhythmIterItem,
+        pattern_index: usize,
+        pattern_event: PatternEvent,
         time_base: BeatTimeBase,
         time_offset: SampleTime,
     ) {
@@ -348,8 +357,8 @@ impl SamplePlayer {
             const SHOW_INSTRUMENTS_AND_PARAMETERS: bool = true;
             println!(
                 "{}: {}",
-                time_base.display(rhythm_item.time),
-                match &rhythm_item.event {
+                time_base.display(pattern_event.time),
+                match &pattern_event.event {
                     Some(event) => event.to_string(SHOW_INSTRUMENTS_AND_PARAMETERS),
                     None => "---".to_string(),
                 }
@@ -357,8 +366,8 @@ impl SamplePlayer {
         }
 
         // Process note events
-        let playing_notes_in_rhythm = &mut self.playing_notes[rhythm_index];
-        if let Some(Event::NoteEvents(notes)) = rhythm_item.event {
+        let playing_notes_in_pattern = &mut self.playing_notes[pattern_index];
+        if let Some(Event::NoteEvents(notes)) = pattern_event.event {
             for (voice_index, note_event) in notes.iter().enumerate() {
                 let note_event = match note_event {
                     None => continue,
@@ -369,12 +378,12 @@ impl SamplePlayer {
                     || (note_event.note.is_note_on()
                         && self.new_note_action != NewNoteAction::Continue)
                 {
-                    if let Some((playback_id, _)) = playing_notes_in_rhythm.get(&voice_index) {
+                    if let Some((playback_id, _)) = playing_notes_in_pattern.get(&voice_index) {
                         let _ = self.player.stop_source_at_sample_time(
                             *playback_id,
-                            time_offset + rhythm_item.time,
+                            time_offset + pattern_event.time,
                         );
-                        playing_notes_in_rhythm.remove(&voice_index);
+                        playing_notes_in_pattern.remove(&voice_index);
                     }
                 }
                 // Play new note
@@ -408,12 +417,12 @@ impl SamplePlayer {
                         sample_pool.get_sample(instrument, playback_options, playback_sample_rate)
                     {
                         let sample_delay =
-                            (note_event.delay * rhythm_item.duration as f32) as SampleTime;
-                        let start_time = Some(time_offset + rhythm_item.time + sample_delay);
+                            (note_event.delay * pattern_event.duration as f32) as SampleTime;
+                        let start_time = Some(time_offset + pattern_event.time + sample_delay);
 
                         let context: Option<PlaybackStatusContext> =
                             Some(Arc::new(SamplePlaybackContext {
-                                rhythm_index: Some(rhythm_index),
+                                pattern_index: Some(pattern_index),
                                 voice_index: Some(voice_index),
                             }));
 
@@ -422,7 +431,8 @@ impl SamplePlayer {
                             .play_file_source_with_context(sample, start_time, context)
                             .expect("Failed to play file source");
 
-                        playing_notes_in_rhythm.insert(voice_index, (playback_id, note_event.note));
+                        playing_notes_in_pattern
+                            .insert(voice_index, (playback_id, note_event.note));
                     } else {
                         log::error!(target: "Player", "Failed to get sample with id {}", instrument);
                     }
@@ -434,7 +444,7 @@ impl SamplePlayer {
     fn reset_playback_position(&mut self, sequence: &Sequence) {
         // rebuild playing notes vec
         self.playing_notes
-            .resize(sequence.phrase_rhythm_slot_count(), HashMap::new());
+            .resize(sequence.phrase_pattern_slot_count(), HashMap::new());
         // stop whatever is playing in case we're restarting
         self.player
             .stop_all_sources()

@@ -1,9 +1,9 @@
-return rhythm {
+return pattern {
   unit = "1/16",
-  pattern = pattern.euclidean(6, 8, -5),
+  pulse = pulse.euclidean(6, 8, -5),
   repeats = 63,
   offset = 16 * 64,
-  emit = function(context)
+  event = function(context)
     local SCALE_STEP_COUNT = 8
     local VOLUME_STEP_COUNT = 32
 
@@ -16,10 +16,10 @@ return rhythm {
     local volume_step = 4
     local volume_direction = 1.0
 
-    ---@param context EmitterContext
+    ---@param context EventContext
     return function(context)
       -- get current note set
-      local notes = pattern.from { 1, 6, 3, 4, 8, 3 }:map(function(index, value)
+      local notes = pulse.from { 1, 6, 3, 4, 8, 3 }:map(function(index, value)
         return SCALES[scale_index][value]
       end)
       -- get current note

@@ -60,9 +60,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // load samples and get paths to the rhythm scripts
+    // load samples and get paths to the pattern scripts
     let sample_pool = SamplePool::new();
-    struct RhythmEntry {
+    struct PatternEntry {
         instrument_id: InstrumentId,
         script_path: String,
     }
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             log::info!("Found file/script: '{}'...", stem);
             let instrument_id = sample_pool.load_sample(&wave_file.to_string_lossy())?;
             let script_path = lua_file.to_string_lossy().to_string();
-            entries.push(RhythmEntry {
+            entries.push(PatternEntry {
                 instrument_id,
                 script_path,
             });
@@ -124,14 +124,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     while !stop_running.load(Ordering::Relaxed) {
         if script_files_changed.load(Ordering::Relaxed) {
             script_files_changed.store(false, Ordering::Relaxed);
-            log::info!("Rebuilding all rhythms...");
+            log::info!("Rebuilding all patterns...");
         }
 
         // build final phrase
         let load = |instrument: Option<InstrumentId>, file_name: &str| {
-            new_rhythm_from_file(beat_time, instrument, file_name).unwrap_or_else(|err| {
+            new_pattern_from_file(beat_time, instrument, file_name).unwrap_or_else(|err| {
                 log::warn!("Script '{}' failed to compile:\n{}", file_name, err);
-                Rc::new(RefCell::new(BeatTimeRhythm::new(
+                Rc::new(RefCell::new(BeatTimePattern::new(
                     beat_time,
                     BeatTimeStep::Beats(1.0),
                 )))

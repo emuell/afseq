@@ -12,9 +12,9 @@ local patterns = {
 }
 
 -- Create Nerdo Rhythm script
-return rhythm {
+return pattern {
   unit = "1/16",
-  emit = function(context)
+  event = function(context)
     -- State variables to track current pattern index and position in pattern
     local pattern_index = 1
     -- Counter to change pattern every 16 steps

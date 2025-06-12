@@ -7,7 +7,7 @@ fn main() -> Result<(), Error> {
     let options = Options {
         library: "../../types/nerdo/library".into(),
         output: "../src".into(),
-        excluded_classes: ["TimeContext", "TriggerContext", "pattern", "parameter"]
+        excluded_classes: ["TimeContext", "TriggerContext", "pulse", "parameter"]
             .into_iter()
             .map(String::from)
             .collect(),

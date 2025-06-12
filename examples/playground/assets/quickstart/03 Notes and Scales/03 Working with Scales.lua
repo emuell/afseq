@@ -1,7 +1,7 @@
 -- Advanced chord and scale operations
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = {
+  event = {
     chord("c4", "major"),          -- C major via the chord function
     chord("c4", {0, 4, 7}),        -- C major via custom intervals
     scale("c", "major"):chord(1),  -- C major from 1st degree of C major scale

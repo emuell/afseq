@@ -8,14 +8,20 @@ use std::{
 
 // -------------------------------------------------------------------------------------------------
 
-/// A note representable in a 7 bit unsigned int. The subscript 'S' to a note means sharp.
-/// Because it only uses the least significant 7 bits, any value can be interpreted as either an i8
-/// or a u8 for free (as the representation is the same in both)
+pub mod chord;
+pub mod scale;
+
+// -------------------------------------------------------------------------------------------------
+
+/// A note representable in a 7 bit unsigned int.
 ///
-/// Note implements From\<u8\>, Into\<u8\> as well as From\<i8\>, Into\<i8\> and From\<&str\> so the
-/// enum names usually should be completely ignored.
+/// The subscript 'S' to a note means sharp. Because it only uses the least significant 7 bits,
+/// any value can be interpreted as either an i8 or a u8 for free.
 ///
-/// For From<&str> conversions, the following notation is supported:
+/// Note implements `From\<u8\>`, `Into\<u8\>` as well as `From\<i8\>`, `Into\<i8\>` and
+/// `From\<&str\>` so the enum values usually can be completely ignored.
+///
+/// In `From<&str>` conversions, the following notation is supported:
 /// `C4` (plain), `C#1` (sharps), `Db1` (flats),
 /// `D_2` (using _ as separator), `G 5` (using space as separator)
 #[repr(u8)]

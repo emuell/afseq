@@ -5,7 +5,7 @@ import { default as createModule } from "./playground.js";
 const defaultBpm = 120;
 const defaultInstrument = 0;
 const defaultScriptContent = `--
--- Welcome to the pttrns playground!
+-- Welcome to the Renoise pattrns playground!
 --
 -- Create and experiment with pattern scripts here to learn how the work.
 -- Check out the interactive 'Quickstart' scripts on the right, or load some examples
@@ -21,9 +21,9 @@ const defaultScriptContent = `--
 local chord = { "c4", "e4", "g4", "a4", "e4", "a3" } -- The arpeggio notes
 local length = 32 -- Modulation length in units
 
-return rhythm {
+return pattern {
   unit = "1/16",
-  emit = function(context)
+  event = function(context)
     -- Cycle through chord notes
     local step = math.imod(context.step, #chord)
     -- Return the note event
@@ -344,7 +344,7 @@ var app = {
             } else {
                 backend.updateScriptContent(example.content);
             }
-            this._editor.setScrollPosition({scrollTop: 0});
+            this._editor.setScrollPosition({ scrollTop: 0 });
             this._updateEditCount(0);
             this.setStatus(`Loaded script: '${example.name}'.`);
         };
@@ -462,7 +462,7 @@ var app = {
             });
 
             /*
-            // TODO: Register a simple autocomplete provider for Lua for `rhythm`
+            // TODO: Register a simple autocomplete provider for Lua for `pattern`
             monaco.languages.registerCompletionItemProvider('lua', {
                 provideCompletionItems: function (model, position) {
                     const lineContent = model.getLineContent(position.lineNumber);
@@ -473,17 +473,17 @@ var app = {
                         endColumn: position.column
                     });
     
-                    let insideRhythmTable = false;
+                    let insidePatternTable = false;
                     let braceDepth = 0;
-                    let inRhythm = false;
+                    let inPattern = false;
                     for (let i = 0; i < textUntilPosition.length; i++) {
                         const char = textUntilPosition[i];
     
-                        if (textUntilPosition.substr(i, 6) === 'rhythm') {
+                        if (textUntilPosition.substr(i, 6) === 'pattern') {
                             // Look ahead for opening brace
                             for (let j = i + 6; j < textUntilPosition.length; j++) {
                                 if (textUntilPosition[j] === '{') {
-                                    inRhythm = true;
+                                    inPattern = true;
                                     braceDepth = 1;
                                     i = j;
                                     break;
@@ -491,20 +491,20 @@ var app = {
                                     break;
                                 }
                             }
-                        } else if (inRhythm) {
+                        } else if (inPattern) {
                             if (char === '{') {
                                 braceDepth++;
                             } else if (char === '}') {
                                 braceDepth--;
                                 if (braceDepth === 0) {
-                                    inRhythm = false;
+                                    inPattern = false;
                                 }
                             }
                         }
                     }
 
-                    insideRhythmTable = inRhythm && braceDepth > 0;
-                    if (insideRhythmTable) {
+                    insidePatternTable = inPattern && braceDepth > 0;
+                    if (insidePatternTable) {
                         const word = model.getWordUntilPosition(position);
                         const range = {
                             startLineNumber: position.lineNumber,
@@ -515,16 +515,16 @@ var app = {
                         return {
                             suggestions: [
                                 {
-                                    label: 'emit',
+                                    label: 'event',
                                     kind: monaco.languages.CompletionItemKind.Property,
-                                    insertText: 'emit = ',
+                                    insertText: 'event = ',
                                     range: range,
                                     sortText: '1'
                                 },
                                 {
-                                    label: 'pattern',
+                                    label: 'pulse',
                                     kind: monaco.languages.CompletionItemKind.Property,
-                                    insertText: 'pattern = ',
+                                    insertText: 'pulse = ',
                                     range: range,
                                     sortText: '2'
                                 }

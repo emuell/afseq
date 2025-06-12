@@ -1,14 +1,14 @@
-//! Beat time based `Rhythm` implementation.
+//! Beat time based `Pattern` implementation.
 
 use crate::{
-    rhythm::generic::{GenericRhythm, GenericRhythmTimeStep},
+    pattern::generic::{GenericPattern, GenericPatternTimeStep},
     time::BeatTimeStep,
     BeatTimeBase,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-impl GenericRhythmTimeStep for BeatTimeStep {
+impl GenericPatternTimeStep for BeatTimeStep {
     #[inline]
     fn default_offset() -> Self {
         Self::Beats(0.0)
@@ -27,8 +27,8 @@ impl GenericRhythmTimeStep for BeatTimeStep {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A Rhythm with a beat time offset and beat time step.
-pub type BeatTimeRhythm = GenericRhythm<BeatTimeStep, BeatTimeStep>;
+/// A Pattern with a beat time offset and beat time step.
+pub type BeatTimePattern = GenericPattern<BeatTimeStep, BeatTimeStep>;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ macro_rules! generate_step_funcs {
             pub fn [<every_nth_ $name>](
                 &self,
                 step: f32,
-            ) -> BeatTimeRhythm {
+            ) -> BeatTimePattern {
                 self.every_nth_step($type(step))
             }
         }
@@ -47,8 +47,8 @@ macro_rules! generate_step_funcs {
 
 /// Shortcuts for creating beat-time based patterns.
 impl BeatTimeBase {
-    pub fn every_nth_step(&self, step: BeatTimeStep) -> BeatTimeRhythm {
-        BeatTimeRhythm::new(*self, step)
+    pub fn every_nth_step(&self, step: BeatTimeStep) -> BeatTimePattern {
+        BeatTimePattern::new(*self, step)
     }
     generate_step_funcs!(sixteenth, BeatTimeStep::Sixteenth);
     generate_step_funcs!(eighth, BeatTimeStep::Eighth);

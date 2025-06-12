@@ -1,6 +1,6 @@
 // -------------------------------------------------------------------------------------------------
 
-/// Generates a Euclidean rhythm pattern with the given number of steps, pulses, and rotation offset.
+/// Generates a Euclidean rhythm with the given number of steps, pulses, and rotation offset.
 pub fn euclidean(steps: u32, pulses: u32, offset: i32) -> Vec<bool> {
     type Pattern = Vec<bool>;
     type Patterns = Vec<Pattern>;

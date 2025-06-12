@@ -6,8 +6,8 @@ use mlua::prelude::*;
 
 use crate::{
     bindings::{
-        callback::LuaCallback, cycle::CycleUserData, input::InputParameterUserData,
-        note::NoteUserData, sequence::SequenceUserData, LuaTimeoutHook,
+        callback::LuaCallback, cycle::CycleUserData, note::NoteUserData,
+        parameter::ParameterUserData, sequence::SequenceUserData, LuaTimeoutHook,
     },
     prelude::*,
 };
@@ -718,11 +718,11 @@ pub(crate) fn chord_events_from_mode(
 
 pub(crate) fn chord_events_from_intervals(
     note: &LuaValue,
-    intervals: &Vec<i32>,
+    intervals: &[i32],
 ) -> LuaResult<Vec<Option<NoteEvent>>> {
     let note_event = note_event_from_value(note, Some(1))?;
     if let Some(note_event) = note_event {
-        let chord = Chord::try_from((note_event.note, intervals.as_slice()))
+        let chord = Chord::try_from((note_event.note, intervals))
             .map_err(|err| LuaError::RuntimeError(err.to_string()))?;
         Ok(chord
             .intervals()
@@ -745,7 +745,7 @@ pub(crate) fn chord_events_from_intervals(
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
+pub fn pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
     match value {
         LuaValue::Nil => Ok(Pulse::Pulse(0.0)),
         LuaValue::Boolean(bool) => Ok(Pulse::from(*bool)),
@@ -762,8 +762,8 @@ pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
             } else {
                 Err(LuaError::FromLuaConversionError {
                     from: "string",
-                    to: "pattern pulse".to_string(),
-                    message: Some("Invalid pattern pulse string value".to_string()),
+                    to: "pulse".to_string(),
+                    message: Some("Invalid pulse string value".to_string()),
                 })
             }
         }
@@ -771,21 +771,21 @@ pub fn pattern_pulse_from_value(value: &LuaValue) -> LuaResult<Pulse> {
             let sub_div = table
                 .clone()
                 .sequence_values()
-                .map(|result| pattern_pulse_from_value(&result?))
+                .map(|result| pulse_from_value(&result?))
                 .collect::<LuaResult<Vec<Pulse>>>()?;
             Ok(Pulse::from(sub_div))
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "pattern pulse".to_string(),
-            message: Some("Invalid pattern pulse value".to_string()),
+            to: "pulse".to_string(),
+            message: Some("Invalid pulse value".to_string()),
         }),
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn pattern_repeat_count_from_value(value: &LuaValue) -> LuaResult<Option<usize>> {
+pub(crate) fn rhythm_repeat_count_from_value(value: &LuaValue) -> LuaResult<Option<usize>> {
     if let Some(boolean) = value.as_boolean() {
         if boolean {
             Ok(None)
@@ -837,15 +837,15 @@ pub fn gate_trigger_from_value(value: &LuaValue) -> LuaResult<bool> {
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<InputParameterSet> {
-    let mut parameters = InputParameterSet::new();
+pub(crate) fn parameters_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<ParameterSet> {
+    let mut parameters = ParameterSet::new();
     for user_data in value.clone().sequence_values::<LuaAnyUserData>() {
-        if let Ok(parameter_user_data) = user_data?.take::<InputParameterUserData>() {
+        if let Ok(parameter_user_data) = user_data?.take::<ParameterUserData>() {
             let parameter_id = parameter_user_data.parameter.id().to_string();
             if parameter_id.is_empty() {
                 return Err(LuaError::FromLuaConversionError {
                     from: "user_data",
-                    to: "input parameter".to_string(),
+                    to: "parameter".to_string(),
                     message: Some("Parameter id's can not be empty.".to_string()),
                 });
             }
@@ -853,9 +853,9 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
             if parameters.iter().any(|p| p.borrow().id() == parameter_id) {
                 return Err(LuaError::FromLuaConversionError {
                     from: "user_data",
-                    to: "input parameter".to_string(),
+                    to: "parameter".to_string(),
                     message: Some(format!(
-                        "Parameter id's must be unique: an input with id '{}' already exists.",
+                        "Parameter id's must be unique: a parameter with id '{}' already exists.",
                         parameter_id
                     )),
                 });
@@ -864,8 +864,8 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
         } else {
             return Err(LuaError::FromLuaConversionError {
                 from: "user_data",
-                to: "input parameter".to_string(),
-                message: Some("Invalid input parameter".to_string()),
+                to: "parameter".to_string(),
+                message: Some("Invalid parameter".to_string()),
             });
         }
     }
@@ -874,30 +874,30 @@ pub(crate) fn inputs_from_value(_lua: &Lua, value: &LuaTable) -> LuaResult<Input
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn pattern_from_value(
+pub(crate) fn rhythm_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
     value: &LuaValue,
     time_base: &BeatTimeBase,
-) -> LuaResult<Box<dyn Pattern>> {
+) -> LuaResult<Box<dyn Rhythm>> {
     match value {
         LuaValue::Function(func) => {
             let callback = LuaCallback::new(lua, func.clone())?;
-            let pattern = ScriptedPattern::new(timeout_hook, callback, time_base)?;
-            Ok(Box::new(pattern))
+            let rhythm = ScriptedRhythm::new(timeout_hook, callback, time_base)?;
+            Ok(Box::new(rhythm))
         }
         LuaValue::Table(table) => {
             let pulses = table
                 .clone()
                 .sequence_values::<LuaValue>()
-                .map(|result| pattern_pulse_from_value(&result?))
+                .map(|result| pulse_from_value(&result?))
                 .collect::<LuaResult<Vec<Pulse>>>()?;
-            Ok(Box::new(pulses.to_pattern()))
+            Ok(Box::new(pulses.to_rhythm()))
         }
         _ => Err(LuaError::FromLuaConversionError {
             from: value.type_name(),
-            to: "pattern".to_string(),
-            message: Some("pattern must either be an array or a function".to_string()),
+            to: "rhythm".to_string(),
+            message: Some("pulse must either be an array or a function".to_string()),
         }),
     }
 }
@@ -926,37 +926,37 @@ pub(crate) fn gate_from_value(
 
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn event_iter_from_value(
+pub(crate) fn emitter_from_value(
     lua: &Lua,
     timeout_hook: &LuaTimeoutHook,
     value: &LuaValue,
     time_base: &BeatTimeBase,
-) -> LuaResult<Box<dyn EventIter>> {
+) -> LuaResult<Box<dyn Emitter>> {
     match value {
         LuaValue::UserData(userdata) => {
             if userdata.is::<NoteUserData>() {
                 let note = userdata.borrow::<NoteUserData>()?.clone();
-                Ok(Box::new(note.notes.to_event()))
+                Ok(Box::new(note.notes.to_emitter()))
             } else if userdata.is::<SequenceUserData>() {
                 let sequence = userdata.borrow::<SequenceUserData>()?.clone();
-                Ok(Box::new(sequence.notes.to_event_sequence()))
+                Ok(Box::new(sequence.notes.to_sequence_emitter()))
             } else if userdata.is::<CycleUserData>() {
                 // NB: take instead of cloning: cycle userdata has no other usage than being defined
                 let userdata = userdata.take::<CycleUserData>()?;
                 let cycle = userdata.cycle;
                 if let Some(mapping_function) = userdata.mapping_function {
                     let mapping_callback = LuaCallback::new(lua, mapping_function)?;
-                    let event_iter = ScriptedCycleEventIter::with_mapping_callback(
+                    let emitter = ScriptedCycleEmitter::with_mapping_callback(
                         cycle,
                         timeout_hook,
                         mapping_callback,
                         time_base,
                     )?;
-                    Ok(Box::new(event_iter))
+                    Ok(Box::new(emitter))
                 } else {
                     let mappings = userdata.mappings;
-                    let event_iter = ScriptedCycleEventIter::with_mappings(cycle, mappings);
-                    Ok(Box::new(event_iter))
+                    let emitter = ScriptedCycleEmitter::with_mappings(cycle, mappings);
+                    Ok(Box::new(emitter))
                 }
             } else {
                 Err(LuaError::FromLuaConversionError {
@@ -968,8 +968,8 @@ pub(crate) fn event_iter_from_value(
         }
         LuaValue::Function(function) => {
             let callback = LuaCallback::new(lua, function.clone())?;
-            let event_iter = ScriptedEventIter::new(timeout_hook, callback, time_base)?;
-            Ok(Box::new(event_iter))
+            let emitter = ScriptedEmitter::new(timeout_hook, callback, time_base)?;
+            Ok(Box::new(emitter))
         }
         LuaValue::Table(ref table) => {
             // convert an array alike table to a event sequence
@@ -978,19 +978,19 @@ pub(crate) fn event_iter_from_value(
                 for (arg_index, arg) in sequence.iter().enumerate() {
                     note_event_sequence.push(note_events_from_value(arg, Some(arg_index))?);
                 }
-                let iter = note_event_sequence.to_event_sequence();
+                let iter = note_event_sequence.to_sequence_emitter();
                 Ok(Box::new(iter))
             }
             // convert table to a single note event
             else {
-                let event_iter = note_event_from_value(value, None)?.to_event();
-                Ok(Box::new(event_iter))
+                let emitter = note_event_from_value(value, None)?.to_emitter();
+                Ok(Box::new(emitter))
             }
         }
         _ => {
-            // try converting a note number or note/chord string to an event iter
-            let event_iter = note_events_from_value(value, None)?.to_event();
-            Ok(Box::new(event_iter))
+            // try converting a note number or note/chord string to an emitter.
+            let emitter = note_events_from_value(value, None)?.to_emitter();
+            Ok(Box::new(emitter))
         }
     }
 }

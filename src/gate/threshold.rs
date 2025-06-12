@@ -1,4 +1,4 @@
-use crate::{BeatTimeBase, Event, Gate, InputParameterSet, PulseIterItem};
+use crate::{BeatTimeBase, Event, Gate, ParameterSet, RhythmEvent};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -33,11 +33,11 @@ impl Gate for ThresholdGate {
         // nothing to do
     }
 
-    fn set_input_parameters(&mut self, _parameters: InputParameterSet) {
+    fn set_parameters(&mut self, _parameters: ParameterSet) {
         // nothing to do
     }
 
-    fn run(&mut self, pulse: &PulseIterItem) -> bool {
+    fn run(&mut self, pulse: &RhythmEvent) -> bool {
         pulse.value > self.threshold
     }
 

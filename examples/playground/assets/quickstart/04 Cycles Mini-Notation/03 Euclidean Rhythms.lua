@@ -1,7 +1,7 @@
 -- Euclidean patterns in tidal cycles notation
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = cycle("c4(3,8) e4(5,8) g4(7,8)")  -- Different Euclidean rhythms
+  event = cycle("c4(3,8) e4(5,8) g4(7,8)")  -- Different Euclidean rhythms
 }
 
 -- TRY THIS: Combine with alternation: c4(3,8)|e4(5,8)

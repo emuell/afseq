@@ -1,33 +1,33 @@
-# Input Parameters
+# Parameters
 
-Rhythm [`inputs`](../API/rhythm.md#inputs) allow user controlled parameter values to be injected into a rhythm. This allows you to write more flexible rhythms that can be used as templates or to automate functions within the rhythm.
+Pattern [`parameters`](../API/pattern.md#parameter) allow user controlled parameter values to be injected into a pattern. This allows you to write more flexible patterns that can be used as templates or to automate functions within the pattern.
 
-Input parameters can be accessed in dynamic pattern, gate, emitter or cycle function [`contexts`](../API/rhythm.md#EmitterContext).
+Input parameters can be accessed in dynamic `pulse`, `gate`, `event` or `cycle` function [`contexts`](../API/pattern.md#EventContext).
 
 ## Parameter Types
 
 Currenty available parameter types are:
 
-- boolean - on/off switches - [`parameter.boolean`](../API/input.md#boolean)
-- integer - integer value ranges - [`parameter.integer`](../API/input.md#integer)
-- number - real number value ranges -[`parameter.number`](../API/input.md#number)
-- string - enumeration value sets - [`parameter.enum`](../API/input.md#enum)
+- boolean - on/off switches - [`parameter.boolean`](../API/parameter.md#boolean)
+- integer - integer value ranges - [`parameter.integer`](../API/parameter.md#integer)
+- number - real number value ranges -[`parameter.number`](../API/parameter.md#number)
+- string - enumeration value sets - [`parameter.enum`](../API/parameter.md#enum)
 
 ## Parameter access
  
-When defining a parameter, each parameter has a unique string id set. This id can then be used to access the *actual* paramter value in the function contexts.
+When defining a parameter, each parameter has a unique string id set. This id is used to access the *actual* paramter value in the function contexts.
 
 Definition:
 
-» `inputs = { parameter.boolean("enabled", true) }`
+» `parameter = { parameter.boolean("enabled", true) }`
 
 Usage:
 
-» `emit = function(context) return context.inputs.enabled and "c5" or nil }`
+» `event = function(context) return context.parameter.enabled and "c5" or nil }`
 
 Usage, if you've got spaces in your ids (not recommended):
 
-» `emit = function(context) return context.inputs["enabled"] and "c5" or nil }`
+» `event = function(context) return context.parameter["enabled"] and "c5" or nil }`
 
 
 ## Examples
@@ -35,8 +35,8 @@ Usage, if you've got spaces in your ids (not recommended):
 Euclidean pattern generator with user configurable steps, pulses, offset value.
 
 ```lua
-return rhythm {
-  inputs = {
+return pattern {
+  parameter = {
     parameter.integer('steps', 12, {1, 64}, "Steps", 
       "Number of on steps in the pattern"),
     parameter.integer('pulses', 16, {1, 64}, "Pulses", 
@@ -45,13 +45,13 @@ return rhythm {
       "Rotates on pattern left (values > 0) or right (values < 0)"),
   },
   unit = "1/1",
-  pattern = function(context)
-    return pattern.euclidean(
-      math.min(context.inputs.steps, context.inputs.pulses), 
-      context.inputs.pulses, 
-      context.inputs.offset)
+  pulse = function(context)
+    return pulse.euclidean(
+      math.min(context.parameter.steps, context.parameter.pulses), 
+      context.parameter.pulses, 
+      context.parameter.offset)
   end,
-  emit = "c4"
+  event = "c4"
 }
 ```
 
@@ -59,21 +59,21 @@ return rhythm {
 Random bass line generator with user defined custom scales and variations (seeds).
 ```lua
 local scales = {"Chromatic", "Minor", "Major"}
-return rhythm {
-  inputs = {
+return pattern {
+  parameter = {
     parameter.enum('scale', scales[1], scales, "Scale"),
     parameter.integer('notes', 7, {1, 12}, "#Notes"),
     parameter.integer('variation', 0, {0, 0xff}, "Variation"),
   },
   unit = "1/1",
-  pattern = function(context)
-    local rand = math.randomstate(2345 + context.inputs.variation)
-    return pattern.euclidean(rand(3, 16), 16, 0)
+  pulse = function(context)
+    local rand = math.randomstate(2345 + context.parameter.variation)
+    return pulse.euclidean(rand(3, 16), 16, 0)
   end,
-  emit = function(context)
-    local notes = scale("c4", context.inputs.scale).notes
-    local rand = math.randomstate(127364 + context.inputs.variation)
-    local notes = pattern.new(context.inputs.notes):map(function(_)
+  event = function(context)
+    local notes = scale("c4", context.parameter.scale).notes
+    local rand = math.randomstate(127364 + context.parameter.variation)
+    local notes = pulse.new(context.parameter.notes):map(function(_)
       return notes[rand(#notes)]
     end)
     return notes[math.imod(context.step, #notes)]
@@ -83,14 +83,14 @@ return rhythm {
 
 Drum pattern cycle with configurable note values for each drumkit instrument. 
 ```lua
-return rhythm {
+return pattern {
   unit = "1/1",
-  inputs = {
+  parameter = {
     parameter.integer("bd_note", 48, {0, 127}),
     parameter.integer("sn_note", 70, {0, 127}),
     parameter.integer("hh_note", 98, {0, 127})
   },
-  emit = cycle([[
+  event = cycle([[
     [<hh1 hh2 hh2>*12],
     [bd1 ~]*2 ~ [~ bd2] ~,
     [~ sn1]*2,

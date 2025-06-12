@@ -1,254 +1,475 @@
 # pattern
 <!-- toc -->
-# Pattern<a name="Pattern"></a>  
-> Array alike table with helper functions to ease creating rhythmic patterns.
-> 
-> #### examples:
-> ```lua
-> -- using + and * operators to combine patterns
-> pattern.from{ 0, 1 } * 3 + { 1, 0 }
-> ```
-> ```lua
-> -- repeating, spreading and subsets
-> pattern.from{ 0, 1, { 1, 1 } }:repeat_n(4):spread(1.25):take(16)
-> ```
-> ```lua
-> -- euclidean patterns
-> pattern.euclidean(12, 16)
-> pattern.from{ 1, 0.5, 1, 1 }:euclidean(12)
-> ```
-> ```lua
-> -- generate/init from functions
-> pattern.new(8):init(1) --> 1,1,1,1,1,1,1,1
-> pattern.new(12):init(function() return math.random(0.5, 1.0) end )
-> pattern.new(16):init(scale("c", "minor").notes_iter())
-> ```
-> ```lua
-> -- generate note patterns
-> pattern.from{ "c4", "g4", "a4" } * 7 + { "a4", "g4", "c4" }
-> ```
-> ```lua
-> -- generate chords from degree values
-> pattern.from{ 1, 5, 6, 4 }:map(function(index, degree)
->   return scale("c", "minor"):chord(degree)
-> end)
-> ```  
+# Global<a name="Global"></a>  
 
 ---  
 ## Functions
-### new(length : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), value : [`PulseValue`](#PulseValue) | (index : [`integer`](../API/builtins/integer.md)) `->` [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="new"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
+### pattern(options : [`PatternOptions`](../API/pattern.md#PatternOptions))<a name="pattern"></a>
+`->`[`userdata`](../API/builtins/userdata.md)  
 
-> Create a new empty pattern or pattern with the given length and pulse value.
-> 
+> Create a new pattern with the given properties table:
 > 
 > #### examples:
 > ```lua
-> pattern.new(4,1) --> {1,1,1,1}
-> pattern.new(4, function() return math.random() end)
+> --trigger notes in an euclidean triplet pattern
+> return pattern {
+>   unit = "1/16",
+>   resolution = 2/3,
+>   pulse = pulse.euclidean(12, 16),
+>   event = { "c4", "g4", { "c5 v0.7", "g5 v0.4" }, "a#4" }
+> }
 > ```
-### from(...[`PulseValue`](#PulseValue) | [`PulseValue`](#PulseValue)[])<a name="from"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Create a new pattern from an existing set of values or tables.
-> When passing tables, those will be flattened.
-> 
-> #### examples:
 > ```lua
-> pattern.from(1,0,1,0) --> {1,0,1,0}
-> pattern.from({1,0},{1,0}) --> {1,0,1,0}
+> -- trigger a chord sequence every 4 bars after 4 bars
+> return pattern {
+>   unit = "bars",
+>   resolution = 4,
+>   offset = 1,
+>   event = {
+>     note("c4'm"),
+>     note("g3'm7"):transpose({ 0, 12, 0, 0 })
+>   }
+> }
 > ```
-### copy(self : [`Pattern`](../API/pattern.md#Pattern))<a name="copy"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
->  create a shallow-copy of the given pattern (or self)
-> 
-> #### examples:
 > ```lua
-> local p = pattern.from(1, 0)
-> local p2 = p:copy() --> {1,0}
+> --trigger notes in a seeded, random subdivision pattern
+> local seed = 23498
+> return pattern {
+>   unit = "1/8",
+>   pulse = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
+>   gate = function(init_context)
+>     local rand = math.randomstate(seed)
+>     return function(context)
+>       return context.pulse_value > rand()
+>     end
+>   end,
+>   event = { "c4" }
+> }
 > ```
-### distributed(steps : [`integer`](../API/builtins/integer.md) | [`table`](../API/builtins/table.md), length : [`integer`](../API/builtins/integer.md), offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="distributed"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Create an new pattern or spread and existing pattern evenly within the given length.
-> Similar, but not exactly like `euclidean`.
-> 
-> Shortcut for `pattern.from{1,1,1}:spread(length / #self):rotate(offset)`
-> 
-> #### examples:
 > ```lua
-> pattern.distributed(3, 8) --> {1,0,0,1,0,1,0}
-> pattern.from{1,1}:distributed(4, 1) --> {0,1,0,1}
+> --trigger random notes in a seeded random pattern from a pentatonic scale
+> local cmin = scale("c5", "pentatonic minor").notes
+> return pattern {
+>   unit = "1/16",
+>   pulse = function(context)
+>     return (context.pulse_step % 4 == 1) or (math.random() > 0.8)
+>   end,
+>   event = function(context)
+>     return { key = cmin[math.random(#cmin)], volume = 0.7 }
+>   end
+> }
 > ```
-### euclidean(steps : [`integer`](../API/builtins/integer.md) | [`table`](../API/builtins/table.md), length : [`integer`](../API/builtins/integer.md), offset : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="euclidean"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Create a new euclidean rhythm pattern with the given pulses or number of new pulses
-> in the given length and optionally rotate the contents.
-> [Euclidean Rhythm](https://en.wikipedia.org/wiki/Euclidean_rhythm)
-> 
-> #### examples:
 > ```lua
-> pattern.euclidean(3, 8)
->  --> {1,0,0,1,0,0,1,0}
-> pattern.from{"a", "b", "c"}:euclidean(8, 0, "-")
->  --> {"a","-","-","b","-","-","c","-"}
-> ```
-### unpack(self : [`Pattern`](../API/pattern.md#Pattern))<a name="unpack"></a>
-`->`... : [`PulseValue`](#PulseValue)  
-
-> Shortcut for table.unpack(pattern): returns elements from this pattern as var args.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,2,3,4}
-> local v1, v2, v3, v4 = p:unpack()
-> ```
-### subrange(self : [`Pattern`](../API/pattern.md#Pattern), i : [`integer`](../API/builtins/integer.md), j : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="subrange"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Get sub range from the pattern as new pattern.
-> When the given length is past end of this pattern its filled up with empty values.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,2,3,4}
-> p = p:subrange(2,3) --> {2,3}
-> p = p:subrange(1,4,"X") --> {2,3,"X","X"}
-> ```
-### take(self : [`Pattern`](../API/pattern.md#Pattern), length : [`integer`](../API/builtins/integer.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="take"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Get first n items from the pattern as new pattern.
-> When the given length is past end of this pattern its filled up with empty values.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,2,3,4}
-> p = p:take(2) --> {1,2}
-> p = p:take(4, "") --> {1,2,"",""}
-> ```
-### clear(self : [`Pattern`](../API/pattern.md#Pattern))<a name="clear"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Clear a pattern, remove all its contents.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,0}
-> p:clear() --> {}
-> ```
-### init(self : [`Pattern`](../API/pattern.md#Pattern), value : [`PulseValue`](#PulseValue) | (index : [`integer`](../API/builtins/integer.md)) `->` [`PulseValue`](#PulseValue), length : [`integer`](../API/builtins/integer.md)[`?`](../API/builtins/nil.md))<a name="init"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Fill pattern with the given value or generator function in length.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{0,0}
-> p:init(1) --> {1,1}
-> p:init("X", 3) --> {"X","X", "X"}
-> ```
-### map(self : [`Pattern`](../API/pattern.md#Pattern), fun : (index : [`integer`](../API/builtins/integer.md), value : [`PulseValue`](#PulseValue)) `->` [`PulseValue`](#PulseValue))<a name="map"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Apply the given function to every item in the pattern.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,3,5}
-> p:map(function(k, v)
->   return scale("c", "minor"):degree(v)
-> end) --> {48, 51, 55}
-> ```
-### reverse(self : [`Pattern`](../API/pattern.md#Pattern))<a name="reverse"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Invert the order of items.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,2,3}
-> p:reverse() --> {3,2,1}
-> ```
-### rotate(self : [`Pattern`](../API/pattern.md#Pattern), amount : [`integer`](../API/builtins/integer.md))<a name="rotate"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Shift contents by the given amount to the left (negative amount) or right.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,0,0}
-> p:rotate(1) --> {0,1,0}
-> p:rotate(-2) --> {0,0,1}
-> ```
-### push_back(self : [`Pattern`](../API/pattern.md#Pattern), ...[`PulseValue`](#PulseValue)[] | [`PulseValue`](#PulseValue))<a name="push_back"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Push a single or multiple number of items or other pattern contents to the end of the pattern.
-> Note: When passing array alike tables or patterns, they will be *unpacked*.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.new()
-> p:push_back(1) --> {1}
-> p:push_back(2,3) --> {1,2,3}
-> p:push_back{4} --> {1,2,3,4}
-> p:push_back({5,{6,7}) --> {1,2,3,4,5,6,7}
-> ```
-### pop_back(self : [`Pattern`](../API/pattern.md#Pattern))<a name="pop_back"></a>
-`->`[`PulseValue`](#PulseValue)  
-
-> Remove an entry from the back of the pattern. returns the popped item.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from({1,2})
-> p:pop_back() --> {1}
-> p:pop_back() --> {}
-> p:pop_back() --> {}
-> ```
-### repeat_n(self : [`Pattern`](../API/pattern.md#Pattern), count : [`integer`](../API/builtins/integer.md))<a name="repeat_n"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Duplicate the pattern n times.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,2,3}
-> patterns:repeat_n(2) --> {1,2,3,1,2,3}
-> ```
-### spread(self : [`Pattern`](../API/pattern.md#Pattern), amount : [`number`](../API/builtins/number.md), empty_value : [`PulseValue`](#PulseValue)[`?`](../API/builtins/nil.md))<a name="spread"></a>
-`->`[`Pattern`](../API/pattern.md#Pattern)  
-
-> Expand (with amount > 1) or shrink (amount < 1) the length of the pattern by the
-> given factor, spreading allowed content evenly and filling gaps with 0 or the
-> given empty value.
-> 
-> #### examples:
-> ```lua
-> local p = pattern.from{1,1}
-> p:spread(2) --> {1,0,1,0}
-> p:spread(1/2) --> {1,1}
-> ```
-### tostring(self : [`Pattern`](../API/pattern.md#Pattern))<a name="tostring"></a>
-`->`[`string`](../API/builtins/string.md)  
-
-> Serialze a pattern for display/debugging purposes.
-> 
-> #### examples:
-> ```lua
-> pattern.euclidean(3, 8):tostring() --> "{1, 1, 1, 0}"
+> --emit a tidal cycle every bar
+> return pattern {
+>   unit = "bars",
+>   event = cycle("[c4 [f5 f4]*2]|[c4 [g5 g4]*3]")
+> }
 > ```  
 
 
 
 ---  
 ## Aliases  
+### NoteValue<a name="NoteValue"></a>
+[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
+  
+  
 ### PulseValue<a name="PulseValue"></a>
-[`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`table`](../API/builtins/table.md)  
-> Valid pulse value in a pattern  
+[`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md)[] | `0` | `1` | [`nil`](../API/builtins/nil.md)  
+> ```lua
+> -- Single pulse value or a nested subdivision of pulses within a pulse.
+> PulseValue:
+>     | 0
+>     | 1
+> ```  
+  
+
+
+
+# EventContext<a name="EventContext"></a>  
+> Event related context passed to functions in 'emit'.  
+
+---  
+## Properties
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
+> `context.note.notes[1].key`
+
+### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
+> Current parameter values: parameter ids are keys, parameter values are values.
+> To access a parameter with id `enabled` use: `context.parameter.enabled`
+
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
+> Project's tempo in beats per minutes.
+
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
+> Project's beats per bar setting - usually will be 4.
+
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
+> Project's audio playback sample rate in samples per second.
+
+### pulse_step : [`integer`](../API/builtins/integer.md)<a name="pulse_step"></a>
+> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+> Unlike `step` in event this includes all pulses, so it also counts pulses which do
+> not emit events. Starts from 1 when the pattern starts running or after it got reset.
+
+### pulse_time_step : [`number`](../API/builtins/number.md)<a name="pulse_time_step"></a>
+> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+> Starts from 0 and increases with each new pulse by the pulse's step time duration.
+
+### pulse_time : [`number`](../API/builtins/number.md)<a name="pulse_time"></a>
+> Current pulse's step time as fraction of a full step in the pulse. For simple pulses this
+> will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in
+> the subdivision, relative to the parent subdivisions pulse step time.
+> #### examples:
+> ```lua
+> {1, {1, 1}} --> step times: {1, {0.5, 0.5}}
+> ```
+
+### pulse_value : [`number`](../API/builtins/number.md)<a name="pulse_value"></a>
+> Current pulse value. For binary pulses this will be 0 or 1, but it can be any number value.
+
+### playback : [`PlaybackState`](#PlaybackState)<a name="playback"></a>
+> Specifies how the pattern currently is running.
+
+### step : [`integer`](../API/builtins/integer.md)<a name="step"></a>
+> Continues step counter, incrementing with each new *emitted* pulse.
+> Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
+> how often the event function already got called.
+> Starts from 1 when the pattern starts running or is reset.
+
+  
+
+
+
+---  
+## Aliases  
+### PlaybackState<a name="PlaybackState"></a>
+`"running"` | `"seeking"`  
+> ```lua
+> -- - *seeking*: The pattern is auto-seeked to a target time. All events are discarded. Avoid
+> --   unnecessary computations while seeking, and only maintain your generator's internal state.
+> -- - *running*: The pattern is played back regularly. Events are emitted and audible.
+> PlaybackState:
+>     | "seeking"
+>     | "running"
+> ```  
+  
+
+
+
+# GateContext<a name="GateContext"></a>  
+> ConPulse value context passed to functions in `gate` and `event`.  
+
+---  
+## Properties
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
+> `context.note.notes[1].key`
+
+### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
+> Current parameter values: parameter ids are keys, parameter values are values.
+> To access a parameter with id `enabled` use: `context.parameter.enabled`
+
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
+> Project's tempo in beats per minutes.
+
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
+> Project's beats per bar setting - usually will be 4.
+
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
+> Project's audio playback sample rate in samples per second.
+
+### pulse_step : [`integer`](../API/builtins/integer.md)<a name="pulse_step"></a>
+> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+> Unlike `step` in event this includes all pulses, so it also counts pulses which do
+> not emit events. Starts from 1 when the pattern starts running or after it got reset.
+
+### pulse_time_step : [`number`](../API/builtins/number.md)<a name="pulse_time_step"></a>
+> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+> Starts from 0 and increases with each new pulse by the pulse's step time duration.
+
+### pulse_time : [`number`](../API/builtins/number.md)<a name="pulse_time"></a>
+> Current pulse's step time as fraction of a full step in the pulse. For simple pulses this
+> will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in
+> the subdivision, relative to the parent subdivisions pulse step time.
+> #### examples:
+> ```lua
+> {1, {1, 1}} --> step times: {1, {0.5, 0.5}}
+> ```
+
+### pulse_value : [`number`](../API/builtins/number.md)<a name="pulse_value"></a>
+> Current pulse value. For binary pulses this will be 0 or 1, but it can be any number value.
+
+  
+
+
+
+# PatternOptions<a name="PatternOptions"></a>  
+> Construction options for a new pattern.  
+
+---  
+## Properties
+### unit : `"ms"` | `"seconds"` | `"bars"` | `"beats"` | `"1/1"` | `"1/2"` | `"1/4"` | `"1/8"` | `"1/16"` | `"1/32"` | `"1/64"`<a name="unit"></a>
+> Base time unit of the pattern. Use `resolution` to apply an additional factor, in order to
+> create other less common time bases.
+> #### examples:
+> ```lua
+> -- slightly off beat pulse
+> unit = "beats",
+> resolution = 1.01
+> ```
+> ```lua
+> -- triplet
+> unit = "1/16",
+> resolution = 2/3
+> ```
+
+### resolution : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="resolution"></a>
+> Factor which is applied on `unit` to specify the final time resolution of the pattern.
+> #### examples:
+> ```lua
+> -- slightly off beat pulse
+> unit = "beats",
+> resolution = 1.01
+> ```
+> ```lua
+> -- triplet
+> unit = "1/16",
+> resolution = 2/3
+> ```
+
+### offset : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="offset"></a>
+> Optional offset in `unit * resolution` time units. By default 0.
+> When set, the pattern's event output will be delayed by the given offset value.
+> #### examples:
+> ```lua
+> -- start emitting after 4*4 beats
+> unit = "1/4",
+> resolution = 4,
+> offset = 4
+> ```
+
+### parameter : [`Parameter`](../API/parameter.md#Parameter)[]<a name="parameter"></a>
+> Define optional parameters for the pattern. Parameters can dynamically
+> change a patterns behavior everywhere where `context`s are passed, e.g. in `pulse`,
+> `gate`, `event` or `cycle` map generator functions.
+> 
+> #### examples:
+> ```lua
+> -- trigger a single note as specified by parameter 'note'
+> -- when parameter 'enabled' is true, else triggers nothing.
+> return pattern {
+>   parameter = {
+>     parameter.boolean("enabled", true),
+>     parameter.integer("note", 48, { 0, 127 })
+>   },
+>   event = function(context)
+>     if context.parameter.enabled then -- boolean value
+>       return note(context.parameter.note) -- integer value
+>     else
+>       return nil
+>     end
+>   end
+> }
+> ```
+
+### pulse : [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md)[] | (context : [`PulseContext`](../API/pattern.md#PulseContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md) | (context : [`PulseContext`](../API/pattern.md#PulseContext)) `->` (context : [`PulseContext`](../API/pattern.md#PulseContext)) `->` [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md)<a name="pulse"></a>
+> Defines the rhythmical part of the pattern. With the default `gate` implementation,
+> each pulse with a value of `1` or `true` will cause an event from the `event` property
+> to be triggered in the pattern's time unit. `0`, `false` or `nil` values do not trigger.
+> 
+> Pulses may contain subdivisions, sub-tables of pulses, to "cram" multiple pulses
+> into a single pulse's time interval. This way more complex rhythmical patterns can
+> be created.
+> 
+> When no pulse is defined, a constant pulse value of `1` is triggered.
+> 
+> Just like the `event` property, pulses can either be a static array of values
+> or a function or generators which produces pulse values dynamically.
+> 
+> #### examples:
+> ```lua
+> -- static pattern
+> pulse = { 1, 0, 0, 1 }
+> ```
+> ```lua
+> -- "cram" pulses into a single pulse slot via sub-divisions
+> pulse = { 1, { 1, 1, 1 } }
+> ```
+> ```lua
+> -- pulses created via the "pulse" lib
+> pulse = pulse.from{ 1, 0 } * 3 + { 1, 1 }
+> pulse = pulse.euclidean(7, 16, 2)
+> ```
+> ```lua
+> -- stateless pulse function
+> pulse = function(context)
+>   return math.random(0, 1)
+> end
+> ```
+> ```lua
+> -- stateful pulse function
+> pulse = function(init_context)
+>   local triggers = table.new{ 0, 6, 10 }
+>   return function(context)
+>     local step = (context.pulse_step - 1) % 16
+>     return triggers:contains(step)
+>   end
+> end
+> ```
+
+### repeats : [`boolean`](../API/builtins/boolean.md) | [`integer`](../API/builtins/integer.md)<a name="repeats"></a>
+> If and how many times a pattern should repeat. When 0 or false, the pattern does not repeat
+> and plays back only once. When true, the pattern repeats endlessly, which is the default.
+> When a number > 0, this specifies the number of times the pattern repeats until it stops.
+> 
+> Note: When `pulse` is a function or iterator, the repeat count is the number of
+> *function calls or iteration steps*. When the pattern is a pulse array, this is the number of
+> times the whole pulse pattern gets repeated.
+> 
+> #### examples:
+> ```lua
+> -- one-shot
+> repeat = 0
+> -- also a one-shot
+> repeat = false
+> -- play the pattern 4 times
+> repeat = 3
+> -- play & repeat forever (default)
+> repeat = true
+> ```
+
+### gate : (context : [`GateContext`](../API/pattern.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) | (context : [`GateContext`](../API/pattern.md#GateContext)) `->` (context : [`GateContext`](../API/pattern.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md)<a name="gate"></a>
+> Optional pulse train filter function which filters events between the pulse and event emitter. 
+> By default a threshold gate, which passes all pulse values greater than zero.
+> 
+> Functions return true when a pulse value should be passed, and false when the event
+> emitter should be skipped.
+> 
+> #### examples:
+> ```lua
+> -- probability gate: skips all 0s, passes all 1s. pulse alues in range (0, 1) are
+> -- maybe passed, using the pulse value as probablility.
+> gate = function(context)
+>   return context.pulse_value > math.random()
+> end
+> ```
+> ```lua
+> -- threshold gate: skips all pulse values below a given threshold value
+> gate = function(context)
+>   return context.pulse_value > 0.5
+> end
+> ```
+
+### event : [`Cycle`](../API/cycle.md#Cycle) | [`Sequence`](../API/sequence.md#Sequence) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue)[] | (context : [`EventContext`](../API/pattern.md#EventContext)) `->` [`NoteValue`](#NoteValue) | (context : [`EventContext`](../API/pattern.md#EventContext)) `->` (context : [`EventContext`](../API/pattern.md#EventContext)) `->` [`NoteValue`](#NoteValue)<a name="event"></a>
+> Specify the event values of the pattern. For every pulse in the pulse pattern, an event
+> is picked from the specified event sequence. When the end of the sequence is reached, it starts
+> again from the beginning.
+> 
+> To generate events dynamically, you can pass a function or a function iterator, instead of a
+> static array or sequence of notes.
+> 
+> Events can also be generated via a tidal cycle mini-notation. Cycles are repeated endlessly
+> by default, and have the duration of a single step in the patterns. Pulses can be used to
+> sequence cycles too.
+> 
+> #### examples:
+> ```lua
+> -- a sequence of c4, g4
+> event = {"c4", "g4"}
+> ```
+> ```lua
+> -- a chord of c4, d#4, g4
+> event = {{"c4", "d#4", "g4"}} -- or {"c4'min"}
+> ```
+> ```lua
+> -- a sequence of c4, g4 with volume 0.5
+> event = sequence{"c4", "g4"}:volume(0.5)
+> ```
+> ```lua
+> -- stateless generator function
+> event = function(context)
+>   return 48 + math.random(1, 4) * 5
+> end
+> ```
+> ```lua
+> -- stateful generator function
+> event = function(init_context)
+>   local count, step, notes = 1, 2, scale("c5", "minor").notes
+>   return function(context)
+>     local key = notes[count]
+>     count = (count + step - 1) % #notes + 1
+>     return { key = key, volume = 0.5 }
+>   end
+> end
+> ```
+> ```lua
+> -- a note pattern
+> local tritone = scale("c5", "tritone")
+> --[...]
+> event = pulse.from(tritone:chord(1, 4)):euclidean(6) +
+>   pulse.from(tritone:chord(5, 4)):euclidean(6)
+> ```
+> ```lua
+> -- a tidal cycle
+> event = cycle("<[a3 c4 e4 a4]*3 [d4 g3 g4 c4]>"),
+> ```
+
+  
+
+
+
+---  
+## Aliases  
+### NoteValue<a name="NoteValue"></a>
+[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
+  
+  
+### PulseValue<a name="PulseValue"></a>
+[`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md)[] | `0` | `1` | [`nil`](../API/builtins/nil.md)  
+> ```lua
+> -- Single pulse value or a nested subdivision of pulses within a pulse.
+> PulseValue:
+>     | 0
+>     | 1
+> ```  
+  
+
+
+
+# PulseContext<a name="PulseContext"></a>  
+> Pulse timing context passed to functions in `pulse` and `gate`.  
+
+---  
+## Properties
+### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
+> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
+> `context.note.notes[1].key`
+
+### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
+> Current parameter values: parameter ids are keys, parameter values are values.
+> To access a parameter with id `enabled` use: `context.parameter.enabled`
+
+### beats_per_min : [`number`](../API/builtins/number.md)<a name="beats_per_min"></a>
+> Project's tempo in beats per minutes.
+
+### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
+> Project's beats per bar setting - usually will be 4.
+
+### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
+> Project's audio playback sample rate in samples per second.
+
+### pulse_step : [`integer`](../API/builtins/integer.md)<a name="pulse_step"></a>
+> Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+> Unlike `step` in event this includes all pulses, so it also counts pulses which do
+> not emit events. Starts from 1 when the pattern starts running or after it got reset.
+
+### pulse_time_step : [`number`](../API/builtins/number.md)<a name="pulse_time_step"></a>
+> Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+> Starts from 0 and increases with each new pulse by the pulse's step time duration.
+
   
 
 

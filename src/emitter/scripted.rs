@@ -2,15 +2,15 @@ use mlua::prelude::LuaResult;
 
 use crate::{
     bindings::{note_events_from_value, ContextPlaybackState, LuaCallback, LuaTimeoutHook},
-    event::fixed::FixedEventIter,
-    BeatTimeBase, Event, EventIter, EventIterItem, InputParameterSet, NoteEvent, PulseIterItem,
+    emitter::fixed::FixedEmitter,
+    BeatTimeBase, Emitter, EmitterEvent, Event, NoteEvent, ParameterSet, RhythmEvent,
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/// eventiter impl, which calls an existing lua script function to generate new events.
+/// Evaluates a lua script function to generate new events.
 #[derive(Debug)]
-pub struct ScriptedEventIter {
+pub struct ScriptedEmitter {
     timeout_hook: LuaTimeoutHook,
     callback: LuaCallback,
     note_event_state: Vec<Option<NoteEvent>>,
@@ -19,7 +19,7 @@ pub struct ScriptedEventIter {
     step: usize,
 }
 
-impl ScriptedEventIter {
+impl ScriptedEmitter {
     pub(crate) fn new(
         timeout_hook: &LuaTimeoutHook,
         callback: LuaCallback,
@@ -32,7 +32,7 @@ impl ScriptedEventIter {
         let mut callback = callback;
         let note_event_state = Vec::new();
         let playback_state = ContextPlaybackState::Running;
-        let pulse = PulseIterItem::default();
+        let pulse = RhythmEvent::default();
         let pulse_step = 0;
         let pulse_time_step = 0.0;
         let step = 0;
@@ -54,7 +54,7 @@ impl ScriptedEventIter {
         })
     }
 
-    fn run(&mut self, pulse: PulseIterItem) -> LuaResult<Option<Vec<EventIterItem>>> {
+    fn run(&mut self, pulse: RhythmEvent) -> LuaResult<Option<Vec<EmitterEvent>>> {
         // reset timeout
         self.timeout_hook.reset();
         // update function context
@@ -68,12 +68,12 @@ impl ScriptedEventIter {
         let events = note_events_from_value(&self.callback.call()?, None)?;
         // normalize event
         let mut event = Event::NoteEvents(events);
-        FixedEventIter::normalize_event(&mut event, &mut self.note_event_state);
-        // return as EventIterItem
-        Ok(Some(vec![EventIterItem::new(event)]))
+        FixedEmitter::normalize_event(&mut event, &mut self.note_event_state);
+        // return as EmitterEvent
+        Ok(Some(vec![EmitterEvent::new(event)]))
     }
 
-    fn advance(&mut self, pulse: PulseIterItem) -> LuaResult<()> {
+    fn advance(&mut self, pulse: RhythmEvent) -> LuaResult<()> {
         if self.callback.is_stateful().unwrap_or(true) {
             // reset timeout
             self.timeout_hook.reset();
@@ -93,7 +93,7 @@ impl ScriptedEventIter {
     }
 }
 
-impl Clone for ScriptedEventIter {
+impl Clone for ScriptedEmitter {
     fn clone(&self) -> Self {
         Self {
             timeout_hook: self.timeout_hook.clone(),
@@ -106,7 +106,7 @@ impl Clone for ScriptedEventIter {
     }
 }
 
-impl EventIter for ScriptedEventIter {
+impl Emitter for ScriptedEmitter {
     fn set_time_base(&mut self, time_base: &BeatTimeBase) {
         // reset timeout
         self.timeout_hook.reset();
@@ -125,16 +125,16 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn set_input_parameters(&mut self, parameters: InputParameterSet) {
+    fn set_parameters(&mut self, parameters: ParameterSet) {
         // reset timeout
         self.timeout_hook.reset();
         // update function context with the new parameters
-        if let Err(err) = self.callback.set_context_input_parameters(parameters) {
+        if let Err(err) = self.callback.set_context_parameters(parameters) {
             self.callback.handle_error(&err);
         }
     }
 
-    fn run(&mut self, pulse: PulseIterItem, emit_event: bool) -> Option<Vec<EventIterItem>> {
+    fn run(&mut self, pulse: RhythmEvent, emit_event: bool) -> Option<Vec<EmitterEvent>> {
         // generate a new event and move or only update pulse counters
         if emit_event {
             let event = match self.run(pulse) {
@@ -155,7 +155,7 @@ impl EventIter for ScriptedEventIter {
         }
     }
 
-    fn advance(&mut self, pulse: PulseIterItem, emit_event: bool) {
+    fn advance(&mut self, pulse: RhythmEvent, emit_event: bool) {
         // generate a new event and move or only update pulse counters
         if emit_event {
             if let Err(err) = self.advance(pulse) {
@@ -167,7 +167,7 @@ impl EventIter for ScriptedEventIter {
         self.pulse_time_step += pulse.step_time;
     }
 
-    fn duplicate(&self) -> Box<dyn EventIter> {
+    fn duplicate(&self) -> Box<dyn Emitter> {
         Box::new(self.clone())
     }
 

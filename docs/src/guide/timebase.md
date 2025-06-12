@@ -1,10 +1,10 @@
 # Timebase
 
-A rhythm's [`timebase`](../API/rhythm.md#unit) represents the unit of time for the rhythm, either in musical beats or wall-clock time (seconds, ms). It defines the unit and duration of a single step in patterns. The time base is static and thus can't be changed during runtime.
+A pattern's [`timebase`](../API/pattern.md#unit) represents the unit of time for the pattern, either in musical beats or wall-clock time (seconds, ms). It defines the unit and duration of a single step in patterns. The time base is static and thus can't be changed during runtime.
 
-The default time unit of rhythm is a beat. 
+The default time unit of pattern is a beat. 
 
-The BPM and signature (beats per bar) settings are configured by the application which is running the rhythm. 
+The BPM and signature (beats per bar) settings are configured by the application which is running the pattern. 
 
 ## Supported Time Units
 
@@ -27,34 +27,42 @@ The BPM and signature (beats per bar) settings are configured by the application
 
 ## Resolution
 
-The [`resolution`](../API/rhythm.md#resolution) parameter acts as an additional multiplier to the time unit and can be any positive real number. You can use it to scale the unit or to create odd time signatures.
+The [`resolution`](../API/pattern.md#resolution) property acts as an additional multiplier to the time unit and can be any positive real number. You can use it to scale the unit or to create odd time signatures.
 
 ## Examples
 
 A slightly off beat time unit.
 ```lua
-return rhythm {
+return pattern {
   unit = "beats", 
   resolution = 1.01,
-  emit = "c4"
+  event = "c4"
 }
 ```
 
-Sixteenth tripplets
+Sixteenth tripplets.
 ```lua
-return rhythm {
+return pattern {
   unit = "1/16", 
   resolution = 2/3,
-  emit = "c4"
+  event = "c4"
 }
 ```
 
-
-2 Seconds
+A beat expressed with resolution.
 ```lua
-return rhythm {
+return pattern {
+  unit = "1/1", 
+  resolution = 1/4,
+  event = "c4"
+}
+```
+
+2 Seconds.
+```lua
+return pattern {
   unit = "seconds", 
   resolution = 2,
-  emit = "c4"
+  event = "c4"
 }
 ```

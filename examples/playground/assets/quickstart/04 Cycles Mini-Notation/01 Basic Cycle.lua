@@ -1,7 +1,7 @@
 -- Using tidal cycles notation for concise patterns
-return rhythm {
+return pattern {
   unit = "1/4", -- Emit a cycle every beat
-  emit = cycle("c4 e4 g4") -- C major arpeggio
+  event = cycle("c4 e4 g4") -- C major arpeggio
 }
 
 -- TRY THIS: The simplified notation emits a cycle per bar

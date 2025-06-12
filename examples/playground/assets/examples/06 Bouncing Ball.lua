@@ -5,12 +5,12 @@
 local BOUNCE_DISTANCE = 32
 local BOUNCE_SPEED = 1.05
 
-return rhythm {
+return pattern {
   unit = '1/4',
   resolution = 1/32,
-  pattern = function(context)
+  pulse = function(context)
     local step, step_size = 0, BOUNCE_DISTANCE
-    ---@param context PatternContext
+    ---@param context PulseContext
     return function(context)
       if step_size <= 1 then
         -- restart
@@ -28,7 +28,7 @@ return rhythm {
       return trigger_new_pulse
     end
   end,
-  emit = function(context)
+  event = function(context)
     return {
       key = "c4",
       delay = math.random() * 0.25

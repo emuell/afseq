@@ -5,7 +5,7 @@ use mlua::prelude::{IntoLua, Lua, LuaInteger, LuaResult, LuaValue};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Value representation type of an input parameter.
+/// Value representation of a parameter.
 #[derive(Debug, Default, Copy, Clone)]
 pub enum ParameterType {
     Boolean,
@@ -17,16 +17,16 @@ pub enum ParameterType {
 
 // -------------------------------------------------------------------------------------------------
 
-/// A parameter vector with Parameter RefCells. Ids are unique, so this actually is a set, but
-/// stored as a vector to preserve the parameter order.
+/// A vector of Parameter RefCells. Ids are unique, so this actually is a set, but is stored as
+/// a vector to preserve the order of the parameters.
 pub type ParameterSet = Vec<Rc<RefCell<Parameter>>>;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Input parameter for a `Rhythm`, allowing to dynamically change the rhythm's behavior.
+/// Template parameter for a [`Pattern`](crate::Pattern), to dynamically change pattern behavior.
 ///
-/// Parameter values can be changed by the user during rhythm playback, and will usually be
-/// applied in scripted callbacks as those are the only runtime dynamic components in rhythms.
+/// Parameter values can be changed by the user during playback, and will usually be applied in
+/// scripted callbacks only, as those are the only runtime dynamic components in patterns.
 #[derive(Debug, Clone)]
 pub struct Parameter {
     id: String,

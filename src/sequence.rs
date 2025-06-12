@@ -1,16 +1,10 @@
-//! Arrange multiple `Phrase`S into a single `Rhythm`.
+//! Arrange `Phrase`s into a playback sequence.
 
-use crate::{phrase::RhythmIndex, BeatTimeBase, Phrase, Rhythm, RhythmIterItem, SampleTime};
-
-#[cfg(doc)]
-use crate::EventIter;
+use crate::{phrase::PatternIndex, BeatTimeBase, Pattern, PatternEvent, Phrase, SampleTime};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Sequentially arrange [`Phrase`] into a new [`EventIter`] to form simple arrangements.
-///
-/// The `consume_events_until_time` function can be used to feed the entire sequence into a
-/// player engine.
+/// Sequentially arrange [`Phrase`]s to form simple arrangements.
 #[derive(Clone, Debug)]
 pub struct Sequence {
     time_base: BeatTimeBase,
@@ -22,7 +16,7 @@ pub struct Sequence {
 }
 
 impl Sequence {
-    /// Create a new sequence from a vector of [`Phrase`].
+    /// Create a new sequence from a vector of [`Phrase`]s.
     pub fn new(time_base: BeatTimeBase, phrases: Vec<Phrase>) -> Self {
         let phrase_index = 0;
         let sample_position_in_phrase = 0;
@@ -38,7 +32,7 @@ impl Sequence {
         }
     }
 
-    /// Read-only borrowed access to our time base.
+    /// Read-only access to our beat time base.
     pub fn time_base(&self) -> &BeatTimeBase {
         &self.time_base
     }
@@ -61,20 +55,20 @@ impl Sequence {
         &mut self.phrases
     }
 
-    /// returns maximum rhythm count in all phrases.
-    pub fn phrase_rhythm_slot_count(&self) -> usize {
+    /// returns maximum pattern count in all phrases.
+    pub fn phrase_pattern_slot_count(&self) -> usize {
         let mut count = 0;
         for phrase in &self.phrases {
-            count = count.max(phrase.rhythm_slots().len());
+            count = count.max(phrase.pattern_slots().len());
         }
         count
     }
 
-    /// Run rhythms until a given sample time is reached, calling the given `visitor`
-    /// function for all emitted events to consume them.
+    /// Run patterns until a given sample time is reached, calling the given `visitor`
+    /// function for all emitted events to consume emitted events.
     pub fn consume_events_until_time<F>(&mut self, time: SampleTime, consumer: &mut F)
     where
-        F: FnMut(RhythmIndex, RhythmIterItem),
+        F: FnMut(PatternIndex, PatternEvent),
     {
         debug_assert!(time >= self.sample_position, "can not rewind playback here");
         while time - self.sample_position > 0 {
@@ -141,7 +135,7 @@ impl Sequence {
         }
     }
 
-    /// Reset all rhythms in our phrases to their initial state.
+    /// Reset phrases to their initial state.
     pub fn reset(&mut self) {
         // reset sample offset
         self.sample_offset = 0;

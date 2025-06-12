@@ -1,7 +1,7 @@
 -- Using chord notation shortcuts
-return rhythm {
+return pattern {
   unit = "1/1",
-  emit = {
+  event = {
     "c4'M",   -- C major using ' chord notation
     "d4'm",   -- D minor
     "g4'dom7" -- G dominant 7th

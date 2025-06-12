@@ -1,539 +1,360 @@
+---@meta
+error("Do not try to execute this file. It's just a type definition file.")
 ---
---- Part of the afseq trait:
---- Exports Pattern, a table wrapper with array alike helper functions which are useful to
---- ease creating rhythmical patterns. Inspired from https://github.com/rick4stley/array
----
---- Copyright (c) 2024 Eduard Müller <mail@emuell.net>
---- Distributed under the MIT License.
+---Part of the afseq trait: Defines LuaLS annotations for the afseq Pattern class.
 ---
 
 ----------------------------------------------------------------------------------------------------
 
----Valid pulse value in a pattern
----@alias PulseValue number|boolean|string|table
+---Trigger context passed to functions in `pulse`, `gate` and `event`.
+---Contains information about what triggered the patterns and allows accessing parameter values.
+---@class TriggerContext
+---Note that triggered the pattern, if any. Usually will ne a monophic note.
+---To access the raw note number value use: `context.trigger.notes[1].key`
+---@field trigger Note?
+---Current parameter values: parameter ids are keys, parameter values are values.
+---To access a parameter with id `enabled` use: `context.parameter.enabled`
+---@field parameter table<string, number|integer|boolean|string>
+---@see Parameter
 
----Default empty pulse values for specific pulse types.
-local empty_pulse_values = {
-  ["userdata"] = {},
-  ["table"] = {},
-  ["string"] = "",
-  ["boolean"] = false,
-  ["number"] = 0
-}
+----------------------------------------------------------------------------------------------------
 
----Guess empty pulse values from an existing pattern (implementation detail).
-local function empty_pulse_value(table)
-  if type(table) == "table" then
-    for _, v in pairs(table) do
-      -- special case for numbers, which are likely notes when > 1
-      if type(v) == "number" then
-        if v > 1 then
-          return 0xff -- empty note value
-        end
-      end
-      local value = empty_pulse_values[type(v)]
-      if value ~= nil then
-        return value
-      end
-    end
-  end
-  return 0
-end
+---Transport & playback time context passed to functions in `pulse`, `gate` and `event`.
+---@class TimeContext : TriggerContext
+---
+---Project's tempo in beats per minutes.
+---@field beats_per_min number
+---Project's beats per bar settings - usually will be 4.
+---@field beats_per_bar integer
+---Project's audio playback sample rate in samples per second.
+---@field samples_per_sec integer
 
----Array alike table with helper functions to ease creating rhythmic patterns.
+----------------------------------------------------------------------------------------------------
+
+---Pulse timing context passed to functions in `pulse` and `gate`.
+---@class PulseContext : TimeContext
+---
+---Continues pulse counter, incrementing with each new **skipped or emitted pulse**.
+---Unlike `step` in event this includes all pulses, so it also counts pulses which do
+---not emit events. Starts from 1 when the pattern starts running or after it got reset.
+---@field pulse_step integer
+---Continues pulse time counter, incrementing with each new **skipped or emitted pulse**.
+---Starts from 0 and increases with each new pulse by the pulse's step time duration.
+---@field pulse_time_step number
+
+----------------------------------------------------------------------------------------------------
+
+---Pulse value context passed to functions in `gate` and `event`.
+---@class GateContext : PulseContext
+---
+---Current pulse's step time as fraction of a full step in the pulse. For simple pulses this
+---will be 1, for pulses in subdivisions this will be the reciprocal of the number of steps in
+---the subdivision, relative to the parent subdivisions pulse step time.
+---### examples:
+---```lua
+---{1, {1, 1}} --> step times: {1, {0.5, 0.5}}
+---```
+---@field pulse_time number
+---Current pulse value. For binary pulses this will be 0 or 1, but it can be any number value.
+---@field pulse_value number
+
+----------------------------------------------------------------------------------------------------
+
+---- *seeking*: The pattern is auto-seeked to a target time. All events are discarded. Avoid
+---  unnecessary computations while seeking, and only maintain your generator's internal state.
+---- *running*: The pattern is played back regularly. Events are emitted and audible.
+---@alias PlaybackState "seeking"|"running"
+
+---Event related context passed to functions in 'emit'.
+---@class EventContext : GateContext
+---
+---Specifies how the pattern currently is running.
+---@field playback PlaybackState
+---Continues step counter, incrementing with each new *emitted* pulse.
+---Unlike `pulse_step` this does not include skipped, zero values pulses so it basically counts
+---how often the event function already got called.
+---Starts from 1 when the pattern starts running or is reset.
+---@field step integer
+
+----------------------------------------------------------------------------------------------------
+
+---Single pulse value or a nested subdivision of pulses within a rhythm's pulse.
+---@alias PulseValue (0|1|number|boolean|nil)|(PulseValue)[]
+
+----------------------------------------------------------------------------------------------------
+
+---Construction options for a new pattern.
+---@class PatternOptions
+---
+---Base time unit of the pattern. Use `resolution` to apply an additional factor, in order to
+---create other less common time bases.
+---### examples:
+---```lua
+----- slightly off beat pulse
+---unit = "beats",
+---resolution = 1.01
+---```
+---```lua
+----- triplet
+---unit = "1/16",
+---resolution = 2/3
+---```
+---@field unit "ms"|"seconds"|"bars"|"beats"|"1/1"|"1/2"|"1/4"|"1/8"|"1/16"|"1/32"|"1/64"
+---
+---Factor which is applied on `unit` to specify the final time resolution of the pattern.
+---### examples:
+---```lua
+----- slightly off beat pulse
+---unit = "beats",
+---resolution = 1.01
+---```
+---```lua
+----- triplet
+---unit = "1/16",
+---resolution = 2/3
+---```
+---@field resolution? number
+---
+---Optional offset in `unit * resolution` time units. By default 0.
+---When set, the pattern's event output will be delayed by the given offset value.
+---### examples:
+---```lua
+----- start emitting after 4*4 beats
+---unit = "1/4",
+---resolution = 4,
+---offset = 4
+---```
+---@field offset? number
+---
+---Define optional parameters for the pattern. Parameters can dynamically
+---change a patterns behavior everywhere where `context`s are passed, e.g. in `pulse`,
+---`gate`, `event` or `cycle` map generator functions.
 ---
 ---### examples:
 ---```lua
------ using + and * operators to combine patterns
----pattern.from{ 0, 1 } * 3 + { 1, 0 }
+----- trigger a single note as specified by parameter 'note'
+----- when parameter 'enabled' is true, else triggers nothing.
+---return pattern {
+---  parameter = {
+---    parameter.boolean("enabled", true),
+---    parameter.integer("note", 48, { 0, 127 })
+---  },
+---  event = function(context)
+---    if context.parameter.enabled then -- boolean value
+---      return note(context.parameter.note) -- integer value
+---    else
+---      return nil
+---    end
+---  end
+---}
 ---```
----```lua
------ repeating, spreading and subsets
----pattern.from{ 0, 1, { 1, 1 } }:repeat_n(4):spread(1.25):take(16)
----```
----```lua
------ euclidean patterns
----pattern.euclidean(12, 16)
----pattern.from{ 1, 0.5, 1, 1 }:euclidean(12)
----```
----```lua
------ generate/init from functions
----pattern.new(8):init(1) --> 1,1,1,1,1,1,1,1
----pattern.new(12):init(function() return math.random(0.5, 1.0) end )
----pattern.new(16):init(scale("c", "minor").notes_iter())
----```
----```lua
------ generate note patterns
----pattern.from{ "c4", "g4", "a4" } * 7 + { "a4", "g4", "c4" }
----```
----```lua
------ generate chords from degree values
----pattern.from{ 1, 5, 6, 4 }:map(function(index, degree)
----  return scale("c", "minor"):chord(degree)
----end)
----```
----@class Pattern : table
----@operator add(Pattern|table): Pattern
----@operator mul(number): Pattern
-pattern = {}
-
-----------------------------------------------------------------------------------------------------
---- Pattern creation
-----------------------------------------------------------------------------------------------------
-
----Create a new empty pattern or pattern with the given length and pulse value.
+---@field parameter? Parameter[]
 ---
+---Defines the rhythmical part of the pattern. With the default `gate` implementation,
+---each pulse with a value of `1` or `true` will cause an event from the `event` property
+---to be triggered in the pattern's time unit. `0`, `false` or `nil` values do not trigger.
+---
+---Pulses may contain subdivisions, sub-tables of pulses, to "cram" multiple pulses
+---into a single pulse's time interval. This way more complex rhythmical patterns can
+---be created.
+---
+---When no pulse is defined, a constant pulse value of `1` is triggered.
+---
+---Just like the `event` property, pulses can either be a static array of values
+---or a function or generators which produces pulse values dynamically.
 ---
 ---### examples:
 ---```lua
----pattern.new(4,1) --> {1,1,1,1}
----pattern.new(4, function() return math.random() end)
+----- static pattern
+---pulse = { 1, 0, 0, 1 }
 ---```
----@param length integer? Initial length of the pattern. When undefined, an empty pattern is created.
----@param value (PulseValue|(fun(index: integer):PulseValue))? Value or generator function, which sets the initial values in the pattern.
----@return Pattern
+---```lua
+----- "cram" pulses into a single pulse slot via sub-divisions
+---pulse = { 1, { 1, 1, 1 } }
+---```
+---```lua
+----- pulses created via the "pulse" lib
+---pulse = pulse.from{ 1, 0 } * 3 + { 1, 1 }
+---pulse = pulse.euclidean(7, 16, 2)
+---```
+---```lua
+----- stateless pulse function
+---pulse = function(context)
+---  return math.random(0, 1)
+---end
+---```
+---```lua
+----- stateful pulse function
+---pulse = function(init_context)
+---  local triggers = table.new{ 0, 6, 10 }
+---  return function(context)
+---    local step = (context.pulse_step - 1) % 16
+---    return triggers:contains(step)
+---  end
+---end
+---```
+---@field pulse? PulseValue[]|(fun(context: PulseContext):PulseValue)|(fun(context: PulseContext):fun(context: PulseContext):PulseValue)
+---
+---If and how many times a pattern should repeat. When 0 or false, the pattern does not repeat
+---and plays back only once. When true, the pattern repeats endlessly, which is the default.
+---When a number > 0, this specifies the number of times the pattern repeats until it stops.
+---
+---Note: When `pulse` is a function or iterator, the repeat count is the number of
+---*function calls or iteration steps*. When the pattern is a pulse array, this is the number of
+---times the whole pulse pattern gets repeated.
+---
+---### examples:
+---```lua
+----- one-shot
+---repeat = 0
+----- also a one-shot
+---repeat = false
+----- play the pattern 4 times
+---repeat = 3
+----- play & repeat forever (default)
+---repeat = true
+---```
+---@field repeats? (integer|boolean)
+---
+---Optional pulse train filter function which filters events between the pulse and event emitter.
+---By default a threshold gate, which passes all pulse values greater than zero.
+---
+---Functions return true when a pulse value should be passed, and false when the event
+---emitter should be skipped.
+---
+---### examples:
+---```lua
+----- probability gate: skips all 0s, passes all 1s. pulse alues in range (0, 1) are
+----- maybe passed, using the pulse value as probablility.
+---gate = function(context)
+---  return context.pulse_value > math.random()
+---end
+---```
+---```lua
+----- threshold gate: skips all pulse values below a given threshold value
+---gate = function(context)
+---  return context.pulse_value > 0.5
+---end
+---```
+---@field gate? (fun(context: GateContext):boolean)|(fun(context: GateContext):fun(context: GateContext):boolean)
+---
+---Specify the event values of the pattern. For every pulse in the pulse pattern, an event
+---is picked from the specified event sequence. When the end of the sequence is reached, it starts
+---again from the beginning.
+---
+---To generate events dynamically, you can pass a function or a function iterator, instead of a
+---static array or sequence of notes.
+---
+---Events can also be generated via a tidal cycle mini-notation. Cycles are repeated endlessly
+---by default, and have the duration of a single step in the patterns. Pulses can be used to
+---sequence cycles too.
+---
+---### examples:
+---```lua
+----- a sequence of c4, g4
+---event = {"c4", "g4"}
+---```
+---```lua
+----- a chord of c4, d#4, g4
+---event = {{"c4", "d#4", "g4"}} -- or {"c4'min"}
+---```
+---```lua
+----- a sequence of c4, g4 with volume 0.5
+---event = sequence{"c4", "g4"}:volume(0.5)
+---```
+---```lua
+----- stateless generator function
+---event = function(context)
+---  return 48 + math.random(1, 4) * 5
+---end
+---```
+---```lua
+----- stateful generator function
+---event = function(init_context)
+---  local count, step, notes = 1, 2, scale("c5", "minor").notes
+---  return function(context)
+---    local key = notes[count]
+---    count = (count + step - 1) % #notes + 1
+---    return { key = key, volume = 0.5 }
+---  end
+---end
+---```
+---```lua
+----- a note pattern
+---local tritone = scale("c5", "tritone")
+-----[...]
+---event = pulse.from(tritone:chord(1, 4)):euclidean(6) +
+---  pulse.from(tritone:chord(5, 4)):euclidean(6)
+---```
+---```lua
+----- a tidal cycle
+---event = cycle("<[a3 c4 e4 a4]*3 [d4 g3 g4 c4]>"),
+---```
+---@field event? Cycle|Sequence|Note|NoteValue|(NoteValue|Note)[]|(fun(context: EventContext):NoteValue)|(fun(context: EventContext):fun(context: EventContext):NoteValue)
+
+
+----------------------------------------------------------------------------------------------------
+
+---Create a new pattern with the given properties table:
+---
+---### examples:
+---```lua
+-----trigger notes in an euclidean triplet pattern
+---return pattern {
+---  unit = "1/16",
+---  resolution = 2/3,
+---  pulse = pulse.euclidean(12, 16),
+---  event = { "c4", "g4", { "c5 v0.7", "g5 v0.4" }, "a#4" }
+---}
+---```
+---```lua
+----- trigger a chord sequence every 4 bars after 4 bars
+---return pattern {
+---  unit = "bars",
+---  resolution = 4,
+---  offset = 1,
+---  event = {
+---    note("c4'm"),
+---    note("g3'm7"):transpose({ 0, 12, 0, 0 })
+---  }
+---}
+---```
+---```lua
+-----trigger notes in a seeded, random subdivision pattern
+---local seed = 23498
+---return pattern {
+---  unit = "1/8",
+---  pulse = { 1, { 0, 1 }, 0, 0.3, 0.2, 1, { 0.5, 0.1, 1 }, 0.5 },
+---  gate = function(init_context)
+---    local rand = math.randomstate(seed)
+---    return function(context)
+---      return context.pulse_value > rand()
+---    end
+---  end,
+---  event = { "c4" }
+---}
+---```
+---```lua
+-----trigger random notes in a seeded random pattern from a pentatonic scale
+---local cmin = scale("c5", "pentatonic minor").notes
+---return pattern {
+---  unit = "1/16",
+---  pulse = function(context)
+---    return (context.pulse_step % 4 == 1) or (math.random() > 0.8)
+---  end,
+---  event = function(context)
+---    return { key = cmin[math.random(#cmin)], volume = 0.7 }
+---  end
+---}
+---```
+---```lua
+-----emit a tidal cycle every bar
+---return pattern {
+---  unit = "bars",
+---  event = cycle("[c4 [f5 f4]*2]|[c4 [g5 g4]*3]")
+---}
+---```
+---@param options PatternOptions
+---@return userdata
 ---@nodiscard
-function pattern.new(length, value)
-  local t = setmetatable({}, {
-    ---all pattern functions can be accessed as member functions
-    __index = pattern,
-    ---operator + adds two patterns
-    __add = function(a, b)
-      return a:copy():push_back(b)
-    end,
-    ---operator * creates a repeated pattern
-    __mul = function(a, b)
-      return a:copy():repeat_n(b)
-    end
-  })
-  -- initialize
-  if length ~= nil then
-    value = value or 0
-    t:init(value, length)
-  end
-  return t
-end
-
----Create a new pattern from an existing set of values or tables.
----When passing tables, those will be flattened.
----
----### examples:
----```lua
----pattern.from(1,0,1,0) --> {1,0,1,0}
----pattern.from({1,0},{1,0}) --> {1,0,1,0}
----```
----@param ... PulseValue|(PulseValue[])
----@return Pattern
----@nodiscard
-function pattern.from(...)
-  return pattern.new():push_back(...)
-end
-
--- create a shallow-copy of the given pattern (or self)
----
----### examples:
----```lua
----local p = pattern.from(1, 0)
----local p2 = p:copy() --> {1,0}
----```
----@return Pattern
----@nodiscard
-function pattern.copy(self)
-  return pattern.from(self:unpack())
-end
-
----Create an new pattern or spread and existing pattern evenly within the given length.
----Similar, but not exactly like `euclidean`.
----
----Shortcut for `pattern.from{1,1,1}:spread(length / #self):rotate(offset)`
----
----### examples:
----```lua
----pattern.distributed(3, 8) --> {1,0,0,1,0,1,0}
----pattern.from{1,1}:distributed(4, 1) --> {0,1,0,1}
----```
----@param steps table|integer Existing pattern or number of on steps in the pattern.
----@param length integer Number of total steps in the pattern.
----@param offset integer? Optional rotation offset.
----@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
-function pattern.distributed(steps, length, offset, empty_value)
-  assert(type(length) == "number" and length > 0,
-    "invalid length argument (must be an integer > 0)")
-  local from
-  if type(steps) == "table" then
-    from = pattern.from(steps)
-  else
-    assert(type(steps) == "number" and steps > 0,
-      "invalid step argument (must be an integer > 0)")
-    from = pattern.new(steps, 1)
-  end
-  assert(length >= #from,
-    "Invalid length or steps arguments (length must be >= steps")
-  return from:spread(length / #from, empty_value):rotate(offset or 0)
-end
-
----Create a new euclidean rhythm pattern with the given pulses or number of new pulses
----in the given length and optionally rotate the contents.
----[Euclidean Rhythm](https://en.wikipedia.org/wiki/Euclidean_rhythm)
----
----### examples:
----```lua
----pattern.euclidean(3, 8)
---- --> {1,0,0,1,0,0,1,0}
----pattern.from{"a", "b", "c"}:euclidean(8, 0, "-")
---- --> {"a","-","-","b","-","-","c","-"}
----```
----@param steps table|integer Existing pattern or number of on steps in the pattern.
----@param length integer Number of total steps in the pattern.
----@param offset integer? Optional rotation offset.
----@param empty_value PulseValue? Value used as off value (by default 0 or guessed from existing content).
-function pattern.euclidean(steps, length, offset, empty_value)
-  -- get or create initial pulse pattern
-  local front = {}
-  if type(steps) == "table" then
-    for _, v in ipairs(steps) do
-      table.insert(front, { v })
-    end
-  else
-    assert(type(steps) == "number" and steps >= 0,
-      "invalid steps argument (must be a table or an integer > 0)")
-    for _ = 1, steps do
-      table.insert(front, { 1 })
-    end
-  end
-  assert(type(length) == "number" and length > 0,
-    "invalid length argument (expecting an integer > 0)")
-  assert(type(offset) == "number" or offset == nil,
-    "invalid offset argument (must be an integer or nil)")
-  empty_value = empty_value or empty_pulse_value(steps)
-  -- merge/add two tables
-  local function join_tables(a, b)
-    local c = { table.unpack(a) }
-    for i = 1, #b do
-      table.insert(c, b[i])
-    end
-    return c
-  end
-  -- recursive euclidean pattern impl
-  local function euclidean_impl(front, back)
-    if #back < 2 then
-      return join_tables(front, back)
-    end
-    local newFront = {}
-    while #front > 0 and #back > 0 do
-      table.insert(newFront, join_tables(table.remove(front), table.remove(back)))
-    end
-    return euclidean_impl(newFront, join_tables(front, back))
-  end
-  -- apply
-  if #front == 0 then
-    local result = pattern.new();
-    for _ = 1, length do
-      result:push_back(empty_value)
-    end
-    return result
-  elseif #front >= length then
-    local result = pattern.from(front);
-    while #result > length do
-      result:pop_back()
-    end
-    return result
-  else
-    local back = {}
-    for _ = 1, length - #front do
-      table.insert(back, { empty_value })
-    end
-    -- spread
-    local rhythms = euclidean_impl(front, back);
-    -- convert to pattern and flatten
-    local result = pattern.new();
-    for _, g in ipairs(rhythms) do
-      result:push_back(g);
-    end
-    -- rotate
-    if offset then
-      result:rotate(-offset)
-    end
-    return result
-  end
-end
-
-----------------------------------------------------------------------------------------------------
---- Access sub ranges
-----------------------------------------------------------------------------------------------------
-
----Shortcut for table.unpack(pattern): returns elements from this pattern as var args.
----
----### examples:
----```lua
----local p = pattern.from{1,2,3,4}
----local v1, v2, v3, v4 = p:unpack()
----```
----@return PulseValue ...
----@nodiscard
-function pattern.unpack(self)
-  return table.unpack(self)
-end
-
----Get sub range from the pattern as new pattern.
----When the given length is past end of this pattern its filled up with empty values.
----
----### examples:
----```lua
----local p = pattern.from{1,2,3,4}
----p = p:subrange(2,3) --> {2,3}
----p = p:subrange(1,4,"X") --> {2,3,"X","X"}
----```
----@param i integer Subrange start
----@param j integer? Subrange end (defaults to pattern length)
----@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
-function pattern.subrange(self, i, j, empty_value)
-  assert(type(i) == "number" and i > 0,
-    "invalid subrange start argument (must be an integer > 0)")
-  assert(j == nil or (type(j) == "number" and j > 0),
-    "invalid subrange end argument (must be an integer > 0)")
-  local len = j or #self
-  local a = pattern.new()
-  empty_value = empty_value or empty_pulse_value(self)
-  for ii = i, len do
-    a:push_back(self[ii] or empty_value)
-  end
-  return a
-end
-
----Get first n items from the pattern as new pattern.
----When the given length is past end of this pattern its filled up with empty values.
----
----### examples:
----```lua
----local p = pattern.from{1,2,3,4}
----p = p:take(2) --> {1,2}
----p = p:take(4, "") --> {1,2,"",""}
----```
----@param length integer
----@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
-function pattern.take(self, length, empty_value)
-  assert(type(length) == "number" and length > 0,
-    "invalid length argument (must be an integer > 0)")
-  return self:subrange(1, length, empty_value)
-end
-
-----------------------------------------------------------------------------------------------------
---- Modify contents
-----------------------------------------------------------------------------------------------------
-
----Clear a pattern, remove all its contents.
----
----### examples:
----```lua
----local p = pattern.from{1,0}
----p:clear() --> {}
----```
-function pattern.clear(self)
-  while #self > 0 do
-    table.remove(self)
-  end
-  return self
-end
-
----Fill pattern with the given value or generator function in length.
----
----### examples:
----```lua
----local p = pattern.from{0,0}
----p:init(1) --> {1,1}
----p:init("X", 3) --> {"X","X", "X"}
----```
----@param value PulseValue|fun(index: integer):PulseValue
----@param length integer?
-function pattern.init(self, value, length)
-  assert(type(length) == "nil" or (type(length) == "number" and length > 0),
-    "invalid length argument (must be an integer > 0)")
-  length = length or #self
-  if type(value) == 'function' then
-    for i = 1, length do
-      self[i] = value(i)
-    end
-  else
-    for i = 1, length do
-      self[i] = value
-    end
-  end
-  while #self > length do
-    table.remove(self, #self)
-  end
-  return self
-end
-
----Apply the given function to every item in the pattern.
----
----### examples:
----```lua
----local p = pattern.from{1,3,5}
----p:map(function(k, v)
----  return scale("c", "minor"):degree(v)
----end) --> {48, 51, 55}
----```
----@param fun fun(index: integer, value: PulseValue): PulseValue
-function pattern.map(self, fun)
-  local num = #self
-  for i = 1, num do
-    self[i] = fun(i, self[i])
-  end
-  return self
-end
-
----Invert the order of items.
----
----### examples:
----```lua
----local p = pattern.from{1,2,3}
----p:reverse() --> {3,2,1}
----```
-function pattern.reverse(self)
-  local num = #self
-  for i = 1, math.floor(num / 2) do
-    local j = num - (i - 1)
-    self[j], self[i] = self[i], self[j]
-  end
-  return self
-end
-
----Shift contents by the given amount to the left (negative amount) or right.
----
----### examples:
----```lua
----local p = pattern.from{1,0,0}
----p:rotate(1) --> {0,1,0}
----p:rotate(-2) --> {0,0,1}
----```
----@param amount integer
-function pattern.rotate(self, amount)
-  assert(type(amount) == "number",
-    "invalid amount argument (must be an integer)")
-  local n = #self
-  amount = amount % n
-  if amount == 0 then return self end
-  for i = n, 1, -1 do
-    self[i + amount] = self[i]
-  end
-  for i = 1, amount do
-    self[i], self[i + n] = self[i + n], nil
-  end
-  return self
-end
-
-----------------------------------------------------------------------------------------------------
---- Add/remove contents
-----------------------------------------------------------------------------------------------------
-
----Push a single or multiple number of items or other pattern contents to the end of the pattern.
----Note: When passing array alike tables or patterns, they will be *unpacked*.
----
----### examples:
----```lua
----local p = pattern.new()
----p:push_back(1) --> {1}
----p:push_back(2,3) --> {1,2,3}
----p:push_back{4} --> {1,2,3,4}
----p:push_back({5,{6,7}) --> {1,2,3,4,5,6,7}
----```
----@param ... PulseValue|(PulseValue)[]
-function pattern.push_back(self, ...)
-  local function add_unpacked(v)
-    if type(v) == 'table' and #v > 0 then
-      for i = 1, #v do
-        if v[i] ~= nil then
-          add_unpacked(v[i])
-        end
-      end
-    else
-      table.insert(self, v)
-    end
-  end
-  local len = select("#", ...)
-  for i = 1, len do
-    local v = select(i, ...)
-    add_unpacked(v)
-  end
-  return self
-end
-
----Remove an entry from the back of the pattern. returns the popped item.
----
----### examples:
----```lua
----local p = pattern.from({1,2})
----p:pop_back() --> {1}
----p:pop_back() --> {}
----p:pop_back() --> {}
----```
----@return PulseValue
-function pattern.pop_back(self)
-  return table.remove(self)
-end
-
----Duplicate the pattern n times.
----
----### examples:
----```lua
----local p = pattern.from{1,2,3}
----patterns:repeat_n(2) --> {1,2,3,1,2,3}
----```
----@param count integer
-function pattern.repeat_n(self, count)
-  assert(type(count) == "number" and count > 0,
-    "invalid count argument (must be an integer > 0)")
-  local num = #self
-  for _ = 1, count - 1 do
-    for i = 1, num do
-      self:push_back(self[i])
-    end
-  end
-  return self
-end
-
----Expand (with amount > 1) or shrink (amount < 1) the length of the pattern by the
----given factor, spreading allowed content evenly and filling gaps with 0 or the
----given empty value.
----
----### examples:
----```lua
----local p = pattern.from{1,1}
----p:spread(2) --> {1,0,1,0}
----p:spread(1/2) --> {1,1}
----```
----@param amount number Spread factor (2 = double, 0.5 = half the size).
----@param empty_value PulseValue? Value used as empty value (by default 0 or guessed from existing content).
-function pattern.spread(self, amount, empty_value)
-  assert(type(amount) == "number" and amount > 0,
-    "invalid amount argument (must be an integer > 0)")
-  empty_value = empty_value or empty_pulse_value(self)
-  local old_num = #self
-  local new_num = math.floor(old_num * amount + 0.5)
-  local old = self:copy()
-  self:init(empty_value, new_num)
-  for i = 1, old_num do
-    local j = math.floor((i - 1) * amount + 0.5) + 1
-    if j <= new_num then
-      self[j] = old[i]
-    end
-  end
-  return self
-end
-
-----------------------------------------------------------------------------------------------------
---- Conversion
-----------------------------------------------------------------------------------------------------
-
----Serialze a pattern for display/debugging purposes.
----
----### examples:
----```lua
----pattern.euclidean(3, 8):tostring() --> "{1, 1, 1, 0}"
----```
----@return string
----@nodiscard
-pattern.tostring = function(self)
-  return table.tostring(self)
-end
+function pattern(options) end
