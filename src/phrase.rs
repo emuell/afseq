@@ -133,6 +133,21 @@ impl Phrase {
         &mut self.pattern_slots
     }
 
+    /// Run patterns to generate the next pending event, if any, calling the given `consumer`
+    /// visitor function with the emitted event.
+    pub fn consume_event<F>(&mut self, consumer: &mut F)
+    where
+        F: FnMut(PatternIndex, PatternEvent),
+    {
+        // emit and consume next events until we've reached the desired sample_time
+        if let Some((pattern_index, mut pattern_event)) =
+            self.next_event_until_time(SampleTime::MAX)
+        {
+            self.apply_event_transform(&mut pattern_event);
+            consumer(pattern_index, pattern_event);
+        }
+    }
+
     /// Run patterns until a given sample time is reached, calling the given `consumer`
     /// visitor function for all emitted events.
     pub fn consume_events_until_time<F>(&mut self, sample_time: SampleTime, consumer: &mut F)
