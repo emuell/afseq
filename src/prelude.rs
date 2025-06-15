@@ -1,8 +1,8 @@
-//! Alleviates imports of common traits, when using afseq as library.
+//! Alleviates imports of common traits, when using pattrns as library.
 //!
 //! ```
 //! # #![allow(unused_imports)]
-//! use afseq::prelude::*;
+//! use pattrns::prelude::*;
 //! ```
 
 pub use super::{

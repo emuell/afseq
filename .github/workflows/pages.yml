@@ -19,7 +19,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with: 
           cache-workspaces: "docs"
-          cache-key: "afseq-pages"
+          cache-key: "pattrns-pages"
 
       - name: Install mdbook
         run: cargo install mdbook mdbook-linkcheck mdbook-toc mdbook-alerts

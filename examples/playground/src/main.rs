@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use afseq::prelude::*;
+use pattrns::prelude::*;
 
 extern "C" {
     fn emscripten_cancel_animation_frame(requestAnimationFrameId: ffi::c_long);
@@ -382,7 +382,7 @@ impl Playground {
         // apply script content changes
         if self.script_changed || self.sequence.is_none() {
             // clear errors
-            afseq::bindings::clear_lua_callback_errors();
+            pattrns::bindings::clear_lua_callback_errors();
             self.script_runtime_error = String::new();
             // build note pattern slots: one pattern for each live played note
             let pattern_slots = if !self.playing_notes.is_empty() {
@@ -452,7 +452,7 @@ impl Playground {
                     self.emitted_sample_time + samples_to_emit,
                 );
                 // handle runtime errors
-                if let Some(err) = afseq::bindings::has_lua_callback_errors() {
+                if let Some(err) = pattrns::bindings::has_lua_callback_errors() {
                     let err = err.to_string();
                     if err != self.script_runtime_error {
                         self.script_runtime_error = err;

@@ -9,7 +9,7 @@ use std::{
 use anyhow::anyhow;
 use simplelog::*;
 
-use afseq::prelude::*;
+use pattrns::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
 

@@ -56,7 +56,7 @@ See [generators](../extras/generators.md) for more info about using functions as
 
 ## Pulse Library
 
-afseq comes with a built-in `pulse` Lua library, which contains a bunch of helper functions and generators to ease creating pulse arrays. 
+pattrns comes with a built-in `pulse` Lua library, which contains a bunch of helper functions and generators to ease creating pulse arrays. 
 
 » `pulse = pulse.from{0, 1} * 3 + {1, 0}` *combine sub pulses*
 

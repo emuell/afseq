@@ -1,5 +1,5 @@
 ---
---- Part of the afseq trait:
+--- Part of the pattrns crate:
 --- Exports pulse, a table wrapper with helper functions to ease creating rhythmical
 --- pulse or note patterns. Inspired from https://github.com/rick4stley/array
 ---
@@ -27,7 +27,7 @@ local function empty_pulse_value(table)
       -- special case for numbers, which are likely notes when > 1
       if type(v) == "number" then
         if v > 1 then
-          return 0xff -- empty note value
+          return 0xFE -- empty note value
         end
       end
       local value = empty_pulse_values[type(v)]
@@ -494,7 +494,7 @@ function pulse.repeat_n(self, count)
   return self
 end
 
----Expand (with amount > 1) or shrink (amount < 1) the length of the pulse table by 
+---Expand (with amount > 1) or shrink (amount < 1) the length of the pulse table by
 ---the given factor, spreading allowed content evenly and filling gaps with 0 or the
 ---given empty value.
 ---

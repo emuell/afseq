@@ -43,7 +43,7 @@
 ### tostring(t : [`table`](../../API/builtins/table.md))<a name="tostring"></a>
 `->`[`string`](../../API/builtins/string.md)  
 
-> Serialze a table to a string for display/debugging purposes.
+> Serialize a table to a string for display/debugging purposes.
 ### copy(t : [`table`](../../API/builtins/table.md))<a name="copy"></a>
 `->`[`table`](../../API/builtins/table.md)  
 

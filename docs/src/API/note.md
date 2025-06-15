@@ -32,13 +32,14 @@
 `->`[`integer`](../API/builtins/integer.md)  
 
 > Convert a note string or note table to a raw MIDI note number in range 0-127
-> or 0xFF for nil or empty note strings
-> or 0xFE for note offs
+> or 0xFE for nil or empty note strings
+> or 0xFF for note offs
 > ### Examples:
 > ```lua
 > note_number("c4") --> 48
 > note_number(note("c4")) --> 48
-> note_number("-") --> 0xFF
+> note_number("-") --> 0xFE
+> note_number("off") --> 0xFF
 > note_number("xyz") --> error
 > ```  
 

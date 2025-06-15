@@ -15,7 +15,7 @@ mark    = { "#"|"b" }
 note    = ${ (^"a"|^"b"|^"c"|^"d"|^"e"|^"f"|^"g") }
 pitch   = ${ note ~ mark? ~ octave? ~ !name}
 
-/// target properties such as volume "v0.1" (afseq extension)
+/// target properties such as volume "v0.1" (pattrns extension)
 target = ${ ("#" ~ integer) | (ASCII_ALPHA ~ float) }
 /// patterns for assigning target keys with pattern on the right side
 target_name = ${ "#" | name }

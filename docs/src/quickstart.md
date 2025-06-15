@@ -2,11 +2,11 @@
 
 This guide will take you from basic patterns to advanced rhythmic sequencing through practical examples. Each example builds on previous concepts and includes comments to help you understand how things work.
 
-NOTE: afseq uses [Lua](https://www.lua.org/) as a scripting language. If you're not familiar with Lua, don't worry. Lua is very easy to pick up and fortunately there are great tutorials out there, such as [this one](https://w3schools.tech/tutorial/lua/index).
+NOTE: pattrns uses [Lua](https://www.lua.org/) as a scripting language. If you're not familiar with Lua, don't worry. Lua is very easy to pick up and fortunately there are great tutorials out there, such as [this one](https://w3schools.tech/tutorial/lua/index).
 
 ## Online Playground
 
-All the examples in this quickstart are available in the [Online Playground](https://pttrns.renoise.com) as well, where you can run and modify them directly in your browser — no installation required.
+All the examples in this quickstart are available in the [Online Playground](https://pattrns.renoise.com) as well, where you can run and modify them directly in your browser — no installation required.
 
 
 ## Table of Contents
@@ -214,7 +214,7 @@ return cycle("c4(3,8) e4(5,8) g4(7,8)")  -- Different Euclidean rhythms
 
 Tidal Cycles mini-notation also supports Euclidean patterns with the `(n,k)` notation, where `n` is the number of notes and `k` is the number of steps.
 
-See [Cycles Guide](./guide/cycles.md) for more example and info about Tidal Cycles in afseq.
+See [Cycles Guide](./guide/cycles.md) for more example and info about Tidal Cycles in pattrns.
 
 
 ## Dynamic Pulses & Events

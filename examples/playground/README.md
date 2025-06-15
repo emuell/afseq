@@ -1,4 +1,4 @@
-# afseq playground Demo
+# pattrns playground Demo
 
 ## Build Instructions
 

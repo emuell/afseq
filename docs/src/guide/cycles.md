@@ -1,6 +1,6 @@
 # Cycles
 
-In addition to static arrays of [notes](./notes&scales.md) or dynamic [generator functions](../extras/generators.md), `event` in afseq can also use cycles using the [tidal cycles mini-notation](https://tidalcycles.org/docs/reference/mini_notation/)
+In addition to static arrays of [notes](./notes&scales.md) or dynamic [generator functions](../extras/generators.md), `event` in pattrns can also use cycles using the [tidal cycles mini-notation](https://tidalcycles.org/docs/reference/mini_notation/)
 
 ## Introduction
 
@@ -80,7 +80,7 @@ There's no exact specification for how tidal cycles work, and it's constantly ev
 
 ### Timing 
 
-The base time of a pattern in tidal is specified as *cycles per second*. In afseq, the time of a cycle instead is given in *cycles per pattern pulse units*. 
+The base time of a pattern in tidal is specified as *cycles per second*. In pattrns, the time of a cycle instead is given in *cycles per pattern pulse units*. 
 
 ```lua
 -- emits an entire cycle every beat
@@ -92,7 +92,7 @@ return pattern {
 
 ### Sequencing
 
-An event in afseq gets triggered for each incoming non-gated pattern pulse. This is true for cycles are well and allows you to sequence cycles too. 
+An event in pattrns gets triggered for each incoming non-gated pattern pulse. This is true for cycles are well and allows you to sequence cycles too. 
 
 ```lua
 -- emit an entire cycle's every bar, then pause for two bars, then repeat
@@ -116,7 +116,7 @@ return pattern {
 
 ### Seeding
 
-afseq's general random number generator is also used in cycles. So when you seed the global number generator, you can also seed the cycle's random operations with `math.randomseed(12345)`.  
+pattrns's general random number generator is also used in cycles. So when you seed the global number generator, you can also seed the cycle's random operations with `math.randomseed(12345)`.  
 
 ### Note Attributes
 
@@ -165,7 +165,7 @@ cycle("[c4 d#4 e4]:<v.1 v.2 v.3 v.4>")
 
 ### Mapping
 
-Notes and chords in cycles are expressed as [note strings](./notes&scales.md#note-strings) in afseq. But you can also dynamically evaluate and map cycle identifiers using the cycle [`map`](../API/cycle.md#map) function.
+Notes and chords in cycles are expressed as [note strings](./notes&scales.md#note-strings) in pattrns. But you can also dynamically evaluate and map cycle identifiers using the cycle [`map`](../API/cycle.md#map) function.
 
 This allows you, for example, to inject [parameters](./parameters.md) into cycles or to use custom identifiers.
 

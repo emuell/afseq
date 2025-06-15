@@ -78,7 +78,7 @@
 ### PulseValue<a name="PulseValue"></a>
 [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md)[] | `0` | `1` | [`nil`](../API/builtins/nil.md)  
 > ```lua
-> -- Single pulse value or a nested subdivision of pulses within a pulse.
+> -- Single pulse value or a nested subdivision of pulses within a rhythm's pulse.
 > PulseValue:
 >     | 0
 >     | 1
@@ -93,8 +93,8 @@
 ---  
 ## Properties
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
-> `context.note.notes[1].key`
+> Note that triggered the pattern, if any. Usually will ne a monophic note.
+> To access the raw note number value use: `context.trigger.notes[1].key`
 
 ### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
 > Current parameter values: parameter ids are keys, parameter values are values.
@@ -104,7 +104,7 @@
 > Project's tempo in beats per minutes.
 
 ### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
-> Project's beats per bar setting - usually will be 4.
+> Project's beats per bar settings - usually will be 4.
 
 ### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
 > Project's audio playback sample rate in samples per second.
@@ -160,13 +160,13 @@
 
 
 # GateContext<a name="GateContext"></a>  
-> ConPulse value context passed to functions in `gate` and `event`.  
+> Pulse value context passed to functions in `gate` and `event`.  
 
 ---  
 ## Properties
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
-> `context.note.notes[1].key`
+> Note that triggered the pattern, if any. Usually will ne a monophic note.
+> To access the raw note number value use: `context.trigger.notes[1].key`
 
 ### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
 > Current parameter values: parameter ids are keys, parameter values are values.
@@ -176,7 +176,7 @@
 > Project's tempo in beats per minutes.
 
 ### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
-> Project's beats per bar setting - usually will be 4.
+> Project's beats per bar settings - usually will be 4.
 
 ### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
 > Project's audio playback sample rate in samples per second.
@@ -226,7 +226,7 @@
 > resolution = 2/3
 > ```
 
-### resolution : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="resolution"></a>
+### resolution : [`number`](../API/builtins/number.md)<a name="resolution"></a>
 > Factor which is applied on `unit` to specify the final time resolution of the pattern.
 > #### examples:
 > ```lua
@@ -240,7 +240,7 @@
 > resolution = 2/3
 > ```
 
-### offset : [`number`](../API/builtins/number.md)[`?`](../API/builtins/nil.md)<a name="offset"></a>
+### offset : [`number`](../API/builtins/number.md)<a name="offset"></a>
 > Optional offset in `unit * resolution` time units. By default 0.
 > When set, the pattern's event output will be delayed by the given offset value.
 > #### examples:
@@ -342,7 +342,7 @@
 > ```
 
 ### gate : (context : [`GateContext`](../API/pattern.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md) | (context : [`GateContext`](../API/pattern.md#GateContext)) `->` (context : [`GateContext`](../API/pattern.md#GateContext)) `->` [`boolean`](../API/builtins/boolean.md)<a name="gate"></a>
-> Optional pulse train filter function which filters events between the pulse and event emitter. 
+> Optional pulse train filter function which filters events between the pulse and event emitter.
 > By default a threshold gate, which passes all pulse values greater than zero.
 > 
 > Functions return true when a pulse value should be passed, and false when the event
@@ -430,7 +430,7 @@
 ### PulseValue<a name="PulseValue"></a>
 [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | [`boolean`](../API/builtins/boolean.md) | [`number`](../API/builtins/number.md) | `0` | `1` | [`PulseValue`](#PulseValue) | [`nil`](../API/builtins/nil.md)[] | `0` | `1` | [`nil`](../API/builtins/nil.md)  
 > ```lua
-> -- Single pulse value or a nested subdivision of pulses within a pulse.
+> -- Single pulse value or a nested subdivision of pulses within a rhythm's pulse.
 > PulseValue:
 >     | 0
 >     | 1
@@ -445,8 +445,8 @@
 ---  
 ## Properties
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
-> `context.note.notes[1].key`
+> Note that triggered the pattern, if any. Usually will ne a monophic note.
+> To access the raw note number value use: `context.trigger.notes[1].key`
 
 ### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
 > Current parameter values: parameter ids are keys, parameter values are values.
@@ -456,7 +456,7 @@
 > Project's tempo in beats per minutes.
 
 ### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
-> Project's beats per bar setting - usually will be 4.
+> Project's beats per bar settings - usually will be 4.
 
 ### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
 > Project's audio playback sample rate in samples per second.

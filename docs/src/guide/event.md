@@ -9,7 +9,7 @@ The default event implementation emits a single middle C note value for each inc
 
 ## Event Types
 
-Currently afseq only supports monophonic or polyphonic *note events* as event output. This is likely to change in the future to allow other musically interesting events to be emitted. 
+Currently pattrns only supports monophonic or polyphonic *note events* as event output. This is likely to change in the future to allow other musically interesting events to be emitted. 
 
 Note values can be expressed as:
 - Integer values like `48`, which are interpreted as MIDI note numbers. 
@@ -64,7 +64,7 @@ You likey won't use custom pulse or gate functions with cycles, but it's possibl
 
 » `event = cycle("[c4 <d#4 d4> g4|g5]")` *arpeggio with variations*
 
-See [cycles](./cycles.md) for more info about Tidal Cycles support in afseq. 
+See [cycles](./cycles.md) for more info about Tidal Cycles support in pattrns. 
 
 ## Examples
 

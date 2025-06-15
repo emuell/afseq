@@ -13,7 +13,7 @@ use std::{
 use notify::{RecursiveMode, Watcher};
 use simplelog::*;
 
-use afseq::prelude::*;
+use pattrns::prelude::*;
 
 // -------------------------------------------------------------------------------------------------
 

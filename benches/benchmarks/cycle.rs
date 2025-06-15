@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, Criterion};
 
-use afseq::Cycle;
+use pattrns::Cycle;
 
 // ---------------------------------------------------------------------------------------------
 

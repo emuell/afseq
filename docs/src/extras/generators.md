@@ -4,13 +4,13 @@
 
 Anonymous Lua functions, as used in patterns, are actually [closures](https://www.lua.org/pil/6.1.html). They keep a record of their environment, so all (up)values which are declared outside of the anonymous function are accessible from within the function itself. 
 
-We can use this in afseq scripts to keep track of a pattern's *global* or *local* state.   
+We can use this in pattrns scripts to keep track of a pattern's *global* or *local* state.   
 
 ### Runtime
 
 To better understand how local and global states are relevant here, we first need to understand how patterns are evaluated.
 
-Let's say we're in a DAW that supports afseq. This DAW triggers your pattern script when a single note is triggered. If we now want to allow polyphonic playback of scripts, only *one script instance* is actually created *per instrument or track*. So a *single script* will be *triggered multiple times* with multiple notes. 
+Let's say we're in a DAW that supports pattrns. This DAW triggers your pattern script when a single note is triggered. If we now want to allow polyphonic playback of scripts, only *one script instance* is actually created *per instrument or track*. So a *single script* will be *triggered multiple times* with multiple notes. 
 
 This means that all notes triggered by the DAW will share the same global state within a pattern script. But this also means that in order to create local states for each individual note trigger, you'll need to keep track of a local state somehow.
 
@@ -59,7 +59,7 @@ Because the context is unique for each newly triggered pattern instance, we now 
 
 ### Generators
 
-Generators in afseq are pattern, gate or emit **functions**, that do **return another function**. This is similar to how iterators work in Lua. By returning a function from a function you can create a new local state that is valid for the returned function only. 
+Generators in pattrns are pattern, gate or emit **functions**, that do **return another function**. This is similar to how iterators work in Lua. By returning a function from a function you can create a new local state that is valid for the returned function only. 
 
 Let's use our counter example again with such a *generator*:
 

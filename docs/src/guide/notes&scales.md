@@ -86,7 +86,7 @@ To create off notes use the string `"off"` or `"~"`.
 
 ## Scales
 
-To make working with chords and chord progressions and programming music in general easier, afseq also has a simple scale API to create chords and notes from scales.
+To make working with chords and chord progressions and programming music in general easier, pattrns also has a simple scale API to create chords and notes from scales.
 
 
 ### Scale objects

@@ -1,5 +1,5 @@
 ---
---- Part of the afseq trait:
+--- Part of the pattrns crate:
 --- adds a few extra helper functions to the Lua default table lib
 ---
 

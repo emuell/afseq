@@ -1,13 +1,13 @@
 [package]
 categories = ["multimedia::audio"]
-description = "Experimental, dynamic, imperative and functional music sequence generator for Rust and Lua"
+description = "Experimental, dynamic, imperative music sequence generator"
 edition = "2021"
 exclude = ["assets", "examples", "benches"]
-keywords = ["audio", "sequencer", "lua", "live_coding"]
+keywords = ["audio", "sequencer", "lua", "live_coding", "renoise"]
 license = "GNU AFFERO"
-name = "afseq"
+name = "pattrns"
 readme = "README.md"
-repository = "https://github.com/emuell/afseq"
+repository = "https://github.com/emuell/pattrns"
 version = "0.9.0"
 
 [dependencies]

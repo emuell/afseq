@@ -5,7 +5,7 @@ fn main() -> Result<(), Error> {
     std::env::set_current_dir(env!("CARGO_MANIFEST_DIR"))?;
     // set option and generate...
     let options = Options {
-        library: "../../types/nerdo/library".into(),
+        library: "../../types/pattrns/library".into(),
         output: "../src".into(),
         excluded_classes: ["TimeContext", "TriggerContext", "pulse", "parameter"]
             .into_iter()

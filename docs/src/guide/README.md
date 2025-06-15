@@ -1,8 +1,8 @@
 # Guide
 
-A `Pattern` is the main building block in afseq. It lets you define when and what to play.
+A `Pattern` is the main building block in pattrns. It lets you define when and what to play.
 
-afseq consumes [Lua script](https://www.lua.org/) files that define patterns as specified in the [API documentation](../API/).
+pattrns consumes [Lua script](https://www.lua.org/) files that define patterns as specified in the [API documentation](../API/).
 
 ## Components
 

@@ -560,9 +560,9 @@ mod test {
         assert!(evaluate_number(&lua, r#"note_number(0x80)"#).is_err());
         assert!(evaluate_number(&lua, r#"note_number(-1)"#).is_err());
         assert_eq!(evaluate_number(&lua, r#"note_number("c4")"#)?, 48);
-        assert_eq!(evaluate_number(&lua, r#"note_number("---")"#)?, 0xFF);
-        assert_eq!(evaluate_number(&lua, r#"note_number(nil)"#)?, 0xFF);
-        assert_eq!(evaluate_number(&lua, r#"note_number("off")"#)?, 0xFE);
+        assert_eq!(evaluate_number(&lua, r#"note_number("---")"#)?, 0xFE);
+        assert_eq!(evaluate_number(&lua, r#"note_number(nil)"#)?, 0xFE);
+        assert_eq!(evaluate_number(&lua, r#"note_number("off")"#)?, 0xFF);
 
         Ok(())
     }

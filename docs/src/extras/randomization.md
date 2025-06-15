@@ -1,12 +1,12 @@
 # Randomization
 
-Controlled randomness can be a lot of fun when creating music algorithmically, so afseq supports a number of randomisation techniques to deal with *pseudo* randomness. 
+Controlled randomness can be a lot of fun when creating music algorithmically, so pattrns supports a number of randomisation techniques to deal with *pseudo* randomness. 
 
 ### Random Number Generation
 
-You can use the standard Lua [`math.random()`](https://www.lua.org/pil/18.html) to create pseudo-random numbers in afseq, and can use [`math.randomseed()`](https://www.lua.org/pil/18.html) to seed them. 
+You can use the standard Lua [`math.random()`](https://www.lua.org/pil/18.html) to create pseudo-random numbers in pattrns, and can use [`math.randomseed()`](https://www.lua.org/pil/18.html) to seed them. 
 
-Note that the standard Lua random implementation is overridden by afseq, to use a [Xoshiro256PlusPlus](https://docs.rs/rand_xoshiro/latest/rand_xoshiro/struct.Xoshiro256PlusPlus.html) random number generator. This ensures that seeded random operations behave the same on all platforms and architectures.
+Note that the standard Lua random implementation is overridden by pattrns, to use a [Xoshiro256PlusPlus](https://docs.rs/rand_xoshiro/latest/rand_xoshiro/struct.Xoshiro256PlusPlus.html) random number generator. This ensures that seeded random operations behave the same on all platforms and architectures.
 
 Here's a simple example which creates a random melody line based on a scale.
 
@@ -47,7 +47,7 @@ return pattern {
 
 When seeding the RNG, each time a pattern is (re)started, an existing pattern instance will continue to run. The global state of a pattern script is not recreated each time the pattern is played again. 
 
-See [generators](./generators.md) for details of how afseq handles global and local states in general.
+See [generators](./generators.md) for details of how pattrns handles global and local states in general.
 
 To create multiple separate local random states, use the non standard [`math.randomstate(seed)`](../API/modules/math.md#randomstate) function to create local, possibly seeded random number generators. 
 

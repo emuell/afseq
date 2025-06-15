@@ -157,8 +157,8 @@ pub enum Note {
     Fs10 = 0x7E,
     G10 = 0x7F,
     // Following notes are NOT valid MIDI notes, but only internally used
-    OFF = 0xFE,
-    EMPTY = 0xFF,
+    EMPTY = 0xFE,
+    OFF = 0xFF,
 }
 
 impl Note {
@@ -309,8 +309,8 @@ impl TryFrom<&str> for Note {
 impl From<u8> for Note {
     fn from(n: u8) -> Note {
         match n {
-            0xFF => Self::EMPTY,
-            0xFE => Self::OFF,
+            0xFE => Self::EMPTY,
+            0xFF => Self::OFF,
             _ => unsafe { mem::transmute::<u8, Self>(n & 0x7f) },
         }
     }
@@ -376,13 +376,13 @@ mod test {
         assert_eq!(Note::from(0x0_u8), Note::C0);
         assert_eq!(Note::from(0x24_u8), Note::C3);
         assert_eq!(Note::from(0x80_u8), Note::C0); // wraps, probably should not be allowed
-        assert_eq!(Note::from(0xFF_u8), Note::EMPTY);
-        assert_eq!(Note::from(-1i32 as u8), Note::EMPTY);
-        assert_eq!(Note::from(0xFE_u8), Note::OFF);
+        assert_eq!(Note::from(0xFE_u8), Note::EMPTY);
+        assert_eq!(Note::from(-1i32 as u8), Note::OFF);
+        assert_eq!(Note::from(0xFF_u8), Note::OFF);
         assert_eq!(i8::from(Note::C4), 48);
         assert_eq!(u8::from(Note::C3), 0x24);
-        assert_eq!(u8::from(Note::OFF), 0xFE);
-        assert_eq!(u8::from(Note::EMPTY), 0xFF);
+        assert_eq!(u8::from(Note::EMPTY), 0xFE);
+        assert_eq!(u8::from(Note::OFF), 0xFF);
     }
 
     #[test]

@@ -150,7 +150,7 @@ pub fn new_pattern_from_string(
 
 // -------------------------------------------------------------------------------------------------
 
-/// Register afseq bindings to the given Lua engine.
+/// Register pattrns bindings to the given Lua engine.
 /// Engine instance is expected to be one created via [`new_engine`].
 pub(crate) fn register_bindings(
     lua: &mut Lua,
@@ -583,7 +583,7 @@ fn register_math_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up initialization
     lazy_static! {
         static ref MATH_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
-            include_str!("../types/nerdo/library/extensions/math.lua"),
+            include_str!("../types/pattrns/library/extensions/math.lua"),
             "[inbuilt:math.lua]"
         );
     }
@@ -662,7 +662,7 @@ fn register_table_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up initialization
     lazy_static! {
         static ref TABLE_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
-            include_str!("../types/nerdo/library/extensions/table.lua"),
+            include_str!("../types/pattrns/library/extensions/table.lua"),
             "[inbuilt:table.lua]"
         );
     }
@@ -681,7 +681,7 @@ fn register_pulse_bindings(lua: &mut Lua) -> LuaResult<()> {
     // cache module bytecode to speed up requires
     lazy_static! {
         static ref PULSE_BYTECODE: LuaResult<Vec<u8>> = compile_chunk(
-            include_str!("../types/nerdo/library/pulse.lua"),
+            include_str!("../types/pattrns/library/pulse.lua"),
             "[inbuilt:pulse.lua]"
         );
     }

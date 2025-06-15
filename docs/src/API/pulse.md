@@ -224,7 +224,7 @@
 ### spread(self : [`Pulse`](../API/pulse.md#Pulse), amount : [`number`](../API/builtins/number.md), empty_value : [`PulseTableValue`](#PulseTableValue)[`?`](../API/builtins/nil.md))<a name="spread"></a>
 `->`[`Pulse`](../API/pulse.md#Pulse)  
 
-> Expand (with amount > 1) or shrink (amount < 1) the length of the pulse table by 
+> Expand (with amount > 1) or shrink (amount < 1) the length of the pulse table by
 > the given factor, spreading allowed content evenly and filling gaps with 0 or the
 > given empty value.
 > 

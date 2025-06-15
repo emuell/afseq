@@ -10,7 +10,7 @@
 > Create a sequence from an array of note values or note value varargs.
 > 
 > Using `sequence` instead of a raw `{}` table can be useful to ease transforming the note
-> content and to explicitly pass a sequence of e.g. single notes to the note emitter.
+> content and to explicitly pass a sequence of e.g. single notes to the event emitter.
 > 
 > #### examples:
 > ```lua

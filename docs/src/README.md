@@ -1,8 +1,8 @@
 # Welcome
 
-... to the afseq scripting guide! **afseq** a.k.a **nerdo-patterns**, is an experimental imperative music sequence generator engine that lets you create musical patterns programmatically using Lua scripts for algorithmic or [live music coding](https://github.com/pjagielski/awesome-live-coding-music).
+... to the pattrns scripting guide! **pattrns** is an experimental imperative music sequence generator engine that lets you create musical patterns programmatically using Lua scripts for algorithmic or [live music coding](https://github.com/pjagielski/awesome-live-coding-music).
 
-This guide focuses on the Lua scripting API. For Rust development, see the [afseq crate docs](https://github.com/emuell/afseq).
+This guide focuses on the Lua scripting API. For Rust development, see the [pattrns crate docs](https://github.com/emuell/pattrns).
 
 
 ## Key Features
@@ -27,11 +27,9 @@ This guide focuses on the Lua scripting API. For Rust development, see the [afse
 
 ## Applications
 
-[Renoise](https://www.renoise.com)
-: has built-in afseq support in its [phrase editor](https://tutorials.renoise.com/wiki/Phrase_Editor).<br>
-[Online Playground](https://pttrns.renoise.com)
-: Experiment with afseq scripts directly in your browser<br>
-[Rust Examples](https://github.com/emuell/afseq/tree/master/examples)
+[Online Playground](https://pattrns.renoise.com)
+: Experiment with pattrns scripts directly in your browser<br>
+[Rust Examples](https://github.com/emuell/pattrns/tree/master/examples)
 : Write or test scripts in Rust or Lua with a basic sample player.<br>
 
 

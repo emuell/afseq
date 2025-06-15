@@ -181,8 +181,8 @@
 > step length fraction within the cycle, where 1 is the total duration of a single cycle run.
 
 ### trigger : [`Note`](../API/note.md#Note)[`?`](../API/builtins/nil.md)<a name="trigger"></a>
-> Note that triggered the pattern, if any. Usually will ne a monophic note. To access the key use:
-> `context.note.notes[1].key`
+> Note that triggered the pattern, if any. Usually will ne a monophic note.
+> To access the raw note number value use: `context.trigger.notes[1].key`
 
 ### parameter : table<[`string`](../API/builtins/string.md), [`boolean`](../API/builtins/boolean.md) | [`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md)><a name="parameter"></a>
 > Current parameter values: parameter ids are keys, parameter values are values.
@@ -192,7 +192,7 @@
 > Project's tempo in beats per minutes.
 
 ### beats_per_bar : [`integer`](../API/builtins/integer.md)<a name="beats_per_bar"></a>
-> Project's beats per bar setting - usually will be 4.
+> Project's beats per bar settings - usually will be 4.
 
 ### samples_per_sec : [`integer`](../API/builtins/integer.md)<a name="samples_per_sec"></a>
 > Project's audio playback sample rate in samples per second.

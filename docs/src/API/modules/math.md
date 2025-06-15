@@ -15,15 +15,16 @@
 > * `math.random(n)`: Returns a integer in the range [1, n].
 > * `math.random(m, n)`: Returns a integer in the range [m, n].
 > 
+> Overridden to use a `Xoshiro256PlusPlus` random number generator to ensure that
+>  seeded random operations behave the same on all platforms and architectures.
 > 
-> [View documents](http://www.lua.org/manual/5.4/manual.html#pdf-math.random)
+> [View documents](command:extension.lua.doc?["en-us/51/manual.html/pdf-math.random"])
 ### randomseed(x : [`integer`](../../API/builtins/integer.md))<a name="randomseed"></a>
-> * `math.randomseed(x, y)`: Concatenate `x` and `y` into a 128-bit `seed` to reinitialize the pseudo-random generator.
-> * `math.randomseed(x)`: Equate to `math.randomseed(x, 0)` .
-> * `math.randomseed()`: Generates a seed with a weak attempt for randomness.
+> Sets `x` as the "seed" for the pseudo-random generator.
 > 
+> Overridden to seed the internally used  `Xoshiro256PlusPlus` random number generator.
 > 
-> [View documents](http://www.lua.org/manual/5.4/manual.html#pdf-math.randomseed)
+> [View documents](command:extension.lua.doc?["en-us/51/manual.html/pdf-math.randomseed"])
 ### randomstate(seed : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md))<a name="randomstate"></a>
 `->`(m : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md), n : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md)) `->` [`number`](../../API/builtins/number.md)  
 

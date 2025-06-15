@@ -3,26 +3,6 @@
 version = 4
 
 [[package]]
-name = "afseq"
-version = "0.9.0"
-dependencies = [
- "anyhow",
- "crossbeam-channel",
- "derive_more",
- "lazy_static",
- "log",
- "mlua",
- "num-rational",
- "num-traits",
- "paste",
- "pest",
- "pest_derive",
- "phonic",
- "rand",
- "rand_xoshiro",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -468,6 +448,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "pattrns"
+version = "0.9.0"
+dependencies = [
+ "anyhow",
+ "crossbeam-channel",
+ "derive_more",
+ "lazy_static",
+ "log",
+ "mlua",
+ "num-rational",
+ "num-traits",
+ "paste",
+ "pest",
+ "pest_derive",
+ "phonic",
+ "rand",
+ "rand_xoshiro",
+]
+
+[[package]]
 name = "pest"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -543,7 +543,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 name = "playground"
 version = "0.1.0"
 dependencies = [
- "afseq",
+ "pattrns",
  "serde",
  "serde_json",
 ]

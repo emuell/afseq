@@ -16,7 +16,7 @@
         "ffi": "disable",
     },
     "Lua.workspace.library": [
-        "types/nerdo"
+        "types/pattrns"
     ],
     "Lua.workspace.ignoreDir": [
         "docs"

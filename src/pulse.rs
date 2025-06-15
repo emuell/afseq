@@ -14,7 +14,7 @@
 /// ### Example
 ///
 /// ```rust
-/// use afseq::Pulse;
+/// use pattrns::Pulse;
 /// // Assuming pulse step is 1 beat.
 /// // Defines a pulse rhythm with one quater note followed by a 16th note triplet.
 /// let pulses = vec![Pulse::from(1), Pulse::from(vec![1, 1, 1])];

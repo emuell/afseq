@@ -1,6 +1,6 @@
-# AFSEQ API Documentation Generator
+# pattrns API Documentation Generator
 
-This app generates the API definition chapters in the [AFSEQ book](https://emuell.github.io/afseq/) from the [Lua API definition](../../types/nerdo/) files using [luals-docs-gen](https://github.com/emuell/luals-docs-gen).
+This app generates the API definition chapters in the [pattrns book](https://emuell.github.io/pattrns/) from the [Lua API definition](../../types/pattrns/) files using [luals-docs-gen](https://github.com/emuell/luals-docs-gen).
 
 ## Requirements
 
@@ -11,7 +11,7 @@ This app generates the API definition chapters in the [AFSEQ book](https://emuel
 To create or update the API definitions chapter, build and run the app, then build the book:
 
 ```bash
-# in the afseq root directory
+# in the pattrns root directory
 cd docs 
 # build and run the generate app to create the API definition
 cargo run
@@ -21,7 +21,7 @@ mdbook serve
 
 ---
 
-Alternatively, if you have vscode installed, open the afseq `./docs` folder and use the provided build task to build the API and the book:
+Alternatively, if you have vscode installed, open the pattrns `./docs` folder and use the provided build task to build the API and the book:
 
 - `build: API Docs`: compiles and runs the API docs generator
 - `build: book`: compiles the mdbook

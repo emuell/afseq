@@ -2,12 +2,12 @@
 name = "playground"
 version = "0.1.0"
 edition = "2021"
-description = "afseq playground for the web"
+description = "pattrns playground for the web"
 
 # see build.rs and build.sh for the emscripten config
 
 [dependencies]
-afseq = { path = "../..", default-features = false, features = [
+pattrns = { path = "../..", default-features = false, features = [
     "scripting",
     "lua",
     "player",

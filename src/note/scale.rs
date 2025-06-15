@@ -392,7 +392,7 @@ impl Scale {
     /// ### Example
     ///
     /// ```rust
-    /// use afseq::{Note, Scale};
+    /// use pattrns::{Note, Scale};
     /// let scale = Scale::try_from((Note::C4, "major")).unwrap();
     /// let cmaj = scale.chord_from_degree(1, 3);
     /// let gmaj7 = scale.chord_from_degree(5, 4);

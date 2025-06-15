@@ -137,7 +137,7 @@ code {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 10px 0px 15px;
+    padding: 6px;
     background-color: var(--color-bg);
     border-bottom: 2px solid var(--color-accent);
 }
