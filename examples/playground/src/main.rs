@@ -1,13 +1,6 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::{
-    cell::RefCell,
-    ffi, fs,
-    path::Path,
-    rc::Rc,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{cell::RefCell, ffi, fs, path::Path, rc::Rc, sync::Arc, time::Duration};
 
 use pattrns::prelude::*;
 
@@ -92,7 +85,7 @@ struct PlayingNote {
 struct Playground {
     playing: bool,
     player: SamplePlayer,
-    sample_pool: Arc<RwLock<SamplePool>>,
+    sample_pool: Arc<SamplePool>,
     samples: Vec<SampleEntry>,
     sequence: Option<Sequence>,
     time_base: BeatTimeBase,
@@ -121,12 +114,12 @@ impl Playground {
         // load samples
         println!("Loading sample files...");
         let mut samples = Vec::new();
-        let sample_pool = Arc::new(RwLock::new(SamplePool::new()));
+        let sample_pool = Arc::new(SamplePool::new());
         for dir_entry in fs::read_dir(format!("{}/samples", Self::ASSETS_PATH))?.flatten() {
             let path = dir_entry.path();
             if let Some(extension) = path.extension().map(|e| e.to_string_lossy()) {
                 if matches!(extension.as_bytes(), b"mp3" | b"wav" | b"flac") {
-                    let id = usize::from(sample_pool.read().unwrap().load_sample(&path)?);
+                    let id = usize::from(sample_pool.load_sample(&path)?);
                     let name = path.file_stem().unwrap().to_string_lossy().to_string();
                     println!("Added sample '{}' with id {}", name, id);
                     samples.push(SampleEntry { id, name });
@@ -368,8 +361,7 @@ impl Playground {
 
     /// Load a sample from a raw file buffer and add it to the pool
     fn load_sample(&mut self, file_buffer: Vec<u8>, file_name: &str) -> Result<usize, String> {
-        let sample_buffer = self.sample_pool.read().unwrap();
-        match sample_buffer.load_sample_buffer(file_buffer, file_name) {
+        match self.sample_pool.load_sample_buffer(file_buffer, file_name) {
             Ok(instrument_id) => {
                 let id = usize::from(instrument_id);
                 let name = Path::new(&file_name)
@@ -387,7 +379,7 @@ impl Playground {
     /// Reset sample pool, removing all samples
     fn clear_samples(&mut self) {
         // Clear the sample pool
-        self.sample_pool.read().unwrap().clear();
+        self.sample_pool.clear();
         self.samples.clear();
         // Reset the current instrument
         self.instrument_id = None;

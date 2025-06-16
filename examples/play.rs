@@ -2,7 +2,7 @@ use std::{
     path,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, RwLock,
+        Arc,
     },
 };
 
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .to_string(),
         )
     }
-    let sample_pool = SamplePool::new();
+    let sample_pool = Arc::new(SamplePool::new());
     let KICK = sample_pool.load_sample(&sample_path("kick.wav")?)?;
     let SNARE = sample_pool.load_sample(&sample_path("snare.wav")?)?;
     let HIHAT = sample_pool.load_sample(&sample_path("hihat.wav")?)?;
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let FX = sample_pool.load_sample(&sample_path("fx.wav")?)?;
 
     // create event player
-    let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
+    let mut player = SamplePlayer::new(sample_pool, None)?;
     player.set_show_events(true);
 
     // define our time bases

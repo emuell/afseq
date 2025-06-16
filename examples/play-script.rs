@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, RwLock,
+        Arc,
     },
 };
 
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // fetch contents from demo dir
     log::info!("Searching for wav/script files in path '{}'...", DEMO_PATH);
-    let sample_pool = SamplePool::new();
+    let sample_pool = Arc::new(SamplePool::new());
     struct PatternEntry {
         instrument_id: InstrumentId,
         script_path: PathBuf,
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // create sample player
-    let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
+    let mut player = SamplePlayer::new(sample_pool, None)?;
 
     // set default time base config
     let beat_time = BeatTimeBase {
