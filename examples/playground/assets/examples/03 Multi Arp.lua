@@ -11,7 +11,6 @@ local patterns = {
   { notes = { 60, 64, 67 },     direction = "down-up" },
 }
 
--- Create Nerdo Rhythm script
 return pattern {
   unit = "1/16",
   event = function(context)
@@ -37,7 +36,7 @@ return pattern {
       local direction = current_pattern.direction
 
       -- Calculate the step within the current pattern
-      local step = context.step % #notes + 1
+      local step = math.imod(context.step, #notes)
 
       -- Determine the note based on the direction
       local note_index
@@ -57,16 +56,8 @@ return pattern {
         end
       end
 
-      -- Get actual note`
-      local note = notes[note_index]
-      -- Calculate volume for a dynamic feel (optional)
-      local volume = 0.8 + 0.2 * math.cos(context.step / 32 * 2 * math.pi)
-
-      -- Emit the note event
-      return {
-        key = note,
-        volume = volume,
-      }
+      -- return actual note
+      return notes[note_index]
     end
   end
 }

@@ -1,8 +1,10 @@
 --[[
   Game of Melody: randomly creates melody populations from the C minor scale.
-  Lets the melodies that best fit a specified target melody survive.
 
-  Stop the playback and start it again for a new random population.
+  Lets the melodies that best fit a specified target melody survive. Stop the playback
+  and start it again for a new random population.
+
+  Based on an idea and initial implementation from: https://forum.renoise.com/u/jonas
 --]]
 
 -- Define the unit for timing
@@ -19,8 +21,8 @@ local SOURCE_NOTES = pulse.new(16, MINOR_SCALE:notes_iter())
 -- Define the optimal melody (best fitness): 16 notes
 -- with ascending, then descending notes from the scale
 local TARGET_MELODY = pulse.from(
-    1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 2, 1):map(
-  function (_, value)
+  1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 2, 1):map(
+  function(_, value)
     return SOURCE_NOTES[value]
   end
 )

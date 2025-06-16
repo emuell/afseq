@@ -1,22 +1,23 @@
 --[[
-  Create a note pattern from scales, distributed via euclidean rhythms. 
+  Create a note pattern from scales, distributed via euclidean rhythms.
 --]]
 
 -- Scale we're creating the note pattern from
 local s = scale("c3", "minor")
 
--- Create a note pattern from euclidean distributed chords 
+-- Create a note pattern from euclidean distributed chords
 local notes =
-  pulse.from(s:chord("i", 3)):euclidean(8) + 
+  pulse.from(s:chord("i", 3)):euclidean(8) +
   pulse.from(s:chord("vi", 3)):euclidean(8, 1):reverse() +
   pulse.from(s:chord("v", 3)):euclidean(8) +
   pulse.from(s:chord("iii", 5)):euclidean(8):reverse()
 
--- The rhythm emits the notes as a sequence
+-- Emit the note pattern as a sequence
 return pattern {
   unit = "1/16",
   event = sequence(notes):amplify(0.8)
-}--[[
+}
+--[[
   Create a chord progression from a scale
 --]]
 
@@ -48,7 +49,6 @@ local patterns = {
   { notes = { 60, 64, 67 },     direction = "down-up" },
 }
 
--- Create Nerdo Rhythm script
 return pattern {
   unit = "1/16",
   event = function(context)
@@ -74,7 +74,7 @@ return pattern {
       local direction = current_pattern.direction
 
       -- Calculate the step within the current pattern
-      local step = context.step % #notes + 1
+      local step = math.imod(context.step, #notes)
 
       -- Determine the note based on the direction
       local note_index
@@ -94,16 +94,8 @@ return pattern {
         end
       end
 
-      -- Get actual note`
-      local note = notes[note_index]
-      -- Calculate volume for a dynamic feel (optional)
-      local volume = 0.8 + 0.2 * math.cos(context.step / 32 * 2 * math.pi)
-
-      -- Emit the note event
-      return {
-        key = note,
-        volume = volume,
-      }
+      -- return actual note
+      return notes[note_index]
     end
   end
 }
@@ -268,6 +260,8 @@ return pattern {
 }
 --[[
   Generates random notes and chord progressions using a pascal triangle as pattern.
+
+  Based on an idea and initial implementation from: https://forum.renoise.com/u/jonas
 --]]
 
 -- Define the Pascal's Triangle pattern
@@ -292,7 +286,7 @@ local function generate_chord_progressions(triangle)
     local progression = {}
     for _, value in ipairs(row) do
       local degree = math.imod(value, #relaxing_scale)
-      table.insert(progression, relaxing_scale[degree] - 12)       -- Transpose an octave down
+      table.insert(progression, relaxing_scale[degree] - 12) -- Transpose an octave down
     end
     table.insert(chord_progressions, progression)
   end
@@ -341,9 +335,11 @@ return pattern {
 }
 --[[
   Game of Melody: randomly creates melody populations from the C minor scale.
-  Lets the melodies that best fit a specified target melody survive.
 
-  Stop the playback and start it again for a new random population.
+  Lets the melodies that best fit a specified target melody survive. Stop the playback
+  and start it again for a new random population.
+
+  Based on an idea and initial implementation from: https://forum.renoise.com/u/jonas
 --]]
 
 -- Define the unit for timing
@@ -360,8 +356,8 @@ local SOURCE_NOTES = pulse.new(16, MINOR_SCALE:notes_iter())
 -- Define the optimal melody (best fitness): 16 notes
 -- with ascending, then descending notes from the scale
 local TARGET_MELODY = pulse.from(
-    1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 2, 1):map(
-  function (_, value)
+  1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 2, 1):map(
+  function(_, value)
     return SOURCE_NOTES[value]
   end
 )
@@ -491,7 +487,8 @@ return pattern {
       }
     end
   end
-}-- The most basic pattern: steady quarter notes
+}
+-- The most basic pattern: steady quarter notes
 return pattern {
   unit = "1/4", -- Quarter note timing grid
   event = "c4"  -- Play middle C on each pulse

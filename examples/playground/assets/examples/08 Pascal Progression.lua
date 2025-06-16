@@ -1,5 +1,7 @@
 --[[
   Generates random notes and chord progressions using a pascal triangle as pattern.
+
+  Based on an idea and initial implementation from: https://forum.renoise.com/u/jonas
 --]]
 
 -- Define the Pascal's Triangle pattern
@@ -24,7 +26,7 @@ local function generate_chord_progressions(triangle)
     local progression = {}
     for _, value in ipairs(row) do
       local degree = math.imod(value, #relaxing_scale)
-      table.insert(progression, relaxing_scale[degree] - 12)       -- Transpose an octave down
+      table.insert(progression, relaxing_scale[degree] - 12) -- Transpose an octave down
     end
     table.insert(chord_progressions, progression)
   end
