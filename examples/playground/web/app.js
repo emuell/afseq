@@ -488,6 +488,16 @@ var app = {
             }
             this._editor.addAction(commitAction);
 
+            // Override global Control + S as commit shortcut 
+            document.addEventListener('keydown', e => {
+                if (e.ctrlKey && e.key === 's') {
+                    // Prevent the Save dialog to open
+                    e.preventDefault();
+                    // Apply 
+                    commitAction.run();
+                }
+            });
+
             // Handle Ctrl+Shift+Space
             const playStopAction = {
                 id: "Start/Stop Playback",
@@ -513,11 +523,10 @@ var app = {
             }
             this._editor.addAction(playStopAction);
 
-            // HACK: don't let the browser handle Control + S 
-            document.addEventListener('keydown', e => {
-                if (e.ctrlKey && e.key === 's') {
-                    // Prevent the Save dialog to open
-                    e.preventDefault();
+            // Stop all notes when leaving the page 
+            document.addEventListener('visibilitychange', e => {
+                if (document.visibilityState === 'hidden') {
+                    backend.stopPlayingNotes();
                 }
             });
 
