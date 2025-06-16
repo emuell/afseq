@@ -6,10 +6,12 @@ use std::{
     path::Path,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, RwLock,
+        Arc,
     },
     time::Duration,
 };
+
+use dashmap::DashMap;
 
 use crossbeam_channel::Sender;
 
@@ -36,21 +38,23 @@ const PLAYBACK_PRELOAD_SECONDS: f64 = 0.5;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Preloads a set of sample files and stores them as [`PreloadedFileSource`] for later use.
+/// Preloads a set of sample files and stores them in a DashMap as [`PreloadedFileSource`]
+/// for later use. Pool usually will be held in an Arc, so it can be read from the sequencer
+/// thread, while it also can be updated from some other thread such as the main thread.
 ///
 /// When files are accessed, the already cached file sources are cloned, which avoids loading
 /// and decoding the files again while playback. Cloned [`PreloadedFileSource`] are using a
-/// shared Buffer, so cloning is very cheap.
+/// shared buffer, so cloning is very cheap.
 #[derive(Default)]
 pub struct SamplePool {
-    pool: RwLock<HashMap<InstrumentId, PreloadedFileSource>>,
+    pool: DashMap<InstrumentId, PreloadedFileSource>,
 }
 
 impl SamplePool {
     /// Create a new empty sample pool.
     pub fn new() -> Self {
         Self {
-            pool: RwLock::new(HashMap::new()),
+            pool: DashMap::new(),
         }
     }
 
@@ -58,17 +62,13 @@ impl SamplePool {
     ///
     /// ### Errors
     /// Returns an error if the instrument id is unknown.
-    ///
-    /// ### Panics
-    /// Panics if the sample pool can not be accessed
     pub fn get_sample(
         &self,
         id: InstrumentId,
         playback_options: FilePlaybackOptions,
         playback_sample_rate: u32,
     ) -> Result<PreloadedFileSource, Error> {
-        let pool = self.pool.read().expect("Failed to access sample pool");
-        if let Some(sample) = pool.get(&id) {
+        if let Some(sample) = self.pool.get(&id) {
             sample.clone(playback_options, playback_sample_rate)
         } else {
             Err(Error::MediaFileNotFound)
@@ -80,15 +80,11 @@ impl SamplePool {
     ///
     /// ### Errors
     /// Returns an error if the sample file could not be loaded.
-    ///
-    /// ### Panics
-    /// Panics if the sample pool can not be accessed
     pub fn load_sample<P: AsRef<Path>>(&self, path: P) -> Result<InstrumentId, Error> {
         let options = FilePlaybackOptions::default();
         let sample = PreloadedFileSource::from_file(path, None, options, 44100)?;
         let id = Self::unique_id();
-        let mut pool = self.pool.write().expect("Failed to access sample pool");
-        pool.insert(id, sample);
+        self.pool.insert(id, sample);
         Ok(id)
     }
 
@@ -97,15 +93,11 @@ impl SamplePool {
     ///
     /// ### Errors
     /// Returns an error if the sample file could not be loaded.
-    ///
-    /// ### Panics
-    /// Panics if the sample pool can not be accessed
     pub fn load_sample_buffer(&self, buffer: Vec<u8>, path: &str) -> Result<InstrumentId, Error> {
         let options = FilePlaybackOptions::default();
         let sample = PreloadedFileSource::from_file_buffer(buffer, path, None, options, 44100)?;
         let id = Self::unique_id();
-        let mut pool = self.pool.write().expect("Failed to access sample pool");
-        pool.insert(id, sample);
+        self.pool.insert(id, sample);
         Ok(id)
     }
 
@@ -114,8 +106,7 @@ impl SamplePool {
     /// ### Panics
     /// Panics if the sample pool can not be accessed
     pub fn clear(&self) {
-        let mut pool = self.pool.write().expect("Failed to access sample pool");
-        pool.clear();
+        self.pool.clear();
     }
 
     /// Generate a new unique instrument id.
@@ -164,13 +155,13 @@ impl SamplePlaybackContext {
 
 // -------------------------------------------------------------------------------------------------
 
-/// An simple example player implementation, which plays back a `Sequence` via the `phonic` crate
+/// A simple example player implementation, which plays back a `Sequence` via the `phonic` crate
 /// using the default audio output device using plain samples loaded from a file as instruments.
 ///
 /// Works on an existing sample pool, which can be used outside of the player as well.
 pub struct SamplePlayer {
     player: PhonicPlayer,
-    sample_pool: Arc<RwLock<SamplePool>>,
+    sample_pool: Arc<SamplePool>,
     playing_notes: Vec<HashMap<usize, (PlaybackId, Note)>>,
     new_note_action: NewNoteAction,
     sample_root_note: Note,
@@ -181,13 +172,12 @@ pub struct SamplePlayer {
 }
 
 impl SamplePlayer {
-    /// Create a new sample player.
+    /// Create a new sample player from the given shared SamplePool.
     ///
     /// # Errors
-    ///
     /// returns an error if the player could not be created.
     pub fn new(
-        sample_pool: Arc<RwLock<SamplePool>>,
+        sample_pool: Arc<SamplePool>,
         playback_status_sender: Option<Sender<PlaybackStatusEvent>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // create player
@@ -440,14 +430,11 @@ impl SamplePlayer {
                     };
 
                     let playback_sample_rate = self.player.output_sample_rate();
-                    let sample_pool = self
-                        .sample_pool
-                        .read()
-                        .expect("Failed to access sample pool");
-
-                    if let Ok(sample) =
-                        sample_pool.get_sample(instrument, playback_options, playback_sample_rate)
-                    {
+                    if let Ok(sample) = self.sample_pool.get_sample(
+                        instrument,
+                        playback_options,
+                        playback_sample_rate,
+                    ) {
                         let sample_delay =
                             (note_event.delay * pattern_event.duration as f32) as SampleTime;
                         let start_time = Some(time_offset + pattern_event.time + sample_delay);

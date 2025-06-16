@@ -459,6 +459,7 @@ version = "0.9.0"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
+ "dashmap",
  "derive_more",
  "lazy_static",
  "log",
