@@ -40,6 +40,10 @@ input {
     font-family: 'Fira Mono';
 }
 
+input[type="range"] {
+    accent-color: var(--color-accent);
+}
+
 select {
     width: 200px;
 }
@@ -181,14 +185,32 @@ code {
     gap: 5px;
 }
 
-.bpm-control > input {
+.bpm-control>input {
     width: 48px;
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#volumeSlider {
+    width: 64px;
+}
+
+#volumeInput {
+    width: 68px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    padding: 8px;
 }
 
 .sample-control {
     display: flex;
     align-items: center;
     gap: 5px;
+    margin-left: auto;
 }
 
 /* Editor section */

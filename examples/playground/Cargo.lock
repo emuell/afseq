@@ -520,7 +520,9 @@ dependencies = [
 
 [[package]]
 name = "phonic"
-version = "0.6.1"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a94f24e81287d8ed48052b639102e798b142f632ec8b9ccbe46a949322678db"
 dependencies = [
  "assume",
  "audio_thread_priority",
