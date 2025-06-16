@@ -1,6 +1,6 @@
 //! Lua bindings for the entire crate.
 
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, path::Path, rc::Rc};
 
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
@@ -107,10 +107,10 @@ pub(crate) fn new_engine() -> LuaResult<(Lua, LuaTimeoutHook)> {
 /// ### Errors
 /// Will return `Err` if `file_name` does not exist, failed to load or the lua file at the given
 /// path fails to evaulate to a valid pattern.
-pub fn new_pattern_from_file(
+pub fn new_pattern_from_file<P: AsRef<Path>>(
     time_base: BeatTimeBase,
     instrument: Option<InstrumentId>,
-    file_name: &str,
+    file_path: P,
 ) -> Result<Rc<RefCell<dyn Pattern>>, Box<dyn std::error::Error>> {
     // create a new engine and register bindings
     let (mut lua, mut timeout_hook) =
@@ -119,7 +119,7 @@ pub fn new_pattern_from_file(
     // restart the timeout hook
     timeout_hook.reset();
     // compile and evaluate script
-    let chunk = lua.load(std::path::PathBuf::from(file_name));
+    let chunk = lua.load(file_path.as_ref());
     let result = chunk.eval::<LuaValue>()?;
     // convert result
     pattern_from_userdata(&lua, &timeout_hook, &result, &time_base, instrument).map_err(Into::into)

@@ -1,6 +1,5 @@
 use std::{
     cell::RefCell,
-    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     rc::Rc,
@@ -46,45 +45,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // fetch contents from demo dir
     log::info!("Searching for wav/script files in path '{}'...", DEMO_PATH);
-    let mut entry_stems = HashSet::<String>::new();
-    let paths = fs::read_dir(DEMO_PATH).expect("Failed to access demo content directory");
-    for path in paths {
-        let path = path?.path();
-        if let Some(extension) = path.extension() {
-            let extension = extension.to_string_lossy().to_string();
-            if matches!(extension.as_str(), "lua" | "wav") {
-                if let Some(stem) = path.file_stem() {
-                    entry_stems.insert(stem.to_string_lossy().to_string());
+    let sample_pool = SamplePool::new();
+    struct PatternEntry {
+        instrument_id: InstrumentId,
+        script_path: PathBuf,
+    }
+    let mut entries = vec![];
+    for dir_entry in fs::read_dir(DEMO_PATH)?.flatten() {
+        let path = dir_entry.path();
+        if let Some(extension) = path.extension().map(|e| e.to_string_lossy()) {
+            // collect all audio file's that have a lua file next to it
+            if matches!(extension.as_bytes(), b"mp3" | b"wav" | b"flac") {
+                let script_path = path.clone().with_extension("lua");
+                if script_path.exists() {
+                    let instrument_id = sample_pool.load_sample(path)?;
+                    entries.push(PatternEntry {
+                        instrument_id,
+                        script_path,
+                    });
                 }
             }
         }
     }
 
-    // load samples and get paths to the pattern scripts
-    let sample_pool = SamplePool::new();
-    struct PatternEntry {
-        instrument_id: InstrumentId,
-        script_path: String,
-    }
-    let mut entries = vec![];
-    for stem in entry_stems.iter() {
-        let base_path = PathBuf::new().join(DEMO_PATH).join(stem);
-        let wave_file = base_path.with_extension("wav");
-        let lua_file = base_path.with_extension("lua");
-        if wave_file.exists() && lua_file.exists() {
-            log::info!("Found file/script: '{}'...", stem);
-            let instrument_id = sample_pool.load_sample(&wave_file.to_string_lossy())?;
-            let script_path = lua_file.to_string_lossy().to_string();
-            entries.push(PatternEntry {
-                instrument_id,
-                script_path,
-            });
-        } else if lua_file.exists() || wave_file.exists() {
-            log::warn!("Ignoring file/script: '{}'...", stem);
-        }
-    }
-
-    // create event player
+    // create sample player
     let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
 
     // set default time base config
@@ -128,9 +112,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // build final phrase
-        let load = |instrument: Option<InstrumentId>, file_name: &str| {
+        let load = |instrument: Option<InstrumentId>, file_name: &Path| {
             new_pattern_from_file(beat_time, instrument, file_name).unwrap_or_else(|err| {
-                log::warn!("Script '{}' failed to compile:\n{}", file_name, err);
+                log::warn!(
+                    "Script '{}' failed to compile:\n{}",
+                    file_name.display(),
+                    err
+                );
                 Rc::new(RefCell::new(BeatTimePattern::new(
                     beat_time,
                     BeatTimeStep::Beats(1.0),

@@ -15,6 +15,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
+name = "assume"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d6f9ca11400f14ef046700eb6401c706c587871303453a5e7586efb82340c3d"
+
+[[package]]
 name = "audio_thread_priority"
 version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -515,9 +521,8 @@ dependencies = [
 [[package]]
 name = "phonic"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b52cde25825c2a1cfce1d15838904297740645674f87887f1574a34cdf4385d"
 dependencies = [
+ "assume",
  "audio_thread_priority",
  "basedrop",
  "crossbeam-channel",

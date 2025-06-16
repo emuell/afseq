@@ -3,6 +3,7 @@
 
 use std::{
     collections::HashMap,
+    path::Path,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, RwLock,
@@ -82,9 +83,26 @@ impl SamplePool {
     ///
     /// ### Panics
     /// Panics if the sample pool can not be accessed
-    pub fn load_sample(&self, file_path: &str) -> Result<InstrumentId, Error> {
-        let sample =
-            PreloadedFileSource::new(file_path, None, FilePlaybackOptions::default(), 44100)?;
+    pub fn load_sample<P: AsRef<Path>>(&self, path: P) -> Result<InstrumentId, Error> {
+        let options = FilePlaybackOptions::default();
+        let sample = PreloadedFileSource::from_file(path, None, options, 44100)?;
+        let id = Self::unique_id();
+        let mut pool = self.pool.write().expect("Failed to access sample pool");
+        pool.insert(id, sample);
+        Ok(id)
+    }
+
+    /// Loads a sample file from a raw encoded file buffer as [`PreloadedFileSource`] and return
+    /// its unique id. Given path is used to identify the file in status messages only.
+    ///
+    /// ### Errors
+    /// Returns an error if the sample file could not be loaded.
+    ///
+    /// ### Panics
+    /// Panics if the sample pool can not be accessed
+    pub fn load_sample_buffer(&self, buffer: Vec<u8>, path: &str) -> Result<InstrumentId, Error> {
+        let options = FilePlaybackOptions::default();
+        let sample = PreloadedFileSource::from_file_buffer(buffer, path, None, options, 44100)?;
         let id = Self::unique_id();
         let mut pool = self.pool.write().expect("Failed to access sample pool");
         pool.insert(id, sample);
@@ -227,6 +245,11 @@ impl SamplePlayer {
     // set a new global root note.
     pub fn set_sample_root_note(&mut self, root_note: Note) {
         self.sample_root_note = root_note;
+    }
+
+    // set a new global volume factor.
+    pub fn set_global_volume(&mut self, volume: f32) {
+        self.player.set_output_volume(volume)
     }
 
     /// Stop all currently playing back sources.

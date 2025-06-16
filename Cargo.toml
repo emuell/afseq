@@ -34,7 +34,8 @@ mlua = { version = "^0.10", default-features = false, features = [
 
 # optional -> player
 crossbeam-channel = { version = "^0.5", optional = true }
-phonic = { version = "^0.6", default-features = false, optional = true }
+phonic = { version = "^0.7", default-features = false, optional = true }
+# phonic = { path = "../phonic", default-features = false, optional = true }
 
 # dev dependencies
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
