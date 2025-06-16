@@ -129,6 +129,21 @@ var backend = {
     updateScriptContent: function (content) {
         this._playground.ccall("update_script", 'undefined', ['string'], [content]);
     },
+
+    loadSample: function (filename, buffer) {
+        const data = new Uint8Array(buffer);
+        const newSampleId = this._playground.ccall(
+            'load_sample',
+            'number',
+            ['string', 'array', 'number'],
+            [filename, data, data.length]
+        );
+        return newSampleId;
+    },
+
+    clearSamples: function () {
+        this._playground.ccall('clear_samples', 'undefined', []);
+    },
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -349,6 +364,57 @@ var app = {
                 });
             }
         });
+
+        const loadSampleButton = document.getElementById('loadSampleButton');
+        const sampleFileInput = document.getElementById('sampleFileInput');
+        const clearSamplesButton = document.getElementById('clearSamplesButton');
+        console.assert(loadSampleButton && sampleFileInput && clearSamplesButton);
+
+        loadSampleButton.addEventListener('click', () => {
+            sampleFileInput.value = null;
+            sampleFileInput.click();
+        });
+
+        clearSamplesButton.addEventListener('click', () => {
+            backend.clearSamples();
+            this.setStatus('All samples cleared.');
+            this._initSampleDropdown();
+        });
+
+        sampleFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const maxSize = 4 * 1024 * 1024; // 4MB
+            if (file.size > maxSize) {
+                const isError = true;
+                this.setStatus(`File '${file.name}' is too large. Maximum size is 4MB.`, isError);
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.onload = (e) => {
+                const buffer = e.target.result;
+                const newId = backend.loadSample(file.name, buffer);
+                if (newId >= 0) {
+                    this.setStatus(`Loaded sample '${file.name}'`);
+                    this._initSampleDropdown();
+                    const select = document.getElementById('sampleSelect');
+                    select.value = newId;
+                    backend.updateInstrument(newId);
+                } else {
+                    const isError = true;
+                    this.setStatus(`Failed to load sample '${file.name}'. The format may not be supported.`, isError);
+                }
+            };
+            reader.onerror = (e) => {
+                const isError = true;
+                this.setStatus(`Error reading file: ${e.target.error.message}`, isError);
+            };
+            reader.readAsArrayBuffer(file);
+        });
     },
 
     // Populate sample dropdown
@@ -359,22 +425,31 @@ var app = {
         console.assert(select);
 
         select.innerHTML = '';
-        samples.forEach((sample, index) => {
+        if (samples.length > 0) {
+            samples.forEach((sample, index) => {
+                const option = document.createElement('option');
+                option.value = sample.id;
+                option.textContent = `${String(index).padStart(2, '0')}: ${sample.name}`;
+                select.appendChild(option);
+            });
+            select.onchange = (event) => {
+                let id = event.target.value;
+                backend.updateInstrument(Number(id));
+                this.setStatus(`Set new default instrument: '${id}'`);
+
+            };
+
+            // set last sample as default instrument
+            select.value = samples[samples.length - 1].id
+            backend.updateInstrument(select.value)
+        } else {
             const option = document.createElement('option');
-            option.value = sample.id;
-            option.textContent = `${String(index).padStart(2, '0')}: ${sample.name}`;
+            option.value = 'none';
+            option.textContent = 'No samples loaded';
             select.appendChild(option);
-        });
-        select.onchange = (event) => {
-            let id = event.target.value;
-            backend.updateInstrument(Number(id));
-            this.setStatus(`Set new default instrument: '${id}'`);
-
-        };
-
-        // set last sample as default instrument
-        select.value = samples[samples.length - 1].id
-        backend.updateInstrument(select.value)
+            select.onchange = null;
+            backend.updateInstrument(-1);
+        }
     },
 
     // Set up example scripts list

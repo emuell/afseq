@@ -109,6 +109,15 @@ impl SamplePool {
         Ok(id)
     }
 
+    /// Clears all preloaded samples from the pool.
+    ///
+    /// ### Panics
+    /// Panics if the sample pool can not be accessed
+    pub fn clear(&self) {
+        let mut pool = self.pool.write().expect("Failed to access sample pool");
+        pool.clear();
+    }
+
     /// Generate a new unique instrument id.
     fn unique_id() -> InstrumentId {
         static ID: AtomicUsize = AtomicUsize::new(0);

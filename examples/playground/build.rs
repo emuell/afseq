@@ -23,24 +23,26 @@ fn main() {
         // exports
         println!("cargo::rustc-link-arg=--no-entry");
         let exports = [
-            "UTF8ToString",
             "ccall",
+            "UTF8ToString",
             "_free_cstring",
             "_initialize_playground",
             "_shutdown_playground",
             "_start_playing",
             "_stop_playing",
             "_stop_playing_notes",
-            "_set_volume",
             "_midi_note_on",
             "_midi_note_off",
+            "_set_volume",
             "_set_bpm",
             "_set_instrument",
+            "_update_script",
+            "_load_sample",
+            "_clear_samples",
             "_get_samples",
             "_get_example_scripts",
             "_get_quickstart_scripts",
             "_get_script_error",
-            "_update_script",
         ];
         println!(
             "cargo::rustc-link-arg=-sEXPORTED_FUNCTIONS={}",

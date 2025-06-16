@@ -3,6 +3,7 @@
 use std::{
     cell::RefCell,
     ffi, fs,
+    path::Path,
     rc::Rc,
     sync::{Arc, RwLock},
     time::Duration,
@@ -91,6 +92,7 @@ struct PlayingNote {
 struct Playground {
     playing: bool,
     player: SamplePlayer,
+    sample_pool: Arc<RwLock<SamplePool>>,
     samples: Vec<SampleEntry>,
     sequence: Option<Sequence>,
     time_base: BeatTimeBase,
@@ -119,12 +121,12 @@ impl Playground {
         // load samples
         println!("Loading sample files...");
         let mut samples = Vec::new();
-        let sample_pool = SamplePool::new();
+        let sample_pool = Arc::new(RwLock::new(SamplePool::new()));
         for dir_entry in fs::read_dir(format!("{}/samples", Self::ASSETS_PATH))?.flatten() {
             let path = dir_entry.path();
             if let Some(extension) = path.extension().map(|e| e.to_string_lossy()) {
                 if matches!(extension.as_bytes(), b"mp3" | b"wav" | b"flac") {
-                    let id = usize::from(sample_pool.load_sample(&path)?);
+                    let id = usize::from(sample_pool.read().unwrap().load_sample(&path)?);
                     let name = path.file_stem().unwrap().to_string_lossy().to_string();
                     println!("Added sample '{}' with id {}", name, id);
                     samples.push(SampleEntry { id, name });
@@ -135,7 +137,7 @@ impl Playground {
         // create and configure sample player
         println!("Creating audio player...");
         let playing = false;
-        let mut player = SamplePlayer::new(Arc::new(RwLock::new(sample_pool)), None)?;
+        let mut player = SamplePlayer::new(Arc::clone(&sample_pool), None)?;
         player.set_sample_root_note(Note::C4);
         player.set_new_note_action(NewNoteAction::Off(Some(Duration::from_millis(200))));
 
@@ -174,6 +176,7 @@ impl Playground {
         Ok(Self {
             player,
             playing,
+            sample_pool,
             samples,
             sequence,
             time_base,
@@ -353,13 +356,41 @@ impl Playground {
 
     /// Sets the default instrument ID for playback.
     fn set_instrument(&mut self, id: i32) {
-        self.instrument_id = Some(id as usize);
+        self.instrument_id = if id < 0 { None } else { Some(id as usize) };
         self.script_changed = true;
     }
 
     /// Updates the script content and marks it as changed to trigger recompilation.
     fn update_script_content(&mut self, content: String) {
         self.script_content = content;
+        self.script_changed = true;
+    }
+
+    /// Load a sample from a raw file buffer and add it to the pool
+    fn load_sample(&mut self, file_buffer: Vec<u8>, file_name: &str) -> Result<usize, String> {
+        let sample_buffer = self.sample_pool.read().unwrap();
+        match sample_buffer.load_sample_buffer(file_buffer, file_name) {
+            Ok(instrument_id) => {
+                let id = usize::from(instrument_id);
+                let name = Path::new(&file_name)
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                self.samples.push(SampleEntry { name, id });
+                Ok(id)
+            }
+            Err(err) => Err(err.to_string()),
+        }
+    }
+
+    /// Reset sample pool, removing all samples
+    fn clear_samples(&mut self) {
+        // Clear the sample pool
+        self.sample_pool.read().unwrap().clear();
+        self.samples.clear();
+        // Reset the current instrument
+        self.instrument_id = None;
         self.script_changed = true;
     }
 
@@ -665,6 +696,39 @@ pub unsafe extern "C" fn update_script(content_ptr: *const ffi::c_char) {
             .into_owned()
     };
     with_playground_mut(|playground| playground.update_script_content(content));
+}
+
+/// Load a sample from a file buffer.
+#[no_mangle]
+pub unsafe extern "C" fn load_sample(
+    filename_ptr: *const ffi::c_char,
+    buffer_ptr: *const u8,
+    buffer_len: usize,
+) -> ffi::c_int {
+    let file_buffer = std::slice::from_raw_parts(buffer_ptr, buffer_len).to_vec();
+    let file_name = ffi::CStr::from_ptr(filename_ptr)
+        .to_string_lossy()
+        .into_owned();
+    with_playground_mut(
+        |playground| match playground.load_sample(file_buffer, &file_name) {
+            Ok(id) => {
+                println!("Loaded sample '{}' with id {}", file_name, id);
+                id as ffi::c_int
+            }
+            Err(err) => {
+                eprintln!("Failed to load sample '{}': {}", file_name, err);
+                -1
+            }
+        },
+    )
+}
+
+/// Clears all loaded samples.
+#[no_mangle]
+pub extern "C" fn clear_samples() {
+    with_playground_mut(|playground| {
+        playground.clear_samples();
+    });
 }
 
 /// Returns available sample names and ids as json string.
