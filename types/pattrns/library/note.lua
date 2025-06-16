@@ -82,7 +82,7 @@ function Note:delay(delay) end
 
 ----------------------------------------------------------------------------------------------------
 
----@alias NoteValue NoteTable|string|number|nil
+---@alias NoteValue Note|NoteTable|string|number|nil
 
 --- Create a new monophonic or polyphonic note (a chord) from a number value,
 --- a note string, chord string or array of note values.
