@@ -102,6 +102,10 @@ var backend = {
         this._isPlaying = false;
     },
 
+    setVolume: function (volume) {
+        this._playground.ccall("set_volume", "undefined", ["number"], [volume]);
+    },
+
     stopPlayingNotes: function () {
         this._playground.ccall("stop_playing_notes");
     },
@@ -204,6 +208,62 @@ var app = {
                 backend.updateBpm(bpm);
                 this.setStatus(`Set new BPM: '${bpm}'`);
             }
+        });
+
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeInput = document.getElementById('volumeInput');
+        console.assert(volumeSlider && volumeInput);
+
+        function updateVolumeDisplay(gain) {
+            // Update slider
+            volumeSlider.value = Math.round(gain * 100);
+            // Update text input
+            if (gain <= 0.0001) {
+                volumeInput.value = '-INF dB';
+            } else {
+                const db = 20 * Math.log10(gain);
+                volumeInput.value = `${db.toFixed(1)} dB`;
+            }
+        }
+
+        // Initial setup
+        const initialGain = parseInt(volumeSlider.value, 10) / 100.0;
+        backend.setVolume(initialGain);
+        updateVolumeDisplay(initialGain);
+
+        // Event listener for slider
+        volumeSlider.addEventListener('input', (e) => {
+            const gain = parseInt(e.target.value, 10) / 100.0;
+            backend.setVolume(gain);
+            updateVolumeDisplay(gain);
+        });
+
+        // Event listener for text input
+        volumeInput.addEventListener('change', (e) => {
+            let dbString = e.target.value.trim();
+            let db = dbString.toLowerCase().includes('-inf')
+                ? -Infinity
+                : parseFloat(dbString);
+            if (isNaN(db)) {
+                // Invalid input, revert to current slider value
+                const currentGain = parseInt(volumeSlider.value, 10) / 100.0;
+                updateVolumeDisplay(currentGain);
+                return;
+            }
+            db = Math.min(db, 3.0); // Clamp to +3dB
+            const gain = isFinite(db) ? Math.pow(10, db / 20) : 0;
+            // apply
+            backend.setVolume(gain);
+            updateVolumeDisplay(gain);
+        });
+
+        // When focusing the input, remove " dB" for easier editing
+        volumeInput.addEventListener('focus', (e) => {
+            e.target.value = e.target.value.replace(/\s*dB/i, '');
+        });
+        volumeInput.addEventListener('blur', (e) => {
+            // Trigger change event to re-validate and re-format
+            e.target.dispatchEvent(new Event('change', { 'bubbles': true }));
         });
 
         let midiAccess = null;

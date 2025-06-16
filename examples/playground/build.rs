@@ -31,6 +31,7 @@ fn main() {
             "_start_playing",
             "_stop_playing",
             "_stop_playing_notes",
+            "_set_volume",
             "_midi_note_on",
             "_midi_note_off",
             "_set_bpm",

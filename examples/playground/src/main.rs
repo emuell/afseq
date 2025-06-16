@@ -118,22 +118,16 @@ impl Playground {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // load samples
         println!("Loading sample files...");
-        let sample_paths = fs::read_dir(format!("{}/samples", Self::ASSETS_PATH))?;
         let mut samples = Vec::new();
         let sample_pool = SamplePool::new();
-        for sample_path in sample_paths.flatten() {
-            let path = sample_path.path();
-            if let Some(extension) = path.extension() {
-                let extension = extension.to_string_lossy().to_string();
-                if matches!(extension.as_str(), "mp3" | "wav" | "flac") {
-                    let instrument_id =
-                        usize::from(sample_pool.load_sample(&path.to_string_lossy())?);
+        for dir_entry in fs::read_dir(format!("{}/samples", Self::ASSETS_PATH))?.flatten() {
+            let path = dir_entry.path();
+            if let Some(extension) = path.extension().map(|e| e.to_string_lossy()) {
+                if matches!(extension.as_bytes(), b"mp3" | b"wav" | b"flac") {
+                    let id = usize::from(sample_pool.load_sample(&path)?);
                     let name = path.file_stem().unwrap().to_string_lossy().to_string();
-                    println!("Added sample '{}' with id {}", name, instrument_id);
-                    samples.push(SampleEntry {
-                        id: instrument_id,
-                        name,
-                    });
+                    println!("Added sample '{}' with id {}", name, id);
+                    samples.push(SampleEntry { id, name });
                 }
             }
         }
@@ -285,6 +279,11 @@ impl Playground {
     /// Stops all currently playing audio sources.
     fn stop_playing_notes(&mut self) {
         let _ = self.player.file_player_mut().stop_all_sources();
+    }
+
+    /// Set global playback volume.
+    fn set_volume(&mut self, volume: f32) {
+        self.player.set_global_volume(volume);
     }
 
     /// Handle incoming MIDI note on event
@@ -626,6 +625,12 @@ pub extern "C" fn stop_playing() {
 #[no_mangle]
 pub extern "C" fn stop_playing_notes() {
     with_playground_mut(|playground| playground.stop_playing_notes());
+}
+
+/// Set new global volume factor.
+#[no_mangle]
+pub extern "C" fn set_volume(volume: f32) {
+    with_playground_mut(|playground| playground.set_volume(volume));
 }
 
 /// Handle note on event from the frontend
