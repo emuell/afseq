@@ -1,5 +1,15 @@
 ﻿# Examples
 
+## `Web Examples`
+
+### `playground`
+
+This is a simple WASM online playground. It's hosted here: https://pattrns.renoise.com/
+
+See [playground's README](./playground/README.md) on how to run and build the example locally.
+
+## `Rust Examples`
+
 ### `play.rs`
 
 This only uses the pattrns rust lib. It defines and plays a little music thing. If you change the content here, you will need to recompile and restart the example.
@@ -8,7 +18,7 @@ This only uses the pattrns rust lib. It defines and plays a little music thing. 
 
 This uses the pattrns [Lua API](../types/pattrns/). It also defines and plays a little music thing, but [its contents](./assets/) can be added/removed and changed on the fly, so you can do some basic live music coding here.  
 
-## Running
+#### Running
 
 CD into the main folder, the folder where the `Cargo.toml` file is. 
 
@@ -24,6 +34,6 @@ cargo run --release --example=play-script --features=player,cpal-output
 
 Aternatively you can also open the pattrns root folder with vscode and use the `play` or `play-script` launch tasks.
 
-## Requirements
+#### Requirements
 
 [Rust toolchain](https://www.rust-lang.org/tools/install) with Rust edition >= 2021.
