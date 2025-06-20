@@ -72,7 +72,7 @@
 ---  
 ## Aliases  
 ### NoteValue<a name="NoteValue"></a>
-[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
+[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`Note`](../API/note.md#Note) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
 ### PulseValue<a name="PulseValue"></a>
@@ -363,7 +363,7 @@
 > end
 > ```
 
-### event : [`Cycle`](../API/cycle.md#Cycle) | [`Sequence`](../API/sequence.md#Sequence) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue)[] | (context : [`EventContext`](../API/pattern.md#EventContext)) `->` [`NoteValue`](#NoteValue) | (context : [`EventContext`](../API/pattern.md#EventContext)) `->` (context : [`EventContext`](../API/pattern.md#EventContext)) `->` [`NoteValue`](#NoteValue)<a name="event"></a>
+### event : [`Cycle`](../API/cycle.md#Cycle) | [`Sequence`](../API/sequence.md#Sequence) | [`Note`](../API/note.md#Note) | [`NoteValue`](#NoteValue) | [`NoteValue`](#NoteValue)[] | (context : [`EventContext`](../API/pattern.md#EventContext)) `->` [`NoteValue`](#NoteValue) | (context : [`EventContext`](../API/pattern.md#EventContext)) `->` (context : [`EventContext`](../API/pattern.md#EventContext)) `->` [`NoteValue`](#NoteValue)<a name="event"></a>
 > Specify the event values of the pattern. For every pulse in the pulse pattern, an event
 > is picked from the specified event sequence. When the end of the sequence is reached, it starts
 > again from the beginning.
@@ -424,7 +424,7 @@
 ---  
 ## Aliases  
 ### NoteValue<a name="NoteValue"></a>
-[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
+[`string`](../API/builtins/string.md) | [`number`](../API/builtins/number.md) | [`Note`](../API/note.md#Note) | [`NoteTable`](../API/note.md#NoteTable) | [`nil`](../API/builtins/nil.md)  
   
   
 ### PulseValue<a name="PulseValue"></a>
