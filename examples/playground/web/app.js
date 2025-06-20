@@ -41,7 +41,7 @@ return pattern {
 
 // -------------------------------------------------------------------------------------------------
 
-var backend = {
+const backend = {
     _playground: undefined,
     _isPlaying: false,
 
@@ -148,18 +148,20 @@ var backend = {
 
 // -------------------------------------------------------------------------------------------------
 
-var app = {
+const app = {
     _initialized: false,
     _editor: undefined,
     _editCount: 0,
 
     initialize: function () {
         // hide spinner, show content
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('content').style.display = 'flex';
-        this._initialized = true;
-
+        let splash = document.getElementById('loading-splash');
+        let content = document.getElementById('app-content');
+        console.assert(splash && content);
+        splash.style.display = 'none';
+        content.style.display = 'flex';
         // init components
+        this._initialized = true;
         this._initControls();
         this._initSampleDropdown();
         this._initExampleScripts();
@@ -189,9 +191,6 @@ var app = {
                 }, 5000);
             }
         }
-        else {
-
-        }
     },
 
     // Init transport controls
@@ -207,7 +206,6 @@ var app = {
             this.setStatus("Playing...");
             playButton.style.color = 'var(--color-accent)';
         });
-
         stopButton.addEventListener('click', () => {
             backend.stopPlaying();
             this.setStatus("Stopped");
