@@ -10,12 +10,12 @@
 </head>
 
 <body>
-    <div id="loading">
+    <div id="loading-splash" class="loading-splash">
         <div id="spinner" class="spinner"></div>
         <div id="spinner-status">Loading...</div>
     </div>
 
-    <div id="content">
+    <div id="app-content" class="app-content">
         <div class="header">
             <div>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 104 34" style="width: 132px;">
@@ -78,8 +78,10 @@
                 <select id="sampleSelect">
                     <option value="none">Loading Samples...</option>
                 </select>
-                <button id="loadSampleButton" class="text-button" title="Load a local audio file (.wav, .flac, .mp3)">Load</button>
-                <button id="clearSamplesButton" class="text-button" title="Remove all loaded samples">Clear</button>
+                <button id="loadSampleButton" class="text-button" title="Load a local audio file (.wav, .flac, .mp3)"><i
+                        class="fas fa-upload"></i></button>
+                <button id="clearSamplesButton" class="text-button" title="Remove all loaded samples"><i
+                        class="fas fa-trash"></i></button>
                 <input type="file" id="sampleFileInput" style="display: none;" accept=".wav,.flac,.mp3">
             </div>
         </div>
@@ -97,8 +99,8 @@
                     <div id="editor-error-content" class="editor-error-content"></div>
                 </div>
             </div>
-            <div id="examples-column" class="examples-column">
-                <ul id="examples-list"></ul>
+            <div class="examples-column">
+                <ul id="examples-list" class="examples-list"></ul>
             </div>
         </div>
         <div id="status" class="status">Loading...</div>

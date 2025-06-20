@@ -79,7 +79,7 @@ code {
 }
 
 /* Loading Splash */
-#loading {
+.loading-splash {
     position: fixed;
     top: 0;
     left: 0;
@@ -114,7 +114,7 @@ code {
 }
 
 /* App content */
-#content {
+.app-content {
     display: none;
     flex-direction: column;
     height: 100%;
@@ -180,6 +180,14 @@ code {
     border-bottom: 1px solid var(--color-grid);
 }
 
+.transport>#playButton {
+    font-size: larger;
+}
+
+.transport>#stopButton {
+    font-size: larger;
+}
+
 .bpm-control {
     display: flex;
     align-items: center;
@@ -196,11 +204,11 @@ code {
     gap: 5px;
 }
 
-#volumeSlider {
+.volume-control input[type="range"] {
     width: 64px;
 }
 
-#volumeInput {
+.volume-control input[type="text"] {
     width: 68px;
     font-variant-numeric: tabular-nums;
     text-align: right;
@@ -265,26 +273,30 @@ code {
     max-width: 10%;
 }
 
-#examples-header {
-    margin: 0px;
-}
-
-#examples-list {
+.examples-list {
     list-style: inside;
     padding: 0px 5px;
     overflow-wrap: break-word;
 }
 
-#examples-list>h4 {
-    margin: 5px 0px
+.examples-list>h3 {
+    margin: 10px 5px 0px 0px;
 }
 
-#examples-list a {
+.examples-list>h4 {
+    margin: 5px 0px;
+}
+
+.examples-list>li {
+    padding: 0px 5px;
+}
+
+.examples-list a {
     color: var(--color-accent);
     text-decoration: none;
 }
 
-#examples-list a:hover {
+.examples-list a:hover {
     text-decoration: underline;
 }
 
