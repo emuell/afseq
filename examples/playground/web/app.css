@@ -169,7 +169,6 @@ code {
     text-decoration: underline;
 }
 
-
 /* transport section */
 .transport {
     display: flex;
@@ -219,6 +218,41 @@ code {
     align-items: center;
     gap: 5px;
     margin-left: auto;
+}
+
+/* Parameters section */
+.parameters-container {
+    display: none;
+    /* Hidden by default */
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+    padding: 10px;
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-grid);
+}
+
+.parameter-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.parameter-control label {
+    cursor: help;
+}
+
+.parameter-control input[type="number"],
+.parameter-control input[type="range"] {
+    width: 60px;
+}
+
+.parameter-control select {
+    width: 120px;
+}
+
+.parameter-control input[type="checkbox"] {
+    width: auto;
 }
 
 /* Editor section */
