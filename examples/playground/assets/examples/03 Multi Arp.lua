@@ -5,10 +5,10 @@
 -- Patterns of notes and arpeggio directions
 local patterns = {
   -- Change existing or add more patterns as desired
-  { notes = { 60, 64, 67 },     direction = "up" },
-  { notes = { 64, 67, 71 },     direction = "down" },
-  { notes = { 60, 64, 67, 71 }, direction = "up-down" },
-  { notes = { 60, 64, 67 },     direction = "down-up" },
+  { notes = { 48, 52, 55 },     direction = "up" },
+  { notes = { 52, 55, 59 },     direction = "down" },
+  { notes = { 48, 52, 55, 59 }, direction = "up-down" },
+  { notes = { 48, 52, 55 },     direction = "down-up" },
 }
 
 return pattern {
