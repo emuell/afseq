@@ -5,39 +5,54 @@ import { default as createModule } from "./playground.js";
 const defaultBpm = 120;
 const defaultInstrument = 0;
 const defaultScriptContent = `--
--- Welcome to the Renoise pattrns playground!
+-- Welcome to the pattrns playground!
 --
--- Create and experiment with pattern scripts here to learn how the work.
--- Check out the interactive 'Quickstart' scripts on the right, or load some examples
+-- Create and experiment with pattern scripts here, to learn how the work.
+-- Check out the interactive 'Quickstart' scripts on the right or load some examples
 -- to get started.
 --
 -- This playground uses a simple sample player as the player backend. The currently 
 -- selected sample plays by default, unless your script specifies a different instrument
 -- explicitly.
 --
--- Use \`Control + Return\` in the editor to *apply* changes you've made to the script. 
--- Use \`Control + Shift + Space\` to start stop playing.
+-- Use \`CTRL+Return\` or \`CTRL+S\` in the editor to *apply* script changes. 
+-- Use \`CTRL+SHIFT+SPACE\` to start stop playing.
 
-local chord = { "c4", "e4", "g4", "a4", "e4", "a3" } -- The arpeggio notes
-local length = 32 -- Modulation length in units
+local notes = { "c4", "e4", "g4", "a4", "e4", "a3" }
 
 return pattern {
   unit = "1/16",
+  parameter = {
+    -- template parameters
+    parameter.enum("direction", "up", { "up", "down", "up&down" }, "Direction", 
+      "The note arp direction"),
+    parameter.integer("mod_length", 32, { 1, 256 }, "Mod. Length", 
+      "Modulation length in 1/16 units"),
+  },
   event = function(context)
-    -- Cycle through chord notes
-    local step = math.imod(context.step, #chord)
-    -- Return the note event
+    -- fetch parameter values
+    local direction = context.parameter.direction
+    local mod_length = context.parameter.mod_length
+    -- cycle through notes with the given direction
+    local step_sign = {
+      ["up"] = 1,
+      ["down"] = -1,
+      ["up&down"] = math.floor(context.step / #notes) % 2 == 0 and 1 or -1,
+    }
+    local step = math.imod(step_sign[direction] * context.step, #notes)
+    -- Return the note event with modulated volume and panning
     return {
-        key = chord[step],
+        key = notes[step],
         -- Create a volume swell using cosine wave
-        volume = 0.6 + 0.4 * math.cos(context.step / length * math.pi),
+        volume = 0.6 + 0.4 * math.cos(context.step / mod_length * math.pi),
         -- Add stereo movement with sine wave panning
-        panning = 0.5 * math.sin(context.step / length / 3 * math.pi),
+        panning = 0.5 * math.sin(context.step / mod_length / 3 * math.pi),
         -- Set the instrument (change to 0 for bass sample, nil plays the selected one)
         instrument = nil
     }
   end
-}`;
+}
+`;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -61,31 +76,39 @@ const backend = {
     },
 
     getSamples: function () {
-        const ptr = this._playground.ccall('get_samples', 'number', [])
-        const samplesJson = this._playground.UTF8ToString(ptr);
-        this._playground.ccall('free_cstring', 'undefined', ['number'], [ptr])
+        const stringPtr = this._playground.ccall('get_samples', 'number', [])
+        const samplesJson = this._playground.UTF8ToString(stringPtr);
+        this._freeCString(stringPtr)
         return JSON.parse(samplesJson);
     },
 
     getQuickstartScripts: function () {
-        const ptr = this._playground.ccall('get_quickstart_scripts', 'number', [])
-        const examplesJson = this._playground.UTF8ToString(ptr);
-        this._playground.ccall('free_cstring', 'undefined', ['number'], [ptr])
+        const stringPtr = this._playground.ccall('get_quickstart_scripts', 'number', [])
+        const examplesJson = this._playground.UTF8ToString(stringPtr);
+        this._freeCString(stringPtr)
         return JSON.parse(examplesJson);
     },
 
     getExampleScripts: function () {
-        const ptr = this._playground.ccall('get_example_scripts', 'number', [])
-        const examplesJson = this._playground.UTF8ToString(ptr);
-        this._playground.ccall('free_cstring', 'undefined', ['number'], [ptr])
+        const stringPtr = this._playground.ccall('get_example_scripts', 'number', [])
+        const examplesJson = this._playground.UTF8ToString(stringPtr);
+        this._freeCString(stringPtr)
         return JSON.parse(examplesJson);
     },
 
     getScriptError: function () {
-        let ptr = this._playground.ccall('get_script_error', 'number', [])
-        const err = this._playground.UTF8ToString(ptr);
-        this._playground._free_cstring(ptr);
-        return err;
+        let stringPtr = this._playground.ccall('get_script_error', 'number', [])
+        const error = this._playground.UTF8ToString(stringPtr);
+        this._freeCString(stringPtr)
+        return error;
+    },
+
+    getScriptParameters: function () {
+        let stringPtr = this._playground.ccall('get_script_parameters', 'number', [])
+        const json = this._playground.UTF8ToString(stringPtr);
+        const parameters = JSON.parse(json);
+        this._freeCString(stringPtr)
+        return parameters;
     },
 
     isPlaying: function () {
@@ -126,6 +149,10 @@ const backend = {
         this._playground.ccall("set_bpm", 'undefined', ['number'], [bpm]);
     },
 
+    updateParameterValue: function (id, value) {
+        this._playground.ccall("set_parameter_value", "undefined", ["string", "number"], [id, value]);
+    },
+
     updateScriptContent: function (content) {
         this._playground.ccall("update_script", 'undefined', ['string'], [content]);
     },
@@ -143,6 +170,10 @@ const backend = {
 
     clearSamples: function () {
         this._playground.ccall('clear_samples', 'undefined', []);
+    },
+
+    _freeCString: function (stringPtr) {
+        this._playground.ccall('free_cstring', 'undefined', ['number'], [stringPtr])
     },
 };
 
@@ -165,7 +196,8 @@ const app = {
         this._initControls();
         this._initSampleDropdown();
         this._initExampleScripts();
-        this._initScriptErrorTimer();
+        this._initScriptErrorHandler();
+        this._initScriptParameterHandler();
         this._initEditor();
     },
 
@@ -215,11 +247,17 @@ const app = {
         const bpmInput = document.getElementById('bpmInput');
         console.assert(bpmInput);
 
+        bpmInput.min = 20;
+        bpmInput.max = 999;
         bpmInput.addEventListener('change', (e) => {
             const bpm = parseInt(e.target.value);
             if (!isNaN(bpm)) {
-                backend.updateBpm(bpm);
-                this.setStatus(`Set new BPM: '${bpm}'`);
+                const clampedBpm = Math.max(bpmInput.min, Math.min(bpm, bpmInput.max));
+                if (bpm !== clampedBpm) {
+                    e.target.value = clampedBpm;
+                }
+                backend.updateBpm(clampedBpm);
+                this.setStatus(`Set new BPM: '${clampedBpm}'`);
             }
         });
 
@@ -681,54 +719,62 @@ const app = {
         });
     },
 
-    _initScriptErrorTimer: function () {
+    // install script error change handler
+    _initScriptErrorHandler: function () {
+        window.on_script_error_changed = () => {
+            this._updateScriptErrorsUI();
+        }
+    },
+
+    // install script parameter change handler
+    _initScriptParameterHandler: function () {
+        window.on_script_parameters_changed = () => {
+            this._updateParametersUI();
+        }
+        this._updateParametersUI();
+    },
+
+    // update script error display in editor and error panel
+    _updateScriptErrorsUI: function () {
         const errorPane = document.getElementById('editor-error');
         console.assert(errorPane);
 
         const errorContent = document.getElementById('editor-error-content');
         console.assert(errorContent);
 
-        let lastScriptError = "";
-        setInterval(() => {
-            const err = backend.getScriptError();
-            if (err !== lastScriptError) {
-                lastScriptError = err;
-
-                // Clear previous markers
-                if (this._editor) {
-                    monaco.editor.setModelMarkers(
-                        this._editor.getModel(),
-                        'owner',
-                        []
-                    );
-                }
-
-                if (err) {
-                    errorContent.textContent = err;
-                    errorPane.style.display = 'flex';
-
-                    // Parse error and add to editor
-                    const parsedError = this._parseLuaError(err);
-                    if (parsedError && this._editor) {
-                        monaco.editor.setModelMarkers(
-                            this._editor.getModel(),
-                            'owner',
-                            [{
-                                severity: monaco.MarkerSeverity.Error,
-                                message: parsedError.message,
-                                startLineNumber: parsedError.lineNumber,
-                                startColumn: 1,
-                                endLineNumber: parsedError.lineNumber,
-                                endColumn: 100 // arbitrary large column
-                            }]
-                        );
-                    }
-                } else {
-                    errorContent.textContent = '';
-                    errorPane.style.display = 'none';
-                }
+        const err = backend.getScriptError();
+        // Clear previous markers
+        if (this._editor) {
+            monaco.editor.setModelMarkers(
+                this._editor.getModel(),
+                'owner',
+                []
+            );
+        }
+        if (err) {
+            // Parse error and add to editor
+            errorContent.textContent = err;
+            errorPane.style.display = 'flex';
+            const parsedError = this._parseLuaError(err);
+            if (parsedError && this._editor) {
+                monaco.editor.setModelMarkers(
+                    this._editor.getModel(),
+                    'owner',
+                    [{
+                        severity: monaco.MarkerSeverity.Error,
+                        message: parsedError.message,
+                        startLineNumber: parsedError.lineNumber,
+                        startColumn: 1,
+                        endLineNumber: parsedError.lineNumber,
+                        endColumn: 100 // arbitrary large column
+                    }]
+                );
             }
-        }, 200);
+        } else {
+            // Clear error display
+            errorContent.textContent = '';
+            errorPane.style.display = 'none';
+        }
     },
 
     // Show hide the "X edits" text
@@ -761,7 +807,101 @@ const app = {
             };
         }
         return null;
-    }
+    },
+
+    // rebuild parameter controls
+    _updateParametersUI: function () {
+        const container = document.getElementById('parameters-container');
+        console.assert(container);
+        container.innerHTML = '';
+
+        const parameters = backend.getScriptParameters();
+        if (!parameters || parameters.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'flex';
+
+        parameters.forEach(param => {
+            const controlWrapper = document.createElement('div');
+            controlWrapper.className = 'parameter-control';
+
+            const label = document.createElement('label');
+            label.textContent = param.name + ":";
+            label.title = param.description || param.name;
+            controlWrapper.appendChild(label);
+
+            let control;
+
+            switch (param.type) {
+                case 'boolean':
+                    control = document.createElement('input');
+                    control.type = 'checkbox';
+                    control.checked = param.value;
+                    control.addEventListener('change', (e) => {
+                        backend.updateParameterValue(param.id, e.target.checked ? 1 : 0);
+                    });
+                    break;
+
+                case 'integer':
+                case 'float':
+                    control = document.createElement('input');
+                    control.type = 'number';
+
+                    control.min = param.range.start;
+                    control.max = param.range.end;
+
+                    if (param.type === 'float') {
+                        const step = (param.range.end - param.range.start) / 100;
+                        if (step > 0) {
+                            control.step = step;
+                        }
+                    } else {
+                        control.step = 1;
+                    }
+
+                    control.value = param.value;
+                    control.title = param.description;
+                    control.addEventListener('change', (e) => {
+                        let value = parseFloat(e.target.value);
+                        if (isNaN(value)) {
+                            // On invalid input, revert to the last known value from the backend.
+                            e.target.value = param.value;
+                            return;
+                        }
+                        // Clamp value to the defined range
+                        const clampedValue = Math.max(param.range.start, Math.min(value, param.range.end));
+                        // Update the input field to show the (potentially clamped) value
+                        if (value !== clampedValue) {
+                            e.target.value = clampedValue;
+                        }
+                        // Send the valid, clamped value to the backend
+                        backend.updateParameterValue(param.id, clampedValue);
+                    });
+                    break;
+
+                case 'enum':
+                    control = document.createElement('select');
+                    param.value_strings.forEach((name, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = name;
+                        control.appendChild(option);
+                    });
+                    control.value = param.value;
+                    control.addEventListener('change', (e) => {
+                        backend.updateParameterValue(param.id, parseInt(e.target.value, 10));
+                    });
+                    break;
+            }
+
+            if (control) {
+                controlWrapper.appendChild(control);
+            }
+            container.appendChild(controlWrapper);
+        });
+    },
 }
 
 // -------------------------------------------------------------------------------------------------

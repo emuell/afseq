@@ -1,21 +1,27 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::{cell::RefCell, ffi, fs, path::Path, rc::Rc, sync::Arc, time::Duration};
+use std::{
+    cell::RefCell, collections::HashMap, ffi, fs, path::Path, rc::Rc, sync::Arc, time::Duration,
+};
+
+use serde::ser::SerializeStruct;
 
 use pattrns::prelude::*;
 
+// Externally defined emscripten runtime functions
 extern "C" {
     fn emscripten_cancel_animation_frame(requestAnimationFrameId: ffi::c_long);
     fn emscripten_request_animation_frame_loop(
         func: unsafe extern "C" fn(ffi::c_double, *mut ffi::c_void) -> ffi::c_int,
         user_data: *mut ffi::c_void,
     ) -> ffi::c_long;
+    fn emscripten_run_script(script: *const ffi::c_char);
 }
 
 // -------------------------------------------------------------------------------------------------
 
 // We're called from single thread in JS only, thus we can avoid using Mutex or other RWLocks
-// which would require using atomics in the WASM.
+// which actually would require using atomics in the WASM.
 thread_local!( //
     static PLAYGROUND: RefCell<Option<Playground>> = const { RefCell::new(None) }
 );
@@ -73,6 +79,45 @@ struct ScriptEntry {
     content: String,
 }
 
+/// Single script parameter, passed as JSON to the frontend.
+
+#[derive(Clone, PartialEq)]
+struct ScriptParameter(Rc<RefCell<Parameter>>);
+
+impl serde::Serialize for ScriptParameter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let parameter = self.0.borrow();
+
+        let mut s = serializer.serialize_struct("Parameter", 8)?;
+        s.serialize_field("id", parameter.id())?;
+        s.serialize_field("name", parameter.name())?;
+        s.serialize_field("description", parameter.description())?;
+        let parameter_type = {
+            match &parameter.parameter_type() {
+                ParameterType::Boolean => "boolean",
+                ParameterType::Float => "float",
+                ParameterType::Integer => "integer",
+                ParameterType::Enum => "enum",
+            }
+        };
+        s.serialize_field("type", &parameter_type)?;
+        s.serialize_field("range", parameter.range())?;
+        s.serialize_field("default", &parameter.default())?;
+        s.serialize_field("value", &parameter.value())?;
+        s.serialize_field("value_strings", parameter.value_strings())?;
+        s.end()
+    }
+}
+
+impl From<&Rc<RefCell<pattrns::Parameter>>> for ScriptParameter {
+    fn from(value: &Rc<RefCell<pattrns::Parameter>>) -> Self {
+        Self(Rc::clone(value))
+    }
+}
+
 /// Single pattern triggered by a MIDI note
 #[derive(Clone)]
 struct PlayingNote {
@@ -88,12 +133,15 @@ struct Playground {
     sample_pool: Arc<SamplePool>,
     samples: Vec<SampleEntry>,
     sequence: Option<Sequence>,
+    pattern: Option<Rc<RefCell<dyn Pattern>>>,
     time_base: BeatTimeBase,
     time_base_changed: bool,
     instrument_id: Option<usize>,
     script_content: String,
     script_changed: bool,
-    script_runtime_error: String,
+    script_parameters: Vec<ScriptParameter>,
+    script_parameter_values: HashMap<String, f64>,
+    script_error: String,
     playing_notes: Vec<PlayingNote>,
     output_start_sample_time: u64,
     emitted_sample_time: u64,
@@ -134,8 +182,9 @@ impl Playground {
         player.set_sample_root_note(Note::C4);
         player.set_new_note_action(NewNoteAction::Off(Some(Duration::from_millis(200))));
 
-        // create sequence
+        // sequence & pattern
         let sequence = None;
+        let pattern = None;
 
         // time base
         let time_base = BeatTimeBase {
@@ -148,7 +197,9 @@ impl Playground {
         // script content
         let script_content = "return pattern { }".to_string();
         let script_changed = true;
-        let script_runtime_error = String::new();
+        let script_parameters = Vec::new();
+        let script_parameter_values = HashMap::new();
+        let script_error = String::new();
 
         // MIDI note playback
         let playing_notes = Vec::new();
@@ -172,11 +223,14 @@ impl Playground {
             sample_pool,
             samples,
             sequence,
+            pattern,
             time_base,
             time_base_changed,
             script_content,
             script_changed,
-            script_runtime_error,
+            script_parameters,
+            script_parameter_values,
+            script_error,
             playing_notes,
             instrument_id,
             output_start_sample_time,
@@ -186,7 +240,7 @@ impl Playground {
     }
 
     // read examples from the file system into a vector of ExampleScriptEntry
-    fn example_scripts() -> Result<Vec<ScriptEntry>, Box<dyn std::error::Error>> {
+    pub fn example_scripts() -> Result<Vec<ScriptEntry>, Box<dyn std::error::Error>> {
         let mut example_entries = Vec::new();
         let example_paths = fs::read_dir(format!("{}/examples", Self::ASSETS_PATH))?;
         for example in example_paths.flatten() {
@@ -206,7 +260,7 @@ impl Playground {
     }
 
     // read quickstart examples from the file system into a vector of ExampleScriptSection
-    fn quickstart_scripts() -> Result<Vec<ScriptSection>, Box<dyn std::error::Error>> {
+    pub fn quickstart_scripts() -> Result<Vec<ScriptSection>, Box<dyn std::error::Error>> {
         let mut quickstart_scripts = Vec::new();
         let section_paths = fs::read_dir(format!("{}/quickstart", Self::ASSETS_PATH))?;
         for section_path in section_paths.flatten() {
@@ -248,7 +302,7 @@ impl Playground {
     }
 
     /// Starts playback of the current sequence.
-    fn start_playing(&mut self) {
+    pub fn start_playing(&mut self) {
         if !self.playing {
             // reset play head
             let preload_offset = self
@@ -257,33 +311,33 @@ impl Playground {
             self.output_start_sample_time =
                 self.player.file_player().output_sample_frame_position() + preload_offset;
             self.emitted_sample_time = 0;
-            // update sequence and play
-            self.script_changed = true;
+            // reset sequence
+            if let Some(sequence) = self.sequence.as_mut() {
+                sequence.reset();
+            }
+            // start playback
             self.playing = true;
         }
     }
 
     /// Stops all currently playing audio sources and resets the sequence.
-    fn stop_playing(&mut self) {
+    pub fn stop_playing(&mut self) {
         let _ = self.player.file_player_mut().stop_all_sources();
-        if let Some(sequence) = self.sequence.as_mut() {
-            sequence.reset();
-        }
         self.playing = false;
     }
 
     /// Stops all currently playing audio sources.
-    fn stop_playing_notes(&mut self) {
+    pub fn stop_playing_notes(&mut self) {
         let _ = self.player.file_player_mut().stop_all_sources();
     }
 
     /// Set global playback volume.
-    fn set_volume(&mut self, volume: f32) {
+    pub fn set_volume(&mut self, volume: f32) {
         self.player.set_global_volume(volume);
     }
 
     /// Handle incoming MIDI note on event
-    fn handle_midi_note_on(&mut self, note: u8, velocity: u8) {
+    pub fn handle_midi_note_on(&mut self, note: u8, velocity: u8) {
         assert!(note as usize <= Self::NUM_MIDI_NOTES);
         if self.playing_notes.is_empty() || self.pattern_slot(note as usize).is_none() {
             // reset play head
@@ -297,7 +351,7 @@ impl Playground {
                 sample_offset: 0,
             };
             self.playing_notes.push(new_note);
-            // start MIDI playback in `run`
+            // rebuild sequence
             self.script_changed = true;
         } else {
             // memorize playing note
@@ -308,7 +362,11 @@ impl Playground {
             };
             self.playing_notes.push(new_note.clone());
             // add a new pattern for the new note
-            let new_pattern = self.new_pattern(Some(new_note));
+            let pattern = self
+                .pattern
+                .as_ref()
+                .expect("Expecting a valid pattern instance when notes are playing");
+            let new_pattern = self.new_pattern_instance(pattern, Some(new_note));
             let pattern_slot = self
                 .pattern_slot(note as usize)
                 .expect("Missing MIDI pattern slot");
@@ -317,7 +375,7 @@ impl Playground {
     }
 
     /// Handle incoming MIDI note off event
-    fn handle_midi_note_off(&mut self, note: u8) {
+    pub fn handle_midi_note_off(&mut self, note: u8) {
         assert!(note as usize <= Self::NUM_MIDI_NOTES);
         // ony handle off events when we got an on event
         if let Some((playing_notes_index, _)) = self
@@ -342,25 +400,40 @@ impl Playground {
     }
 
     /// Updates the tempo (beats per minute) of playback.
-    fn set_bpm(&mut self, bpm: f32) {
+    pub fn set_bpm(&mut self, bpm: f32) {
         self.time_base.beats_per_min = bpm;
         self.time_base_changed = true;
     }
 
     /// Sets the default instrument ID for playback.
-    fn set_instrument(&mut self, id: i32) {
+    pub fn set_instrument(&mut self, id: i32) {
         self.instrument_id = if id < 0 { None } else { Some(id as usize) };
         self.script_changed = true;
     }
 
+    /// Sets a script parameter value.
+    pub fn set_parameter_value(&mut self, id: &str, value: f64) {
+        self.script_parameter_values.insert(id.to_owned(), value);
+        if let Some(pattern) = &mut self.pattern {
+            if let Some(parameter) = pattern
+                .borrow()
+                .parameters()
+                .iter()
+                .find(|p| p.borrow().id() == id)
+            {
+                parameter.borrow_mut().set_value(value);
+            }
+        }
+    }
+
     /// Updates the script content and marks it as changed to trigger recompilation.
-    fn update_script_content(&mut self, content: String) {
+    pub fn update_script_content(&mut self, content: String) {
         self.script_content = content;
         self.script_changed = true;
     }
 
     /// Load a sample from a raw file buffer and add it to the pool
-    fn load_sample(&mut self, file_buffer: Vec<u8>, file_name: &str) -> Result<usize, String> {
+    pub fn load_sample(&mut self, file_buffer: Vec<u8>, file_name: &str) -> Result<usize, String> {
         match self.sample_pool.load_sample_buffer(file_buffer, file_name) {
             Ok(instrument_id) => {
                 let id = usize::from(instrument_id);
@@ -377,7 +450,7 @@ impl Playground {
     }
 
     /// Reset sample pool, removing all samples
-    fn clear_samples(&mut self) {
+    pub fn clear_samples(&mut self) {
         // Clear the sample pool
         self.sample_pool.clear();
         self.samples.clear();
@@ -403,52 +476,28 @@ impl Playground {
     fn run(&mut self) {
         // apply script content changes
         if self.script_changed || self.sequence.is_none() {
-            // clear errors
-            pattrns::bindings::clear_lua_callback_errors();
-            self.script_runtime_error = String::new();
-            // build note pattern slots: one pattern for each live played note
-            let pattern_slots = if !self.playing_notes.is_empty() {
-                let mut slots = vec![PatternSlot::Stop; Self::NUM_MIDI_NOTES];
-                for playing_note in &self.playing_notes.clone() {
-                    slots[playing_note.note as usize] =
-                        PatternSlot::Pattern(self.new_pattern(Some(playing_note.clone())));
-                }
-                slots
-            } else {
-                // build a single regular pattern slot
-                [PatternSlot::Pattern(self.new_pattern(None))].to_vec()
-            };
-            // replace sequence
-            let mut sequence = Sequence::new(
-                self.time_base,
-                vec![Phrase::new(
-                    self.time_base,
-                    pattern_slots,
-                    BeatTimeStep::Bar(4.0),
-                )],
-            );
-            self.player
-                .prepare_run_until_time(&mut sequence, self.emitted_sample_time);
-            self.sequence.replace(sequence);
-            // reset all update flags: we're fully up to date now.
-            self.script_changed = false;
-            self.time_base_changed = false;
+            self.rebuild_sequence();
         }
 
         // apply time base changes
         if self.time_base_changed {
-            self.time_base_changed = false;
-            self.sequence
-                .as_mut()
-                .unwrap()
-                .set_time_base(&self.time_base);
+            self.rebuild_time_base();
         }
+
+        // verify internal state
+        debug_assert!(
+            !self.script_changed
+                && !self.time_base_changed
+                && self.sequence.is_some()
+                && self.pattern.is_some(),
+            "Should have a valid sequence and pattern here"
+        );
 
         // check if audio output has been suspended by the browser
         let suspended = self.player.file_player().output_suspended();
 
         // run the player, when playing and audio output is not suspended
-        if (self.playing || !self.playing_notes.is_empty()) && !suspended {
+        if !suspended && (self.playing || !self.playing_notes.is_empty()) {
             // calculate emitted and playback time differences
             let time_base = self.time_base;
             let output_sample_time = self.player.file_player().output_sample_frame_position();
@@ -475,17 +524,114 @@ impl Playground {
                 );
                 // handle runtime errors
                 if let Some(err) = pattrns::bindings::has_lua_callback_errors() {
-                    let err = err.to_string();
-                    if err != self.script_runtime_error {
-                        self.script_runtime_error = err;
-                    }
+                    self.update_script_error(&err.to_string());
+                    pattrns::bindings::clear_lua_callback_errors();
                 }
             }
             self.emitted_sample_time += samples_to_emit;
         }
     }
 
-    /// Access an existing pattern slot
+    // Rebuild sequence and pattern from actual script content
+    fn rebuild_sequence(&mut self) {
+        // clear runtime errors
+        pattrns::bindings::clear_lua_callback_errors();
+        // build pattern and set compile errors and parameters
+        let (pattern, error) = self.new_pattern();
+        self.update_script_error(&error);
+        self.update_script_parameters(
+            &pattern
+                .borrow()
+                .parameters()
+                .iter()
+                .map(ScriptParameter::from)
+                .collect::<Vec<_>>(),
+        );
+        // restore previous parameter values in new pattern
+        for (id, value) in &self.script_parameter_values {
+            if let Some(parameter) = pattern
+                .borrow()
+                .parameters()
+                .iter()
+                .find(|p| p.borrow().id() == id)
+            {
+                let clamped_value = value.clamp(
+                    *parameter.borrow().range().start(),
+                    *parameter.borrow().range().end(),
+                );
+                parameter.borrow_mut().set_value(clamped_value);
+            }
+        }
+        // build pattern slots
+        let pattern_slots = {
+            if !self.playing_notes.is_empty() {
+                // one pattern for each live played note
+                let mut slots = vec![PatternSlot::Stop; Self::NUM_MIDI_NOTES];
+                for playing_note in &self.playing_notes.clone() {
+                    slots[playing_note.note as usize] = PatternSlot::Pattern(
+                        self.new_pattern_instance(&pattern, Some(playing_note.clone())),
+                    );
+                }
+                slots
+            } else {
+                // a single pattern slot for regular playback
+                vec![PatternSlot::Pattern(Rc::clone(&pattern))]
+            }
+        };
+        // replace pattern and sequence
+        let mut sequence = Sequence::new(
+            self.time_base,
+            vec![Phrase::new(
+                self.time_base,
+                pattern_slots,
+                BeatTimeStep::Bar(4.0),
+            )],
+        );
+        self.player
+            .prepare_run_until_time(&mut sequence, self.emitted_sample_time);
+        self.sequence.replace(sequence);
+        self.pattern.replace(pattern);
+        // reset all update flags: we're fully up to date now.
+        self.script_changed = false;
+        self.time_base_changed = false;
+    }
+
+    // Rebuild sequence time base from actual timer base
+    fn rebuild_time_base(&mut self) {
+        self.time_base_changed = false;
+        if let Some(sequence) = &mut self.sequence {
+            sequence.set_time_base(&self.time_base);
+        }
+    }
+
+    /// Update script error internally and in frontend if needed
+    fn update_script_error(&mut self, error: &str) {
+        if self.script_error != error {
+            self.script_error = error.to_string();
+            unsafe {
+                call_frontend_notifier("on_script_error_changed");
+            }
+        }
+    }
+
+    /// Update script parameters internally and in frontend if needed
+    fn update_script_parameters(&mut self, parameters: &[ScriptParameter]) {
+        let parameters_changed = self.script_parameters != parameters;
+        // memorize new parameters
+        self.script_parameters = parameters.to_vec();
+        self.script_parameter_values.retain(|id, _| {
+            self.script_parameters
+                .iter()
+                .any(|p| p.0.borrow().id() == id)
+        });
+        if parameters_changed {
+            unsafe {
+                call_frontend_notifier("on_script_parameters_changed");
+            }
+        }
+    }
+
+    /// Access a pattern slot by index. pattern_index is used as MIDI note number.
     fn pattern_slot(&mut self, pattern_index: usize) -> Option<&mut PatternSlot> {
         if let Some(sequence) = &mut self.sequence {
             let phrase = sequence
@@ -498,23 +644,41 @@ impl Playground {
         }
     }
 
-    /// Create a new pattern from the currently set script content
-    fn new_pattern(&mut self, midi_note: Option<PlayingNote>) -> Rc<RefCell<dyn Pattern>> {
+    /// Create a new pattern from the currently set script content.
+    fn new_pattern(&self) -> (Rc<RefCell<dyn Pattern>>, String) {
         // create a new pattern from our script
-        let pattern = new_pattern_from_string(
+        match new_pattern_from_string(
             self.time_base,
             self.instrument_id.map(InstrumentId::from),
             &self.script_content,
             "[script]",
-        )
-        .unwrap_or_else(|err| {
-            self.script_runtime_error = err.to_string();
-            // create an empty fallback pattern on errors
-            Rc::new(RefCell::new(BeatTimePattern::new(
-                self.time_base,
-                BeatTimeStep::Beats(1.0),
-            )))
-        });
+        ) {
+            Ok(pattern) => {
+                // return pattern as it is
+                (pattern, String::new())
+            }
+            Err(err) => {
+                // create an empty fallback pattern on errors
+                (
+                    Rc::new(RefCell::new(BeatTimePattern::new(
+                        self.time_base,
+                        BeatTimeStep::Beats(1.0),
+                    ))),
+                    err.to_string(),
+                )
+            }
+        }
+    }
+
+    /// Create a new pattern instance clone for the given note from the passed pattern
+    /// for the given optional midi note for note transforms.
+    fn new_pattern_instance(
+        &self,
+        pattern: &Rc<RefCell<dyn Pattern>>,
+        midi_note: Option<PlayingNote>,
+    ) -> Rc<RefCell<dyn Pattern>> {
+        // create a new pattern clone
+        let pattern = pattern.borrow().duplicate();
         // and apply sample offset and event transform
         pattern
             .borrow_mut()
@@ -605,6 +769,13 @@ pub unsafe extern "C" fn free_cstring(ptr: *mut ffi::c_char) {
     drop_raw_cstring(ptr);
 }
 
+// -------------------------------------------------------------------------------------------------
+
+fn main() {
+    // Disabled in build.rs via `cargo::rustc-link-arg=--no-entry`
+    panic!("The main function is not exported and thus should never be called");
+}
+
 /// Creates global `Playground` state.
 #[no_mangle]
 pub extern "C" fn initialize_playground() -> *const ffi::c_char {
@@ -680,6 +851,13 @@ pub extern "C" fn set_instrument(id: ffi::c_int) {
     with_playground_mut(|playground| playground.set_instrument(id));
 }
 
+/// Set a script parameter value.
+#[no_mangle]
+pub unsafe extern "C" fn set_parameter_value(id_ptr: *const ffi::c_char, value: f64) {
+    let id = ffi::CStr::from_ptr(id_ptr).to_string_lossy().into_owned();
+    with_playground_mut(|playground| playground.set_parameter_value(&id, value));
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn update_script(content_ptr: *const ffi::c_char) {
     let content = unsafe {
@@ -743,14 +921,26 @@ pub unsafe extern "C" fn get_quickstart_scripts() -> *const ffi::c_char {
     new_raw_cstring(&serde_json::to_string(&quickstart_scripts).unwrap())
 }
 
+/// Returns actual script parameters, if any
+#[no_mangle]
+pub unsafe extern "C" fn get_script_parameters() -> *const ffi::c_char {
+    let parameters = with_playground(|playground| playground.script_parameters.clone());
+    new_raw_cstring(&serde_json::to_string(&parameters).unwrap())
+}
+
 /// Returns actual script runtime errors, if any
 #[no_mangle]
 pub unsafe extern "C" fn get_script_error() -> *const ffi::c_char {
-    let string = with_playground(|playground| playground.script_runtime_error.clone());
+    let string = with_playground(|playground| playground.script_error.clone());
     new_raw_cstring(&string)
 }
 
-fn main() {
-    // Disabled in build.rs via `cargo::rustc-link-arg=--no-entry`
-    panic!("The main function is not exported and thus should never be called");
+// -------------------------------------------------------------------------------------------------
+
+/// Call the given `window.$NOTIFIER` function in the frontend
+unsafe fn call_frontend_notifier(notifier_name: &str) {
+    // NB: async to avoid that JS is calling back into rust while the playground ref is borrowed
+    let ptr = new_raw_cstring(format!("window.setTimeout(window.{}, 0)", notifier_name).as_str());
+    emscripten_run_script(ptr);
+    free_cstring(ptr);
 }

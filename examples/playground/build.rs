@@ -36,6 +36,7 @@ fn main() {
             "_set_volume",
             "_set_bpm",
             "_set_instrument",
+            "_set_parameter_value",
             "_update_script",
             "_load_sample",
             "_clear_samples",
@@ -43,6 +44,7 @@ fn main() {
             "_get_example_scripts",
             "_get_quickstart_scripts",
             "_get_script_error",
+            "_get_script_parameters",
         ];
         println!(
             "cargo::rustc-link-arg=-sEXPORTED_FUNCTIONS={}",
