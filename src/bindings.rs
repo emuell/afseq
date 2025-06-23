@@ -397,7 +397,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let description =
                     optional_string_from_value(&description, "boolean", "description", 4)?;
                 Ok(ParameterUserData {
-                    parameter: Parameter::new_boolean(&id, &name, &description, default),
+                    parameter: Parameter::with_boolean(&id, &name, &description, default),
                 })
             },
         )?,
@@ -454,7 +454,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let description =
                     optional_string_from_value(&description, "integer", "description", 4)?;
                 Ok(ParameterUserData {
-                    parameter: Parameter::new_integer(&id, &name, &description, range, default),
+                    parameter: Parameter::with_integer(&id, &name, &description, range, default),
                 })
             },
         )?,
@@ -514,7 +514,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let description =
                     optional_string_from_value(&description, "number", "description", 4)?;
                 Ok(ParameterUserData {
-                    parameter: Parameter::new_float(&id, &name, &description, range, default),
+                    parameter: Parameter::with_float(&id, &name, &description, range, default),
                 })
             },
         )?,
@@ -566,7 +566,7 @@ fn register_parameter_bindings(lua: &mut Lua) -> LuaResult<()> {
                 let description =
                     optional_string_from_value(&description, "enum", "description", 4)?;
                 Ok(ParameterUserData {
-                    parameter: Parameter::new_enum(&id, &name, &description, values, default),
+                    parameter: Parameter::with_enum(&id, &name, &description, values, default),
                 })
             },
         )?,

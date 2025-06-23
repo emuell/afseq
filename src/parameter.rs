@@ -6,7 +6,7 @@ use mlua::prelude::{IntoLua, Lua, LuaInteger, LuaResult, LuaValue};
 // -------------------------------------------------------------------------------------------------
 
 /// Value representation of a parameter.
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub enum ParameterType {
     Boolean,
     #[default]
@@ -47,7 +47,7 @@ impl Parameter {
     ///
     /// ### Panics
     /// Panics if the default value is not in the specified range.
-    pub fn new_boolean(id: &str, name: &str, description: &str, default: bool) -> Self {
+    pub fn with_boolean(id: &str, name: &str, description: &str, default: bool) -> Self {
         let id: String = id.to_string();
         let mut name: String = name.to_string();
         if name.is_empty() {
@@ -81,7 +81,7 @@ impl Parameter {
     ///
     /// ### Panics
     /// Panics if the default value is not in the specified range.
-    pub fn new_integer(
+    pub fn with_integer(
         id: &str,
         name: &str,
         description: &str,
@@ -120,7 +120,7 @@ impl Parameter {
     ///
     /// ### Panics
     /// Panics if the default value is not in the specified range.
-    pub fn new_float(
+    pub fn with_float(
         id: &str,
         name: &str,
         description: &str,
@@ -157,7 +157,7 @@ impl Parameter {
     ///
     /// ### Panics
     /// Panics if the default value is not in the specified values set.
-    pub fn new_enum(
+    pub fn with_enum(
         id: &str,
         name: &str,
         description: &str,
@@ -282,5 +282,18 @@ impl Parameter {
                 .clone()
                 .into_lua(lua),
         }
+    }
+}
+
+impl PartialEq for Parameter {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.name == other.name
+            && self.description == other.description
+            && self.parameter_type == other.parameter_type
+            && self.range == other.range
+            && self.default == other.default
+            // SKIP value
+            && self.value_strings == other.value_strings
     }
 }
