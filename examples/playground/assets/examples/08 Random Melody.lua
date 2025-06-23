@@ -3,20 +3,23 @@
   rhythms with seeded randomly generated notes in a given scale.
 --]]
 
--- CHANGE ME: adjust timing
+-- base timing & generator lengths: change me, if you like
 local UNIT = "1/16"
 local PATTERN_LEN = 16
 local MELODY_LEN = PATTERN_LEN
 
--- CHANGE ME: adjust variations
-local SCALE = "blues minor"
-local RHYTHM_SEED = 1
-local MELODY_SEED = 1
-
 ---
+
+-- last created rhythm cache
+last_rhythm_seed = nil
+last_rhythm = nil
 
 -- Create a random rhythm from two Euclidean rhythms
 local function generate_rhythm(seed)
+  -- Use last generated one just to avoid overhead
+  if last_rhythm_seed == seed then
+    return last_rhythm
+  end 
   -- Create a new local random number generator
   local rand = math.randomstate(seed)
 
@@ -48,11 +51,22 @@ local function generate_rhythm(seed)
       combined[step] = 0
     end
   end
+  last_rhythm_seed = seed
+  last_rhythm = combined
   return combined
 end
 
+-- last created melody cache
+last_melody_seed = nil
+last_melody_scale = nil
+last_melody = nil
+
 -- Create a function to map combined rhythm to the scale with randomness
 local function generate_melody(pattern_len, scale, seed)
+  -- Use last generated one just to avoid overhead
+  if last_melody_seed == seed and last_melody_scale == scale then
+    return last_melody
+  end
   -- Create a new local random number generator
   local rand = math.randomstate(seed)
   -- generate the melody, starting with the root note
@@ -72,30 +86,33 @@ local function generate_melody(pattern_len, scale, seed)
       melody[#melody + 1] = scale[note_index]
     end
   end
+  last_melody_seed = seed
+  last_melody_scale = scale
+  last_melody = melody
   return melody
 end
 
 -- return pattern
 return pattern {
   unit = UNIT,
-  pulse = function(init_context)
+  parameter = {
+    parameter.integer("rhythm_seed", 1, {1, 9999}, "Rhythm Seed"),
+    parameter.integer("melody_seed", 1, {1, 9999}, "Melody Seed"),
+    parameter.enum("scale", scale_names()[8], scale_names(), "Melody Scale"),
+  },
+  pulse = function(context)
     -- Generate combined rhythm
-    local rhythm = generate_rhythm(RHYTHM_SEED)
+    local rhythm = generate_rhythm(context.parameter.rhythm_seed)
     -- Pick pulse from the rhythm for each new step
-    return function(context)
-      return rhythm[math.imod(context.pulse_step, #rhythm)]
-    end
+    return rhythm[math.imod(context.pulse_step, #rhythm)]
   end,
-  event = function(init_context)
+  event = function(context)
     -- Define the notes that should be used for the melody
-    local scale = scale("c", SCALE).notes
+    local scale = scale("c", context.parameter.scale).notes
     -- Generate the melody based on the combined rhythm
-    local melody = generate_melody(MELODY_LEN, scale, MELODY_SEED)
+    local melody = generate_melody(MELODY_LEN, scale, context.parameter.melody_seed)
     -- Pick note from the melody and use the pulse value as volume
-    ---@param context EventContext
-    return function(context)
-      local step = math.imod(context.pulse_step, #melody)
-      return note(melody[step]):volume(context.pulse_value)
-    end
+    local step = math.imod(context.pulse_step, #melody)
+    return note(melody[step]):volume(context.pulse_value)
   end
 }

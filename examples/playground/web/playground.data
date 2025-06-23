@@ -43,10 +43,10 @@ return pattern {
 -- Patterns of notes and arpeggio directions
 local patterns = {
   -- Change existing or add more patterns as desired
-  { notes = { 60, 64, 67 },     direction = "up" },
-  { notes = { 64, 67, 71 },     direction = "down" },
-  { notes = { 60, 64, 67, 71 }, direction = "up-down" },
-  { notes = { 60, 64, 67 },     direction = "down-up" },
+  { notes = { 48, 52, 55 },     direction = "up" },
+  { notes = { 52, 55, 59 },     direction = "down" },
+  { notes = { 48, 52, 55, 59 }, direction = "up-down" },
+  { notes = { 48, 52, 55 },     direction = "down-up" },
 }
 
 return pattern {
@@ -98,8 +98,7 @@ return pattern {
       return notes[note_index]
     end
   end
-}
---[[
+}--[[
   Multi channel drum pattern cycle with explicit instrument selection.
 --]]
 
@@ -116,33 +115,36 @@ return cycle(
   oh = "c4 #7",       -- Open Hat
   hh = "c4 #6 v0.5",  -- Closed Hat
 })--[[
-  Simple polyrhytm with cycles. 
+  A simple polyrhythm cycle. 
 --]]
 
-return cycle("[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63")
+return cycle(
+  "[C3 D#4 F3 G#4], [[D#3?0.2 G4 F4]/64]*63"
+)
 --[[
   Dynamic bouncing ball pulse generator
 --]]
 
-local BOUNCE_DISTANCE = 32
-local BOUNCE_SPEED = 1.05
-
 return pattern {
   unit = '1/4',
   resolution = 1/32,
-  pulse = function(context)
-    local step, step_size = 0, BOUNCE_DISTANCE
+  parameter = {
+    parameter.integer("distance", 32, { 16, 128 }, "Distance", "Initial bounce distance"),
+    parameter.number("speed", 1.025, { 1, 2 }, "Speed", "Bounce speed"),
+  },
+  pulse = function(init_context) 
+    local step, step_size = 0, init_context.parameter.distance
     ---@param context PulseContext
     return function(context)
       if step_size <= 1 then
         -- restart
         step = 0
-        step_size = BOUNCE_DISTANCE
+        step_size = init_context.parameter.distance
         return 0
       end
       if step >= step_size then
         -- modify step with bounce speed
-        step_size = step_size / BOUNCE_SPEED
+        step_size = step_size / init_context.parameter.speed
         step = 0
       end
       local trigger_new_pulse = (step == 0)
@@ -156,26 +158,49 @@ return pattern {
       delay = math.random() * 0.25
     }
   end
-}
---[[
+}--[[
+  Simple euclidean rhythm, with configurable and automateable parameters
+--]]
+
+return pattern {
+  parameter = {
+    parameter.integer('steps', 12, {1, 64}, "Steps", 
+      "Number of on steps in the pattern"),
+    parameter.integer('pulses', 16, {1, 64}, "Pulses", 
+      "Total number of on & off pulses"),
+    parameter.integer('offset', 0, {-16, 16}, "Offset", 
+      "Rotates on pattern left (values > 0) or right (values < 0)"),
+  },
+  unit = "1/1",
+  pulse = function(context)
+    return pulse.euclidean(
+      math.min(context.parameter.steps, context.parameter.pulses), 
+      context.parameter.pulses, 
+      context.parameter.offset)
+  end,
+  event = "c4"
+}--[[
   Controlled randomness: Combines two seeded randomly generated euclidean
   rhythms with seeded randomly generated notes in a given scale.
 --]]
 
--- CHANGE ME: adjust timing
+-- base timing & generator lengths: change me, if you like
 local UNIT = "1/16"
 local PATTERN_LEN = 16
 local MELODY_LEN = PATTERN_LEN
 
--- CHANGE ME: adjust variations
-local SCALE = "blues minor"
-local RHYTHM_SEED = 1
-local MELODY_SEED = 1
-
 ---
+
+-- last created rhythm cache
+last_rhythm_seed = nil
+last_rhythm = nil
 
 -- Create a random rhythm from two Euclidean rhythms
 local function generate_rhythm(seed)
+  -- Use last generated one just to avoid overhead
+  if last_rhythm_seed == seed then
+    return last_rhythm
+  end 
   -- Create a new local random number generator
   local rand = math.randomstate(seed)
 
@@ -207,11 +232,22 @@ local function generate_rhythm(seed)
       combined[step] = 0
     end
   end
+  last_rhythm_seed = seed
+  last_rhythm = combined
   return combined
 end
 
+-- last created melody cache
+last_melody_seed = nil
+last_melody_scale = nil
+last_melody = nil
+
 -- Create a function to map combined rhythm to the scale with randomness
 local function generate_melody(pattern_len, scale, seed)
+  -- Use last generated one just to avoid overhead
+  if last_melody_seed == seed and last_melody_scale == scale then
+    return last_melody
+  end
   -- Create a new local random number generator
   local rand = math.randomstate(seed)
   -- generate the melody, starting with the root note
@@ -231,34 +267,36 @@ local function generate_melody(pattern_len, scale, seed)
       melody[#melody + 1] = scale[note_index]
     end
   end
+  last_melody_seed = seed
+  last_melody_scale = scale
+  last_melody = melody
   return melody
 end
 
 -- return pattern
 return pattern {
   unit = UNIT,
-  pulse = function(init_context)
+  parameter = {
+    parameter.integer("rhythm_seed", 1, {1, 9999}, "Rhythm Seed"),
+    parameter.integer("melody_seed", 1, {1, 9999}, "Melody Seed"),
+    parameter.enum("scale", scale_names()[8], scale_names(), "Melody Scale"),
+  },
+  pulse = function(context)
     -- Generate combined rhythm
-    local rhythm = generate_rhythm(RHYTHM_SEED)
+    local rhythm = generate_rhythm(context.parameter.rhythm_seed)
     -- Pick pulse from the rhythm for each new step
-    return function(context)
-      return rhythm[math.imod(context.pulse_step, #rhythm)]
-    end
+    return rhythm[math.imod(context.pulse_step, #rhythm)]
   end,
-  event = function(init_context)
+  event = function(context)
     -- Define the notes that should be used for the melody
-    local scale = scale("c", SCALE).notes
+    local scale = scale("c", context.parameter.scale).notes
     -- Generate the melody based on the combined rhythm
-    local melody = generate_melody(MELODY_LEN, scale, MELODY_SEED)
+    local melody = generate_melody(MELODY_LEN, scale, context.parameter.melody_seed)
     -- Pick note from the melody and use the pulse value as volume
-    ---@param context EventContext
-    return function(context)
-      local step = math.imod(context.pulse_step, #melody)
-      return note(melody[step]):volume(context.pulse_value)
-    end
+    local step = math.imod(context.pulse_step, #melody)
+    return note(melody[step]):volume(context.pulse_value)
   end
-}
---[[
+}--[[
   Generates random notes and chord progressions using a pascal triangle as pattern.
 
   Based on an idea and initial implementation from: https://forum.renoise.com/u/jonas
