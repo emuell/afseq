@@ -141,7 +141,7 @@ code {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px;
+    padding: 10px;
     background-color: var(--color-bg);
     border-bottom: 2px solid var(--color-accent);
 }
@@ -150,7 +150,6 @@ code {
     display: flex;
     align-self: end;
     gap: 10px;
-    padding-bottom: 8px;
 }
 
 .title {
