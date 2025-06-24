@@ -2,7 +2,17 @@
 
 ---  
 ## Functions
-### new(t : [`table`](../../API/builtins/table.md)[`?`](../../API/builtins/nil.md))<a name="new"></a>
+### `new()`<a name="new"></a>
+`->`[`table`](../../API/builtins/table.md) | tablelib  
+
+> Create a new empty table that uses the global 'table.XXX' functions as methods, just like
+> strings in Lua do. See also `table.from`.
+> 
+> #### examples:
+> ```lua
+> t = table.new(); t:insert("a"); print(t[1]) -> "a";
+> ```
+### from(t : [`table`](../../API/builtins/table.md))<a name="from"></a>
 `->`[`table`](../../API/builtins/table.md) | tablelib  
 
 > Create a new empty table, or convert an exiting table to an object that uses the global
@@ -10,8 +20,7 @@
 > 
 > #### examples:
 > ```lua
-> t = table.new(); t:insert("a"); print(t[1]) -> "a";
-> t = table.new{1,2,3}; print(t:concat("|")); -> "1|2|3";
+> t = table.from{1,2,3}; print(t:concat("|")); -> "1|2|3";
 > ```
 ### contains(t : [`table`](../../API/builtins/table.md), value : [`any`](../../API/builtins/any.md), start_index : [`integer`](../../API/builtins/integer.md)[`?`](../../API/builtins/nil.md))<a name="contains"></a>
 `->`[`boolean`](../../API/builtins/boolean.md)  

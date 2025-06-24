@@ -115,7 +115,7 @@ Stateful function.
 return pattern {
   pulse = function(init_context)
     local rand = math.randomstate(12345)
-    local triggers = table.new{ 0, 6, 10 }
+    local triggers = table.from{ 0, 6, 10 }
     return function(context)
       local step = (context.pulse_step - 1) % 16
       return rand() > 0.8 and triggers:contains(step)

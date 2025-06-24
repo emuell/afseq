@@ -5,19 +5,30 @@
 
 ----------------------------------------------------------------------------------------------------
 
+---Create a new empty table that uses the global 'table.XXX' functions as methods, just like
+---strings in Lua do. See also `table.from`.
+---
+---### examples:
+---```lua
+---t = table.new(); t:insert("a"); print(t[1]) -> "a";
+---```
+---@nodiscard
+function table.new()
+  return table.from {}
+end
+
 ---Create a new empty table, or convert an exiting table to an object that uses the global
 ---'table.XXX' functions as methods, just like strings in Lua do.
 ---
 ---### examples:
 ---```lua
----t = table.new(); t:insert("a"); print(t[1]) -> "a";
----t = table.new{1,2,3}; print(t:concat("|")); -> "1|2|3";
+---t = table.from{1,2,3}; print(t:concat("|")); -> "1|2|3";
 ---```
----@param t table?
+---@param t table
 ---@nodiscard
-function table.new(t)
-  assert(not t or type(t) == 'table', ("bad argument #1 to 'table.new' " ..
-    "(table or nil expected, got '%s')"):format(type(t)))
+function table.from(t)
+  assert(type(t) == 'table', ("bad argument #1 to 'table.from' " ..
+    "(table expected, got '%s')"):format(type(t)))
   return setmetatable(t or {}, { __index = _G.table })
 end
 
@@ -129,6 +140,6 @@ function table.copy(t)
   return setmetatable(new_table, getmetatable(t))
 end
 
----Backwards compatibility with Lua 5.1.
+--Backwards compatibility with Lua 5.1.
 ---@diagnostic disable-next-line: deprecated
 table.unpack = table.unpack or unpack
