@@ -7,48 +7,63 @@ const defaultInstrument = 0;
 const defaultScriptContent = `--
 -- Welcome to the pattrns playground!
 --
--- Create and experiment with pattern scripts here, to learn how the work.
--- Check out the interactive 'Quickstart' scripts on the right or load some examples
+-- Create and experiment with pattern scripts here to learn how they work.
+-- Check out the interactive 'Quickstart' scripts on the right or load examples
 -- to get started.
 --
--- This playground uses a simple sample player as the player backend. The currently 
--- selected sample plays by default, unless your script specifies a different instrument
--- explicitly.
+-- **Nothing is persistent here**: Copy and save scripts locally to keep them!
 --
--- Use \`CTRL+Return\` or \`CTRL+S\` in the editor to *apply* script changes. 
--- Use \`CTRL+SHIFT+SPACE\` to start stop playing.
+-- The playground uses a simple sample player backend. The currently selected 
+-- sample plays by default, unless your script specifies an instrument explicitely.
+--
+-- Use 'CTRL+Return' or 'CTRL+S' to apply script changes.
+-- Use 'CTRL+SHIFT+SPACE' to start/stop playing.
+--
 
 local notes = { "c4", "e4", "g4", "a4", "e4", "a3" }
 
 return pattern {
   unit = "1/16",
   parameter = {
-    -- template parameters
-    parameter.enum("direction", "up", { "up", "down", "up&down" }, "Direction", 
-      "The note arp direction"),
-    parameter.integer("mod_length", 32, { 1, 256 }, "Mod. Length", 
-      "Modulation length in 1/16 units"),
+    -- template parameter definition
+    parameter.enum("direction", "up", { "up", "down", "up&down", "random" }, 
+      "Direction", "The note arp direction"),
+    parameter.integer("mod_length", 24, { 1, 256 }, 
+      "ModLength", "Modulation length in time units (1/16)"),
+  },
+  pulse = { 
+    -- pulse values are used as accent here
+    1.0, 0.6, 1.0, 0.8, 1.0 
   },
   event = function(context)
-    -- fetch parameter values
-    local direction = context.parameter.direction
-    local mod_length = context.parameter.mod_length
-    -- cycle through notes with the given direction
-    local step_sign = {
-      ["up"] = 1,
-      ["down"] = -1,
-      ["up&down"] = math.floor(context.step / #notes) % 2 == 0 and 1 or -1,
-    }
-    local step = math.imod(step_sign[direction] * context.step, #notes)
-    -- Return the note event with modulated volume and panning
+    -- fetch actual parameter values
+    local direction, mod_length = 
+      context.parameter.direction, context.parameter.mod_length
+    -- get arp direction
+    local sign 
+    if direction == "up" then
+      sign = 1
+    elseif direction == "down" then
+      sign = -1
+    elseif direction == "up&down" then
+      sign = math.floor(context.step / #notes) % 2 == 0 and 1 or -1
+    else -- random
+      sign = math.random() > 0.5 and 1 or -1
+    end
+    -- cycle through notes with the current direction
+    local note_step = math.imod(sign * context.step, #notes)
+    -- create a volume swell using cosine wave
+    local volume_mod = math.cos(context.step / mod_length * math.pi)
+    -- add stereo movement with sine wave panning
+    local panning_mod = math.sin(context.step / mod_length / 3 * math.pi)
+    -- set the instrument (change to 0 for bass sample, nil plays the selected one)
+    local instrument = nil
+    -- return a final note from the computed note properties
     return {
-        key = notes[step],
-        -- Create a volume swell using cosine wave
-        volume = 0.6 + 0.4 * math.cos(context.step / mod_length * math.pi),
-        -- Add stereo movement with sine wave panning
-        panning = 0.5 * math.sin(context.step / mod_length / 3 * math.pi),
-        -- Set the instrument (change to 0 for bass sample, nil plays the selected one)
-        instrument = nil
+        key = notes[note_step],
+        volume = context.pulse_value * (0.7 + 0.3 * volume_mod),
+        panning = 0.6 * panning_mod,
+        instrument = instrument
     }
   end
 }
